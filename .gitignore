@@ -5,9 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
-
-# Virtual environments
 .venv
+
+# Project-specific files
+.env
 logs/
 data/
 mlruns/
@@ -15,9 +16,8 @@ logs/
 catboost_info/
 .vscode/
 examples/
-hyperptuning_results/
-memory_bank/
+hypertuning_results/
+memory-bank/
 models/
 pipeline_reports/
 pipeline_stats/
-.gitignore
