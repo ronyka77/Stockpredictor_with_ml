@@ -18,6 +18,6 @@ catboost_info/
 examples/
 hypertuning_results/
 memory-bank/
-models/
+models/*
 pipeline_reports/
 pipeline_stats/
