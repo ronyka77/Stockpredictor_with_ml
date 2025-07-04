@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+logs/
+data/
+mlruns/
+logs/
+catboost_info/
+.vscode/
+examples/
+hyperptuning_results/
+memory_bank/
+models/
+pipeline_reports/
+pipeline_stats/
+.gitignore

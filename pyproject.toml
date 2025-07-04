@@ -1,0 +1,86 @@
+[project]
+name = "stockpredictor-v1"
+version = "0.1.0"
+description = "Advanced stock prediction system with Polygon.io data acquisition"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.12.11",
+    "catboost>=1.2.8",
+    "dotenv>=0.9.9",
+    "fastparquet>=2024.11.0",
+    "lightgbm>=4.6.0",
+    "logging>=0.4.9.6",
+    "mlflow>=2.22.0",
+    "openpyxl>=3.1.5",
+    "optuna>=4.4.0",
+    "pandas>=2.3.0",
+    "psycopg2>=2.9.10",
+    "ruff>=0.11.13",
+    "ta>=0.11.0",
+    "torch>=2.0.0",
+    "xgboost>=3.0.2",
+]
+
+[project.scripts]
+stockpredictor = "run_polygon_examples:main"
+polygon-test = "test_polygon:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.0.0",
+]
+
+dependencies = [
+    "catboost>=1.2.8",
+    "fastparquet>=2024.11.0",
+    "lightgbm>=4.6.0",
+    "logging>=0.4.9.6",
+    "mlflow>=2.22.0",
+    "newsapi-python>=0.2.7",
+    "nltk>=3.9.1",
+    "numpy>=2.3.0",
+    "pandas>=2.3.0",
+    "pandas-ta>=0.3.14b0",
+    "psycopg2-binary>=2.9.10",
+    "pyarrow>=19.0.1",
+    "pydantic>=2.11.5",
+    "requests>=2.32.3",
+    "ruff>=0.11.13",
+    "scikit-learn>=1.7.0",
+    "sentence-transformers>=4.1.0",
+    "spacy>=3.8.7",
+    "sqlalchemy>=2.0.41",
+    "ta>=0.11.0",
+    "textblob>=0.19.0",
+    "torch>=2.0.0",
+    "transformers>=4.52.4",
+    "vadersentiment>=3.3.2",
+    "xgboost>=3.0.2",
+    "yfinance>=0.2.61",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/pyproject.toml",
+]
+
+[[tool.uv.index]]
+url = "file:///C:/Users/szita.DESKTOP-4G1EVV7/Documents/StockPredictor_V1/pytorch"
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
