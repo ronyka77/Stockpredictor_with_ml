@@ -6,7 +6,7 @@ Only calculates the specific ratios defined in the database schema.
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import date, timedelta
+from datetime import date
 
 from src.utils.logger import get_logger
 from src.feature_engineering.fundamental_indicators.base import BaseFundamentalCalculator, FundamentalCalculationResult, FundamentalCalculatorRegistry

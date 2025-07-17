@@ -64,83 +64,6 @@ class PolygonNewsCollector:
         
         self.logger.info("Polygon News Collector initialized")
     
-    def collect_incremental_news(self, 
-                                max_tickers: int = 100,
-                                days_lookback: int = 7) -> Dict[str, Any]:
-        """
-        Collect news incrementally from last stored date to current
-        
-        Args:
-            max_tickers: Maximum number of tickers to process
-            days_lookback: Fallback days to look back if no existing data
-            
-        Returns:
-            Collection statistics
-        """
-        self.logger.info("Starting incremental news collection")
-        self._reset_stats()
-        from datetime import timezone
-        self.stats['start_time'] = datetime.now(timezone.utc)
-        
-        try:
-            # Get prioritized tickers
-            ticker_info_list = self.ticker_integration.get_prioritized_tickers(max_tickers)
-            tickers = [info['ticker'] for info in ticker_info_list]
-            
-            self.logger.info(f"Processing {len(tickers)} tickers for incremental update")
-            
-            # Determine date range for each ticker (ensure timezone consistency)
-            from datetime import timezone
-            end_date = datetime.now(timezone.utc)
-            
-            for ticker_info in ticker_info_list:
-                ticker = ticker_info['ticker']
-                
-                try:
-                    # Get last stored date for this ticker
-                    last_date = self.storage.get_latest_date_for_ticker(ticker)
-                    
-                    if last_date:
-                        # Ensure last_date is timezone-aware
-                        if last_date.tzinfo is None:
-                            last_date = last_date.replace(tzinfo=timezone.utc)
-                        
-                        # Start from day after last stored date
-                        start_date = last_date + timedelta(days=1)
-                        self.logger.debug(f"Ticker {ticker}: updating from {start_date.date()}")
-                    else:
-                        # No existing data, use lookback period
-                        start_date = end_date - timedelta(days=days_lookback)
-                        self.logger.debug(f"Ticker {ticker}: no existing data, using {days_lookback} day lookback")
-                    
-                    # Skip if start date is after end date
-                    if start_date >= end_date:
-                        self.logger.debug(f"Ticker {ticker}: already up to date")
-                        continue
-                    
-                    # Collect news for this ticker
-                    ticker_stats = self._collect_ticker_news(
-                        ticker, start_date, end_date, ticker_info['priority_score']
-                    )
-                    
-                    # Update overall stats
-                    self._update_stats(ticker_stats)
-                    
-                except Exception as e:
-                    self.logger.error(f"Error processing ticker {ticker}: {e}")
-                    self.stats['failed_tickers'].append(ticker)
-                    self.stats['processing_errors'].append(f"{ticker}: {str(e)}")
-            
-            self.stats['end_time'] = datetime.now(timezone.utc)
-            self.logger.info(f"Incremental collection completed: {self._format_stats()}")
-            
-            return self.stats.copy()
-            
-        except Exception as e:
-            self.logger.error(f"Incremental collection failed: {e}")
-            self.stats['end_time'] = datetime.now(timezone.utc)
-            raise
-    
     def collect_historical_news(self, 
                                 max_tickers: int = 50,
                                 years_back: int = 2,
@@ -398,11 +321,6 @@ class PolygonNewsCollector:
                 f"Skipped: {self.stats['total_articles_skipped']}, "
                 f"Failed tickers: {len(self.stats['failed_tickers'])}, "
                 f"Duration: {duration}")
-    
-    def cleanup_old_data(self, retention_days: int = 730) -> int:
-        """Clean up articles older than retention period"""
-        self.logger.info(f"Cleaning up articles older than {retention_days} days")
-        return self.storage.cleanup_old_articles(retention_days)
     
     def get_collection_status(self) -> Dict[str, Any]:
         """Get current collection status and statistics"""

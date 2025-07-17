@@ -5,17 +5,13 @@ This module provides an abstract base class for all machine learning models
 in the stock prediction system, with built-in MLflow tracking, persistence,
 and evaluation capabilities.
 """
-
-import os
-import pickle
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import datetime
-import mlflow
-import mlflow.sklearn
 
+from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
 from src.utils.logger import get_logger
 from src.utils.mlflow_integration import MLflowIntegration
 
@@ -46,7 +42,6 @@ class BaseModel(ABC):
         self.mlflow_integration = MLflowIntegration()
         self.experiment_name = f"stock_prediction_{model_name}"
         self.run_id = None
-        self.disable_mlflow = False  # Flag to disable MLflow logging
         
         logger.info(f"Initialized {model_name} model")
     
@@ -137,66 +132,88 @@ class BaseModel(ABC):
         
         return importance_df
     
-    def save_model(self, filepath: str) -> None:
+    def save_model(self, experiment_name: str) -> str:
         """
-        Save model to disk
+        Save model to MLflow
         
         Args:
-            filepath: Path to save the model
+            experiment_name: MLflow experiment name
+            
+        Returns:
+            MLflow run ID
         """
         if not self.is_trained:
             raise ValueError("Cannot save untrained model")
         
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        # Set the experiment
+        self.mlflow_integration.setup_experiment(experiment_name)
         
-        model_data = {
-            'model': self.model,
+        # Start a new run if not already started
+        if self.run_id is None:
+            self.mlflow_integration.start_run()
+            self.run_id = self.mlflow_integration.get_run_id()
+        
+        # Log model parameters and metadata
+        params = {
             'model_name': self.model_name,
-            'config': self.config,
-            'feature_names': self.feature_names,
-            'feature_importance': self.feature_importance,
-            'training_history': self.training_history,
+            'config': str(self.config),
+            'feature_count': len(self.feature_names) if self.feature_names else 0,
             'is_trained': self.is_trained
         }
+        if self.feature_names:
+            params['feature_names'] = str(self.feature_names)
+        if self.feature_importance is not None:
+            params['has_feature_importance'] = True
+        self.log_params(params)
         
-        with open(filepath, 'wb') as f:
-            pickle.dump(model_data, f)
+        # Log the actual model
+        self.log_model(flavor="sklearn")
         
-        logger.info(f"Model saved to {filepath}")
+        logger.info(f"Model saved to MLflow with run ID: {self.run_id}")
+        return self.run_id
     
-    def load_model(self, filepath: str) -> 'BaseModel':
+    def load_model(self, run_id: str) -> 'BaseModel':
         """
-        Load model from disk
+        Load model from MLflow
         
         Args:
-            filepath: Path to load the model from
+            run_id: MLflow run ID to load the model from
             
         Returns:
             Self for method chaining
         """
-        with open(filepath, 'rb') as f:
-            model_data = pickle.load(f)
         
-        self.model = model_data['model']
-        self.model_name = model_data['model_name']
-        self.config = model_data['config']
-        self.feature_names = model_data['feature_names']
-        self.feature_importance = model_data['feature_importance']
-        self.training_history = model_data['training_history']
-        self.is_trained = model_data['is_trained']
+        # Load the model from MLflow
+        model_uri = f"runs:/{run_id}/model"
+        self.model = self.mlflow_integration.load_sklearn_model(model_uri)
         
-        logger.info(f"Model loaded from {filepath}")
+        # Load run parameters
+        run_info = self.mlflow_integration.get_run(run_id)
+        params = run_info.data.params
+        
+        self.model_name = params.get('model_name', 'Unknown')
+        self.config = eval(params.get('config', '{}')) if params.get('config', '{}') != '{}' else {}
+        self.feature_names = eval(params.get('feature_names', '[]')) if params.get('feature_names', '[]') != '[]' else None
+        self.is_trained = params.get('is_trained', 'True') == 'True'
+        self.run_id = run_id
+        
+        logger.info(f"Model loaded from MLflow run ID: {run_id}")
         return self
     
     def evaluate(self, X: pd.DataFrame, y: pd.Series, 
-                 metrics_calculator: Any) -> Dict[str, float]:
+                current_prices: Optional[np.ndarray] = None,
+                confidence_method: str = 'leaf_depth') -> Dict[str, float]:
         """
-        Evaluate model performance
+        Evaluate model performance with optional threshold-based evaluation
         
         Args:
             X: Features for evaluation
             y: True targets
             metrics_calculator: CustomMetrics instance
+            current_prices: Current stock prices for profit calculation (optional)
+            threshold_evaluator: ThresholdEvaluator instance for advanced evaluation (optional)
+            use_threshold_optimization: Whether to use threshold optimization
+            confidence_method: Method for calculating confidence scores
             
         Returns:
             Dictionary of metric scores
@@ -204,23 +221,36 @@ class BaseModel(ABC):
         if not self.is_trained:
             raise ValueError("Model must be trained before evaluation")
         
-        predictions = self.predict(X)
-        
-        # Calculate metrics
         metrics = {}
-        
-        # Custom accuracy metric for financial data
-        if hasattr(metrics_calculator, 'custom_accuracy'):
-            metrics['custom_accuracy'] = metrics_calculator.custom_accuracy(y, predictions)
-        
-        # Directional accuracy
-        if hasattr(metrics_calculator, 'directional_accuracy'):
-            metrics['directional_accuracy'] = metrics_calculator.directional_accuracy(y, predictions)
-        
-        # Traditional ML metrics
-        if hasattr(metrics_calculator, 'calculate_regression_metrics'):
-            reg_metrics = metrics_calculator.calculate_regression_metrics(y, predictions)
-            metrics.update(reg_metrics)
+        threshold_evaluator = ThresholdEvaluator()
+        # Advanced threshold-based evaluation
+        if current_prices is not None:
+            try:
+                # Perform threshold optimization
+                threshold_results = threshold_evaluator.optimize_prediction_threshold(
+                    model=self,
+                    X_test=X,
+                    y_test=y,
+                    current_prices_test=current_prices,
+                    confidence_method=confidence_method
+                )
+                
+                if threshold_results.get('status') == 'success':
+                    # Extract results directly from threshold optimization
+                    best_result = threshold_results['best_result']
+                    
+                    # Add threshold-based metrics
+                    metrics.update({
+                        'threshold_optimized': True,
+                        'optimal_threshold': threshold_results['optimal_threshold'],
+                        'threshold_profit': best_result.get('test_profit_per_investment', 0.0),
+                        'threshold_custom_accuracy': best_result.get('test_custom_accuracy', 0.0),
+                        'threshold_investment_success_rate': best_result.get('test_investment_success_rate', 0.0),
+                        'threshold_samples_kept_ratio': best_result.get('test_samples_kept_ratio', 0.0)
+                    })
+            except Exception as e:
+                logger.warning(f"Threshold evaluation failed: {e}")
+                metrics['threshold_evaluation_error'] = str(e)
         
         return metrics
     

@@ -149,7 +149,7 @@ class FundamentalDataValidator:
         
         # Validate logical relationships
         revenues = self._get_value(stmt.revenues)
-        net_income = self._get_value(stmt.net_income_loss)
+        # net_income = self._get_value(stmt.net_income_loss)
         gross_profit = self._get_value(stmt.gross_profit)
         cost_of_revenue = self._get_value(stmt.cost_of_revenue)
         

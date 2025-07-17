@@ -343,7 +343,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
         total_assets = self.get_financial_value(balance_sheet.assets)
         current_assets = self.get_financial_value(balance_sheet.current_assets)
         current_liabilities = self.get_financial_value(balance_sheet.current_liabilities)
-        total_liabilities = self.get_financial_value(balance_sheet.liabilities)
+        # total_liabilities = self.get_financial_value(balance_sheet.liabilities)
         revenues = self.get_financial_value(income_stmt.revenues)
         gross_profit = self.get_financial_value(income_stmt.gross_profit)
         

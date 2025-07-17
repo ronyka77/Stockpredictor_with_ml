@@ -170,35 +170,6 @@ class DataPipeline:
             self.stats.finish()
             raise
     
-    def run_incremental_update(self, days_back: int = 7, 
-                                ticker_source: str = "popular",
-                                max_tickers: Optional[int] = None) -> PipelineStats:
-        """
-        Run incremental update for recent data
-        
-        Args:
-            days_back: Number of days to look back for updates
-            ticker_source: Source of tickers
-            max_tickers: Maximum number of tickers to process
-            
-        Returns:
-            Pipeline statistics
-        """
-        end_date = date.today()
-        start_date = end_date - timedelta(days=days_back)
-        
-        logger.info(f"Running incremental update: last {days_back} days")
-        
-        return self.run_full_pipeline(
-            start_date=start_date,
-            end_date=end_date,
-            ticker_source=ticker_source,
-            max_tickers=max_tickers,
-            timespan="day",
-            validate_data=True,
-            batch_size=20  # Larger batches for incremental updates
-        )
-    
     def run_single_ticker(self, ticker: str, start_date: Union[str, date],
                             end_date: Union[str, date], timespan: str = "day",
                             validate_data: bool = True) -> Dict[str, Any]:
@@ -476,15 +447,6 @@ class DataPipeline:
             
         except Exception as e:
             logger.warning(f"Failed to save pipeline statistics: {e}")
-    
-    def get_pipeline_status(self) -> Dict[str, Any]:
-        """Get current pipeline status"""
-        return {
-            'is_running': self.stats.end_time is None,
-            'stats': self.stats.to_dict(),
-            'rate_limit_status': self.client.get_rate_limit_status(),
-            'database_stats': self.storage.get_data_stats()
-        }
     
     def cleanup(self) -> None:
         """Cleanup pipeline resources"""

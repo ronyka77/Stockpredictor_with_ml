@@ -224,36 +224,6 @@ class MLflowIntegration:
             logger.error(f"Error logging artifact: {str(e)}")
             raise
 
-    def get_run_context(self, run_id: str) -> dict[str, Any]:
-        """Get context information for a run.
-
-        Args:
-            run_id: MLflow run ID
-
-        Returns:
-            Dictionary with run context information
-        """
-        try:
-            run = self.client.get_run(run_id)
-
-            context = {
-                "run_id": run.info.run_id,
-                "experiment_id": run.info.experiment_id,
-                "status": run.info.status,
-                "start_time": run.info.start_time,
-                "end_time": run.info.end_time,
-                "artifact_uri": run.info.artifact_uri,
-                "metrics": run.data.metrics,
-                "params": run.data.params,
-                "tags": run.data.tags,
-            }
-
-            return context
-
-        except Exception as e:
-            logger.error(f"Error getting run context: {str(e)}")
-            raise
-
     def load_model(self, run_id: str, model_path: str = "model") -> Any:
         """Load a model from MLflow.
         Args:
@@ -274,37 +244,6 @@ class MLflowIntegration:
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise
-
-
-def setup_mlflow(base_path: Optional[Union[str, Path]] = None) -> MLflowIntegration:
-    """Set up MLflow integration.
-    Args:
-        base_path: Optional base path for MLflow files
-    Returns:
-        Configured MLflowIntegration instance
-    """
-    try:
-        # Use provided base path or default to project root
-        if base_path:
-            mlruns_dir = Path(base_path) / "mlruns"
-        else:
-            mlruns_dir = project_root / "mlruns"
-
-        # Ensure directory exists
-        mlruns_dir.mkdir(parents=True, exist_ok=True)
-
-        # Set up MLflow tracking (use file:// URI for Windows compatibility)
-        tracking_uri = mlruns_dir.absolute().as_uri()
-        mlflow.set_tracking_uri(tracking_uri)
-
-        logger.info("MLflow setup complete", extra={"tracking_uri": mlflow.get_tracking_uri()})
-
-        return MLflowIntegration()
-
-    except Exception as e:
-        logger.error(f"Error setting up MLflow: {str(e)}")
-        raise
-
 
 def cleanup_deleted_runs(mlruns_dir="mlruns"):
     client = MlflowClient()
@@ -349,7 +288,7 @@ def cleanup_empty_experiments(mlruns_dir="mlruns"):
                 run_view_type=mlflow.entities.ViewType.ALL
             )
             
-            if len(runs) == 0:
+            if len(runs) == 0 and exp.experiment_id != "0":
                 print(f"Experiment {exp.name} has no runs - deleting...")
                 exp_path = os.path.join(mlruns_dir, exp.experiment_id)
                 

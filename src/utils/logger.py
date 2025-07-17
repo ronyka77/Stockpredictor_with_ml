@@ -21,21 +21,9 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-# Base logs directory
-LOGS_BASE_DIR = Path(__file__).parent / "logs"
+# Base logs directory - point to central logs folder at project root
+LOGS_BASE_DIR = Path(__file__).parent.parent.parent / "logs"
 
-class MinuteFormatter(logging.Formatter):
-    """Custom formatter that shows time only to the minute"""
-    
-    def formatTime(self, record, datefmt=None):
-        """Override formatTime to show only to the minute"""
-        ct = self.converter(record.created)
-        if datefmt:
-            s = datetime(*ct[:6]).strftime(datefmt)
-        else:
-            # Default format: YYYY-MM-DD HH:MM
-            s = datetime(*ct[:6]).strftime('%Y-%m-%d %H:%M')
-        return s
 
 def setup_logging_config(utility: str = "general") -> dict:
     """
@@ -62,15 +50,12 @@ def setup_logging_config(utility: str = "general") -> dict:
         'disable_existing_loggers': False,
         'formatters': {
             'standard': {
-                '()': MinuteFormatter,
                 'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
             },
             'detailed': {
-                '()': MinuteFormatter,
                 'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
             },
             'console': {
-                '()': MinuteFormatter,
                 'format': '%(asctime)s [%(levelname)s] %(message)s'
             },
         },
@@ -152,14 +137,6 @@ def get_logger(name: str, utility: Optional[str] = None) -> logging.Logger:
 def get_polygon_logger(name: str) -> logging.Logger:
     """Convenience function for polygon-specific logging"""
     return get_logger(name, utility='polygon')
-
-def get_predictor_logger(name: str) -> logging.Logger:
-    """Convenience function for predictor-specific logging"""
-    return get_logger(name, utility='predictor')
-
-def get_general_logger(name: str) -> logging.Logger:
-    """Convenience function for general logging"""
-    return get_logger(name, utility='general')
 
 def cleanup_old_logs(utility: str, days_to_keep: int = 30) -> None:
     """

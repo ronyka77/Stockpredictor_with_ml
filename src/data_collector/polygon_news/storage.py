@@ -283,13 +283,6 @@ class PolygonNewsStorage:
         """Get latest article date across all articles"""
         return PolygonNewsArticle.get_latest_date_overall(self.session)
     
-    def get_existing_polygon_ids(self, polygon_ids: List[str]) -> set:
-        """Get set of Polygon IDs that already exist in database"""
-        existing = self.session.query(PolygonNewsArticle.polygon_id).filter(
-            PolygonNewsArticle.polygon_id.in_(polygon_ids)
-        ).all()
-        return {polygon_id[0] for polygon_id in existing}
-    
     def cleanup_old_articles(self, retention_days: Optional[int] = None) -> int:
         """Remove articles older than retention period"""
         if retention_days is None:
@@ -316,45 +309,61 @@ class PolygonNewsStorage:
                                 start_date: Optional[datetime] = None,
                                 end_date: Optional[datetime] = None) -> Dict[str, Any]:
         """Get comprehensive statistics about stored articles"""
-        query = self.session.query(PolygonNewsArticle)
+        try:
+            query = self.session.query(PolygonNewsArticle)
+            
+            if start_date:
+                query = query.filter(PolygonNewsArticle.published_utc >= start_date)
+            
+            if end_date:
+                query = query.filter(PolygonNewsArticle.published_utc <= end_date)
+            
+            total_articles = query.count()
+            
+            # Get ticker counts
+            ticker_counts = PolygonNewsTicker.get_ticker_counts(
+                self.session, start_date, end_date
+            )
+            
+            # Get sentiment distribution
+            sentiment_dist = PolygonNewsInsight.get_sentiment_distribution(
+                self.session, start_date, end_date
+            )
+            
+            # Get publisher counts
+            publisher_counts = self.session.query(
+                PolygonNewsArticle.publisher_name,
+                self.session.query(PolygonNewsArticle).filter(
+                    PolygonNewsArticle.publisher_name == PolygonNewsArticle.publisher_name
+                ).count().label('count')
+            ).group_by(PolygonNewsArticle.publisher_name).limit(10).all()
+            
+            return {
+                'total_articles': total_articles,
+                'date_range': {
+                    'start': start_date.isoformat() if start_date else None,
+                    'end': end_date.isoformat() if end_date else None
+                },
+                'top_tickers': dict(ticker_counts[:10]),
+                'sentiment_distribution': sentiment_dist,
+                'top_publishers': dict(publisher_counts),
+                'latest_article_date': self.get_latest_date_overall()
+            }
         
-        if start_date:
-            query = query.filter(PolygonNewsArticle.published_utc >= start_date)
-        
-        if end_date:
-            query = query.filter(PolygonNewsArticle.published_utc <= end_date)
-        
-        total_articles = query.count()
-        
-        # Get ticker counts
-        ticker_counts = PolygonNewsTicker.get_ticker_counts(
-            self.session, start_date, end_date
-        )
-        
-        # Get sentiment distribution
-        sentiment_dist = PolygonNewsInsight.get_sentiment_distribution(
-            self.session, start_date, end_date
-        )
-        
-        # Get publisher counts
-        publisher_counts = self.session.query(
-            PolygonNewsArticle.publisher_name,
-            self.session.query(PolygonNewsArticle).filter(
-                PolygonNewsArticle.publisher_name == PolygonNewsArticle.publisher_name
-            ).count().label('count')
-        ).group_by(PolygonNewsArticle.publisher_name).limit(10).all()
-        
-        return {
-            'total_articles': total_articles,
-            'date_range': {
-                'start': start_date.isoformat() if start_date else None,
-                'end': end_date.isoformat() if end_date else None
-            },
-            'top_tickers': dict(ticker_counts[:10]),
-            'sentiment_distribution': sentiment_dist,
-            'top_publishers': dict(publisher_counts),
-            'latest_article_date': self.get_latest_date_overall()
-        }
+        except Exception as e:
+            self.logger.error(f"Error getting article statistics: {e}")
+            return {
+                'total_articles': 0,
+                'date_range': {
+                    'start': start_date.isoformat() if start_date else None,
+                    'end': end_date.isoformat() if end_date else None
+                },
+                'top_tickers': {},
+                'sentiment_distribution': {},
+                'top_publishers': {},
+                'latest_article_date': None,
+                'error': str(e)
+            }
     
     def _parse_datetime(self, date_str: str) -> Optional[datetime]:
         """Parse datetime string from Polygon API"""
@@ -404,7 +413,7 @@ class PolygonNewsStorage:
         """Context manager entry"""
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type):
         """Context manager exit with cleanup"""
         if exc_type:
             self.session.rollback()

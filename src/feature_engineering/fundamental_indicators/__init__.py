@@ -14,13 +14,6 @@ from .base import (
     FundamentalCalculatorRegistry
 )
 
-# Import all calculator modules to trigger decorator registration
-# The decorators will automatically register calculators with FundamentalCalculatorRegistry
-from . import ratios
-from . import growth_metrics
-from . import scoring_systems
-from . import sector_analysis
-
 # Export specific classes for direct import if needed
 from .ratios import FundamentalRatiosCalculator
 from .growth_metrics import GrowthMetricsCalculator

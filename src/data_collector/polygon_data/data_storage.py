@@ -340,52 +340,6 @@ class DataStorage:
             logger.error(f"Error retrieving data statistics: {e}")
             raise
     
-    def delete_data(self, ticker: Optional[str] = None, 
-                    start_date: Optional[date] = None,
-                    end_date: Optional[date] = None) -> int:
-        """
-        Delete data from database
-        
-        Args:
-            ticker: Optional ticker filter
-            start_date: Optional start date filter
-            end_date: Optional end date filter
-            
-        Returns:
-            Number of records deleted
-        """
-        query = "DELETE FROM historical_prices"
-        conditions = []
-        params = {}
-        
-        if ticker:
-            conditions.append("ticker = :ticker")
-            params['ticker'] = ticker.upper()
-        
-        if start_date:
-            conditions.append("date >= :start_date")
-            params['start_date'] = start_date
-        
-        if end_date:
-            conditions.append("date <= :end_date")
-            params['end_date'] = end_date
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(query), params)
-                deleted_count = result.rowcount
-                conn.commit()
-                
-            logger.info(f"Deleted {deleted_count} records")
-            return deleted_count
-            
-        except Exception as e:
-            logger.error(f"Error deleting data: {e}")
-            raise
-    
     def create_tables(self) -> None:
         """Create database tables if they don't exist"""
         create_table_sql = """
@@ -867,7 +821,7 @@ class DataStorage:
             logger.error(f"Error clearing expired cache: {e}")
             raise
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self):
         """Context manager exit"""
         if hasattr(self, 'engine'):
             self.engine.dispose() 

@@ -9,6 +9,7 @@ wheels/
 
 # Project-specific files
 .env
+*.xlsx
 logs/
 data/
 mlruns/
@@ -21,3 +22,4 @@ memory-bank/
 models/*
 pipeline_reports/
 pipeline_stats/
+docs/shrimp_manager.md

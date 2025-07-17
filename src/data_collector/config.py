@@ -5,6 +5,9 @@ Configuration settings for Polygon.io data acquisition and news collection
 import os
 from dataclasses import dataclass, field
 from typing import List, Dict
+from dotenv import load_dotenv
+# Load environment variables from a .env file if present
+load_dotenv()
 
 @dataclass
 class PolygonConfig:
@@ -73,18 +76,11 @@ class FeatureEngineeringConfig:
     })
     FIBONACCI_LOOKBACK: int = 100
     
-    # Multi-timeframe Settings
-    TIMEFRAMES: List[str] = field(default_factory=lambda: ["1D", "1W", "1M"])
-    
     # Storage Configuration
     FEATURES_STORAGE_PATH: str = os.getenv("FEATURES_STORAGE_PATH", "data/features")
     FEATURE_VERSION: str = os.getenv("FEATURE_VERSION", "v1.0")
     PARQUET_COMPRESSION: str = "snappy"  # Options: snappy, gzip, brotli
     PARQUET_ENGINE: str = "pyarrow"      # Options: pyarrow, fastparquet
-    
-    # Normalization Settings
-    NORMALIZATION_METHOD: str = "z-score"  # Options: z-score, min-max, robust
-    NORMALIZATION_WINDOW: int = 252  # Rolling window for normalization (trading days in a year)
     
     # Validation Settings
     MAX_MISSING_PCT: float = 0.05  # 5% max missing data allowed
@@ -115,38 +111,3 @@ class FeatureEngineeringConfig:
 # Global configuration instances
 config = PolygonConfig.from_env()
 feature_config = FeatureEngineeringConfig()
-
-# Legacy logging config kept for backward compatibility only
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-        'detailed': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
-        },
-    },
-    'handlers': {
-        'default': {
-            'level': 'INFO',
-            'formatter': 'standard',
-            'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'level': 'DEBUG',
-            'formatter': 'detailed',
-            'class': 'logging.FileHandler',
-            'filename': 'src/logs/polygon/polygon_data_acquisition.log',
-            'mode': 'a',
-        },
-    },
-    'loggers': {
-        '': {
-            'handlers': ['default', 'file'],
-            'level': 'DEBUG',
-            'propagate': False
-        }
-    }
-} 

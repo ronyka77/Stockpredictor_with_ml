@@ -271,10 +271,6 @@ class NewsTickerIntegration:
         
         return category_tickers[:max_tickers]
     
-    def get_major_tickers(self, max_tickers: int = 20) -> List[str]:
-        """Get list of major tickers for priority news collection"""
-        return self.get_tickers_by_category('major', max_tickers)
-    
     def get_growth_tickers(self, max_tickers: int = 30) -> List[str]:
         """Get list of growth tickers for news collection"""
         return self.get_tickers_by_category('growth', max_tickers)

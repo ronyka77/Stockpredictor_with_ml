@@ -100,14 +100,6 @@ class PolygonNewsArticle(Base):
         """Get article by Polygon ID"""
         return session.query(cls).filter(cls.polygon_id == polygon_id).first()
     
-    def is_within_retention_period(self, retention_days: Optional[int] = None) -> bool:
-        """Check if article is within retention period"""
-        if retention_days is None:
-            retention_days = config.NEWS_RETENTION_YEARS * 365
-        from datetime import timezone
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
-        return self.published_utc >= cutoff_date
-    
     def get_ticker_list(self) -> List[str]:
         """Get list of associated ticker symbols"""
         return [ticker.ticker for ticker in self.tickers]

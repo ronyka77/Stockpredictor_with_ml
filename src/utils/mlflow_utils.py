@@ -1,5 +1,4 @@
 import os
-import shutil
 import sys
 import time
 from pathlib import Path
@@ -82,31 +81,6 @@ class MLFlowManager:
             return experiment_id
         except Exception as e:
             self.logger.error(f"Error setting up experiment: {e}")
-            raise
-
-    def load_latest_model(self, experiment_name: str):
-        """Load the most recent model from the specified experiment"""
-        try:
-            experiment = mlflow.get_experiment_by_name(experiment_name)
-            if experiment is None:
-                raise ValueError(f"Experiment {experiment_name} not found")
-
-            runs = mlflow.search_runs(
-                experiment_ids=[experiment.experiment_id], order_by=["start_time DESC"]
-            )
-            if runs.empty:
-                raise ValueError(f"No runs found for experiment {experiment_name}")
-            
-            latest_run_id = runs.iloc[0].run_id
-            # Get the actual model path including experiment folders
-            client = MlflowClient()
-            client.get_run(latest_run_id)
-            model_uri = f"runs:/{latest_run_id}/model_global"
-
-            return mlflow.xgboost.load_model(model_uri), latest_run_id
-
-        except Exception as e:
-            self.logger.error(f"Error loading latest model: {e}")
             raise
 
     def normalize_meta_yaml_paths(self, meta_path: Path, new_base_path: str) -> None:
@@ -260,102 +234,6 @@ class MLFlowManager:
         except Exception as e:
             self.logger.error(f"Error in normalize_all_meta_yaml_paths: {e}")
             raise
-
-    def get_run_artifact_uri(self, run_id: str) -> str:
-        """Get the artifact URI for a specific MLflow run.
-        Args:
-            run_id: The MLflow run ID to locate
-        Returns:
-            String containing the artifact URI
-        Raises:
-            FileNotFoundError: If the run directory cannot be found
-            ValueError: If the run ID is invalid
-        """
-        if not run_id or not isinstance(run_id, str) or len(run_id) != 32:
-            raise ValueError(f"Invalid run ID format: {run_id}")
-
-        mlruns_path = Path(self.mlruns_dir).resolve()
-        tracking_uri = self.config.config.get("tracking_uri", "")
-        if tracking_uri and Path(tracking_uri).exists():
-            mlruns_path = Path(tracking_uri).resolve()
-            self.logger.debug(f"Using tracking URI path: {mlruns_path}")
-
-        # Search for the run directory
-        try:
-            # First try direct path construction (most efficient)
-            for experiment_dir in mlruns_path.iterdir():
-                if experiment_dir.is_dir():
-                    # Skip .trash and non-experiment directories
-                    if experiment_dir.name == ".trash" or not experiment_dir.name.isdigit():
-                        continue
-
-                    # Search within experiment directory
-                    potential_paths = [p for p in experiment_dir.glob(f"**/{run_id}") if p.is_dir()]
-                    if potential_paths:
-                        run_path = potential_paths[0]
-                        self.logger.info(f"Found run directory at: {run_path}")
-                        return str(run_path / "artifacts")
-
-            # If direct search fails, try global recursive search with more inclusive pattern
-            all_potential_paths = [
-                p
-                for p in mlruns_path.glob(f"**/{run_id}*")  # Add wildcard to catch variations
-                if p.is_dir()
-                and ".trash" not in str(p)
-                and any(parent.name.isdigit() for parent in p.parents)
-                and run_id in str(p)  # Ensure run_id is actually in the path
-            ]
-            self.logger.debug(f"Global search found {len(all_potential_paths)} potential paths")
-            self.logger.debug(f"Searching in mlruns path: {mlruns_path}")
-            self.logger.debug(f"All potential paths: {all_potential_paths}")
-            if all_potential_paths:
-                run_path = all_potential_paths[0]
-                self.logger.info(f"Found run directory via global search: {run_path}")
-                return str(run_path / "artifacts")
-
-            # Check trash as last resort
-            trash_paths = list(mlruns_path.glob(f".trash/**/{run_id}"))
-            if trash_paths:
-                self.logger.warning(f"Run {run_id} found only in trash: {trash_paths[0]}")
-
-            # Debug info before raising error
-            self.logger.debug(f"Searched in mlruns path: {mlruns_path}")
-            self.logger.debug(
-                f"Available experiment directories: {[d.name for d in mlruns_path.iterdir() if d.is_dir()]}"
-            )
-            raise FileNotFoundError(f"Run directory not found for ID: {run_id}")
-
-        except Exception as e:
-            self.logger.error(f"Error locating run directory: {str(e)}")
-            raise FileNotFoundError(
-                f"Failed to locate run directory for ID {run_id}: {str(e)}"
-            ) from e
-
-
-def create_experiment_run(experiment_name: str, experiment_id: str):
-    """Decorator for creating MLflow runs"""
-
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            manager = MLFlowManager()
-            experiment_id = manager.setup_experiment(experiment_name)
-            with mlflow.start_run(experiment_id=experiment_id):
-                mlflow.set_tracking_uri(manager.config.config["tracking_uri"])
-                result = func(*args, **kwargs)
-            return result
-
-        return wrapper
-
-    return decorator
-
-
-def train_model(X, y):
-    # Create and train a dummy model
-    dummy_model = xgb.XGBClassifier(n_estimators=10, max_depth=3, random_state=42)
-    dummy_model.fit(X, y)
-
-    return dummy_model
-
 
 # Usage example:
 if __name__ == "__main__":

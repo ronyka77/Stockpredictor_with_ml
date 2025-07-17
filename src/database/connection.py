@@ -58,6 +58,7 @@ class DatabaseConnection:
                 password=self.config['password'],
                 cursor_factory=RealDictCursor
             )
+            self.test_connection()
             yield conn
         except Exception as e:
             if conn:

@@ -755,32 +755,6 @@ class FundamentalPipeline:
         
         return new_count
 
-    def get_calculator_info(self) -> Dict[str, Any]:
-        """
-        Get detailed information about calculators
-        
-        Returns:
-            Dictionary with calculator information
-        """
-        registered = FundamentalCalculatorRegistry.get_all_calculators()
-        active = self.calculators
-        
-        return {
-            "registered_count": len(registered),
-            "active_count": len(active),
-            "registered_calculators": {
-                name: {
-                    "class_name": calc_class.__name__,
-                    "is_active": name in active,
-                    "module": calc_class.__module__
-                }
-                for name, calc_class in registered.items()
-            },
-            "inactive_calculators": [
-                name for name in registered.keys() if name not in active
-            ]
-        }
-
 async def main():
     """Main function to run the fundamental pipeline for TSLA"""
     

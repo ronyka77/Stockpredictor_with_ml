@@ -195,31 +195,6 @@ class HistoricalDataFetcher:
             validate_data=validate_data
         )
     
-    def get_date_range_data(self, ticker: str, years: int = 2,
-                            timespan: str = "day", validate_data: bool = True) -> tuple[List[OHLCVRecord], DataQualityMetrics]:
-        """
-        Get historical data for a specific number of years
-        
-        Args:
-            ticker: Stock ticker symbol
-            years: Number of years of data to fetch
-            timespan: Time window
-            validate_data: Whether to validate the data
-            
-        Returns:
-            Tuple of (validated_records, quality_metrics)
-        """
-        end_date = date.today()
-        start_date = end_date - timedelta(days=years * 365)
-        
-        return self.get_historical_data(
-            ticker=ticker,
-            start_date=start_date,
-            end_date=end_date,
-            timespan=timespan,
-            validate_data=validate_data
-        )
-    
     def get_grouped_daily_data(self, target_date: Union[str, date],
                                 validate_data: bool = True) -> Dict[str, OHLCVRecord]:
         """

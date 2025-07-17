@@ -7,11 +7,11 @@ capabilities that can be used by different gradient boosting models (XGBoost, Li
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional, Tuple, List, Protocol, runtime_checkable
+from typing import Dict, Any, Optional, Tuple, Protocol, runtime_checkable
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import warnings
 
 from src.utils.logger import get_logger
+from src.models.evaluation.metrics import CustomMetrics
 
 logger = get_logger(__name__)
 
@@ -34,7 +34,7 @@ class ThresholdEvaluator:
     This class provides model-agnostic evaluation capabilities including:
     - Threshold optimization based on confidence scores
     - Profit-based performance evaluation
-    - Comprehensive metrics calculation
+    - Custom accuracy calculation using conservative prediction logic
     - Investment decision analysis
     """
     
@@ -46,17 +46,144 @@ class ThresholdEvaluator:
             investment_amount: Default investment amount per stock
         """
         self.investment_amount = investment_amount
+        self.custom_metrics = CustomMetrics()
         logger.info(f"ThresholdEvaluator initialized with ${investment_amount:.2f} investment amount")
     
-    def calculate_filtered_profit(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                 current_prices: np.ndarray, 
-                                 investment_amount: Optional[float] = None) -> float:
+    def _vectorized_profit_calculation(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                                        current_prices: np.ndarray, 
+                                        investment_amount: Optional[float] = None) -> np.ndarray:
         """
-        Calculate profit for filtered predictions
+        Vectorized profit calculation for percentage returns
         
         Args:
-            y_true: Actual future prices
-            y_pred: Predicted future prices
+            y_true: Actual percentage returns (e.g., 0.05 for 5% gain)
+            y_pred: Predicted percentage returns (e.g., 0.03 for 3% gain)
+            current_prices: Current prices
+            investment_amount: Investment amount per stock
+            
+        Returns:
+            Array of profits for each sample
+        """
+        if investment_amount is None:
+            investment_amount = self.investment_amount
+        
+        # Only invest where model predicts positive return
+        invest_mask = y_pred > 0
+        
+        # Calculate profits vectorized
+        profits = np.zeros_like(y_true)
+        if invest_mask.sum() > 0:
+            shares_bought = investment_amount / current_prices[invest_mask]
+            # For percentage returns: profit = shares * current_price * actual_return
+            profits[invest_mask] = shares_bought * current_prices[invest_mask] * y_true[invest_mask]
+        
+        return profits
+    
+    def _vectorized_threshold_testing(self, test_predictions: np.ndarray, 
+                                    test_confidence: np.ndarray,
+                                    y_test: np.ndarray, 
+                                    current_prices_test: np.ndarray,
+                                    thresholds: np.ndarray) -> pd.DataFrame:
+        """
+        Vectorized threshold testing - process all thresholds simultaneously
+        
+        Args:
+            test_predictions: Model predictions
+            test_confidence: Confidence scores
+            y_test: Test targets
+            current_prices_test: Current prices
+            thresholds: Array of thresholds to test
+            
+        Returns:
+            DataFrame with results for all thresholds
+        """
+        
+        # Create threshold masks for all thresholds at once using broadcasting
+        threshold_masks = test_confidence[:, np.newaxis] >= thresholds[np.newaxis, :]
+        
+        results = []
+
+        # Sample restriction: 0.1% to 1% of the dataset
+        min_samples = max(1, int(0.0005 * len(test_confidence)))
+        max_samples = int(0.02 * len(test_confidence))
+        
+        for i, threshold in enumerate(thresholds):
+            mask = threshold_masks[:, i]
+            samples_kept = mask.sum()
+            
+            if not (min_samples <= samples_kept <= max_samples):
+                continue
+            
+            filtered_y_true = y_test[mask]
+            filtered_y_pred = test_predictions[mask]
+            filtered_current_prices = current_prices_test[mask]
+            filtered_confidence = test_confidence[mask]
+            
+            filtered_profits = self._vectorized_profit_calculation(
+                filtered_y_true, filtered_y_pred, filtered_current_prices
+            )
+            
+            # Calculate metrics
+            total_profit = filtered_profits.sum()
+            profit_per_investment = total_profit / samples_kept if samples_kept > 0 else 0
+            
+            custom_accuracy = self.custom_metrics.custom_accuracy(
+                filtered_y_true, filtered_y_pred
+            )
+            
+            investment_decisions = filtered_y_pred > 0
+            if investment_decisions.sum() > 0:
+                successful_investments = ((filtered_y_true[investment_decisions] > 0) & 
+                                        (filtered_y_true[investment_decisions] <= filtered_y_pred[investment_decisions])).sum()
+                investment_success_rate = successful_investments / investment_decisions.sum()
+                profitable_investments = successful_investments
+            else:
+                investment_success_rate = 0.0
+                profitable_investments = 0
+            
+            result_dict = {
+                'threshold': threshold,
+                'test_samples_kept': samples_kept,
+                'test_samples_ratio': samples_kept / len(test_confidence),
+                'test_profit': total_profit,
+                'test_custom_accuracy': custom_accuracy,
+                'test_profit_per_investment': profit_per_investment,
+                'investment_success_rate': investment_success_rate,
+                'profitable_investments': profitable_investments,
+                'average_confidence': filtered_confidence.mean()
+            }
+            
+            results.append(result_dict)
+        
+        results_df = pd.DataFrame(results)
+        
+        if len(results_df) == 0:
+            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.1% to 1%)")
+            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.1%-1% sample constraint'}
+        
+        # Find best threshold based on profit per investment
+        best_idx = results_df['test_profit_per_investment'].idxmax()
+        best_result = results_df.loc[best_idx]
+        
+        logger.info("🎯 Threshold Optimization Results (Test Data Only - Optimized for Profit Per Investment):")
+        logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
+        logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})")
+        logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
+        logger.info(f"   Test profit per investment: ${best_result['test_profit_per_investment']:.2f}")
+        logger.info(f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
+        logger.info(f"   Total test profit: ${best_result['test_profit']:.2f}")
+        
+        return results_df
+    
+    def calculate_filtered_profit(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                                    current_prices: np.ndarray, 
+                                    investment_amount: Optional[float] = None) -> float:
+        """
+        Calculate profit for filtered predictions (percentage returns)
+        
+        Args:
+            y_true: Actual percentage returns (e.g., 0.05 for 5% gain)
+            y_pred: Predicted percentage returns (e.g., 0.03 for 3% gain)
             current_prices: Current prices
             investment_amount: Investment amount per stock (uses default if None)
             
@@ -69,8 +196,8 @@ class ThresholdEvaluator:
         if len(y_true) == 0:
             return 0.0
         
-        # Only invest where model predicts price increase
-        invest_mask = y_pred > current_prices
+        # Only invest where model predicts positive return
+        invest_mask = y_pred > 0
         
         if invest_mask.sum() == 0:
             return 0.0
@@ -79,16 +206,17 @@ class ThresholdEvaluator:
         selected_actual = y_true[invest_mask]
         selected_current = current_prices[invest_mask]
         
-        # Calculate shares bought and profits
+        # Calculate shares bought at current market price
         shares_bought = investment_amount / selected_current
-        profits = shares_bought * (selected_actual - selected_current)
+        
+        # For percentage returns: profit = shares * current_price * actual_return
+        profits = shares_bought * selected_current * selected_actual
         
         return profits.sum()
     
-    def calculate_precision_metrics(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                   current_prices: np.ndarray) -> float:
+    def calculate_custom_accuracy(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         """
-        Calculate precision for filtered predictions
+        Calculate custom accuracy for filtered predictions using conservative prediction logic
         
         Args:
             y_true: Actual future prices
@@ -96,28 +224,15 @@ class ThresholdEvaluator:
             current_prices: Current prices
             
         Returns:
-            Precision score (correct positive predictions / total positive predictions)
+            Custom accuracy score (0 to 1)
         """
         if len(y_true) == 0:
             return 0.0
         
-        # Predictions: invest where model predicts price increase
-        predicted_positive = y_pred > current_prices
-        
-        # Actual: stocks that actually increased in price
-        actual_positive = y_true > current_prices
-        
-        if predicted_positive.sum() == 0:
-            return 0.0
-        
-        # Calculate precision
-        correct_positive = (predicted_positive & actual_positive).sum()
-        precision = correct_positive / predicted_positive.sum()
-        
-        return precision
+        # Custom accuracy using conservative prediction logic
+        return self.custom_metrics.custom_accuracy(y_true, y_pred)
     
-    def calculate_investment_metrics(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                   current_prices: np.ndarray) -> Dict[str, Any]:
+    def calculate_investment_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
         """
         Calculate comprehensive investment decision metrics
         
@@ -138,135 +253,112 @@ class ThresholdEvaluator:
                 'total_samples': 0
             }
         
-        # Investment decisions
-        invest_mask = y_pred > current_prices
+        # Investment decisions: only invest where model predicts positive return
+        invest_mask = y_pred > 0
+        investment_decisions = y_pred > 0
+            
         investments_made = invest_mask.sum()
         investment_rate = investments_made / len(y_pred)
         
-        # Actual profitability of investments made
-        if investments_made > 0:
-            actual_profitable = (y_true[invest_mask] > current_prices[invest_mask]).sum()
-            investment_success_rate = actual_profitable / investments_made
+        # Investment success rate (for investment decision analysis)
+        if investment_decisions.sum() > 0:
+            # Success = actual future price > current price (profitable investment)
+            successful_investments = ((y_true[investment_decisions] > 0) & 
+                                        (y_true[investment_decisions] <= y_pred[investment_decisions])).sum()
+            investment_success_rate = successful_investments / investment_decisions.sum()
+            profitable_investments = successful_investments
         else:
             investment_success_rate = 0.0
-            actual_profitable = 0
+            profitable_investments = 0
         
         return {
             'investments_made': investments_made,
             'investment_rate': investment_rate,
             'investment_success_rate': investment_success_rate,
-            'profitable_investments': actual_profitable,
+            'profitable_investments': profitable_investments,
             'total_samples': len(y_pred)
         }
     
     def optimize_prediction_threshold(self, model: ModelProtocol,
-                                    X_train: pd.DataFrame, y_train: pd.Series, 
                                     X_test: pd.DataFrame, y_test: pd.Series,
-                                    current_prices_train: np.ndarray, 
                                     current_prices_test: np.ndarray,
-                                    confidence_method: str = 'leaf_depth',
+                                    confidence_method: str = 'simple',
                                     threshold_range: Tuple[float, float] = (0.1, 0.9),
                                     n_thresholds: int = 20) -> Dict[str, Any]:
         """
-        Optimize prediction threshold based on confidence scores to maximize profit
+        Optimize prediction threshold based on confidence scores to maximize investment success rate on test data
         
         Args:
             model: Model instance with predict and get_prediction_confidence methods
-            X_train: Training features
-            y_train: Training targets
-            X_test: Test features
+            X_test: Test features (unseen data)
             y_test: Test targets
-            current_prices_train: Current prices for training set
             current_prices_test: Current prices for test set
             confidence_method: Method for calculating confidence scores
             threshold_range: Range of thresholds to test (min, max)
             n_thresholds: Number of thresholds to test
             
         Returns:
-            Dictionary with optimization results
+            Dictionary with optimization results based on test data only (optimized for investment success rate)
         """
-        logger.info(f"🎯 Starting threshold optimization using {confidence_method} confidence method")
+        logger.info(f"🎯 Starting threshold optimization on test data using {confidence_method} confidence method")
+        logger.info(f"   Testing {n_thresholds} thresholds from {threshold_range[0]:.2f} to {threshold_range[1]:.2f}")
         
         # Validate model protocol
         if not isinstance(model, ModelProtocol):
             raise ValueError("Model must implement ModelProtocol (predict and get_prediction_confidence methods)")
         
-        # Get predictions and confidence scores for both sets
-        train_predictions = model.predict(X_train)
+        # Phase 1: Get predictions
         test_predictions = model.predict(X_test)
         
-        train_confidence = model.get_prediction_confidence(X_train, method=confidence_method)
+        # Validate prediction diversity
+        unique_predictions = np.unique(test_predictions)
+        min_required_diversity = len(test_predictions) / 100
+        
+        if len(unique_predictions) < min_required_diversity:
+            logger.error("🚨 CRITICAL: Model produced insufficient prediction diversity.")
+            logger.error(f"   Unique predictions: {len(unique_predictions)}")
+            logger.error(f"   Minimum required: {min_required_diversity:.1f}")
+            logger.error("   This indicates a failed training process, likely due to constant features.")
+            logger.error("   Aborting threshold optimization.")
+            return {'status': 'failed', 'message': f'Model produced insufficient prediction diversity: {len(unique_predictions)} unique values (minimum required: {min_required_diversity:.1f}).'}
+        # Phase 2: Get confidence scores
         test_confidence = model.get_prediction_confidence(X_test, method=confidence_method)
         
-        # Test different confidence thresholds
+        # For percentage returns: invest when predicted return > 0
+        invest_mask = test_predictions > 0
+        logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
+        logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")        
+        if invest_mask.sum() > 0:
+            actual_vs_predicted = y_test.values[invest_mask] >= test_predictions[invest_mask]
+            logger.info(f"   Conservative success rate (all samples): {actual_vs_predicted.sum()}/{invest_mask.sum()} ({actual_vs_predicted.sum()/invest_mask.sum()*100:.1f}%)")
+        else:
+            logger.info("   No investment candidates found!")
+        
+        # Phase 3: Vectorized threshold testing
         thresholds = np.linspace(threshold_range[0], threshold_range[1], n_thresholds)
-        results = []
         
-        for threshold in thresholds:
-            # Filter predictions based on confidence threshold
-            train_mask = train_confidence >= threshold
-            test_mask = test_confidence >= threshold
-            
-            if train_mask.sum() == 0 or test_mask.sum() == 0:
-                continue
-            
-            # Calculate metrics for filtered predictions
-            train_filtered_profit = self.calculate_filtered_profit(
-                y_train.values[train_mask], 
-                train_predictions[train_mask], 
-                current_prices_train[train_mask]
-            )
-            
-            test_filtered_profit = self.calculate_filtered_profit(
-                y_test.values[test_mask], 
-                test_predictions[test_mask], 
-                current_prices_test[test_mask]
-            )
-            
-            # Calculate precision metrics for filtered predictions
-            train_precision = self.calculate_precision_metrics(
-                y_train.values[train_mask], 
-                train_predictions[train_mask], 
-                current_prices_train[train_mask]
-            )
-            
-            test_precision = self.calculate_precision_metrics(
-                y_test.values[test_mask], 
-                test_predictions[test_mask], 
-                current_prices_test[test_mask]
-            )
-            
-            results.append({
-                'threshold': threshold,
-                'train_samples_kept': train_mask.sum(),
-                'test_samples_kept': test_mask.sum(),
-                'train_samples_ratio': train_mask.sum() / len(train_mask),
-                'test_samples_ratio': test_mask.sum() / len(test_mask),
-                'train_profit': train_filtered_profit,
-                'test_profit': test_filtered_profit,
-                'train_precision': train_precision,
-                'test_precision': test_precision,
-                'train_profit_per_investment': train_filtered_profit / train_mask.sum() if train_mask.sum() > 0 else 0,
-                'test_profit_per_investment': test_filtered_profit / test_mask.sum() if test_mask.sum() > 0 else 0
-            })
+        # Use vectorized threshold testing
+        results_df = self._vectorized_threshold_testing(
+            test_predictions, test_confidence, y_test.values, current_prices_test, thresholds
+        )
         
-        # Convert to DataFrame for easier analysis
-        results_df = pd.DataFrame(results)
-        
+        # Phase 4: Analyze results
         if len(results_df) == 0:
-            logger.warning("⚠️ No valid thresholds found")
-            return {'status': 'failed', 'message': 'No valid thresholds found'}
+            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.1% to 1%)")
+            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.1%-1% sample constraint'}
         
-        # Find best threshold based on test profit per investment
+        # Find best threshold based on profit per investment
         best_idx = results_df['test_profit_per_investment'].idxmax()
-        best_result = results_df.iloc[best_idx]
+        best_result = results_df.loc[best_idx]
         
-        logger.info("🎯 Threshold Optimization Results:")
+        logger.info("🎯 Threshold Optimization Results (Test Data Only - Optimized for Profit Per Investment):")
         logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
-        logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_mask)} ({best_result['test_samples_ratio']:.1%})")
+        logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})")
+        logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
         logger.info(f"   Test profit per investment: ${best_result['test_profit_per_investment']:.2f}")
-        logger.info(f"   Test precision: {best_result['test_precision']:.3f}")
+        logger.info(f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
         logger.info(f"   Total test profit: ${best_result['test_profit']:.2f}")
+        logger.info(f"   Average confidence of selected predictions: {best_result['average_confidence']:.3f}")
         
         return {
             'status': 'success',
@@ -275,12 +367,13 @@ class ThresholdEvaluator:
             'best_result': best_result.to_dict(),
             'all_results': results_df,
             'threshold_range': threshold_range,
-            'n_thresholds_tested': len(results_df)
+            'n_thresholds_tested': len(results_df),
+            'total_test_samples': len(test_confidence)
         }
     
     def predict_with_threshold(self, model: ModelProtocol, X: pd.DataFrame, 
-                              threshold: float, confidence_method: str = 'leaf_depth',
-                              return_confidence: bool = False) -> Dict[str, Any]:
+                                threshold: float, confidence_method: str = 'leaf_depth',
+                                return_confidence: bool = False) -> Dict[str, Any]:
         """
         Make predictions with confidence-based filtering
         
@@ -334,10 +427,10 @@ class ThresholdEvaluator:
         return result
     
     def evaluate_threshold_performance(self, model: ModelProtocol,
-                                     X_test: pd.DataFrame, y_test: pd.Series,
-                                     current_prices_test: np.ndarray,
-                                     threshold: float,
-                                     confidence_method: str = 'leaf_depth') -> Dict[str, Any]:
+                                        X_test: pd.DataFrame, y_test: pd.Series,
+                                        current_prices_test: np.ndarray,
+                                        threshold: float,
+                                        confidence_method: str = 'leaf_depth') -> Dict[str, Any]:
         """
         Evaluate model performance with threshold filtering
         
@@ -381,14 +474,14 @@ class ThresholdEvaluator:
         )
         profit_per_investment = total_profit / len(filtered_predictions)
         
-        # Precision metrics
-        precision = self.calculate_precision_metrics(
-            filtered_actual, filtered_predictions, filtered_current_prices
+        # Custom accuracy calculation
+        custom_accuracy = self.calculate_custom_accuracy(
+            filtered_actual, filtered_predictions
         )
         
         # Investment decision metrics
         investment_metrics = self.calculate_investment_metrics(
-            filtered_actual, filtered_predictions, filtered_current_prices
+            filtered_actual, filtered_predictions
         )
         
         results = {
@@ -407,7 +500,9 @@ class ThresholdEvaluator:
             # Profit metrics
             'total_profit': total_profit,
             'profit_per_investment': profit_per_investment,
-            'precision': precision,
+            
+            # Custom accuracy
+            'custom_accuracy': custom_accuracy,
             
             # Investment metrics
             'investments_made': investment_metrics['investments_made'],
@@ -426,71 +521,74 @@ class ThresholdEvaluator:
         logger.info(f"   Samples evaluated: {results['samples_evaluated']}/{results['total_test_samples']} ({results['samples_kept_ratio']:.1%})")
         logger.info(f"   Total profit: ${results['total_profit']:.2f}")
         logger.info(f"   Profit per investment: ${results['profit_per_investment']:.2f}")
-        logger.info(f"   Precision: {results['precision']:.3f}")
+        logger.info(f"   Custom accuracy: {results['custom_accuracy']:.3f}")
         logger.info(f"   Investment success rate: {results['investment_success_rate']:.3f}")
         logger.info(f"   Traditional R²: {results['r2_score']:.4f}")
         
         return results
     
     def calculate_profit_score(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                              current_prices: np.ndarray, 
-                              investment_amount: Optional[float] = None) -> float:
+                                current_prices: np.ndarray, 
+                                investment_amount: Optional[float] = None) -> float:
         """
-        Calculate profit score based on actual investment returns with precision metrics
+        Calculate profit score based on percentage return investments with custom accuracy and precision metrics
         
         Args:
-            y_true: Actual future prices (target values)
-            y_pred: Predicted future prices
+            y_true: Actual percentage returns (e.g., 0.05 for 5% gain)
+            y_pred: Predicted percentage returns (e.g., 0.03 for 3% gain)
             current_prices: Current stock prices (to calculate shares bought)
             investment_amount: Amount to invest in each stock
             
         Returns:
-            Total profit/loss from investing only in stocks where model predicts price increase
+            Total profit/loss from investing only in stocks where model predicts positive return
         """
         if investment_amount is None:
             investment_amount = self.investment_amount
-            
-        # Only invest in stocks where model predicts price will increase
-        invest_mask = y_pred > current_prices
+        
+        # Calculate custom accuracy using conservative prediction logic
+        custom_accuracy = self.custom_metrics.custom_accuracy(y_true, y_pred)
+        
+        # Only invest in stocks where model predicts positive return
+        invest_mask = y_pred > 0
         
         # Calculate prediction precision metrics
         total_predictions = len(y_pred)
         positive_predictions = invest_mask.sum()
         
         if positive_predictions == 0:
-            logger.info("📊 Precision Metrics: No positive predictions made")
+            logger.info("📊 Prediction Metrics: No positive predictions made")
+            logger.info(f"📊 Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
             return 0.0
         
         # Calculate actual profitable investments among positive predictions
-        selected_actual_prices = y_true[invest_mask]
+        selected_actual_values = y_true[invest_mask]
+        selected_predicted_values = y_pred[invest_mask]
         selected_current_prices = current_prices[invest_mask]
         
-        # Check which positive predictions were actually profitable
-        actual_profitable = selected_actual_prices > selected_current_prices
-        correct_positive_predictions = actual_profitable.sum()
-        
-        # Calculate precision: correct positive predictions / total positive predictions
-        precision = correct_positive_predictions / positive_predictions if positive_predictions > 0 else 0.0
+        # Check which positive predictions were conservative (actual >= predicted)
+        conservative_predictions = selected_actual_values >= selected_predicted_values
+        correct_conservative_predictions = conservative_predictions.sum()
         
         # Calculate percentage of total predictions that were positive
         positive_prediction_rate = (positive_predictions / total_predictions) * 100
         
-        # Calculate percentage of positive predictions that were profitable
-        profitable_rate = (correct_positive_predictions / positive_predictions) * 100 if positive_predictions > 0 else 0.0
+        # Calculate percentage of positive predictions that were conservative
+        conservative_rate = (correct_conservative_predictions / positive_predictions) * 100 if positive_predictions > 0 else 0.0
         
-        # Log precision metrics
-        logger.info("📊 Prediction Precision Metrics:")
+        # Log accuracy and precision metrics
+        logger.info("📊 Prediction Accuracy & Conservative Investment Metrics:")
+        logger.info(f"   Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
         logger.info(f"   Total predictions: {total_predictions}")
         logger.info(f"   Positive predictions: {positive_predictions} ({positive_prediction_rate:.1f}%)")
-        logger.info(f"   Correct positive predictions: {correct_positive_predictions}")
-        logger.info(f"   Precision (profitable/predicted positive): {precision:.3f} ({profitable_rate:.1f}%)")
+        logger.info(f"   Conservative predictions (actual >= predicted): {correct_conservative_predictions}")
+        logger.info(f"   Conservative success rate: {conservative_rate:.1f}%")
         
         # Calculate number of shares we can buy with investment amount for selected stocks
         shares_bought = investment_amount / selected_current_prices
         
         # Calculate actual profit/loss for each selected stock
-        # Profit = shares * (actual_future_price - current_price)
-        profits = shares_bought * (selected_actual_prices - selected_current_prices)
+        # For percentage returns: profit = shares * current_price * actual_return
+        profits = shares_bought * selected_current_prices * selected_actual_values
         
         # Calculate additional profit metrics
         profitable_investments = profits > 0
@@ -505,81 +603,3 @@ class ThresholdEvaluator:
         # Return total profit from selected investments
         total_profit = profits.sum()
         return total_profit
-    
-    def compare_threshold_strategies(self, model: ModelProtocol,
-                                   X_test: pd.DataFrame, y_test: pd.Series,
-                                   current_prices_test: np.ndarray,
-                                   thresholds: List[float],
-                                   confidence_method: str = 'leaf_depth') -> pd.DataFrame:
-        """
-        Compare performance across multiple threshold strategies
-        
-        Args:
-            model: Model instance with predict and get_prediction_confidence methods
-            X_test: Test features
-            y_test: Test targets
-            current_prices_test: Current prices for test set
-            thresholds: List of thresholds to compare
-            confidence_method: Confidence calculation method
-            
-        Returns:
-            DataFrame with comparison results
-        """
-        results = []
-        
-        for threshold in thresholds:
-            try:
-                performance = self.evaluate_threshold_performance(
-                    model, X_test, y_test, current_prices_test, threshold, confidence_method
-                )
-                
-                if performance['status'] == 'success':
-                    results.append({
-                        'threshold': threshold,
-                        'samples_kept': performance['samples_evaluated'],
-                        'samples_kept_ratio': performance['samples_kept_ratio'],
-                        'profit_per_investment': performance['profit_per_investment'],
-                        'total_profit': performance['total_profit'],
-                        'precision': performance['precision'],
-                        'investment_success_rate': performance['investment_success_rate'],
-                        'r2_score': performance['r2_score'],
-                        'mse': performance['mse'],
-                        'mae': performance['mae']
-                    })
-                else:
-                    results.append({
-                        'threshold': threshold,
-                        'samples_kept': 0,
-                        'samples_kept_ratio': 0.0,
-                        'profit_per_investment': 0.0,
-                        'total_profit': 0.0,
-                        'precision': 0.0,
-                        'investment_success_rate': 0.0,
-                        'r2_score': 0.0,
-                        'mse': np.inf,
-                        'mae': np.inf
-                    })
-                    
-            except Exception as e:
-                logger.warning(f"Error evaluating threshold {threshold}: {e}")
-                results.append({
-                    'threshold': threshold,
-                    'samples_kept': 0,
-                    'samples_kept_ratio': 0.0,
-                    'profit_per_investment': 0.0,
-                    'total_profit': 0.0,
-                    'precision': 0.0,
-                    'investment_success_rate': 0.0,
-                    'r2_score': 0.0,
-                    'mse': np.inf,
-                    'mae': np.inf
-                })
-        
-        comparison_df = pd.DataFrame(results)
-        
-        logger.info("📊 Threshold Strategy Comparison:")
-        logger.info(f"   Evaluated {len(thresholds)} thresholds")
-        logger.info(f"   Best profit per investment: ${comparison_df['profit_per_investment'].max():.2f}")
-        logger.info(f"   Best threshold: {comparison_df.loc[comparison_df['profit_per_investment'].idxmax(), 'threshold']:.3f}")
-        
-        return comparison_df 

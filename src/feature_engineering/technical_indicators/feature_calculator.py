@@ -210,12 +210,14 @@ class FeatureCalculator:
         logger.debug("Adding future price targets")
         
         # Future high prices (targets for prediction)
-        features_df['Future_High_10D'] = price_data['high'].shift(-10)
-        features_df['Future_High_30D'] = price_data['high'].shift(-30)
+        features_df['Future_High_10D'] = price_data['high'].shift(-9)
+        features_df['Future_High_20D'] = price_data['high'].shift(-19)
+        features_df['Future_High_30D'] = price_data['high'].shift(-29)
         
         # Future close prices (alternative targets)
-        features_df['Future_Close_10D'] = price_data['close'].shift(-10)
-        features_df['Future_Close_30D'] = price_data['close'].shift(-30)
+        features_df['Future_Close_10D'] = price_data['close'].shift(-9)
+        features_df['Future_Close_20D'] = price_data['close'].shift(-19)
+        features_df['Future_Close_30D'] = price_data['close'].shift(-29)
         logger.debug(f"Added {len([col for col in features_df.columns if 'Future_' in col])} future price target features")
         
         return features_df
@@ -261,6 +263,8 @@ class FeatureCalculator:
         # Log returns
         features_df['Log_Return_1D'] = np.log(price_data['close'] / price_data['close'].shift(1))
         features_df['Log_Return_5D'] = np.log(price_data['close'] / price_data['close'].shift(5))
+        features_df['Log_Return_10D'] = np.log(price_data['close'] / price_data['close'].shift(10))
+        features_df['Log_Return_20D'] = np.log(price_data['close'] / price_data['close'].shift(20))
         
         # Volume features
         if 'volume' in price_data.columns:
