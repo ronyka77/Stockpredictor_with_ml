@@ -100,7 +100,7 @@ class MLflowIntegration:
             )
 
             logger.info(
-                f"Started MLflow run: {run_name or 'unnamed'}",
+                "Started MLflow run",
                 extra={"run_id": run.info.run_id, "experiment_id": run.info.experiment_id},
             )
             return run

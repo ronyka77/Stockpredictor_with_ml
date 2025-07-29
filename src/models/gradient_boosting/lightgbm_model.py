@@ -33,7 +33,8 @@ class LightGBMModel(BaseModel):
     def __init__(self, 
                 model_name: str = "lightgbm_stock_predictor",
                 config: Optional[Dict[str, Any]] = None,
-                prediction_horizon: int = 10):
+                prediction_horizon: int = 10,
+                threshold_evaluator: Optional[ThresholdEvaluator] = None):
         """
         Initialize LightGBM model
         
@@ -41,13 +42,14 @@ class LightGBMModel(BaseModel):
             model_name: Name for MLflow tracking
             config: Model configuration parameters
             prediction_horizon: Prediction horizon in days
+            threshold_evaluator: Optional shared ThresholdEvaluator instance
         """
         # Add prediction_horizon to config
         if config is None:
             config = {}
         config['prediction_horizon'] = prediction_horizon
         
-        super().__init__(model_name, config)
+        super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
         
         # Initialize LightGBM-specific parameters
         self.prediction_horizon = self.config.get('prediction_horizon', 10)
@@ -59,7 +61,6 @@ class LightGBMModel(BaseModel):
         self.base_threshold = 0.5
         
         # Initialize central evaluators
-        self.threshold_evaluator = threshold_evaluator
         self.custom_metrics = CustomMetrics()
     
     def _create_model(self, params: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None, **kwargs) -> 'LightGBMModel':
@@ -89,7 +90,8 @@ class LightGBMModel(BaseModel):
         new_model = LightGBMModel(
             model_name=model_name,
             config=config,
-            prediction_horizon=self.prediction_horizon
+            prediction_horizon=self.prediction_horizon,
+            threshold_evaluator=self.threshold_evaluator
         )
         
         # Copy any relevant settings from the current model
@@ -252,13 +254,6 @@ class LightGBMModel(BaseModel):
         
         logger.info(f"Training completed. Best iteration: {best_iteration}, Best score: {best_score:.4f}")
         
-        # Log parameters to MLflow
-        self.log_params(params)
-        self.log_metrics({
-            "best_iteration": best_iteration,
-            "best_score": best_score
-        })
-        
         return self
     
     def predict(self, X: pd.DataFrame) -> np.ndarray:
@@ -384,12 +379,6 @@ class LightGBMModel(BaseModel):
                     'profitable_investments': threshold_results['best_result']['profitable_investments']
                 }
                 
-                # Log threshold optimization results for this trial
-                logger.debug(f"Trial {trial.number} threshold optimization:")
-                logger.debug(f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
-                logger.debug(f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                logger.debug(f"  Optimized profit per investment: {optimized_profit_score:.3f}")
-                
                 # Check if this is the best trial so far
                 if optimized_profit_score > self.best_investment_success_rate:
                     self.best_investment_success_rate = optimized_profit_score
@@ -415,7 +404,7 @@ class LightGBMModel(BaseModel):
                     
                     self.previous_best = optimized_profit_score
                 else:
-                    logger.debug(f"Trial {trial.number}: Profit Per Investment = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
+                    logger.info(f"Trial {trial.number}: Profit Per Investment = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
                 
                 return optimized_profit_score
                 
@@ -1045,7 +1034,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 300
+        number_of_trials = 200
         n_features_to_select = 60
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
@@ -1054,7 +1043,7 @@ def main():
             split_date='2025-02-01',
             ticker=None,  # Load ALL tickers
             clean_features=True,  # Apply feature cleaning
-            use_cache=True,  # Apply LightGBM data cleaning
+            use_cache=False,  # Apply LightGBM data cleaning
         )
         
         # Extract prepared data

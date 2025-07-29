@@ -47,7 +47,7 @@ class ThresholdEvaluator:
         """
         self.investment_amount = investment_amount
         self.custom_metrics = CustomMetrics()
-        logger.info(f"ThresholdEvaluator initialized with ${investment_amount:.2f} investment amount")
+        # logger.info(f"ThresholdEvaluator initialized with ${investment_amount:.2f} investment amount")
     
     def _vectorized_profit_calculation(self, y_true: np.ndarray, y_pred: np.ndarray, 
                                         current_prices: np.ndarray, 
@@ -73,9 +73,25 @@ class ThresholdEvaluator:
         # Calculate profits vectorized
         profits = np.zeros_like(y_true)
         if invest_mask.sum() > 0:
-            shares_bought = investment_amount / current_prices[invest_mask]
-            # For percentage returns: profit = shares * current_price * actual_return
-            profits[invest_mask] = shares_bought * current_prices[invest_mask] * y_true[invest_mask]
+            # Ensure all arrays are 1D
+            y_true_1d = y_true.flatten() if y_true.ndim > 1 else y_true
+            y_pred_1d = y_pred.flatten() if y_pred.ndim > 1 else y_pred
+            current_prices_1d = current_prices.flatten() if current_prices.ndim > 1 else current_prices
+            
+            # Recreate invest_mask with 1D arrays
+            invest_mask_1d = y_pred_1d > 0
+            
+            if invest_mask_1d.sum() > 0:
+                shares_bought = investment_amount / current_prices_1d[invest_mask_1d]
+                # For percentage returns: profit = shares * current_price * actual_return
+                profits_1d = np.zeros_like(y_true_1d)
+                profits_1d[invest_mask_1d] = shares_bought * current_prices_1d[invest_mask_1d] * y_true_1d[invest_mask_1d]
+                
+                # Map back to original shape
+                if y_true.ndim > 1:
+                    profits = profits_1d.reshape(y_true.shape)
+                else:
+                    profits = profits_1d
         
         return profits
     
@@ -103,9 +119,11 @@ class ThresholdEvaluator:
         
         results = []
 
-        # Sample restriction: 0.1% to 1% of the dataset
-        min_samples = max(1, int(0.0005 * len(test_confidence)))
-        max_samples = int(0.02 * len(test_confidence))
+        # Relaxed sample constraints: 0.05% to 5% of the dataset (more suitable for LSTM models)
+        min_samples = max(1, int(0.0005 * len(test_confidence)))  # 0.05% minimum
+        max_samples = int(0.05 * len(test_confidence))  # 5% maximum
+        
+        logger.debug(f"Sample constraints: min={min_samples}, max={max_samples} (total samples={len(test_confidence)})")
         
         for i, threshold in enumerate(thresholds):
             mask = threshold_masks[:, i]
@@ -119,6 +137,10 @@ class ThresholdEvaluator:
             filtered_current_prices = current_prices_test[mask]
             filtered_confidence = test_confidence[mask]
             
+            # Ensure we have valid data
+            if len(filtered_y_true) == 0:
+                continue
+                
             filtered_profits = self._vectorized_profit_calculation(
                 filtered_y_true, filtered_y_pred, filtered_current_prices
             )
@@ -158,8 +180,10 @@ class ThresholdEvaluator:
         results_df = pd.DataFrame(results)
         
         if len(results_df) == 0:
-            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.1% to 1%)")
-            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.1%-1% sample constraint'}
+            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.05% to 5%)")
+            logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
+            logger.warning(f"   Total samples: {len(test_confidence)}")
+            return pd.DataFrame()  # Return empty DataFrame instead of dict
         
         # Find best threshold based on profit per investment
         best_idx = results_df['test_profit_per_investment'].idxmax()
@@ -284,7 +308,7 @@ class ThresholdEvaluator:
                                     current_prices_test: np.ndarray,
                                     confidence_method: str = 'simple',
                                     threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                    n_thresholds: int = 20) -> Dict[str, Any]:
+                                    n_thresholds: int = 80) -> Dict[str, Any]:
         """
         Optimize prediction threshold based on confidence scores to maximize investment success rate on test data
         
@@ -308,7 +332,13 @@ class ThresholdEvaluator:
             raise ValueError("Model must implement ModelProtocol (predict and get_prediction_confidence methods)")
         
         # Phase 1: Get predictions
-        test_predictions = model.predict(X_test)
+        try:
+            test_predictions = model.predict(X_test)
+            logger.debug(f"Predictions shape: {test_predictions.shape}")
+            logger.debug(f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]")
+        except Exception as e:
+            logger.error(f"❌ Failed to get predictions: {e}")
+            return {'status': 'failed', 'message': f'Prediction failed: {e}'}
         
         # Validate prediction diversity
         unique_predictions = np.unique(test_predictions)
@@ -321,15 +351,37 @@ class ThresholdEvaluator:
             logger.error("   This indicates a failed training process, likely due to constant features.")
             logger.error("   Aborting threshold optimization.")
             return {'status': 'failed', 'message': f'Model produced insufficient prediction diversity: {len(unique_predictions)} unique values (minimum required: {min_required_diversity:.1f}).'}
+        
         # Phase 2: Get confidence scores
-        test_confidence = model.get_prediction_confidence(X_test, method=confidence_method)
+        try:
+            test_confidence = model.get_prediction_confidence(X_test, method=confidence_method)
+            logger.debug(f"Confidence shape: {test_confidence.shape}")
+            logger.debug(f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
+            logger.debug(f"Confidence mean: {test_confidence.mean():.4f}, std: {test_confidence.std():.4f}")
+        except Exception as e:
+            logger.error(f"❌ Failed to get confidence scores: {e}")
+            return {'status': 'failed', 'message': f'Confidence calculation failed: {e}'}
+        
+        # Validate confidence scores
+        if np.isnan(test_confidence).any():
+            logger.error("❌ Confidence scores contain NaN values")
+            return {'status': 'failed', 'message': 'Confidence scores contain NaN values'}
+        
+        if np.isinf(test_confidence).any():
+            logger.error("❌ Confidence scores contain infinite values")
+            return {'status': 'failed', 'message': 'Confidence scores contain infinite values'}
         
         # For percentage returns: invest when predicted return > 0
-        invest_mask = test_predictions > 0
+        # Ensure test_predictions is 1D
+        test_predictions_1d = test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
+        invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
         logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")        
         if invest_mask.sum() > 0:
-            actual_vs_predicted = y_test.values[invest_mask] >= test_predictions[invest_mask]
+            # Ensure y_test.values and test_predictions are 1D
+            y_test_1d = y_test.values.flatten() if y_test.values.ndim > 1 else y_test.values
+            test_predictions_1d = test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
+            actual_vs_predicted = y_test_1d[invest_mask] >= test_predictions_1d[invest_mask]
             logger.info(f"   Conservative success rate (all samples): {actual_vs_predicted.sum()}/{invest_mask.sum()} ({actual_vs_predicted.sum()/invest_mask.sum()*100:.1f}%)")
         else:
             logger.info("   No investment candidates found!")
@@ -344,8 +396,10 @@ class ThresholdEvaluator:
         
         # Phase 4: Analyze results
         if len(results_df) == 0:
-            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.1% to 1%)")
-            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.1%-1% sample constraint'}
+            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.05% to 5%)")
+            logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
+            logger.warning(f"   Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]")
+            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.05%-5% sample constraint'}
         
         # Find best threshold based on profit per investment
         best_idx = results_df['test_profit_per_investment'].idxmax()
@@ -370,6 +424,50 @@ class ThresholdEvaluator:
             'n_thresholds_tested': len(results_df),
             'total_test_samples': len(test_confidence)
         }
+    
+    def optimize_prediction_threshold_lstm(self, model: ModelProtocol,
+                                        X_test: pd.DataFrame, y_test: pd.Series,
+                                        current_prices_test: np.ndarray,
+                                        confidence_method: str = 'simple',
+                                        threshold_range: Tuple[float, float] = (0.1, 0.9),
+                                        n_thresholds: int = 80) -> Dict[str, Any]:
+        """
+        Optimize prediction threshold specifically for LSTM models
+        
+        Args:
+            model: LSTM model instance
+            X_test: Test features
+            y_test: Test targets
+            current_prices_test: Current prices for test set
+            confidence_method: Confidence calculation method (recommended: 'simple', 'margin', 'leaf_depth')
+            threshold_range: Range of thresholds to test
+            n_thresholds: Number of thresholds to test
+            
+        Returns:
+            Dictionary with optimization results
+        """
+        logger.info(f"🧠 LSTM-Specific Threshold Optimization using {confidence_method} confidence method")
+        
+        # For LSTM models, use more conservative confidence methods that don't require dropout
+        if confidence_method in ['variance', 'lstm_hidden']:
+            logger.warning(f"⚠️ Confidence method '{confidence_method}' requires dropout activation for LSTM models")
+            logger.info("   Consider using 'simple', 'margin', or 'leaf_depth' for more stable results")
+        
+        # Use wider threshold range for LSTM models
+        if threshold_range == (0.1, 0.9):
+            threshold_range = (0.05, 0.95)  # Wider range for LSTM
+            logger.info(f"   Using LSTM-optimized threshold range: {threshold_range}")
+        
+        # Call the main optimization method with LSTM-specific parameters
+        return self.optimize_prediction_threshold(
+            model=model,
+            X_test=X_test,
+            y_test=y_test,
+            current_prices_test=current_prices_test,
+            confidence_method=confidence_method,
+            threshold_range=threshold_range,
+            n_thresholds=n_thresholds
+        )
     
     def predict_with_threshold(self, model: ModelProtocol, X: pd.DataFrame, 
                                 threshold: float, confidence_method: str = 'leaf_depth',
@@ -463,7 +561,6 @@ class ThresholdEvaluator:
         filtered_current_prices = current_prices_test[filtered_indices]
         
         # Calculate comprehensive metrics
-        # Traditional regression metrics
         mse = mean_squared_error(filtered_actual, filtered_predictions)
         mae = mean_absolute_error(filtered_actual, filtered_predictions)
         r2 = r2_score(filtered_actual, filtered_predictions)

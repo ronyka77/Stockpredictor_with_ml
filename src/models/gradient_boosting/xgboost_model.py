@@ -23,7 +23,6 @@ from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cl
 
 logger = get_logger(__name__)
 experiment_name = "xgboost_stock_predictor"
-threshold_evaluator = ThresholdEvaluator()
 
 def log_to_mlflow(model, metrics, params, experiment_name, X_eval):
     """
@@ -111,7 +110,8 @@ class XGBoostModel(BaseModel):
     def __init__(self, 
                 model_name: str = "xgboost_stock_predictor",
                 config: Optional[Dict[str, Any]] = None,
-                prediction_horizon: int = 10):
+                prediction_horizon: int = 10,
+                threshold_evaluator: Optional[ThresholdEvaluator] = None):
         """
         Initialize XGBoost model
         
@@ -119,13 +119,14 @@ class XGBoostModel(BaseModel):
             model_name: Name for MLflow tracking
             config: Model configuration parameters
             prediction_horizon: Prediction horizon in days
+            threshold_evaluator: Optional shared ThresholdEvaluator instance
         """
         # Add prediction_horizon to config
         if config is None:
             config = {}
         config['prediction_horizon'] = prediction_horizon
         
-        super().__init__(model_name, config)
+        super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
         
         # Initialize XGBoost-specific parameters
         self.prediction_horizon = self.config.get('prediction_horizon', 10)
@@ -136,7 +137,7 @@ class XGBoostModel(BaseModel):
         self.base_threshold = 0.5
         
         # Initialize central evaluators
-        self.threshold_evaluator = threshold_evaluator
+        # Use the threshold_evaluator from the base model instead of creating a new one
         self.custom_metrics = CustomMetrics()
     
     def _create_model(self, params: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None, **kwargs) -> 'XGBoostModel':
@@ -166,7 +167,8 @@ class XGBoostModel(BaseModel):
         new_model = XGBoostModel(
             model_name=model_name,
             config=config,
-            prediction_horizon=self.prediction_horizon
+            prediction_horizon=self.prediction_horizon,
+            threshold_evaluator=self.threshold_evaluator
         )
         
         # Copy any relevant settings from the current model

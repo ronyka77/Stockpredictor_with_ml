@@ -23,3 +23,6 @@ models/*
 pipeline_reports/
 pipeline_stats/
 docs/shrimp_manager.md
+_tasks/
+.cursor/
+docs/MEMORY_OPTIMIZATION_TASK_TRACKER.md

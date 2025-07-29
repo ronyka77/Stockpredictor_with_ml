@@ -14,9 +14,10 @@ import pandas as pd
 import numpy as np
 from abc import abstractmethod
 from torch.utils.data import DataLoader, TensorDataset
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from src.models.base_model import BaseModel
+from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,11 +29,10 @@ class PyTorchBasePredictor(BaseModel):
     device management, and model persistence.
     """
 
-    def __init__(self, model_name: str, config: Dict[str, Any] = None):
-        super().__init__(model_name, config)
+    def __init__(self, model_name: str, config: Dict[str, Any] = None, threshold_evaluator: Optional[ThresholdEvaluator] = None):
+        super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
-        # The actual model instance (nn.Module) will be created in the subclass
         self.model = None
 
     @abstractmethod
@@ -127,3 +127,112 @@ class PyTorchBasePredictor(BaseModel):
                 predictions.append(outputs.cpu().numpy())
         
         return np.concatenate(predictions).squeeze()
+
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'leaf_depth') -> np.ndarray:
+        """
+        Calculate confidence scores for predictions using various methods
+        
+        Args:
+            X: Feature matrix
+            method: Confidence calculation method ('variance', 'simple', 'margin')
+            
+        Returns:
+            Array of confidence scores (higher = more confident)
+        """
+        if not self.is_trained:
+            raise ValueError("Model must be trained before calculating confidence")
+        
+        if method == 'variance':
+            # Use prediction variance across multiple forward passes with dropout enabled
+            # Enable dropout temporarily for uncertainty quantification (not training)
+            original_training = self.model.training
+            self.model.train()  # Enable dropout for variance calculation
+            
+            try:
+                predictions = []
+                n_passes = 5  # Reduced from 10 for efficiency
+                
+                X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
+                dataset = TensorDataset(X_tensor)
+                loader = DataLoader(dataset, batch_size=self.config.get('batch_size', 32), shuffle=False)
+                
+                for _ in range(n_passes):
+                    pass_predictions = []
+                    with torch.no_grad():
+                        for batch_X, in loader:
+                            batch_X = batch_X.to(self.device)
+                            outputs = self.model(batch_X)
+                            pass_predictions.append(outputs.cpu().numpy())
+                    predictions.append(np.concatenate(pass_predictions).squeeze())
+                
+                # Calculate variance across passes
+                predictions_array = np.array(predictions)
+                variance = np.var(predictions_array, axis=0)
+                confidence_scores = 1.0 / (1.0 + variance)  # Inverse variance as confidence
+                
+            finally:
+                # Always restore original training state
+                if not original_training:
+                    self.model.eval()
+            
+        elif method == 'simple':
+            # Simple confidence based on prediction magnitude (no dropout needed)
+            self.model.eval()
+            predictions = self.predict(X)
+            # Use absolute prediction values as confidence
+            confidence_scores = np.abs(predictions)
+            
+        elif method == 'margin':
+            # Use prediction margin (distance from zero for regression) (no dropout needed)
+            self.model.eval()
+            predictions = self.predict(X)
+            # For regression, margin is the distance from the mean prediction
+            # Higher distance from mean = more confident (outlier predictions)
+            mean_pred = np.mean(predictions)
+            confidence_scores = np.abs(predictions - mean_pred)
+            
+        elif method == 'leaf_depth':
+            # For PyTorch models, use prediction stability as proxy for leaf_depth (no dropout needed)
+            self.model.eval()
+            # Get predictions with small input perturbations to measure stability
+            predictions = self.predict(X)
+            
+            # Create slightly perturbed inputs
+            X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
+            noise_scale = 0.01  # Small perturbation
+            noise = torch.randn_like(X_tensor) * noise_scale
+            X_perturbed = X_tensor + noise
+            
+            # Get predictions on perturbed data
+            dataset = TensorDataset(X_perturbed)
+            loader = DataLoader(dataset, batch_size=self.config.get('batch_size', 32), shuffle=False)
+            
+            perturbed_predictions = []
+            with torch.no_grad():
+                for batch_X, in loader:
+                    batch_X = batch_X.to(self.device)
+                    outputs = self.model(batch_X)
+                    perturbed_predictions.append(outputs.cpu().numpy())
+            
+            perturbed_predictions = np.concatenate(perturbed_predictions).squeeze()
+            
+            # Stability = inverse of prediction change (more stable = higher confidence)
+            prediction_change = np.abs(predictions - perturbed_predictions)
+            confidence_scores = 1.0 / (1.0 + prediction_change)
+            
+        else:
+            raise ValueError(f"Unknown confidence method: {method}")
+        
+        # Normalize confidence scores to [0, 1] range
+        min_conf, max_conf = confidence_scores.min(), confidence_scores.max()
+        if max_conf > min_conf:
+            confidence_scores = (confidence_scores - min_conf) / (max_conf - min_conf)
+        else:
+            # All confidence scores are identical - this is problematic
+            logger.warning(f"All confidence scores are identical ({min_conf:.4f}) - using uniform distribution")
+            confidence_scores = np.full_like(confidence_scores, 0.5)
+            
+        logger.debug(f"Final confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
+        logger.debug(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
+        
+        return confidence_scores

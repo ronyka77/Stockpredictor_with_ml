@@ -22,13 +22,14 @@ class BaseModel(ABC):
     Abstract base class for all ML models with MLflow integration
     """
     
-    def __init__(self, model_name: str, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, model_name: str, config: Optional[Dict[str, Any]] = None, threshold_evaluator: Optional[ThresholdEvaluator] = None):
         """
         Initialize base model
         
         Args:
             model_name: Name of the model for tracking
             config: Model configuration parameters
+            threshold_evaluator: Optional shared ThresholdEvaluator instance
         """
         self.model_name = model_name
         self.config = config or {}
@@ -42,6 +43,12 @@ class BaseModel(ABC):
         self.mlflow_integration = MLflowIntegration()
         self.experiment_name = f"stock_prediction_{model_name}"
         self.run_id = None
+        
+        # Use provided ThresholdEvaluator or create a new one
+        if threshold_evaluator is not None:
+            self.threshold_evaluator = threshold_evaluator
+        else:
+            self.threshold_evaluator = ThresholdEvaluator()
         
         logger.info(f"Initialized {model_name} model")
     
@@ -150,8 +157,8 @@ class BaseModel(ABC):
         
         # Start a new run if not already started
         if self.run_id is None:
-            self.mlflow_integration.start_run()
-            self.run_id = self.mlflow_integration.get_run_id()
+            run = self.mlflow_integration.start_run()
+            self.run_id = run.info.run_id
         
         # Log model parameters and metadata
         params = {
@@ -222,12 +229,11 @@ class BaseModel(ABC):
             raise ValueError("Model must be trained before evaluation")
         
         metrics = {}
-        threshold_evaluator = ThresholdEvaluator()
         # Advanced threshold-based evaluation
         if current_prices is not None:
             try:
                 # Perform threshold optimization
-                threshold_results = threshold_evaluator.optimize_prediction_threshold(
+                threshold_results = self.threshold_evaluator.optimize_prediction_threshold(
                     model=self,
                     X_test=X,
                     y_test=y,
@@ -261,9 +267,6 @@ class BaseModel(ABC):
         Args:
             experiment_name: Name of the experiment (optional)
         """
-        if self.disable_mlflow:
-            return
-        
         if experiment_name:
             self.experiment_name = experiment_name
         
@@ -287,9 +290,6 @@ class BaseModel(ABC):
         Args:
             params: Parameters to log
         """
-        if self.disable_mlflow:
-            return
-        
         try:
             self.mlflow_integration.log_params(params)
         except Exception as e:
@@ -303,9 +303,6 @@ class BaseModel(ABC):
             metrics: Metrics to log
             step: Step number (optional)
         """
-        if self.disable_mlflow:
-            return
-        
         try:
             self.mlflow_integration.log_metrics(metrics, step=step)
             logger.debug(f"Logged metrics: {list(metrics.keys())}")

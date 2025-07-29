@@ -14,13 +14,10 @@ from mlflow.tracking import MlflowClient
 try:
     project_root = Path(__file__).parent.parent.parent
     if not project_root.exists():
-        # Handle network path by using raw string
         project_root = Path(r"\\".join(str(project_root).split("\\")))
     sys.path.append(str(project_root))
-    print(f"Project root mlflow_utils: {project_root}")
 except Exception as e:
     print(f"Error setting project root path: {e}")
-    # Fallback to current directory if path resolution fails
     sys.path.append(os.getcwd().parent)
     print(f"Current directory mlflow_utils: {os.getcwd().parent}")
 
