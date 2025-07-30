@@ -35,6 +35,8 @@ def run_lstm_training():
     logger.info("🚀 STARTING LSTM MODEL TRAINING PIPELINE")
     logger.info("="*80)
     try:
+        # Option 1: Standard training (original functionality)
+        logger.info("📋 Running standard LSTM training...")
         sequence_length = 20
         batch_size = 512
         data_dict, train_dataset, test_dataset = prepare_data(sequence_length, logger)
@@ -53,19 +55,63 @@ def run_lstm_training():
             'dropout': 0.2,
             'epochs': 10,
             'learning_rate': 0.002,
-            'batch_size': batch_size
+            'batch_size': batch_size,
+            'sequence_length': sequence_length
         }
         lstm_model = LSTMPredictor(config=lstm_config)
         lstm_model.fit(train_loader, val_loader=test_loader, feature_names=X_train.columns.tolist())
         lstm_model.evaluate(X_test, y_test, current_prices=current_prices, confidence_method='leaf_depth')
         logger.info("✅ LSTM model training complete.")
-
-        # evaluate_model(lstm_model, data_dict['X_test'], test_dataset, data_dict, logger, device)
         save_model(lstm_model, logger)
+        
     except Exception as e:
         logger.error(f"❌ An error occurred during the LSTM training pipeline: {e}")
         import traceback
         traceback.print_exc()
 
+
+def run_lstm_hyperparameter_optimization():
+    """
+    Run LSTM hyperparameter optimization using the integrated functionality
+    """
+    logger.info("="*80)
+    logger.info("🎯 STARTING LSTM HYPERPARAMETER OPTIMIZATION")
+    logger.info("="*80)
+    try:
+        # Initialize LSTM model
+        lstm_model = LSTMPredictor(
+            model_name="lstm_hyperparameter_optimized",
+            config={
+                'input_size': 100,  # Will be set automatically during optimization
+                'hidden_size': 128,
+                'num_layers': 2,
+                'output_size': 1,
+                'dropout': 0.2,
+                'epochs': 10,
+                'learning_rate': 0.001,
+                'batch_size': 512,
+                'sequence_length': 20
+            }
+        )
+        
+        # Run hyperparameter optimization
+        results = lstm_model.run_hyperparameter_optimization(
+            n_trials=20,
+            prediction_horizon=10,
+            experiment_name="lstm_hyperparameter_optimization"
+        )
+        
+        logger.info("🎉 Hyperparameter optimization completed successfully!")
+        logger.info(f"Best model saved to MLflow run: {results['saved_run_id']}")
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"❌ An error occurred during hyperparameter optimization: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
 if __name__ == "__main__":
-    run_lstm_training() 
+    import sys
+    run_lstm_hyperparameter_optimization()

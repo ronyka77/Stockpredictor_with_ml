@@ -397,8 +397,8 @@ class ThresholdEvaluator:
         # Phase 4: Analyze results
         if len(results_df) == 0:
             logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.05% to 5%)")
-            logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
-            logger.warning(f"   Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]")
+            logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f} avg: {test_confidence.mean():.4f} std: {test_confidence.std():.4f}")
+            logger.warning(f"   Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f} avg: {test_predictions.mean():.4f} std: {test_predictions.std():.4f}")
             return {'status': 'failed', 'message': 'No valid thresholds found under the 0.05%-5% sample constraint'}
         
         # Find best threshold based on profit per investment

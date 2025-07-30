@@ -7,10 +7,11 @@ Includes Optuna integration, objective functions, and optimization utilities.
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
-from torch.utils.data import DataLoader
+from typing import Dict, Any
+from sklearn.discriminant_analysis import StandardScaler
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
+from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,39 +21,9 @@ class MLPOptimizationMixin:
     """
     Mixin class providing hyperparameter optimization functionality for MLPPredictor.
     """
-    
-    def _create_model_for_tuning(self, params: Optional[Dict[str, Any]] = None, 
-                                model_name: Optional[str] = None) -> 'MLPPredictor':
-        """
-        Create a new MLPPredictor instance with specified parameters for hyperparameter tuning
-        
-        Args:
-            params: Dictionary of MLP parameters
-            model_name: Optional custom name for the new model
-            
-        Returns:
-            New MLPPredictor instance configured with the provided parameters
-        """
-        if params is None:
-            params = {}
-            
-        if model_name is None:
-            model_name = f"{self.model_name}_trial"
-        
-        # Create new model instance with the same threshold evaluator
-        config = self.config.copy()
-        config.update(params)
-        
-        new_model = MLPPredictor(
-            model_name=model_name,
-            config=config,
-            threshold_evaluator=self.threshold_evaluator
-        )
-        
-        return new_model
 
     def objective(self, X_train: pd.DataFrame, y_train: pd.Series, 
-                    X_test: pd.DataFrame, y_test: pd.Series) -> callable:
+                    X_test: pd.DataFrame, X_test_scaled, y_test: pd.Series, fitted_scaler=StandardScaler) -> callable:
         """
         Create Optuna objective function for hyperparameter optimization with threshold optimization
         
@@ -61,6 +32,7 @@ class MLPOptimizationMixin:
             y_train: Training targets
             X_test: Test features  
             y_test: Test targets
+            fitted_scaler: Pre-fitted StandardScaler instance (optional)
             
         Returns:
             Objective function for Optuna optimization with threshold optimization
@@ -70,41 +42,80 @@ class MLPOptimizationMixin:
         self.best_trial_model = None
         self.best_trial_params = None
         self.best_threshold_info = None
+        self.feature_names = X_train.columns
+        
+        # Store the fitted scaler for use in trials
+        if fitted_scaler is not None:
+            self.fitted_scaler = fitted_scaler
+            logger.info("✅ Pre-fitted scaler received for optimization trials")
         
         def objective(trial):
             """Objective function for Optuna optimization with threshold optimization for each trial"""
-            params = {
-                'layer_sizes': trial.suggest_categorical('layer_sizes', 
-                    [[64, 32], [128, 64], [256, 128, 64], [512, 256, 128, 64], [128, 64, 32], [256, 128, 64, 32]]),
-                'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True),
-                'dropout': trial.suggest_float('dropout', 0.1, 0.5),
-                'batch_size': trial.suggest_categorical('batch_size', [16, 32, 64, 128]),
-                'optimizer': trial.suggest_categorical('optimizer', ['adam', 'adamw', 'rmsprop', 'sgd']),
+            
+            # Get layer_sizes as string and convert to list
+            layer_sizes_str = trial.suggest_categorical('layer_sizes', 
+                ('64,32', '128,64', '256,128,64', '512,256,128,64', '128,64,32', '256,128,64,32'))
+            
+            # Convert string back to list of integers
+            layer_sizes = [int(x.strip()) for x in layer_sizes_str.split(',')]
+            
+            # Model creation parameters (relevant for _create_model)
+            model_params = {
+                'input_size': len(X_train.columns),  # Add input_size from training data
+                'layer_sizes': layer_sizes,
+                'learning_rate': trial.suggest_float('learning_rate', 1e-4, 5e-2, log=True),
+                'dropout': trial.suggest_float('dropout', 0.05, 0.5),
+                'optimizer': 'adamw',  # Fixed - generally the best choice
                 'weight_decay': trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True),
-                'activation': trial.suggest_categorical('activation', ['relu', 'leaky_relu', 'elu', 'gelu']),
-                'epochs': trial.suggest_int('epochs', 20, 100),
-                'batch_norm': trial.suggest_categorical('batch_norm', [True, False]),
-                'residual': trial.suggest_categorical('residual', [True, False]),
-                'gradient_clip': trial.suggest_float('gradient_clip', 0.1, 5.0, log=True),
-                'early_stopping_patience': trial.suggest_int('early_stopping_patience', 5, 15),
-                'lr_scheduler': trial.suggest_categorical('lr_scheduler', [None, 'cosine', 'step', 'plateau'])
+                'activation': 'relu',  # Fixed - most reliable activation
+                'epochs': trial.suggest_int('epochs', 5, 30),
+                'batch_norm': True,  # Fixed - generally beneficial
+                'residual': False,  # Fixed - not needed for MLPs
+                'gradient_clip': trial.suggest_float('gradient_clip', 0.1, 5.0, log=True),  # Keep variable
+                'early_stopping_patience': 15,  # Fixed - good default
+                'lr_scheduler': 'cosine',  # Fixed - often the best scheduler
+            }
+            
+            # Data loading parameters (not relevant for model creation)
+            data_params = {
+                'batch_size': trial.suggest_categorical('batch_size', (256, 512, 1024, 2048)),
+                'num_workers': 12,  # Fixed based on CPU cores
+                'pin_memory': True  # Fixed - always True for GPU
             }
             
             try:
-                # Create model with trial parameters using the _create_model_for_tuning method
-                trial_model = self._create_model_for_tuning(
-                    params=params,
-                    model_name=f"mlp_trial_{trial.number}"
+                # Create a new model instance for this trial
+                trial_model = MLPPredictor(
+                    model_name=f"mlp_trial_{trial.number}",
+                    config=model_params,
+                    threshold_evaluator=self.threshold_evaluator
                 )
                 
                 # Disable MLflow for trial models to avoid clutter
                 trial_model.disable_mlflow = True
                 
-                # Prepare data for training
-                train_loader, val_loader = self._prepare_data_for_training(X_train, y_train, X_test, y_test, params['batch_size'])
+                # Create the model using _create_model with only model-relevant parameters
+                trial_model.model = trial_model._create_model(params=model_params)
+                trial_model.model.to(trial_model.device)
+                
+                # Create DataLoaders directly in the objective function
+                
+                
+                # Store the fitted scaler for later use in the trial model
+                self.current_trial_scaler = self.fitted_scaler
+                
+                # Create DataLoaders using the cleaned and scaled data
+                num_workers = data_params.get('num_workers', 12)
+                pin_memory = data_params.get('pin_memory', True)
+                
+                logger.debug(f"🚀 Creating DataLoaders with num_workers={num_workers}, pin_memory={pin_memory}")
+                
+                train_loader, val_loader = MLPDataUtils.create_train_val_dataloaders(
+                    X_train, y_train, X_test_scaled, y_test, data_params['batch_size'], num_workers, pin_memory
+                )
                 
                 # Train the model
-                trial_model.fit(train_loader, val_loader)
+                trial_model.fit(train_loader, val_loader, scaler=self.fitted_scaler, feature_names=self.feature_names)
                 
                 # Extract current prices for test sets
                 test_current_prices = X_test['close'].values if 'close' in X_test.columns else np.ones(len(X_test))
@@ -116,9 +127,7 @@ class MLPOptimizationMixin:
                     X_test=X_test,
                     y_test=y_test,
                     current_prices_test=test_current_prices,
-                    confidence_method='variance', 
-                    threshold_range=(0.1, 0.9),
-                    n_thresholds=80  
+                    confidence_method='variance'
                 )
                 
                 # Use threshold-optimized investment success rate
@@ -145,7 +154,9 @@ class MLPOptimizationMixin:
                 if optimized_profit_score > self.best_investment_success_rate:
                     self.best_investment_success_rate = optimized_profit_score
                     self.best_trial_model = trial_model
-                    self.best_trial_params = params.copy()
+                    # Combine model and data parameters for storing best trial info
+                    combined_params = {**model_params, **data_params}
+                    self.best_trial_params = combined_params.copy()
                     self.best_threshold_info = threshold_info.copy()
                     
                     # Update self.model with the best trial model
@@ -176,28 +187,6 @@ class MLPOptimizationMixin:
         
         return objective
 
-    def _prepare_data_for_training(self, X_train: pd.DataFrame, y_train: pd.Series, 
-                                    X_test: pd.DataFrame, y_test: pd.Series, 
-                                    batch_size: int) -> Tuple[DataLoader, DataLoader]:
-        """
-        Prepare data for training by creating DataLoaders
-        
-        Args:
-            X_train: Training features
-            y_train: Training targets
-            X_test: Test features
-            y_test: Test targets
-            batch_size: Batch size for training
-            
-        Returns:
-            Tuple of (train_loader, val_loader)
-        """
-        from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
-        
-        return MLPDataUtils.create_train_val_dataloaders(
-            X_train, y_train, X_test, y_test, batch_size
-        )
-
     def get_best_trial_info(self) -> Dict[str, Any]:
         """
         Get information about the best trial from hyperparameter optimization with threshold info
@@ -214,6 +203,24 @@ class MLPOptimizationMixin:
             "has_best_model": self.best_trial_model is not None,
             "model_updated": self.model is not None
         }
+        
+        # Add scaler information if available
+        if hasattr(self, 'scaler') and self.scaler is not None:
+            base_info.update({
+                "scaler_info": {
+                    "scaler_type": "StandardScaler",
+                    "scaler_available": True,
+                    "scaler_fitted": hasattr(self.scaler, 'mean_') and hasattr(self.scaler, 'scale_')
+                }
+            })
+        else:
+            base_info.update({
+                "scaler_info": {
+                    "scaler_type": "None",
+                    "scaler_available": False,
+                    "scaler_fitted": False
+                }
+            })
         
         # Add threshold optimization information if available
         if hasattr(self, 'best_threshold_info') and self.best_threshold_info is not None:
@@ -242,6 +249,13 @@ class MLPOptimizationMixin:
             # Copy the best model's state to this instance
             self.model = self.best_trial_model.model
             self.feature_names = self.best_trial_model.feature_names
+            
+            # Transfer the scaler from the best trial model
+            if hasattr(self.best_trial_model, 'scaler') and self.best_trial_model.scaler is not None:
+                self.scaler = self.best_trial_model.scaler
+                logger.info("✅ StandardScaler transferred from best trial model")
+            else:
+                logger.warning("⚠️ No scaler found in best trial model")
             
             # Copy threshold optimization information if available
             if hasattr(self, 'best_threshold_info') and self.best_threshold_info is not None:
@@ -275,6 +289,20 @@ class MLPOptimizationMixin:
                     "best_investment_success_rate": self.best_investment_success_rate,
                     "hypertuning_completed": 1
                 }
+                
+                # Add scaler information
+                if hasattr(self, 'scaler') and self.scaler is not None:
+                    metrics_to_log.update({
+                        "scaler_used": 1,
+                        "scaler_type": "StandardScaler"
+                    })
+                    logger.info("✅ StandardScaler information logged to MLflow")
+                else:
+                    metrics_to_log.update({
+                        "scaler_used": 0,
+                        "scaler_type": "None"
+                    })
+                    logger.warning("⚠️ No scaler information to log to MLflow")
                 
                 # Add threshold metrics if available
                 if hasattr(self, 'best_threshold_info') and self.best_threshold_info is not None:

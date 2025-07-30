@@ -44,8 +44,32 @@ class MLPEvaluationMixin:
         # Select top features
         selected_features = correlations.nlargest(n_features_to_select).index.tolist()
         
+        # Add important columns if they exist and are not already selected
+        important_columns = ['close', 'date_int', 'ticker_id']
+        missing_important_columns = []
+        
+        # First, collect all missing important columns
+        for column in important_columns:
+            if column in X.columns and column not in selected_features:
+                missing_important_columns.append(column)
+        
+        # If we have missing important columns, add them all at once
+        if missing_important_columns:
+            # Calculate how many features we need to remove to make room
+            total_needed = len(selected_features) + len(missing_important_columns)
+            features_to_remove = max(0, total_needed - n_features_to_select)
+            
+            # Remove the lowest correlation features if needed
+            if features_to_remove > 0:
+                selected_features = selected_features[:-features_to_remove]
+                logger.info(f"   Removed {features_to_remove} lowest correlation features to make room for important columns")
+            
+            # Add all missing important columns
+            selected_features.extend(missing_important_columns)
+            logger.info(f"   Added {len(missing_important_columns)} important columns: {missing_important_columns}")
+        
         logger.info(f"✅ Selected {len(selected_features)} features using correlation")
-        logger.info(f"   Top 5 features: {selected_features[:5]}")
+        logger.info(f"   Top 10 features: {selected_features[:10]}")
         
         return selected_features
 
@@ -71,64 +95,6 @@ class MLPEvaluationMixin:
         logger.info(f"   Cleaned data: {len(y_clean)} samples, {len(X_clean.columns)} features")
         
         return X_clean, y_clean
-
-
-def validate_and_clean_data(X: pd.DataFrame, y: pd.Series, logger) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Validate and clean input data to prevent NaN/Inf issues
-    
-    Args:
-        X: Feature matrix
-        y: Target values
-        logger: Logger instance
-        
-    Returns:
-        Tuple of cleaned (X, y)
-    """
-    logger.info("🔍 Validating and cleaning input data...")
-    
-    original_shape = X.shape
-    
-    # Check for NaN/Inf values in features
-    nan_features = X.columns[X.isna().any()].tolist()
-    inf_features = X.columns[np.isinf(X.select_dtypes(include=[np.number])).any()].tolist()
-    
-    if nan_features:
-        logger.warning(f"   Found NaN values in {len(nan_features)} features")
-        X = X.fillna(X.median())
-    
-    if inf_features:
-        logger.warning(f"   Found Inf values in {len(inf_features)} features")
-        # Replace inf with large finite values
-        X = X.replace([np.inf, -np.inf], np.nan)
-        X = X.fillna(X.median())
-    
-    # Check for NaN/Inf in target
-    if y.isna().any() or np.isinf(y).any():
-        logger.warning("   Found NaN/Inf values in target, removing these samples...")
-        valid_mask = ~(y.isna() | np.isinf(y))
-        X = X[valid_mask]
-        y = y[valid_mask]
-        logger.info(f"   Kept {len(y)} valid samples after cleaning (removed {original_shape[0] - len(y)} samples)")
-    
-    # Check for constant features (can cause issues)
-    constant_features = X.columns[X.nunique() <= 1].tolist()
-    if constant_features:
-        logger.warning(f"   Found {len(constant_features)} constant features, removing them...")
-        X = X.drop(columns=constant_features)
-    
-    # Check for features with very high variance (potential outliers)
-    feature_vars = X.var()
-    high_var_features = feature_vars[feature_vars > feature_vars.quantile(0.99)].index.tolist()
-    if high_var_features:
-        logger.warning(f"   Found {len(high_var_features)} features with very high variance")
-        # Clip extreme values instead of removing features
-        for col in X.columns:
-            q1, q3 = X[col].quantile([0.01, 0.99])
-            X[col] = X[col].clip(q1, q3)
-    
-    logger.info(f"✅ Data validation completed. Final shape: {X.shape}")
-    return X, y
 
 
 # Extend MLPPredictor with evaluation mixin

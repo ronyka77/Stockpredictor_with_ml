@@ -13,6 +13,7 @@ import mlflow
 import mlflow.lightgbm
 import optuna
 from datetime import datetime
+import os
 
 from src.models.base_model import BaseModel
 from src.models.evaluation import ThresholdEvaluator, CustomMetrics
@@ -60,8 +61,27 @@ class LightGBMModel(BaseModel):
         self.eval_metric = self.config.get('eval_metric', 'rmse')
         self.base_threshold = 0.5
         
+        # Calculate CPU usage limit (75% of available cores by default)
+        total_cores = os.cpu_count() or 4
+        self.max_cpu_cores = max(1, int(total_cores * 0.75))
+        logger.info(f"🔧 CPU Usage Limit: {self.max_cpu_cores}/{total_cores} cores (75%)")
+        
         # Initialize central evaluators
         self.custom_metrics = CustomMetrics()
+    
+    def set_cpu_usage_limit(self, percentage: float = 0.75) -> None:
+        """
+        Set the CPU usage limit for LightGBM training and prediction
+        
+        Args:
+            percentage: CPU usage percentage (0.0 to 1.0, default 0.75 for 75%)
+        """
+        if not 0.0 <= percentage <= 1.0:
+            raise ValueError("CPU usage percentage must be between 0.0 and 1.0")
+        
+        total_cores = os.cpu_count() or 4
+        self.max_cpu_cores = max(1, int(total_cores * percentage))
+        logger.info(f"🔧 CPU Usage Limit Updated: {self.max_cpu_cores}/{total_cores} cores ({percentage:.1%})")
     
     def _create_model(self, params: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None, **kwargs) -> 'LightGBMModel':
         """
@@ -225,7 +245,8 @@ class LightGBMModel(BaseModel):
         base_params = {
             'objective': 'regression',
             'metric': self.eval_metric,
-            'verbose': -1  # Suppress training output
+            'verbose': -1,  # Suppress training output
+            'num_threads': self.max_cpu_cores  # Limit CPU usage to 75%
         }
         # Only add random_state if not already provided in params
         if 'random_state' not in params:
@@ -336,6 +357,7 @@ class LightGBMModel(BaseModel):
                 'min_child_weight': trial.suggest_float('min_child_weight', 1, 30, step=0.1),
                 'min_child_samples': trial.suggest_int('min_child_samples', 5, 500),
                 'num_leaves': trial.suggest_int('num_leaves', 10, 500),
+                'num_threads': self.max_cpu_cores,  # Limit CPU usage to 75%
             }
             
             try:
@@ -894,7 +916,7 @@ class LightGBMModel(BaseModel):
         # Use a simple, fast configuration for the preliminary model
         prelim_params = {
             'objective': 'regression', 'metric': 'rmse', 'n_estimators': 500,
-            'learning_rate': 0.05, 'verbose': -1, 'n_jobs': -1, 'seed': 42
+            'learning_rate': 0.05, 'verbose': -1, 'num_threads': self.max_cpu_cores, 'seed': 42
         }
         
         categorical_features = self._identify_categorical_features(X)
@@ -994,7 +1016,6 @@ def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, X_eval):
                 "model",  # Keep artifact path as "model"
                 pip_requirements=pip_requirements,
                 signature=signature,
-                # REMOVED: registered_model_name parameter (causes 404 in MLflow 2.8+)
             )
 
             # Step 2: Register model separately using the classic API
@@ -1034,16 +1055,16 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 200
-        n_features_to_select = 60
+        number_of_trials = 1000
+        n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
             split_date='2025-02-01',
-            ticker=None,  # Load ALL tickers
-            clean_features=True,  # Apply feature cleaning
-            use_cache=False,  # Apply LightGBM data cleaning
+            ticker=None,  
+            clean_features=True,
+            use_cache=True,  
         )
         
         # Extract prepared data
@@ -1076,7 +1097,7 @@ def main():
         # Create objective function using the LightGBM model class method with selected features
         objective_function = lgb_model.objective(X_train_selected, y_train, X_test_selected, y_test)
         sampler = optuna.samplers.TPESampler(seed=42)
-        # Run optimization
+        # Run optimization with CPU limit
         study = optuna.create_study(direction='maximize', sampler=sampler)
         study.optimize(objective_function, n_trials=number_of_trials, n_jobs=1)
         

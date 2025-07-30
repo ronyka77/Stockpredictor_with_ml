@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import os
 import pandas as pd
+import numpy as np
 from typing import Optional, Dict, Any, Tuple
 from torch.utils.data import DataLoader
 
@@ -130,26 +131,70 @@ class MLPTrainingMixin:
         total_norm = total_norm ** (1. / 2)
         return total_norm
 
-    def _create_dataloader(self, X: pd.DataFrame, y: pd.Series, shuffle: bool = True):
+    def _create_dataloader(self, X: pd.DataFrame, y: pd.Series, shuffle: bool = True, use_stored_scaler: bool = True):
         """
-        Create a DataLoader from DataFrame and Series
+        Create a DataLoader from DataFrame and Series with centralized preprocessing
         
         Args:
             X: Features DataFrame
             y: Targets Series
             shuffle: Whether to shuffle the data
+            use_stored_scaler: Whether to use stored scaler if available
             
         Returns:
             DataLoader instance
         """
         from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
         
+        # Check if we have a stored scaler and should use it
+        if use_stored_scaler and hasattr(self, 'scaler') and self.scaler is not None:
+            # Use stored scaler for consistent preprocessing
+            logger.info("✅ Using stored scaler for data preprocessing")
+            X_clean, _ = MLPDataUtils.validate_and_clean_data(
+                data=X, 
+                scaler=self.scaler, 
+                fit_scaler=False
+            )
+        else:
+            # Fit new scaler (fallback for backward compatibility)
+            logger.info("✅ Fitting new scaler for data preprocessing")
+            X_clean, fitted_scaler = MLPDataUtils.validate_and_clean_data(
+                data=X, 
+                scaler=None, 
+                fit_scaler=True
+            )
+            
+            # Store the fitted scaler in the model instance for later saving
+            self.scaler = fitted_scaler
+            logger.info("✅ Fitted scaler stored in model instance for later saving")
+        
+        # Clean target data (y) using basic preprocessing since targets don't need scaling
+        y_clean = y.copy()
+        y_clean = y_clean.fillna(y_clean.mean())
+        y_clean = y_clean.replace([np.inf, -np.inf], 0)
+        
+        # Clip extreme values for targets
+        y_clean = y_clean.clip(-10, 10)
+        
         batch_size = self.config.get('batch_size', 32)
-        return MLPDataUtils.create_dataloader_from_dataframe(X, y, batch_size, shuffle)
+        num_workers = self.config.get('num_workers', 4)  # Default to 4 workers
+        pin_memory = self.config.get('pin_memory', True)  # Default to True for GPU training
+        
+        logger.info(f"🚀 Creating DataLoader with batch_size={batch_size}, num_workers={num_workers}, pin_memory={pin_memory}")
+        
+        # Log performance recommendations
+        if num_workers == 0:
+            logger.warning("⚠️ Consider increasing num_workers for better training speed with abundant resources")
+        if not pin_memory and torch.cuda.is_available():
+            logger.warning("⚠️ Consider enabling pin_memory=True for faster GPU data transfer")
+        
+        return MLPDataUtils.create_dataloader_from_dataframe(
+            X_clean, y_clean, batch_size, shuffle, num_workers, pin_memory
+        )
 
     def _training_step(self, batch_X: torch.Tensor, batch_y: torch.Tensor, 
-                      optimizer: torch.optim.Optimizer, criterion: nn.Module, 
-                      scaler: Optional[torch.amp.GradScaler], gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
+                        optimizer: torch.optim.Optimizer, criterion: nn.Module, 
+                        scaler: Optional[torch.amp.GradScaler], gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
         """
         Execute one training step with mixed precision support.
         
@@ -164,8 +209,8 @@ class MLPTrainingMixin:
             return self._standard_step(batch_X, batch_y, optimizer, criterion, gradient_clip)
 
     def _mixed_precision_step(self, batch_X: torch.Tensor, batch_y: torch.Tensor,
-                             optimizer: torch.optim.Optimizer, criterion: nn.Module,
-                             scaler: torch.amp.GradScaler, gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
+                            optimizer: torch.optim.Optimizer, criterion: nn.Module,
+                            scaler: torch.amp.GradScaler, gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
         """Execute training step with mixed precision."""
         with torch.amp.autocast('cuda'):
             outputs = self.model(batch_X)
@@ -188,11 +233,17 @@ class MLPTrainingMixin:
         # Calculate gradient norm
         grad_norm = self._calculate_gradient_norm(self.model)
         
+        # Debug: Check for gradient issues
+        if grad_norm < 1e-8:
+            logger.warning(f"⚠️ Very small gradient norm: {grad_norm:.2e}")
+        elif grad_norm > 100:
+            logger.warning(f"⚠️ Very large gradient norm: {grad_norm:.2e}")
+        
         return loss.item(), grad_norm
 
     def _standard_step(self, batch_X: torch.Tensor, batch_y: torch.Tensor,
-                      optimizer: torch.optim.Optimizer, criterion: nn.Module,
-                      gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
+                        optimizer: torch.optim.Optimizer, criterion: nn.Module,
+                        gradient_clip: Optional[float]) -> Tuple[Optional[float], float]:
         """Execute training step with standard precision."""
         outputs = self.model(batch_X)
         loss = criterion(outputs.squeeze(), batch_y)
@@ -212,11 +263,17 @@ class MLPTrainingMixin:
         # Calculate gradient norm
         grad_norm = self._calculate_gradient_norm(self.model)
         
+        # Debug: Check for gradient issues
+        if grad_norm < 1e-8:
+            logger.warning(f"⚠️ Very small gradient norm: {grad_norm:.2e}")
+        elif grad_norm > 100:
+            logger.warning(f"⚠️ Very large gradient norm: {grad_norm:.2e}")
+        
         return loss.item(), grad_norm
 
     def _training_epoch(self, train_loader: DataLoader, optimizer: torch.optim.Optimizer, 
-                       criterion: nn.Module, scaler: Optional[torch.amp.GradScaler], 
-                       gradient_clip: Optional[float]) -> Dict[str, float]:
+                        criterion: nn.Module, scaler: Optional[torch.amp.GradScaler], 
+                        gradient_clip: Optional[float]) -> Dict[str, float]:
         """
         Execute one training epoch.
         
@@ -265,7 +322,7 @@ class MLPTrainingMixin:
         return total_val_loss / len(val_loader)
 
     def _update_learning_rate(self, scheduler: Optional[torch.optim.lr_scheduler._LRScheduler], 
-                             val_loss: Optional[float]) -> float:
+                            val_loss: Optional[float]) -> float:
         """
         Update learning rate based on scheduler type.
         
@@ -285,7 +342,7 @@ class MLPTrainingMixin:
         return self.optimizer.param_groups[0]['lr']
 
     def _check_early_stopping(self, val_loss: float, epoch: int, 
-                             early_stopping_patience: int, early_stopping_min_delta: float) -> Dict[str, Any]:
+                            early_stopping_patience: int, early_stopping_min_delta: float) -> Dict[str, Any]:
         """
         Check if early stopping should be triggered.
         
@@ -417,6 +474,18 @@ class MLPTrainingMixin:
         logger.info(f"Starting training for {epochs} epochs from epoch {start_epoch}...")
         logger.info(f"Advanced features: Early stopping patience={early_stopping_patience}, "
                     f"Gradient clip={gradient_clip}, Scheduler={self.config.get('lr_scheduler')}")
+        
+        # Log performance configuration
+        batch_size = self.config.get('batch_size', 32)
+        num_workers = self.config.get('num_workers', 4)
+        pin_memory = self.config.get('pin_memory', True)
+        logger.info(f"🚀 Performance config: batch_size={batch_size}, num_workers={num_workers}, pin_memory={pin_memory}")
+        
+        if torch.cuda.is_available():
+            logger.info(f"🎮 GPU available: {torch.cuda.get_device_name(0)}")
+            logger.info(f"🎮 GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        else:
+            logger.warning("⚠️ No GPU detected - training will be slower")
 
         # Main training loop - now much cleaner
         for epoch in range(start_epoch, epochs):

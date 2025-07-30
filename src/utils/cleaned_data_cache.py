@@ -136,6 +136,22 @@ class CleanedDataCache:
                 'diversity_analysis': data_result.get('diversity_analysis', {})
             }
             
+            # Fix Parquet serialization issues with empty structures
+            # Convert empty dictionaries to strings to avoid Parquet struct type issues
+            if isinstance(metadata['removed_features'], dict):
+                if not metadata['removed_features'] or all(not v for v in metadata['removed_features'].values()):
+                    metadata['removed_features'] = '{}'
+                else:
+                    # Convert to JSON string to preserve structure
+                    metadata['removed_features'] = json.dumps(metadata['removed_features'])
+            
+            if isinstance(metadata['diversity_analysis'], dict):
+                if not metadata['diversity_analysis']:
+                    metadata['diversity_analysis'] = '{}'
+                else:
+                    # Convert to JSON string to preserve structure
+                    metadata['diversity_analysis'] = json.dumps(metadata['diversity_analysis'])
+            
             metadata_df = pd.DataFrame([metadata])
             metadata_df.to_parquet(paths['metadata'])
             
@@ -154,10 +170,16 @@ class CleanedDataCache:
             
         except Exception as e:
             logger.error(f"❌ Error saving cleaned data to cache: {str(e)}")
-            # Clean up partial files
+            # Clean up partial files with better error handling
             for path in paths.values():
                 if path.exists():
-                    path.unlink()
+                    try:
+                        path.unlink()
+                        logger.debug(f"   Cleaned up partial file: {path}")
+                    except PermissionError as pe:
+                        logger.warning(f"   Could not delete {path}: {pe}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"   Error cleaning up {path}: {cleanup_error}")
             raise
     
     def load_cleaned_data(self, cache_key: str, data_type: str = "training") -> Dict:
@@ -191,6 +213,23 @@ class CleanedDataCache:
             # Load metadata
             metadata_df = pd.read_parquet(paths['metadata'])
             metadata = metadata_df.iloc[0].to_dict()
+            
+            # Convert JSON strings back to dictionaries for removed_features and diversity_analysis
+            if 'removed_features' in metadata:
+                if isinstance(metadata['removed_features'], str):
+                    try:
+                        metadata['removed_features'] = json.loads(metadata['removed_features'])
+                    except json.JSONDecodeError:
+                        # If it's just '{}', convert to empty dict
+                        metadata['removed_features'] = {}
+            
+            if 'diversity_analysis' in metadata:
+                if isinstance(metadata['diversity_analysis'], str):
+                    try:
+                        metadata['diversity_analysis'] = json.loads(metadata['diversity_analysis'])
+                    except json.JSONDecodeError:
+                        # If it's just '{}', convert to empty dict
+                        metadata['diversity_analysis'] = {}
             
             # Add metadata to result
             result.update(metadata)
@@ -244,3 +283,15 @@ class CleanedDataCache:
                 logger.warning(f"Could not read cache info file {info_file}: {str(e)}")
         
         return cached_entries 
+    
+        
+def main():
+    """
+    Main function to clear the entire cache
+    """
+    cache = CleanedDataCache()
+    cache.clear_cache()
+    print("🧹 Entire cache cleared successfully!")
+
+if __name__ == "__main__":
+    main()

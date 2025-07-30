@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 from abc import abstractmethod
 from torch.utils.data import DataLoader, TensorDataset
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
@@ -46,7 +46,7 @@ class PyTorchBasePredictor(BaseModel):
         """
         pass
 
-    def fit(self, train_loader: DataLoader, val_loader: DataLoader = None, **kwargs) -> 'PyTorchBasePredictor':
+    def fit(self, train_loader: DataLoader, val_loader: DataLoader = None, feature_names: List[str] = None, **kwargs) -> 'PyTorchBasePredictor':
         """
         Train the PyTorch model.
         
@@ -60,7 +60,7 @@ class PyTorchBasePredictor(BaseModel):
         """
         self.model = self._create_model()
         self.model.to(self.device)
-        self.feature_names = kwargs.get('feature_names', self.feature_names)
+        self.feature_names = feature_names
 
         epochs = self.config.get('epochs', 20)
         learning_rate = self.config.get('learning_rate', 1e-3)
