@@ -221,6 +221,8 @@ class BasePredictor(ABC):
             results_df.loc[non_nan_mask, 'price_prediction_error'] = results_df.loc[non_nan_mask, 'predicted_price'] - results_df.loc[non_nan_mask, 'actual_price']
             results_df.loc[non_nan_mask, 'prediction_successful'] = (results_df.loc[non_nan_mask, 'predicted_price'] > results_df.loc[non_nan_mask, 'actual_price']).astype(int)
 
+        
+        
         if self.optimal_threshold is not None:
             confidence_scores = self.get_confidence_scores(features_df)
             _, threshold_mask = self.apply_threshold_filter(predictions, confidence_scores)
@@ -239,6 +241,12 @@ class BasePredictor(ABC):
                 print("   ⚠️  WARNING: No predictions passed the threshold! Exporting empty file.")
         else:
             print("   ℹ️  No optimal threshold available - exporting all predictions")
+
+        # Calculate and log average profit per investment for valid predictions
+        valid_profit_df = results_df[results_df['actual_price'] > 0].copy()
+        avg_profit_per_investment = valid_profit_df['profit_100_investment'].mean()
+        valid_profit_count = valid_profit_df.shape[0]
+        print(f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)")
 
         results_df.to_excel(output_path, index=False)
         print(f"   Saved {len(results_df)} predictions.")

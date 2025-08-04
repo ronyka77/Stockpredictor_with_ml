@@ -6,6 +6,7 @@ Includes the complete pipeline for hypertuning and evaluation.
 """
 
 import torch
+import torch.nn as nn
 import pandas as pd
 import mlflow
 import mlflow.pytorch
@@ -22,28 +23,118 @@ from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cl
 from src.models.time_series.mlp.mlp_evaluation import MLPEvaluationMixin
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 from src.models.time_series.mlp.mlp_optimization import MLPOptimizationMixin
-from src.models.time_series.mlp.mlp_training import MLPTrainingMixin
 
 logger = get_logger(__name__)
 experiment_name = "mlp_stock_predictor"
-
-# Remove feature outliers using IQR method (more robust than percentile)
-def remove_feature_outliers(df, iqr_multiplier=1.5):
-    """Remove outliers from features using IQR method."""
-    df_clean = df.copy()
-    for col in df.columns:
-        if df[col].dtype in ['float64', 'float32', 'int64', 'int32']:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - iqr_multiplier * IQR
-            upper_bound = Q3 + iqr_multiplier * IQR
-            
-            # Cap outliers instead of removing rows to preserve data
-            df_clean[col] = df_clean[col].clip(lower=lower_bound, upper=upper_bound)
+class MLPWrapper(nn.Module):
+    """
+    PyTorch Module wrapper for MLPPredictorWithMLflow to enable MLflow compatibility.
     
-    return df_clean
-class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMixin, MLPTrainingMixin):
+    This wrapper preserves all functionality of the original predictor while making it
+    compatible with MLflow's PyTorch model logging requirements.
+    """
+    
+    def __init__(self, predictor):
+        """
+        Initialize the wrapper with a MLPPredictorWithMLflow instance.
+        
+        Args:
+            predictor: MLPPredictorWithMLflow instance to wrap
+        """
+        super().__init__()
+        self.predictor = predictor
+        
+        # Extract the actual PyTorch model for forward pass
+        if hasattr(predictor, 'model') and predictor.model is not None:
+            self.model = predictor.model
+        else:
+            raise ValueError("Predictor must have a trained model")
+        
+        # Preserve all predictor attributes for compatibility
+        self.scaler = getattr(predictor, 'scaler', None)
+        self.feature_names = getattr(predictor, 'feature_names', [])
+        self.config = getattr(predictor, 'config', {})
+        self.device = getattr(predictor, 'device', torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+        self.model_name = getattr(predictor, 'model_name', 'MLP')
+        self.threshold_evaluator = getattr(predictor, 'threshold_evaluator', None)
+        self.is_trained = getattr(predictor, 'is_trained', False)
+        
+        # Preserve threshold optimization attributes
+        self.optimal_threshold = getattr(predictor, 'optimal_threshold', 0.5)
+        self.confidence_method = getattr(predictor, 'confidence_method', 'variance')
+        self.best_threshold_info = getattr(predictor, 'best_threshold_info', {})
+        
+        logger.info("✅ MLPWrapper initialized with all predictor attributes preserved")
+    
+    def forward(self, x):
+        """
+        Forward pass through the PyTorch model.
+        
+        Args:
+            x: Input tensor
+            
+        Returns:
+            Model predictions
+        """
+        return self.model(x)
+    
+    def predict(self, features_df):
+        """
+        Make predictions using the wrapped predictor's logic.
+        
+        Args:
+            features_df: Input features DataFrame
+            
+        Returns:
+            Predictions as numpy array
+        """
+        return self.predictor.predict(features_df)
+    
+    def get_prediction_confidence(self, features_df, method='variance'):
+        """
+        Get prediction confidence scores using the wrapped predictor's logic.
+        
+        Args:
+            features_df: Input features DataFrame
+            method: Confidence calculation method
+            
+        Returns:
+            Confidence scores as numpy array
+        """
+        return self.predictor.get_prediction_confidence(features_df, method)
+    
+    def predict_with_threshold(self, X, return_confidence=False, threshold=None, confidence_method=None):
+        """
+        Make predictions with confidence-based filtering.
+        
+        Args:
+            X: Feature matrix
+            return_confidence: Whether to return confidence scores
+            threshold: Confidence threshold
+            confidence_method: Confidence method
+            
+        Returns:
+            Dictionary with predictions and filtering info
+        """
+        return self.predictor.predict_with_threshold(X, return_confidence, threshold, confidence_method)
+    
+    def get_prediction_with_confidence(self, features_df, confidence_method='variance'):
+        """
+        Get predictions with confidence scores.
+        
+        Args:
+            features_df: Input features DataFrame
+            confidence_method: Confidence calculation method
+            
+        Returns:
+            Tuple of (predictions, confidence_scores)
+        """
+        predictions = self.predict(features_df)
+        confidence_scores = self.get_prediction_confidence(features_df, confidence_method)
+        return predictions, confidence_scores
+
+
+class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMixin):
     """
     MLPPredictor with MLflow integration capabilities.
     """
@@ -132,60 +223,55 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                             logger.info(f"Converting integer column '{col}' to float64 for signature")
                             input_example[col] = input_example[col].astype("float64")
                 
-                # Infer signature using the predictor's predict method
+                # Create wrapper for MLflow compatibility
+                wrapper = MLPWrapper(self)
+                
+                # Infer signature using the wrapper's predict method
                 try:
-                    predictions_example = self.predict(input_example)
-                    logger.info("✅ Signature generated using predictor predict method")
+                    predictions_example = wrapper.predict(input_example)
+                    logger.info("✅ Signature generated using wrapper predict method")
                     
                 except Exception as predict_error:
-                    logger.warning(f"⚠️ Could not use predictor predict method for signature: {str(predict_error)}")
+                    logger.warning(f"⚠️ Could not use wrapper predict method for signature: {str(predict_error)}")
                     logger.info("🔄 Falling back to direct model inference for signature generation")
                     
                     # Fallback to direct model inference
-                    self.model.eval()
+                    wrapper.eval()
                     with torch.no_grad():
                         input_tensor = torch.FloatTensor(input_example.values)
-                        device = next(self.model.parameters()).device
+                        device = next(wrapper.parameters()).device
                         input_tensor = input_tensor.to(device)
                         
                         if input_tensor.device != device:
                             logger.warning(f"⚠️ Device mismatch detected: input_tensor on {input_tensor.device}, model on {device}")
                             input_tensor = input_tensor.to(device)
                         
-                        predictions_example = self.model(input_tensor).cpu().numpy()
+                        predictions_example = wrapper(input_tensor).cpu().numpy()
                 
                 signature = mlflow.models.infer_signature(input_example, predictions_example)
                 
-                # Log the predictor directly instead of using wrapper
+                # Log the wrapper instead of the predictor
                 try:
                     mlflow.pytorch.log_model(
-                        pytorch_model=self,
+                        pytorch_model=wrapper,
                         name="model",
                         signature=signature,
                     )
-                    logger.info("✅ MLP Predictor successfully logged to MLflow")
+                    logger.info("✅ MLP Wrapper successfully logged to MLflow")
                 except RuntimeError as model_error:
                     if "device" in str(model_error).lower():
                         logger.error(f"❌ Device mismatch error during model logging: {str(model_error)}")
                         logger.info("🔄 Attempting to move model to CPU for logging...")
                         try:
                             # Create a temporary copy for CPU logging
-                            model_cpu = self.model.cpu()
-                            temp_predictor = MLPPredictor(
-                                model_name=f"{self.model_name}_temp",
-                                config=self.config,
-                                threshold_evaluator=self.threshold_evaluator
-                            )
-                            temp_predictor.model = model_cpu
-                            temp_predictor.scaler = scaler
-                            temp_predictor.feature_names = self.feature_names
+                            wrapper_cpu = wrapper.cpu()
                             
                             mlflow.pytorch.log_model(
-                                pytorch_model=temp_predictor,
+                                pytorch_model=wrapper_cpu,
                                 name="model",
                                 signature=signature,
                             )
-                            self.model.to(device)
+                            wrapper.to(self.device)
                             logger.info("✅ Model successfully logged to MLflow (CPU fallback)")
                         except Exception as cpu_error:
                             logger.error(f"❌ Failed to log model even with CPU fallback: {str(cpu_error)}")
@@ -241,19 +327,26 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                     logged_model_info = mlflow.get_logged_model(model_id)
                     logger.info(f"✅ Retrieved logged model: {logged_model_info.name}")
 
-                    loaded_predictor = mlflow.pytorch.load_model(logged_model_info.model_uri)
+                    loaded_wrapper = mlflow.pytorch.load_model(logged_model_info.model_uri)
                     
-                    # Check if loaded model is a wrapper or raw model
-                    if hasattr(loaded_predictor, 'model') and hasattr(loaded_predictor, 'scaler'):
+                    # Check if loaded model is a wrapper
+                    if hasattr(loaded_wrapper, 'predictor'):
                         # It's a wrapper - extract components
-                        self.model = loaded_predictor.model
-                        self.scaler = loaded_predictor.scaler
-                        self.feature_names = loaded_predictor.feature_names
-                        self.config.update(loaded_predictor.config)
+                        self.model = loaded_wrapper.model
+                        self.scaler = loaded_wrapper.scaler
+                        self.feature_names = loaded_wrapper.feature_names
+                        self.config.update(loaded_wrapper.config)
+                        self.device = loaded_wrapper.device
+                        self.model_name = loaded_wrapper.model_name
+                        self.threshold_evaluator = loaded_wrapper.threshold_evaluator
+                        self.is_trained = loaded_wrapper.is_trained
+                        self.optimal_threshold = loaded_wrapper.optimal_threshold
+                        self.confidence_method = loaded_wrapper.confidence_method
+                        self.best_threshold_info = loaded_wrapper.best_threshold_info
                         logger.info("✅ Model wrapper loaded successfully with all components")
                     else:
                         # It's a raw model - use as is
-                        self.model = loaded_predictor
+                        self.model = loaded_wrapper
                         logger.info("✅ Raw model loaded (no wrapper components)")
                     
                     self.model.to(self.device)
@@ -428,7 +521,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 3
+        number_of_trials = 50
         n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
@@ -457,35 +550,25 @@ def main():
         # Calculate percentiles for outlier removal (keep middle 95%)
         y_train_lower = y_train.quantile(0.05)
         y_train_upper = y_train.quantile(0.95)
-        y_test_lower = y_test.quantile(0.05)
-        y_test_upper = y_test.quantile(0.95)
         
         # Create outlier masks
         y_train_outlier_mask = (y_train >= y_train_lower) & (y_train <= y_train_upper)
-        y_test_outlier_mask = (y_test >= y_test_lower) & (y_test <= y_test_upper)
         
         # Apply outlier removal
         X_train_clean_outliers = X_train[y_train_outlier_mask]
         y_train_clean = y_train[y_train_outlier_mask]
-        X_test_clean_outliers = X_test[y_test_outlier_mask]
-        y_test_clean = y_test[y_test_outlier_mask]
         
         # Log outlier removal results
         logger.info("📊 Target outlier removal results:")
         logger.info(f"   Training: {len(y_train)} → {len(y_train_clean)} samples ({len(y_train) - len(y_train_clean)} outliers removed)")
-        logger.info(f"   Testing: {len(y_test)} → {len(y_test_clean)} samples ({len(y_test) - len(y_test_clean)} outliers removed)")
         logger.info(f"   Training target range: {y_train_clean.min():.6f} to {y_train_clean.max():.6f} (avg: {y_train_clean.mean():.6f})")
-        logger.info(f"   Testing target range: {y_test_clean.min():.6f} to {y_test_clean.max():.6f} (avg: {y_test_clean.mean():.6f})")
         
         # Update data with cleaned versions
         X_train = X_train_clean_outliers
-        X_test = X_test_clean_outliers
         y_train = y_train_clean
-        y_test = y_test_clean
         
         # Validate and clean the data
         X_train_clean= MLPDataUtils.validate_and_clean_data(X_train)
-        X_train_scaled, _ = MLPDataUtils.scale_data(X_train_clean, None, True)
         X_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
         
         # Extract cleaned data
@@ -517,6 +600,17 @@ def main():
         
         # Fit a single StandardScaler on training data only to prevent data leakage
         X_train_selected, scaler = MLPDataUtils.scale_data(X_train_selected, None, True)
+        # Remove rows with the highest 50 date_int values
+        if 'date_int' in X_test_selected.columns:
+            threshold = X_test_selected['date_int'].copy()
+            threshold = threshold.drop_duplicates().max()-50
+            logger.info(f"📅 Threshold: {threshold}")
+            mask = X_test_selected['date_int'] < threshold
+            X_test_selected, y_test = X_test_selected[mask], y_test[mask]
+            logger.info(f"📅 Removed rows with date_int >= {threshold} (kept {len(X_test_selected)} samples)")
+        else:
+            logger.warning("⚠️ 'date_int' column not found - skipping date filtering")
+        
         X_test_scaled, _ = MLPDataUtils.scale_data(X_test_selected, scaler, False)
         # Store the fitted scaler in the SAME model instance
         mlp_model.scaler = scaler

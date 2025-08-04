@@ -418,7 +418,6 @@ def main():
             session = Session()
             
             main_logger.info("Database connection established successfully")
-            
         except Exception as e:
             main_logger.error(f"Failed to connect to database: {e}")
             main_logger.error("Please check your DATABASE_URL environment variable")
@@ -435,7 +434,6 @@ def main():
             )
             
             main_logger.info("News collector initialized successfully")
-            
         except Exception as e:
             main_logger.error(f"Failed to initialize news collector: {e}")
             session.close()
@@ -513,7 +511,6 @@ def main():
             
             main_logger.info("=" * 60)
             return True
-            
         except Exception as e:
             main_logger.error(f"News collection failed: {e}")
             main_logger.error("Check the error logs for detailed information")

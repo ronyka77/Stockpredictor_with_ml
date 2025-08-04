@@ -100,7 +100,6 @@ def convert_percentage_predictions_to_prices(predictions: np.ndarray,
     predicted_prices = current_prices * (1 + predictions)
     
     if apply_bounds:
-        # Apply realistic bounds based on typical market behavior
         # For 10-day horizon, reasonable bounds might be ±30% (3% per day on average)
         max_10d_move = max_daily_move * np.sqrt(10)  # Scale for 10-day horizon
         
@@ -116,7 +115,7 @@ def convert_percentage_predictions_to_prices(predictions: np.ndarray,
         capped_low = (predicted_prices < lower_bound).sum()
         
         if capped_high > 0 or capped_low > 0:
-            logger.info(f"🛡️ Applied prediction bounds: {capped_high} capped high, {capped_low} capped low")
+            # logger.info(f"🛡️ Applied prediction bounds: {capped_high} capped high, {capped_low} capped low")
             logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
         
         return bounded_predictions

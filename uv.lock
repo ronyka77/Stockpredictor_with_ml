@@ -1066,6 +1066,18 @@ wheels = [
 ]
 
 [[package]]
+name = "lion-pytorch"
+version = "0.2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/8b/b7afad06d3ace3eecf8d7b63f9f3bbab450039320fa63c7febaa5fe73765/lion_pytorch-0.2.3.tar.gz", hash = "sha256:42ba117ce857e9dd6c67c727e22e575671fd72e441900af137b05e7ee5c8fd88", size = 6990 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/3a/17394e7c09a6796887d12435a7711f6bf6321efacd3e635fc69fcf6dfc70/lion_pytorch-0.2.3-py3-none-any.whl", hash = "sha256:a1f0cb6ddb46c1f5e130b985d2759c33c178195ef88b216621cb4177c6284f81", size = 6565 },
+]
+
+[[package]]
 name = "logging"
 version = "0.4.9.6"
 source = { registry = "https://pypi.org/simple" }
@@ -2201,6 +2213,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytorch-ranger"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/32/9269ee5981995e760c3bf51d6cf7f84a2ce051eca2315753910585bce50d/pytorch_ranger-0.1.1.tar.gz", hash = "sha256:aa7115431cef11b57d7dd7bc86e7302a911dae467f62ec5d0b10e1ff744875db", size = 7865 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/70/12256257d861bbc3e176130d25be1de085ce7a9e60594064888a950f2154/pytorch_ranger-0.1.1-py3-none-any.whl", hash = "sha256:1e69156c9cc8439185cb8ba4725b18c91947fbe72743e25aca937da8aeb0c8ec", size = 14436 },
+]
+
+[[package]]
 name = "pytz"
 version = "2025.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2689,6 +2713,7 @@ dependencies = [
     { name = "fastparquet" },
     { name = "joblib" },
     { name = "lightgbm" },
+    { name = "lion-pytorch" },
     { name = "logging" },
     { name = "mlflow" },
     { name = "newsapi-python" },
@@ -2714,6 +2739,7 @@ dependencies = [
     { name = "ta" },
     { name = "textblob" },
     { name = "torch" },
+    { name = "torch-optimizer" },
     { name = "transformers" },
     { name = "vadersentiment" },
     { name = "vulture" },
@@ -2739,6 +2765,7 @@ requires-dist = [
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "joblib", specifier = ">=1.4.2" },
     { name = "lightgbm", specifier = ">=4.6.0" },
+    { name = "lion-pytorch", specifier = ">=0.2.3" },
     { name = "logging", specifier = ">=0.4.9.6" },
     { name = "mlflow", specifier = ">=2.22.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
@@ -2766,6 +2793,7 @@ requires-dist = [
     { name = "ta", specifier = ">=0.11.0" },
     { name = "textblob", specifier = ">=0.19.0" },
     { name = "torch", specifier = ">=2.0.0" },
+    { name = "torch-optimizer", specifier = ">=0.3.0" },
     { name = "transformers", specifier = ">=4.52.4" },
     { name = "vadersentiment", specifier = ">=3.3.2" },
     { name = "vulture", specifier = ">=2.14" },
@@ -2919,6 +2947,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/90/1c/48b988870823d1cc381f15ec4e70ed3d65e043f43f919329b0045ae83529/torch-2.7.1-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:30207f672328a42df4f2174b8f426f354b2baa0b7cca3a0adb3d6ab5daf00dc8", size = 821098066 },
     { url = "https://files.pythonhosted.org/packages/7b/eb/10050d61c9d5140c5dc04a89ed3257ef1a6b93e49dd91b95363d757071e0/torch-2.7.1-cp313-cp313t-win_amd64.whl", hash = "sha256:79042feca1c634aaf6603fe6feea8c6b30dfa140a6bbc0b973e2260c7e79a22e", size = 216336310 },
     { url = "https://files.pythonhosted.org/packages/b1/29/beb45cdf5c4fc3ebe282bf5eafc8dfd925ead7299b3c97491900fe5ed844/torch-2.7.1-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:988b0cbc4333618a1056d2ebad9eb10089637b659eb645434d0809d8d937b946", size = 68645708 },
+]
+
+[[package]]
+name = "torch-optimizer"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytorch-ranger" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/18/13/c4c0a206131e978d8ceaa095ad1e3153d7daf48efad207b6057efe3491a2/torch-optimizer-0.3.0.tar.gz", hash = "sha256:b2180629df9d6cd7a2aeabe71fa4a872bba938e8e275965092568cd9931b924c", size = 54409 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f6/54/bbb1b4c15afc2dac525c8359c340ade685542113394fd4c6564ee3c71da3/torch_optimizer-0.3.0-py3-none-any.whl", hash = "sha256:7de8e57315e43561cdd0370a1b67303cc8ef1b053f9b5573de629a62390f2af9", size = 61897 },
 ]
 
 [[package]]

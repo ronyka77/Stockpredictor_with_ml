@@ -476,7 +476,7 @@ if __name__ == "__main__":
     
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=7)
+    start_date = end_date - timedelta(days=5)
     
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),
