@@ -9,7 +9,9 @@ import os
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-
+from dotenv import load_dotenv
+# Load environment variables from a .env file if present
+load_dotenv()
 @dataclass
 class PolygonFundamentalsConfig:
     """Configuration for Polygon fundamentals API client"""

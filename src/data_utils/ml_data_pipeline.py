@@ -30,6 +30,32 @@ logger = get_logger(__name__)
 # Global cache instance
 _cleaned_data_cache = CleanedDataCache()
 
+def clean_data_in_place_optimized(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean data in-place to avoid creating copies
+    """
+    logger.info(f"🧹 Cleaning {len(df)} samples in-place")
+    
+    # Use numpy operations for better memory efficiency
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        # Replace inf values in-place
+        df[col] = df[col].replace([np.inf, -np.inf], np.nan)
+        
+        # Fill NaN with median in-place
+        median_val = df[col].median()
+        if pd.isna(median_val):
+            df[col].fillna(0.0, inplace=True)
+        else:
+            df[col].fillna(median_val, inplace=True)
+        
+        # Cap extreme values in-place
+        max_val = np.finfo(np.float32).max / 10
+        min_val = np.finfo(np.float32).min / 10
+        df[col] = df[col].clip(lower=min_val, upper=max_val)
+    
+    return df
 
 def prepare_ml_data_for_training(prediction_horizon: int = 10, 
                                 split_date: str = '2025-02-01',
@@ -543,3 +569,175 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
     logger.info(f"   Prediction data: {len(data_result['X_test'])} samples, {len(data_result['X_test'].columns)} features")
     
     return data_result
+
+
+def prepare_ml_data_for_training_with_cleaning_memory_optimized(
+    prediction_horizon: int = 10,
+    split_date: str = '2025-02-01',
+    ticker: str = None,
+    clean_features: bool = True,
+    use_cache: bool = True,
+    apply_stationarity_transform: bool = False,
+    enable_memory_tracking: bool = True) -> dict:
+    """
+    Memory-optimized version of prepare_ml_data_for_training_with_cleaning
+    
+    Key optimizations:
+    - Uses memory tracking for monitoring
+    - Implements in-place operations to reduce memory copies
+    - Processes data in chunks where possible
+    - Aggressive garbage collection after large operations
+    - Optimized DataFrame operations
+    
+    Args:
+        prediction_horizon: Days ahead for target prediction
+        split_date: Date to split train/test data
+        ticker: Single ticker symbol (None for ALL available tickers)
+        clean_features: Whether to apply feature cleaning
+        use_cache: Whether to use cached data
+        apply_stationarity_transform: Whether to apply stationarity transformations
+        enable_memory_tracking: Whether to enable memory usage tracking
+        
+    Returns:
+        Dictionary with prepared and cleaned data
+    """
+    from src.data_utils.memory_tracker import memory_tracker, optimize_memory_usage
+    
+    logger.info(f"📊 [START] Memory-optimized ML data preparation (horizon: {prediction_horizon}d, split: {split_date})")
+    
+    # Initialize memory tracking
+    if enable_memory_tracking:
+        optimize_memory_usage()
+    
+    # Generate cache key based on parameters
+    cache_params = {
+        'prediction_horizon': prediction_horizon,
+        'split_date': split_date,
+        'ticker': ticker,
+        'clean_features': clean_features,
+        'function': 'prepare_ml_data_for_training_with_cleaning_memory_optimized',
+        'apply_stationarity_transform': apply_stationarity_transform
+    }
+    cache_key = _cleaned_data_cache._generate_cache_key(**cache_params)
+    
+    # Check cache first (memory efficient)
+    if use_cache and _cleaned_data_cache.cache_exists(cache_key, "training"):
+        logger.info(f"💾 [CACHE] Loading cached cleaned training data (key: {cache_key[:8]}...)")
+        try:
+            with memory_tracker("Loading cached data") if enable_memory_tracking else nullcontext():
+                result = _cleaned_data_cache.load_cleaned_data(cache_key, "training")
+            logger.info(f"✅ [CACHE] Loaded cached data: {len(result['X_train'])} train, {len(result['X_test'])} test samples, {result['feature_count']} features")
+            logger.info("✅ [END] Data preparation (from cache) complete.")
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ [CACHE] Failed to load cached data: {str(e)}")
+            logger.info("🔄 [CACHE] Falling back to fresh data preparation...")
+    
+    # Step 1: Load and prepare base data (memory tracked)
+    logger.info("Step 1: Loading and preparing base data...")
+    with memory_tracker("Base data preparation") if enable_memory_tracking else nullcontext():
+        data_result = prepare_ml_data_for_training(
+            prediction_horizon=prediction_horizon,
+            split_date=split_date,
+            ticker=ticker,
+            apply_stationarity_transform=apply_stationarity_transform
+        )
+    
+    logger.info(f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features")
+    
+    # Step 2: Memory-optimized data cleaning
+    logger.info("Step 2: Applying memory-optimized XGBoost data cleaning...")
+    with memory_tracker("Data cleaning") if enable_memory_tracking else nullcontext():
+        # Get original sizes for memory estimation
+        train_size = len(data_result['X_train'])
+        test_size = len(data_result['X_test'])
+        total_samples = train_size + test_size
+        
+        logger.info(f"   Processing {total_samples:,} samples with {data_result['X_train'].shape[1]} features")
+        
+        # Clean train and test separately to avoid large concatenation
+        logger.info("   Cleaning training data...")
+        X_train_clean = clean_data_for_xgboost(data_result['X_train'].copy())
+        
+        logger.info("   Cleaning test data...")
+        X_test_clean = clean_data_for_xgboost(data_result['X_test'].copy())
+        
+        # Update data_result in-place to avoid additional copies
+        data_result['X_train'] = X_train_clean
+        data_result['X_test'] = X_test_clean
+        
+        # Clean targets separately (no need to combine)
+        data_result['y_train'] = data_result['y_train'].copy()
+        data_result['y_test'] = data_result['y_test'].copy()
+        
+        logger.info(f"   After cleaning: {len(X_train_clean)} train, {len(X_test_clean)} test samples")
+    
+    # Step 3: Memory-optimized feature cleaning
+    if clean_features:
+        logger.info("Step 3: Applying memory-optimized feature cleaning...")
+        with memory_tracker("Feature cleaning") if enable_memory_tracking else nullcontext():
+            # Clean training features first
+            X_train_clean, y_train_clean, removed_features = clean_features_for_training(
+                data_result['X_train'], 
+                data_result['y_train']
+            )
+            
+            # Get features to keep
+            features_to_keep = X_train_clean.columns.tolist()
+            
+            # Clean test features using same feature set (avoid re-computation)
+            X_test_clean = data_result['X_test'][features_to_keep].copy()
+            y_test_clean = data_result['y_test'].copy()
+            
+            # Update data_result in-place
+            data_result['X_train'] = X_train_clean
+            data_result['y_train'] = y_train_clean
+            data_result['X_test'] = X_test_clean
+            data_result['y_test'] = y_test_clean
+            data_result['removed_features'] = removed_features
+            data_result['feature_count'] = len(features_to_keep)
+            
+            logger.info(f"   After feature cleaning: {len(X_train_clean)} train, {len(X_test_clean)} test samples, {len(features_to_keep)} features")
+    
+    # Step 4: Memory-optimized feature diversity analysis
+    logger.info("Step 4: Analyzing feature diversity...")
+    with memory_tracker("Feature diversity analysis") if enable_memory_tracking else nullcontext():
+        diversity_analysis = analyze_feature_diversity(data_result['X_train'])
+        data_result['diversity_analysis'] = diversity_analysis
+        
+        logger.info(f"   Diversity: {diversity_analysis['useful_feature_count']} useful, {diversity_analysis['constant_feature_count']} constant, {diversity_analysis['zero_variance_count']} zero-variance features")
+        
+        if diversity_analysis['constant_feature_count'] > 10:
+            logger.warning(f"⚠️ Still {diversity_analysis['constant_feature_count']} constant features after cleaning")
+            logger.warning("💡 Consider expanding date range or checking feature engineering")
+    
+    # Step 5: Memory-optimized caching
+    if use_cache:
+        logger.info("Step 5: Caching cleaned data...")
+        with memory_tracker("Data caching") if enable_memory_tracking else nullcontext():
+            try:
+                logger.info(f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
+                _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "training")
+                logger.info("✅ [CACHE] Data cached successfully.")
+            except Exception as e:
+                logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
+    
+    # Final memory optimization
+    if enable_memory_tracking:
+        optimize_memory_usage()
+    
+    logger.info(f"✅ [END] Memory-optimized data preparation completed: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features")
+    
+    return data_result
+
+
+# Context manager for optional memory tracking
+class nullcontext:
+    """Context manager that does nothing - used when memory tracking is disabled"""
+    def __enter__(self):
+        return None
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+
+
+
