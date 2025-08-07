@@ -73,7 +73,8 @@ class BasePredictor(ABC):
         print(f"📊 Loading recent data (last {days_back} days)...")
         data_result = prepare_ml_data_for_prediction_with_cleaning(
             prediction_horizon=self.prediction_horizon,
-            days_back=days_back
+            days_back=days_back,
+            use_cache=False
         )
         print(f"   Data shape after cleaning: {data_result['X_test'].shape}")
 
@@ -219,7 +220,7 @@ class BasePredictor(ABC):
             results_df.loc[non_nan_mask, 'actual_price'] = convert_percentage_predictions_to_prices(valid_returns, valid_prices, apply_bounds=True)
             results_df.loc[non_nan_mask, 'profit_100_investment'] = 100 * valid_returns
             results_df.loc[non_nan_mask, 'price_prediction_error'] = results_df.loc[non_nan_mask, 'predicted_price'] - results_df.loc[non_nan_mask, 'actual_price']
-            results_df.loc[non_nan_mask, 'prediction_successful'] = (results_df.loc[non_nan_mask, 'predicted_price'] > results_df.loc[non_nan_mask, 'actual_price']).astype(int)
+            results_df.loc[non_nan_mask, 'prediction_successful'] = (results_df.loc[non_nan_mask, 'actual_price'] > results_df.loc[non_nan_mask, 'predicted_price']).astype(int)
 
         
         
@@ -233,14 +234,31 @@ class BasePredictor(ABC):
             # 🔥 NEW: Filter to only include rows that pass the threshold
             original_count = len(results_df)
             results_df = results_df[results_df['passes_threshold'] == True].copy()
-            filtered_count = len(results_df)
+            threshold_filtered_count = len(results_df)
             
-            print(f"   📊 Threshold filtering: {original_count} → {filtered_count} predictions ({filtered_count/original_count:.1%} kept)")
+            print(f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count/original_count:.1%} kept)")
             
-            if filtered_count == 0:
+            if threshold_filtered_count == 0:
                 print("   ⚠️  WARNING: No predictions passed the threshold! Exporting empty file.")
-        else:
-            print("   ℹ️  No optimal threshold available - exporting all predictions")
+            else:
+                # 🔥 NEW: Filter to top 10 highest predicted_return per date
+                print("   🏆 Applying top 10 filtering by predicted_return per date...")
+                
+                # Group by date and get top 10 highest predicted_return for each date
+                top_10_df = results_df.groupby('date').apply(
+                    lambda x: x.nlargest(10, 'predicted_return')
+                ).reset_index(drop=True)
+                
+                top_10_count = len(top_10_df)
+                print(f"   📈 Top 10 filtering: {threshold_filtered_count} → {top_10_count} predictions")
+                
+                # Show summary of dates and counts
+                date_counts = top_10_df['date'].value_counts()
+                print(f"   📅 Dates with predictions: {len(date_counts)}")
+                print(f"   📊 Average predictions per date: {top_10_count/len(date_counts):.1f}")
+                
+                # Update results_df to use the top 10 filtered data
+                results_df = top_10_df.copy()
 
         # Calculate and log average profit per investment for valid predictions
         valid_profit_df = results_df[results_df['actual_price'] > 0].copy()

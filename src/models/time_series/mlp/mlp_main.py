@@ -521,7 +521,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 30
+        number_of_trials = 100
         n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)

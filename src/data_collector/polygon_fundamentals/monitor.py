@@ -4,10 +4,9 @@ Fundamental Data Collection Monitor
 This script monitors the progress and quality of fundamental data collection.
 """
 
-import asyncio
 from typing import Dict, List, Any
 
-from src.database.connection import DatabaseConnectionPool
+from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,10 +15,7 @@ class FundamentalDataMonitor:
     """Monitor for fundamental data collection progress"""
     
     def __init__(self):
-        self.db_pool = DatabaseConnectionPool(
-            min_connections=1,
-            max_connections=5
-        )
+        self.db_pool = get_connection_pool()
     
     def get_collection_progress(self) -> Dict[str, Any]:
         """Get overall collection progress"""
@@ -117,78 +113,46 @@ class FundamentalDataMonitor:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         SELECT 
-                            t.ticker,
-                            t.name as company_name,
-                            rfd.date,
-                            rfd.fiscal_period,
-                            rfd.fiscal_year,
-                            rfd.data_quality_score,
-                            rfd.missing_data_count,
-                            rfd.created_at
-                        FROM raw_fundamental_data rfd
-                        JOIN tickers t ON rfd.ticker_id = t.id
-                        WHERE rfd.created_at >= CURRENT_DATE - INTERVAL %s || ' days'
-                        ORDER BY rfd.created_at DESC
+                            ticker_id,
+                            date,
+                            filing_date,
+                            fiscal_period,
+                            fiscal_year,
+                            data_quality_score,
+                            missing_data_count
+                        FROM raw_fundamental_data 
+                        WHERE date >= CURRENT_DATE - INTERVAL '%s days'
+                        ORDER BY date DESC
+                        LIMIT 50
                     """, (days,))
                     
-                    recent_activity = cursor.fetchall()
-                    
-                    return [
-                        {
-                            'ticker': row['ticker'],
-                            'company_name': row['company_name'],
-                            'date': row['date'],
+                    recent_activity = []
+                    for row in cursor.fetchall():
+                        recent_activity.append({
+                            'ticker_id': row['ticker_id'],
+                            'date': row['date'].isoformat() if row['date'] else None,
+                            'filing_date': row['filing_date'].isoformat() if row['filing_date'] else None,
                             'fiscal_period': row['fiscal_period'],
                             'fiscal_year': row['fiscal_year'],
-                            'quality_score': row['data_quality_score'],
-                            'missing_count': row['missing_data_count'],
-                            'created_at': row['created_at']
-                        }
-                        for row in recent_activity
-                    ]
+                            'data_quality_score': float(row['data_quality_score']) if row['data_quality_score'] else 0,
+                            'missing_data_count': row['missing_data_count']
+                        })
+                    
+                    return recent_activity
                 
         except Exception as e:
             logger.error(f"Failed to get recent activity: {e}")
             return []
     
     def close(self):
-        """Close connection pool when done"""
-        if hasattr(self, 'db_pool') and self.db_pool:
-            self.db_pool.close()
-            logger.debug("Connection pool closed")
-
-async def main():
-    """Main monitoring function"""
-    monitor = FundamentalDataMonitor()
-    try:
-        # Get progress
-        progress = monitor.get_collection_progress()
-        logger.info("=== Collection Progress ===")
-        logger.info(f"Overall progress: {progress.get('overall_progress', 0):.2%}")
-        logger.info(f"Recent data (30 days): {progress.get('recent_data_count', 0)} tickers")
-        
-        # Get quality summary
-        quality = monitor.get_data_quality_summary()
-        logger.info("=== Data Quality ===")
-        logger.info(f"Average quality score: {quality.get('average_quality_score', 0):.2f}")
-        
-        field_completeness = quality.get('field_completeness', {})
-        logger.info("Field completeness:")
-        for field, completeness in field_completeness.items():
-            logger.info(f"  {field}: {completeness:.2%}")
-        
-        # Get recent activity
-        recent = monitor.get_recent_activity(days=7)
-        logger.info("=== Recent Activity (7 days) ===")
-        logger.info(f"New records: {len(recent)}")
-        
-        if recent:
-            logger.info("Recent additions:")
-            for record in recent[:5]:  # Show first 5
-                logger.info(f"  {record['ticker']}: {record['fiscal_period']} {record['fiscal_year']}")
-    finally:
-        # Ensure connection pool is closed
-        monitor.close()
-
-if __name__ == "__main__":
-    asyncio.run(main()) 
+        """Close the monitor and cleanup resources"""
+        # Note: We don't close the connection pool here as it's shared
+        # The pool will be closed by the main application when needed
+        logger.info("FundamentalDataMonitor closed")
+    
+    def __del__(self):
+        """Destructor to ensure cleanup"""
+        try:
+            self.close()
+        except Exception:
+            pass 

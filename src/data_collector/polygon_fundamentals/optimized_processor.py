@@ -5,13 +5,12 @@ This script processes fundamental data collection with per-ticker processing and
 real-time progress tracking.
 """
 
-import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from src.data_collector.polygon_fundamentals.optimized_collector import OptimizedFundamentalCollector
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.utils.logger import get_logger
-from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool, close_connection_pool
+from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
 
 logger = get_logger(__name__)
 
@@ -80,15 +79,6 @@ class OptimizedFundamentalProcessor:
         logger.info(f"Starting fundamental data collection for {len(tickers)} active tickers - one ticker at a time")
         return await self.process_with_progress(tickers)
     
-    async def process_custom_tickers(self, tickers: List[str]) -> Dict[str, bool]:
-        """Process fundamental data for custom ticker list - one ticker at a time"""
-        if not tickers:
-            logger.error("No tickers provided")
-            return {}
-        
-        logger.info(f"Starting fundamental data collection for {len(tickers)} custom tickers - one ticker at a time")
-        return await self.process_with_progress(tickers)
-    
     def get_collection_stats(self, results: Dict[str, bool]) -> Dict[str, Any]:
         """Get statistics from collection results"""
         total = len(results)
@@ -106,36 +96,19 @@ class OptimizedFundamentalProcessor:
             'failed_tickers': failed_tickers,
             'collector_stats': self.collector.stats
         }
-
-async def main():
-    """Main execution function"""
-    processor = OptimizedFundamentalProcessor()
     
-    # Process all fundamentals - one ticker at a time
-    logger.info("Starting fundamental data collection - one ticker at a time...")
-    results = await processor.process_all_fundamentals()
+    def close(self):
+        """Close the processor and cleanup resources"""
+        try:
+            # Close the collector
+            if hasattr(self, 'collector'):
+                self.collector.close()
+            
+            logger.info("OptimizedFundamentalProcessor closed")
+            
+        except Exception as e:
+            logger.error(f"Error during processor cleanup: {e}")
     
-    # Get and display statistics
-    stats = processor.get_collection_stats(results)
-    
-    logger.info("=== Collection Statistics ===")
-    logger.info(f"Total tickers processed: {stats['total']}")
-    logger.info(f"Successful: {stats['successful']}")
-    logger.info(f"Failed: {stats['failed']}")
-    logger.info(f"Success rate: {stats['success_rate']:.2%}")
-    
-    if stats['failed_tickers']:
-        logger.warning(f"Failed tickers: {stats['failed_tickers']}")
-    
-    # Collector stats
-    collector_stats = stats['collector_stats']
-    if collector_stats['start_time'] and collector_stats['end_time']:
-        elapsed = (collector_stats['end_time'] - collector_stats['start_time']).total_seconds()
-        logger.info(f"Total time: {elapsed/60:.1f} minutes")
-        logger.info(f"Average rate: {collector_stats['total_processed']/elapsed*60:.1f} tickers/minute")
-        logger.info(f"Skipped: {collector_stats['skipped']} tickers")
-    
-    logger.info("Collection complete!")
-
-if __name__ == "__main__":
-    asyncio.run(main()) 
+    def __del__(self):
+        """Destructor to ensure cleanup"""
+        self.close() 
