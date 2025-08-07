@@ -8,7 +8,8 @@ Includes Optuna integration, objective functions, and optimization utilities.
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
-from sklearn.discriminant_analysis import StandardScaler
+import torch
+from sklearn.preprocessing import StandardScaler
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
@@ -80,7 +81,8 @@ class MLPOptimizationMixin:
             data_params = {
                 'batch_size': trial.suggest_categorical('batch_size', (256, 512, 1024, 2048)),
                 'num_workers': 12,  # Fixed based on CPU cores
-                'pin_memory': True  # Fixed - always True for GPU
+                # Only pin memory if CUDA is available to avoid warnings on CPU
+                'pin_memory': torch.cuda.is_available()
             }
             
             try:
@@ -202,7 +204,8 @@ class MLPOptimizationMixin:
             "best_investment_success_rate": self.best_investment_success_rate,
             "best_trial_params": self.best_trial_params,
             "has_best_model": self.best_trial_model is not None,
-            "model_updated": self.model is not None
+            # Use getattr to avoid AttributeError when `model` wasn't set on the mixin
+            "model_updated": getattr(self, 'model', None) is not None
         }
         
         # Add scaler information if available

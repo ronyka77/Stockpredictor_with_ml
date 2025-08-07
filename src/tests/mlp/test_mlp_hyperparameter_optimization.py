@@ -113,8 +113,11 @@ def test_mlp_hyperparameter_optimization_integration():
 
     # the optimization mixin should have best_trial info after optimization
     info = opt_mixin.get_best_trial_info()
+    # Ensure info is a dict and contains expected keys
     assert isinstance(info, dict)
-    return info
+    assert "best_investment_success_rate" in info
+    assert "model_updated" in info
+    # Do not return values from tests - use assertions to validate behavior
 
 
 def test_mlp_model_creation_for_tuning():
@@ -147,17 +150,17 @@ def test_mlp_model_creation_for_tuning():
     }
 
     # Create tuned model
-    # _create_model_for_tuning was removed in favor of direct model creation via MLPPredictor._create_model.
-    # Construct a tuned predictor directly and verify its config merging behavior.
     tuned_predictor = MLPPredictor(model_name="tuned_mlp", config={**base_config, **tuning_params})
 
     # Verify the tuned predictor has the correct merged configuration
     for k, v in tuning_params.items():
-        assert tuned_predictor.config.get(k) == v
+        assert tuned_predictor.config.get(k) == v, f"Config mismatch for {k}: expected {v}, got {tuned_predictor.config.get(k)}"
 
     logger.info("✅ MLP model creation for tuning test completed successfully (refactored)")
 
-    return tuned_predictor
+    # Validate configuration merged correctly
+    assert tuned_predictor.config.get("layer_sizes") == tuning_params["layer_sizes"]
+    assert tuned_predictor.config.get("learning_rate") == tuning_params["learning_rate"]
 
 
 def test_data_preparation():
@@ -201,7 +204,8 @@ def test_data_preparation():
 
     logger.info("✅ Data preparation test completed successfully")
 
-    return train_loader, val_loader
+    # Validate loaders created correctly; tests should not return values
+    assert train_loader is not None and val_loader is not None
 
 
 # Module is test-only; run via pytest

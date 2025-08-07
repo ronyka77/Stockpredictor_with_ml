@@ -91,3 +91,19 @@ explicit = true
 
 [tool.flake8]
 max-line-length = 88
+
+[tool.pytest.ini_options]
+# Align pytest configuration with project-level settings so pytest recognizes custom markers
+addopts = "--strict-markers --strict-config --verbose --tb=short --cov=src --cov-report=html:htmlcov --cov-report=term-missing --cov-fail-under=70 --durations=10"
+markers = [
+    "unit: Unit tests - test individual components in isolation",
+    "integration: Integration tests - test multiple components working together",
+    "e2e: End-to-end tests - test complete workflows",
+    "slow: Tests that take more than 1 second to run",
+    "ml: Machine learning specific tests",
+    "data: Data processing and validation tests",
+    "api: Tests that interact with external APIs (should be mocked)",
+    "db: Tests that interact with databases",
+    "file: Tests that read/write files",
+    "performance: Performance and benchmark tests",
+]

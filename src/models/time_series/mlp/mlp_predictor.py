@@ -342,8 +342,13 @@ class MLPPredictor(PyTorchBasePredictor):
         
         with torch.cuda.amp.autocast():
             outputs = self.model(batch_X)
-            loss = criterion(outputs.squeeze(), batch_y)
-        
+
+            # Ensure outputs and targets have compatible shapes for loss
+            outputs_flat = outputs.view(-1)
+            targets_flat = batch_y.view(-1)
+
+            loss = criterion(outputs_flat, targets_flat)
+
         scaler.scale(loss).backward()
         
         if gradient_clip is not None:
@@ -361,7 +366,12 @@ class MLPPredictor(PyTorchBasePredictor):
         """Execute standard training step."""
         optimizer.zero_grad()
         outputs = self.model(batch_X)
-        loss = criterion(outputs.squeeze(), batch_y)
+
+        # Ensure outputs and targets have compatible shapes for loss
+        outputs_flat = outputs.view(-1)
+        targets_flat = batch_y.view(-1)
+
+        loss = criterion(outputs_flat, targets_flat)
         loss.backward()
         
         if gradient_clip is not None:
@@ -411,7 +421,12 @@ class MLPPredictor(PyTorchBasePredictor):
             for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
                 outputs = self.model(batch_X)
-                loss = criterion(outputs.squeeze(), batch_y)
+
+                # Ensure outputs and targets have compatible shapes for loss
+                outputs_flat = outputs.view(-1)
+                targets_flat = batch_y.view(-1)
+
+                loss = criterion(outputs_flat, targets_flat)
                 total_loss += loss.item()
                 num_batches += 1
         

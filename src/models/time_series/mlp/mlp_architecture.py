@@ -336,14 +336,16 @@ class MLPDataUtils:
                 logger.warning("⚠️ fit_scaler=True but scaler provided - will fit new scaler")
 
             scaler = StandardScaler()
-            scaled_array = scaler.fit_transform(tmp.values)
+            # Fit using DataFrame to preserve feature names and avoid transform warnings
+            scaled_array = scaler.fit_transform(tmp)
             logger.info("✅ Fitted new StandardScaler on training data")
         else:
             # Use existing scaler (for prediction)
             if scaler is None:
                 raise ValueError("scaler must be provided when fit_scaler=False")
 
-            scaled_array = scaler.transform(tmp.values)
+            # Use DataFrame for transform to keep feature name checks consistent
+            scaled_array = scaler.transform(tmp)
             logger.info("✅ Applied existing StandardScaler to prediction data")
 
         # Convert back to DataFrame with original column names
@@ -382,12 +384,14 @@ class MLPDataUtils:
         dataset = TensorDataset(X_tensor, y_tensor)
         
         # Create DataLoader with performance optimizations
+        # Ensure pin_memory is only True when CUDA is available to avoid warnings
+        pin_memory_final = pin_memory and torch.cuda.is_available()
         return DataLoader(
             dataset, 
             batch_size=batch_size, 
             shuffle=shuffle,
             num_workers=num_workers,
-            pin_memory=pin_memory,
+            pin_memory=pin_memory_final,
             persistent_workers=num_workers > 0  # Keep workers alive between epochs
         )
     
