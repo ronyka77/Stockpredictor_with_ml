@@ -42,15 +42,14 @@ def test_residual_and_architecture_info():
         batch_norm=True,
     )
 
-
     x = torch.randn(4, input_size)
     out = model(x)
     assert out.shape == (4, 1)
 
     info = model.get_architecture_info()
-    assert info['input_size'] == input_size
-    assert info['layer_sizes'] == layer_sizes
-    assert 'total_parameters' in info
+    assert info["input_size"] == input_size
+    assert info["layer_sizes"] == layer_sizes
+    assert "total_parameters" in info
 
 
 def test_invalid_configurations_raise():
@@ -58,12 +57,12 @@ def test_invalid_configurations_raise():
         MLPModule(input_size=10, layer_sizes=[], output_size=1)
 
     with pytest.raises(ValueError):
-        MLPModule(input_size=10, layer_sizes=[64], task='invalid')
+        MLPModule(input_size=10, layer_sizes=[64], task="invalid")
 
 
 def test_predictor_create_model_and_predict_raises_for_untrained():
-    cfg = {'input_size': 10, 'layer_sizes': [32, 16], 'epochs': 1}
-    predictor = MLPPredictor(model_name='t', config=cfg)
+    cfg = {"input_size": 10, "layer_sizes": [32, 16], "epochs": 1}
+    predictor = MLPPredictor(model_name="t", config=cfg)
     model = predictor._create_model()
     assert isinstance(model, MLPModule)
 

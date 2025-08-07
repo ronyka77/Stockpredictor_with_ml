@@ -318,27 +318,37 @@ class MLPDataUtils:
         """
         if data.empty:
             raise ValueError("Input data is empty")
-        
+
+        # Ensure numeric and no invalid values
+        # Replace infinite values with NaN and if NaNs remain, attempt to clean using validate_and_clean_data
+        tmp = data.replace([np.inf, -np.inf], np.nan)
+        if tmp.isnull().sum().sum() > 0:
+            logger.warning("⚠️ scale_data received data with NaN/Inf - attempting to clean via validate_and_clean_data")
+            try:
+                tmp = MLPDataUtils.validate_and_clean_data(data)
+            except Exception as e:
+                raise ValueError("Input data contains NaN/Inf values and could not be cleaned before scaling") from e
+
         # Apply StandardScaler
         if fit_scaler:
             # Fit new scaler (for training)
             if scaler is not None:
                 logger.warning("⚠️ fit_scaler=True but scaler provided - will fit new scaler")
-            
+
             scaler = StandardScaler()
-            scaled_data = scaler.fit_transform(data)
+            scaled_array = scaler.fit_transform(tmp.values)
             logger.info("✅ Fitted new StandardScaler on training data")
         else:
             # Use existing scaler (for prediction)
             if scaler is None:
                 raise ValueError("scaler must be provided when fit_scaler=False")
-            
-            scaled_data = scaler.transform(data)
+
+            scaled_array = scaler.transform(tmp.values)
             logger.info("✅ Applied existing StandardScaler to prediction data")
-        
+
         # Convert back to DataFrame with original column names
-        scaled_data = pd.DataFrame(scaled_data, columns=data.columns, index=data.index)
-        
+        scaled_data = pd.DataFrame(scaled_array, columns=data.columns, index=data.index)
+
         return scaled_data, scaler
     
     @staticmethod

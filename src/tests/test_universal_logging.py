@@ -8,10 +8,10 @@ import sys
 import os
 
 # Add the src directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from models.gradient_boosting.xgboost_model import XGBoostModel, log_to_mlflow
-from utils.logger import get_logger
+from src.models.gradient_boosting.xgboost_model import XGBoostModel, log_to_mlflow
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

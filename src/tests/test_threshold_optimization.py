@@ -7,8 +7,7 @@ import sys
 import os
 
 # Add the src directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.models.time_series.lstm_model import LSTMPredictor
 from src.utils.logger import get_logger
 

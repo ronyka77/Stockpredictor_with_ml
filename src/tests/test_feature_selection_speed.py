@@ -13,8 +13,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 try:
-    from models.time_series.mlp_main import MLPPredictorWithMLflow
-    
+    from src.models.time_series.mlp.mlp_main import MLPPredictorWithMLflow    
     print("✅ Successfully imported MLPPredictorWithMLflow")
     
     # Create sample data for testing

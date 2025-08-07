@@ -31,12 +31,13 @@ def cpu_device():
 
 class StubModel:
     """Simple deterministic model stub that returns a constant prediction."""
+
     def eval(self):
         return None
 
     def __call__(self, x):
         # Accept pandas.DataFrame or torch.Tensor
-        if hasattr(x, 'shape'):
+        if hasattr(x, "shape"):
             n = x.shape[0]
         else:
             n = len(x)
