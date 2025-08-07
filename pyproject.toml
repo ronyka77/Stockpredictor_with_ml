@@ -82,12 +82,20 @@ include = [
 ]
 
 [[tool.uv.index]]
-url = "file:///C:/Users/szita.DESKTOP-4G1EVV7/Documents/StockPredictor_V1/pytorch"
-
-[[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
+torchaudio = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
 
 [tool.flake8]
 max-line-length = 88

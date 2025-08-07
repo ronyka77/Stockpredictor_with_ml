@@ -49,15 +49,6 @@ def test_mlp_hyperparameter_objective_callable():
     X_train, y_train, X_test, y_test = create_test_data(n_samples=200, n_features=10)
     threshold_evaluator = ThresholdEvaluator()
 
-    mlp_predictor = MLPPredictor(
-        model_name="test_mlp",
-        config={
-            "input_size": X_train.shape[1],
-            "output_size": 1,
-            "task": "classification",
-        },
-        threshold_evaluator=threshold_evaluator,
-    )
 
     # Fit scaler on cleaned training data and provide scaled test data to match strict API
     # Use MLPDataUtils for cleaning and scaling to produce required X_test_scaled
@@ -69,12 +60,16 @@ def test_mlp_hyperparameter_objective_callable():
 
     # Tests expect objective on predictor to be available via the optimization mixin.
     # Create an optimization mixin and use it directly instead of relying on MLPPredictor wrappers.
-    from src.models.time_series.mlp.mlp_optimization import MLPOptimizationMixin
-    opt_mixin = MLPOptimizationMixin()
-    opt_mixin.threshold_evaluator = mlp_predictor.threshold_evaluator
-    opt_mixin.config = mlp_predictor.config
-    opt_mixin.model_name = mlp_predictor.model_name
-    opt_mixin.model = None
+    from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
+    opt_mixin = MLPPredictorWithOptimization(
+        model_name="test_mlp",
+        config={
+            "input_size": X_train.shape[1],
+            "output_size": 1,
+            "task": "classification",
+        },
+        threshold_evaluator=threshold_evaluator,
+    )
 
     objective = opt_mixin.objective(X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler)
     assert callable(objective)
@@ -86,11 +81,6 @@ def test_mlp_hyperparameter_optimization_integration():
     X_train, y_train, X_test, y_test = create_test_data(n_samples=400, n_features=12)
     threshold_evaluator = ThresholdEvaluator()
 
-    mlp_predictor = MLPPredictor(
-        model_name="test_mlp",
-        config={"input_size": X_train.shape[1]},
-        threshold_evaluator=threshold_evaluator,
-    )
 
     # Prepare cleaned and scaled test data and use the optimization mixin directly
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
@@ -99,11 +89,12 @@ def test_mlp_hyperparameter_optimization_integration():
     cleaned_test = MLPDataUtils.validate_and_clean_data(X_test)
     X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
-    from src.models.time_series.mlp.mlp_optimization import MLPOptimizationMixin
-    opt_mixin = MLPOptimizationMixin()
-    opt_mixin.threshold_evaluator = mlp_predictor.threshold_evaluator
-    opt_mixin.config = mlp_predictor.config
-    opt_mixin.model_name = mlp_predictor.model_name
+    from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
+    opt_mixin = MLPPredictorWithOptimization(
+        model_name="test_mlp",
+        config={"input_size": X_train.shape[1]},
+        threshold_evaluator=threshold_evaluator,
+    )
 
     objective = opt_mixin.objective(X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler)
     sampler = optuna.samplers.RandomSampler(seed=42)
@@ -127,13 +118,6 @@ def test_mlp_model_creation_for_tuning():
 
     # Create base MLP predictor
     base_config = {"input_size": 20, "output_size": 1, "task": "classification"}
-
-    threshold_evaluator = ThresholdEvaluator()
-    base_predictor = MLPPredictor(
-        model_name="base_mlp",
-        config=base_config,
-        threshold_evaluator=threshold_evaluator,
-    )
 
     # Test parameters for tuning
     tuning_params = {
@@ -172,11 +156,6 @@ def test_data_preparation():
     X_train, y_train, X_test, y_test = create_test_data()
 
     # Create MLP predictor
-    mlp_predictor = MLPPredictor(
-        model_name="test_mlp",
-        config={"input_size": X_train.shape[1]},
-        threshold_evaluator=ThresholdEvaluator(),
-    )
 
     # Test data preparation
     batch_size = 32
