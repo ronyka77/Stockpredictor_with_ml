@@ -318,27 +318,39 @@ class MLPDataUtils:
         """
         if data.empty:
             raise ValueError("Input data is empty")
-        
+
+        # Ensure numeric and no invalid values
+        # Replace infinite values with NaN and if NaNs remain, attempt to clean using validate_and_clean_data
+        tmp = data.replace([np.inf, -np.inf], np.nan)
+        if tmp.isnull().sum().sum() > 0:
+            logger.warning("⚠️ scale_data received data with NaN/Inf - attempting to clean via validate_and_clean_data")
+            try:
+                tmp = MLPDataUtils.validate_and_clean_data(data)
+            except Exception as e:
+                raise ValueError("Input data contains NaN/Inf values and could not be cleaned before scaling") from e
+
         # Apply StandardScaler
         if fit_scaler:
             # Fit new scaler (for training)
             if scaler is not None:
                 logger.warning("⚠️ fit_scaler=True but scaler provided - will fit new scaler")
-            
+
             scaler = StandardScaler()
-            scaled_data = scaler.fit_transform(data)
+            # Fit using DataFrame to preserve feature names and avoid transform warnings
+            scaled_array = scaler.fit_transform(tmp)
             logger.info("✅ Fitted new StandardScaler on training data")
         else:
             # Use existing scaler (for prediction)
             if scaler is None:
                 raise ValueError("scaler must be provided when fit_scaler=False")
-            
-            scaled_data = scaler.transform(data)
+
+            # Use DataFrame for transform to keep feature name checks consistent
+            scaled_array = scaler.transform(tmp)
             logger.info("✅ Applied existing StandardScaler to prediction data")
-        
+
         # Convert back to DataFrame with original column names
-        scaled_data = pd.DataFrame(scaled_data, columns=data.columns, index=data.index)
-        
+        scaled_data = pd.DataFrame(scaled_array, columns=data.columns, index=data.index)
+
         return scaled_data, scaler
     
     @staticmethod
@@ -372,12 +384,14 @@ class MLPDataUtils:
         dataset = TensorDataset(X_tensor, y_tensor)
         
         # Create DataLoader with performance optimizations
+        # Ensure pin_memory is only True when CUDA is available to avoid warnings
+        pin_memory_final = pin_memory and torch.cuda.is_available()
         return DataLoader(
             dataset, 
             batch_size=batch_size, 
             shuffle=shuffle,
             num_workers=num_workers,
-            pin_memory=pin_memory,
+            pin_memory=pin_memory_final,
             persistent_workers=num_workers > 0  # Keep workers alive between epochs
         )
     

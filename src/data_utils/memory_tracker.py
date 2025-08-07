@@ -236,7 +236,7 @@ def optimize_dataframe_memory(df, target_dtype='float32'):
     optimized_memory = df_optimized.memory_usage(deep=True).sum() / 1024 / 1024
     memory_saved = original_memory - optimized_memory
     
-    logger.info(f"🧹 DataFrame memory optimization:")
+    logger.info("🧹 DataFrame memory optimization:")
     logger.info(f"   Original: {original_memory:.2f}MB")
     logger.info(f"   Optimized: {optimized_memory:.2f}MB")
     logger.info(f"   Saved: {memory_saved:.2f}MB ({memory_saved/original_memory*100:.1f}%)")

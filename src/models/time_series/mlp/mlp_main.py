@@ -161,15 +161,6 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
             experiment_name = f"{self.model_name}_experiment"
         
         try:
-            # Define pip requirements for the model with explicit pip version
-            pip_requirements = [
-                "mlflow>=2.22.0",
-                "torch>=2.0.0",
-                "pandas>=2.3.0",
-                "numpy>=2.3.0",
-                "scikit-learn>=1.4.2"
-            ]
-            
             # End any existing run before starting a new one
             try:
                 mlflow.end_run()
@@ -521,8 +512,8 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 30
-        n_features_to_select = 80
+        number_of_trials = 100
+        # n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(

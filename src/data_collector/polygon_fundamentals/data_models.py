@@ -18,6 +18,7 @@ class FinancialValue(BaseModel):
     unit: Optional[str] = None
     label: Optional[str] = None
     order: Optional[int] = None
+    source: Optional[str] = None  # Add this line to track the data source
 
 class FinancialStatement(BaseModel):
     """Base model for financial statement data"""

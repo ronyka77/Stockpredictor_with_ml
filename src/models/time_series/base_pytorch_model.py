@@ -6,8 +6,6 @@ handling the common logic for training, prediction, device management,
 and persistence.
 """
 
-import os
-import json
 import torch
 import torch.nn as nn
 import pandas as pd

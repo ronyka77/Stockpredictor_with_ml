@@ -1208,7 +1208,6 @@ class LSTMPredictor(PyTorchBasePredictor):
             if scaler_artifact_path:
                 try:
                     import pickle
-                    import tempfile
                     
                     # Download scaler artifact
                     scaler_local_path = client.download_artifacts(run_id, scaler_artifact_path)

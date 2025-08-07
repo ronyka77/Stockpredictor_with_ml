@@ -9,6 +9,8 @@ dependencies = [
     "catboost>=1.2.8",
     "dotenv>=0.9.9",
     "fastparquet>=2024.11.0",
+    "great-expectations>=0.18.8",
+    "hypothesis>=6",
     "joblib>=1.4.2",
     "lightgbm>=4.6.0",
     "lion-pytorch>=0.2.3",
@@ -27,8 +29,10 @@ dependencies = [
     "pyarrow>=19.0.1",
     "pydantic>=2.11.5",
     "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
+    "pytest-xdist>=3.8.0",
     "requests>=2.32.3",
-    "ruff>=0.11.13",
     "scikit-learn==1.4.2",
     "sentence-transformers>=4.1.0",
     "spacy>=3.8.7",
@@ -37,12 +41,18 @@ dependencies = [
     "ta>=0.11.0",
     "textblob>=0.19.0",
     "torch>=2.0.0",
+    "torchvision>=0.20.0",
+    "torchaudio>=2.0.0",
     "torch-optimizer>=0.3.0",
     "transformers>=4.52.4",
     "vadersentiment>=3.3.2",
     "vulture>=2.14",
     "xgboost>=3.0.2",
     "yfinance>=0.2.61",
+    "flake8>=7.3.0",
+    "isort>=6.0.1",
+    "autoflake>=2.3.1",
+    "black>=25.1.0",
 ]
 
 [project.scripts]
@@ -72,9 +82,36 @@ include = [
 ]
 
 [[tool.uv.index]]
-url = "file:///C:/Users/szita.DESKTOP-4G1EVV7/Documents/StockPredictor_V1/pytorch"
-
-[[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
+torchaudio = [
+    { index = "pytorch", marker = "sys_platform == 'win32'" },
+]
+
+[tool.flake8]
+max-line-length = 88
+
+[tool.pytest.ini_options]
+# Align pytest configuration with project-level settings so pytest recognizes custom markers
+addopts = "--strict-markers --strict-config --verbose --tb=short --cov=src --cov-report=html:htmlcov --cov-report=term-missing --cov-fail-under=70 --durations=10"
+markers = [
+    "unit: Unit tests - test individual components in isolation",
+    "integration: Integration tests - test multiple components working together",
+    "e2e: End-to-end tests - test complete workflows",
+    "slow: Tests that take more than 1 second to run",
+    "ml: Machine learning specific tests",
+    "data: Data processing and validation tests",
+    "api: Tests that interact with external APIs (should be mocked)",
+    "db: Tests that interact with databases",
+    "file: Tests that read/write files",
+    "performance: Performance and benchmark tests",
+]

@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import mlflow
-import mlflow.xgboost
-import xgboost as xgb
 import yaml
 from mlflow.tracking import MlflowClient
 

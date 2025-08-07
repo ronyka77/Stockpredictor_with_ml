@@ -3,13 +3,13 @@
 Database Setup for Fundamental Data Collection
 
 This script sets up the database schema for optimized fundamental data collection.
+Simple programmatic interface that always performs full setup and verification.
 """
 
-import logging
-import sys
 from pathlib import Path
 
-from src.database.connection import DatabaseConnection, DatabaseConnectionPool
+from src.database.connection import DatabaseConnection
+from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -32,45 +32,40 @@ def setup_fundamental_database():
                 with open(sql_file, 'r') as f:
                     sql_schema = f.read()
                 
-                # Execute the schema
-                # Split and execute SQL statements
-                statements = sql_schema.split(';')
-                
-                for statement in statements:
-                    statement = statement.strip()
-                    if statement:
-                        try:
-                            cursor.execute(statement)
-                            logger.debug(f"Executed: {statement[:50]}...")
-                        except Exception as e:
-                            logger.warning(f"Statement failed (may already exist): {e}")
-                            logger.debug(f"Failed statement: {statement}")
+                # Execute the schema using execute() method which handles complex SQL better
+                try:
+                    cursor.execute(sql_schema)
+                    logger.debug("Executed SQL schema successfully")
+                except Exception as e:
+                    logger.warning(f"Schema execution failed (may already exist): {e}")
                 
                 conn.commit()
                 logger.info("✅ Fundamental database setup completed successfully")
                 
                 # Verify the table exists
-                result = cursor.execute("""
+                cursor.execute("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_schema = 'public' 
                         AND table_name = 'raw_fundamental_data'
                     )
-                """).scalar()
+                """)
+                result = cursor.fetchone()
                 
-                if result:
+                if result and result['exists']:
                     logger.info("✅ raw_fundamental_data table created successfully")
                     
                     # Check indexes
-                    indexes = cursor.execute("""
+                    cursor.execute("""
                         SELECT indexname 
                         FROM pg_indexes 
                         WHERE tablename = 'raw_fundamental_data'
-                    """).fetchall()
+                    """)
+                    indexes = cursor.fetchall()
                     
                     logger.info(f"📊 Created {len(indexes)} indexes:")
                     for index in indexes:
-                        logger.info(f"   - {index[0]}")
+                        logger.info(f"   - {index['indexname']}")
                     
                     return True
                 else:
@@ -84,58 +79,64 @@ def setup_fundamental_database():
         return False
 
 def verify_database_setup():
-    """Verify that the database is properly set up"""
+    """Verify that the database is properly set up using connection pool"""
     try:
-        db_connection = DatabaseConnection()
+        # Use connection pool for verification operations
+        db_pool = get_connection_pool()
         
-        with db_connection.get_connection() as conn:
+        with db_pool.get_connection() as conn:
             with conn.cursor() as cursor:
                 # Check if table exists
-                table_exists = cursor.execute("""
+                cursor.execute("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_schema = 'public' 
                         AND table_name = 'raw_fundamental_data'
                     )
-                """).scalar()
+                """)
+                result = cursor.fetchone()
+                table_exists = result['exists'] if result else False
                 
                 if not table_exists:
                     logger.error("❌ raw_fundamental_data table does not exist")
                     return False
                 
                 # Check columns
-                columns = cursor.execute("""
+                cursor.execute("""
                     SELECT column_name, data_type 
                     FROM information_schema.columns 
                     WHERE table_name = 'raw_fundamental_data'
                     ORDER BY ordinal_position
-                """).fetchall()
+                """)
+                columns = cursor.fetchall()
                 
                 logger.info(f"📋 Table has {len(columns)} columns:")
                 for column in columns:
-                    logger.info(f"   - {column[0]}: {column[1]}")
+                    logger.info(f"   - {column['column_name']}: {column['data_type']}")
                 
                 # Check constraints
-                constraints = cursor.execute("""
+                cursor.execute("""
                     SELECT constraint_name, constraint_type
                     FROM information_schema.table_constraints
                     WHERE table_name = 'raw_fundamental_data'
-                """).fetchall()
+                """)
+                constraints = cursor.fetchall()
                 
                 logger.info(f"🔒 Table has {len(constraints)} constraints:")
                 for constraint in constraints:
-                    logger.info(f"   - {constraint[0]}: {constraint[1]}")
+                    logger.info(f"   - {constraint['constraint_name']}: {constraint['constraint_type']}")
                 
                 # Check indexes
-                indexes = cursor.execute("""
+                cursor.execute("""
                     SELECT indexname, indexdef
                     FROM pg_indexes 
                     WHERE tablename = 'raw_fundamental_data'
-                """).fetchall()
+                """)
+                indexes = cursor.fetchall()
                 
                 logger.info(f"📊 Table has {len(indexes)} indexes:")
                 for index in indexes:
-                    logger.info(f"   - {index[0]}")
+                    logger.info(f"   - {index['indexname']}")
                 
                 logger.info("✅ Database setup verification complete!")
                 return True
@@ -144,48 +145,69 @@ def verify_database_setup():
         logger.error(f"Database verification failed: {e}")
         return False
 
-def main():
-    """Main setup function"""
-    parser = argparse.ArgumentParser(
-        description="Database Setup for Fundamental Data Collection"
-    )
-    
-    parser.add_argument(
-        '--verify-only',
-        action='store_true',
-        help='Only verify existing setup, do not create'
-    )
-    
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
-    
-    args = parser.parse_args()
-    
-    # Configure logging
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    if args.verify_only:
-        logger.info("Verifying database setup...")
-        success = verify_database_setup()
-    else:
-        logger.info("Setting up fundamental data collection database...")
-        success = setup_fundamental_database()
+def validate_table_structure():
+    """Validate the table structure using connection pool"""
+    try:
+        # Use connection pool for validation operations
+        db_pool = get_connection_pool()
         
-        if success:
-            logger.info("Verifying setup...")
-            success = verify_database_setup()
+        with db_pool.get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Check required columns exist
+                required_columns = [
+                    'ticker_id', 'date', 'filing_date', 'fiscal_period', 'fiscal_year',
+                    'revenues', 'net_income_loss', 'assets', 'equity'
+                ]
+                
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'raw_fundamental_data'
+                """)
+                existing_columns = [row['column_name'] for row in cursor.fetchall()]
+                
+                missing_columns = [col for col in required_columns if col not in existing_columns]
+                
+                if missing_columns:
+                    logger.error(f"❌ Missing required columns: {missing_columns}")
+                    return False
+                
+                # Check data types
+                cursor.execute("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'raw_fundamental_data'
+                    AND column_name IN ('ticker_id', 'date', 'filing_date', 'revenues', 'net_income_loss')
+                """)
+                column_types = cursor.fetchall()
+                
+                logger.info("📋 Key column data types:")
+                for col in column_types:
+                    logger.info(f"   - {col['column_name']}: {col['data_type']}")
+                
+                logger.info("✅ Table structure validation complete!")
+                return True
+                
+    except Exception as e:
+        logger.error(f"Table structure validation failed: {e}")
+        return False
+
+def main():
+    """Main function - always does full database setup and verification"""
+    logger.info("Setting up fundamental data collection database...")
+    
+    # Always do full setup
+    success = setup_fundamental_database()
     
     if success:
-        logger.info("🎉 Database setup/verification successful!")
-        sys.exit(0)
+        logger.info("Verifying setup...")
+        success = verify_database_setup()
+        if success:
+            logger.info("Validating table structure...")
+            success = validate_table_structure()
+    
+        logger.info("✅ Database setup completed successfully")
+        return True
     else:
-        logger.error("❌ Database setup/verification failed!")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    import argparse
-    main() 
+        logger.error("❌ Database setup failed")
+        return False 

@@ -7,8 +7,9 @@ Includes Optuna integration, objective functions, and optimization utilities.
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
-from sklearn.discriminant_analysis import StandardScaler
+from typing import Dict, Any, Optional
+import torch
+from sklearn.preprocessing import StandardScaler
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
@@ -23,7 +24,7 @@ class MLPOptimizationMixin:
     """
 
     def objective(self, X_train: pd.DataFrame, y_train: pd.Series, 
-                    X_test: pd.DataFrame, X_test_scaled, y_test: pd.Series, fitted_scaler=StandardScaler) -> callable:
+                    X_test: pd.DataFrame, X_test_scaled: Optional[pd.DataFrame], y_test: pd.Series, fitted_scaler=StandardScaler) -> callable:
         """
         Create Optuna objective function for hyperparameter optimization with threshold optimization
         
@@ -80,7 +81,8 @@ class MLPOptimizationMixin:
             data_params = {
                 'batch_size': trial.suggest_categorical('batch_size', (256, 512, 1024, 2048)),
                 'num_workers': 12,  # Fixed based on CPU cores
-                'pin_memory': True  # Fixed - always True for GPU
+                # Only pin memory if CUDA is available to avoid warnings on CPU
+                'pin_memory': torch.cuda.is_available()
             }
             
             try:
@@ -102,7 +104,8 @@ class MLPOptimizationMixin:
                 
                 
                 # Store the fitted scaler for later use in the trial model
-                self.current_trial_scaler = self.fitted_scaler
+                # Ensure current_trial_scaler is set to the provided fitted_scaler or fitted from data
+                self.current_trial_scaler = getattr(self, 'fitted_scaler', None) or fitted_scaler
                 
                 # Create DataLoaders using the cleaned and scaled data
                 num_workers = data_params.get('num_workers', 12)
@@ -169,11 +172,11 @@ class MLPOptimizationMixin:
                         self.confidence_method = 'variance'
                     
                     logger.info(f"🎯 NEW BEST TRIAL {trial.number}: Profit Per Investment = {optimized_profit_score:.3f}")
-                    if threshold_info['optimal_threshold'] is not None:
-                        logger.info(f"   Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
-                        logger.info(f"   Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                        logger.info(f"   Investment success rate: {threshold_info['investment_success_rate']:.3f}")
-                        logger.info(f"   Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
+                    if threshold_info.get('optimal_threshold') is not None:
+                        logger.info(f"   Optimal threshold: {threshold_info.get('optimal_threshold'):.3f}")
+                        logger.info(f"   Samples kept: {threshold_info.get('samples_kept_ratio', 0):.1%}")
+                        logger.info(f"   Investment success rate: {threshold_info.get('investment_success_rate', 0):.3f}")
+                        logger.info(f"   Custom accuracy: {threshold_info.get('custom_accuracy', 0):.3f}")
                     
                     self.previous_best = optimized_profit_score
                 else:
@@ -201,7 +204,8 @@ class MLPOptimizationMixin:
             "best_investment_success_rate": self.best_investment_success_rate,
             "best_trial_params": self.best_trial_params,
             "has_best_model": self.best_trial_model is not None,
-            "model_updated": self.model is not None
+            # Use getattr to avoid AttributeError when `model` wasn't set on the mixin
+            "model_updated": getattr(self, 'model', None) is not None
         }
         
         # Add scaler information if available
@@ -272,10 +276,10 @@ class MLPOptimizationMixin:
                 threshold_info = self.best_threshold_info
                 if threshold_info.get('optimal_threshold') is not None:
                     logger.info(f"✅ Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
-                    logger.info(f"✅ Samples kept ratio: {threshold_info['samples_kept_ratio']:.1%}")
-                    logger.info(f"✅ Investment success rate: {threshold_info['investment_success_rate']:.3f}")
-                    logger.info(f"✅ Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
-                    logger.info(f"✅ Profitable investments: {threshold_info['profitable_investments']}")
+                    logger.info(f"✅ Samples kept ratio: {threshold_info.get('samples_kept_ratio', 0):.1%}")
+                    logger.info(f"✅ Investment success rate: {threshold_info.get('investment_success_rate', 0):.3f}")
+                    logger.info(f"✅ Custom accuracy: {threshold_info.get('custom_accuracy', 0):.3f}")
+                    logger.info(f"✅ Profitable investments: {threshold_info.get('profitable_investments', 0)}")
                 else:
                     logger.info("✅ No threshold optimization was successful for the best trial")
             

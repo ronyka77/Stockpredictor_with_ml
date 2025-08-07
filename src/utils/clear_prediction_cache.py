@@ -6,9 +6,6 @@ This script clears the prediction cache files that are causing
 Parquet serialization errors due to empty struct types.
 """
 
-import os
-import shutil
-from pathlib import Path
 from src.utils.cleaned_data_cache import CleanedDataCache
 
 def clear_prediction_cache():

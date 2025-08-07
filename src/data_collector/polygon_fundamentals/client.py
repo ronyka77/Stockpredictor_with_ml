@@ -189,6 +189,8 @@ class PolygonFundamentalsClient:
             results = data.get('results', [])
             if not results:
                 logger.warning(f"No results found in response for {ticker}")
+                logger.info(f"Response data keys: {list(data.keys())}")
+                logger.info(f"Response data: {data}")
                 return response
             
             # Convert new format to legacy format for existing parsing logic
@@ -361,6 +363,39 @@ class PolygonFundamentalsClient:
                 mapped_data[field] = value
         
         return mapped_data
+
+    @staticmethod
+    def _extract_financial_value(data: Any, field_name: str, statement_type: str) -> Optional[FinancialValue]:
+        """Extract a FinancialValue from nested ('financials' → statement_type) or direct legacy structures.
+
+        Args:
+            data: The source dictionary potentially containing financial values
+            field_name: The financial field to extract
+            statement_type: One of 'income_statement', 'balance_sheet', 'cash_flow_statement'
+        """
+        try:
+            if isinstance(data, dict):
+                # New nested Polygon format under 'financials'
+                financials = data.get('financials')
+                if isinstance(financials, dict) and statement_type in financials:
+                    statement_section = financials.get(statement_type, {})
+                    if isinstance(statement_section, dict) and field_name in statement_section:
+                        field_data = statement_section[field_name]
+                        if isinstance(field_data, dict) and 'value' in field_data:
+                            return FinancialValue(**field_data)
+                        else:
+                            return FinancialValue(value=float(field_data))
+
+                # Legacy direct field access
+                if field_name in data and data[field_name] is not None:
+                    if isinstance(data[field_name], dict):
+                        return FinancialValue(**data[field_name])
+                    else:
+                        return FinancialValue(value=float(data[field_name]))
+        except Exception:
+            # On any parsing issue return None to allow graceful degradation
+            return None
+        return None
     
     def _parse_direct_list_format(self, data: Dict[str, Any], ticker: str, response: FundamentalDataResponse) -> FundamentalDataResponse:
         """Parse the current direct list format from API response"""
@@ -430,11 +465,9 @@ class PolygonFundamentalsClient:
             ]
             
             for field in financial_fields:
-                if field in stmt_data and stmt_data[field] is not None:
-                    if isinstance(stmt_data[field], dict):
-                        parsed_data[field] = FinancialValue(**stmt_data[field])
-                    else:
-                        parsed_data[field] = FinancialValue(value=float(stmt_data[field]))
+                financial_value = self._extract_financial_value(stmt_data, field, 'income_statement')
+                if financial_value is not None:
+                    parsed_data[field] = financial_value
             
             return IncomeStatement(**parsed_data)
             
@@ -477,11 +510,9 @@ class PolygonFundamentalsClient:
             ]
             
             for field in financial_fields:
-                if field in stmt_data and stmt_data[field] is not None:
-                    if isinstance(stmt_data[field], dict):
-                        parsed_data[field] = FinancialValue(**stmt_data[field])
-                    else:
-                        parsed_data[field] = FinancialValue(value=float(stmt_data[field]))
+                financial_value = self._extract_financial_value(stmt_data, field, 'balance_sheet')
+                if financial_value is not None:
+                    parsed_data[field] = financial_value
             
             return BalanceSheet(**parsed_data)
             
@@ -522,11 +553,9 @@ class PolygonFundamentalsClient:
             ]
             
             for field in financial_fields:
-                if field in stmt_data and stmt_data[field] is not None:
-                    if isinstance(stmt_data[field], dict):
-                        parsed_data[field] = FinancialValue(**stmt_data[field])
-                    else:
-                        parsed_data[field] = FinancialValue(value=float(stmt_data[field]))
+                financial_value = self._extract_financial_value(stmt_data, field, 'cash_flow_statement')
+                if financial_value is not None:
+                    parsed_data[field] = financial_value
             
             return CashFlowStatement(**parsed_data)
             
