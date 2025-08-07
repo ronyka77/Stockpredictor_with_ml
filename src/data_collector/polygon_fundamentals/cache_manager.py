@@ -6,7 +6,6 @@ to reduce API calls and improve performance.
 """
 
 import json
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, List

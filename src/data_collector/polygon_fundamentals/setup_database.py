@@ -202,8 +202,10 @@ def main():
     if success:
         logger.info("Verifying setup...")
         success = verify_database_setup()
+        if success:
+            logger.info("Validating table structure...")
+            success = validate_table_structure()
     
-    if success:
         logger.info("✅ Database setup completed successfully")
         return True
     else:

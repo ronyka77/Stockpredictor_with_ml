@@ -7,7 +7,7 @@ per ticker and simplified rate limiting.
 
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.data_collector.polygon_fundamentals.client import PolygonFundamentalsClient
