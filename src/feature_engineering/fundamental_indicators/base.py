@@ -241,10 +241,10 @@ class BaseFundamentalCalculator(ABC):
             min_val, max_val = getattr(self.config, cap_attr)
             
             if value < min_val:
-                self.logger.debug(f"Capping {ratio_name} from {value} to {min_val}")
+                self.logger.info(f"Capping {ratio_name} from {value} to {min_val}")
                 return min_val
             elif value > max_val:
-                self.logger.debug(f"Capping {ratio_name} from {value} to {max_val}")
+                self.logger.info(f"Capping {ratio_name} from {value} to {max_val}")
                 return max_val
         
         return value

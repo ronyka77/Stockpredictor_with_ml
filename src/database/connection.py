@@ -39,7 +39,7 @@ class DatabaseConnection:
                 'password': os.getenv('DB_PASSWORD', 'password')
             }
         
-        logger.debug(f"Initialized DatabaseConnection for {self.config['host']}:{self.config['port']}/{self.config['database']}")
+        logger.info(f"Initialized DatabaseConnection for {self.config['host']}:{self.config['port']}/{self.config['database']}")
     
     @contextmanager
     def get_connection(self) -> Generator[psycopg2.extensions.connection, None, None]:
@@ -150,7 +150,7 @@ class DatabaseConnectionPool:
                 password=self.config['password'],
                 cursor_factory=RealDictCursor
             )
-            logger.debug("Connection pool initialized successfully")
+            logger.info("Connection pool initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize connection pool: {str(e)}")
             raise

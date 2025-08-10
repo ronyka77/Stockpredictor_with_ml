@@ -84,7 +84,7 @@ class StockDataLoader:
                 'end_date': end_date
             }
             
-            logger.debug(f"Executing query for {ticker}: {start_date} to {end_date}")
+            logger.info(f"Executing query for {ticker}: {start_date} to {end_date}")
             
             # Use SQLAlchemy engine with pandas
             df = pd.read_sql_query(
@@ -115,7 +115,7 @@ class StockDataLoader:
             df = self._validate_and_clean_data(df, ticker)
             
             logger.info(f"Loaded {len(df)} records for {ticker}")
-            logger.debug(f"Date range: {df.index.min()} to {df.index.max()}")
+            logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
             
             return df
             
@@ -178,7 +178,7 @@ class StockDataLoader:
         if min_data_points is None:
             min_data_points = self.feature_config.data_quality.MIN_DATA_POINTS
         
-        logger.debug(f"Getting available tickers with at least {min_data_points} data points")
+        logger.info(f"Getting available tickers with at least {min_data_points} data points")
         
         try:
             # Join tickers table with historical_prices to get active tickers with sufficient data
@@ -270,7 +270,7 @@ class StockDataLoader:
         Returns:
             Dictionary with data summary
         """
-        logger.debug(f"Getting data summary for {ticker}")
+        logger.info(f"Getting data summary for {ticker}")
         
         try:
             # Get ticker metadata
@@ -316,7 +316,7 @@ class StockDataLoader:
                 }
             }
             
-            logger.debug(f"Data summary for {ticker}: {price_stats.get('total_records', 0)} records")
+            logger.info(f"Data summary for {ticker}: {price_stats.get('total_records', 0)} records")
             
             return summary
             
@@ -335,7 +335,7 @@ class StockDataLoader:
         Returns:
             Cleaned DataFrame
         """
-        logger.debug(f"Validating and cleaning data for {ticker}")
+        logger.info(f"Validating and cleaning data for {ticker}")
         
         original_length = len(df)
         
@@ -523,15 +523,15 @@ class StockDataLoader:
                     
         except Exception as e:
             logger.error(f"Error executing query: {e}")
-            logger.debug(f"Query: {query}")
-            logger.debug(f"Params: {params}")
+            logger.info(f"Query: {query}")
+            logger.info(f"Params: {params}")
             raise
 
     def close(self) -> None:
         """Close database connection"""
         if hasattr(self, 'engine') and self.engine:
             self.engine.dispose()
-            logger.debug("Database connection closed")
+            logger.info("Database connection closed")
     
     def __enter__(self):
         """Context manager entry"""

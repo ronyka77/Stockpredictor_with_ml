@@ -44,7 +44,7 @@ def calculate_bollinger_bands(data: pd.DataFrame, period: Optional[int] = None,
     if std_dev is None:
         std_dev = params['std']
     
-    logger.debug(f"Calculating Bollinger Bands with parameters: period={period}, std_dev={std_dev}")
+    logger.info(f"Calculating Bollinger Bands with parameters: period={period}, std_dev={std_dev}")
     
     try:
         # Check minimum data requirements
@@ -79,7 +79,7 @@ def calculate_bollinger_bands(data: pd.DataFrame, period: Optional[int] = None,
             (result_data['BB_Upper'] - result_data['BB_Lower'])
         )
         
-        # logger.debug(f"Calculated Bollinger Bands: {result_data['BB_Middle'].notna().sum()} valid values")
+        # logger.info(f"Calculated Bollinger Bands: {result_data['BB_Middle'].notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volatility',
@@ -122,7 +122,7 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
     if period is None:
         period = feature_config.ATR_PERIOD
     
-    logger.debug(f"Calculating ATR with period: {period}")
+    logger.info(f"Calculating ATR with period: {period}")
     
     try:
         # Check minimum data requirements
@@ -150,7 +150,7 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
         result_data['ATR_Upper_Band'] = data['close'] + (atr_values * 2)
         result_data['ATR_Lower_Band'] = data['close'] - (atr_values * 2)
         
-        # logger.debug(f"Calculated ATR: {atr_values.notna().sum()} valid values")
+        # logger.info(f"Calculated ATR: {atr_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volatility',
@@ -193,7 +193,7 @@ def calculate_custom_volatility(data: pd.DataFrame, periods: Optional[List[int]]
     if periods is None:
         periods = [10, 20, 30]  # Default volatility periods
     
-    logger.debug(f"Calculating custom volatility for periods: {periods}")
+    logger.info(f"Calculating custom volatility for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -226,7 +226,7 @@ def calculate_custom_volatility(data: pd.DataFrame, periods: Optional[List[int]]
             )
             result_data[f'Parkinson_Vol_{period}'] = parkinson_vol
             
-            # logger.debug(f"Calculated volatility measures for period {period}")
+            # logger.info(f"Calculated volatility measures for period {period}")
         
         # Volatility regime detection
         if len(periods) > 0:

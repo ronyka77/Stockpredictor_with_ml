@@ -127,7 +127,7 @@ class FeatureStorage:
                 self._cleanup_old_versions(ticker)
             
             logger.info(f"Saved {len(features_data)} records with {len(features_data.columns)} features for {ticker}")
-            logger.debug(f"File: {file_path}, Size: {file_stats['size_mb']:.2f} MB")
+            logger.info(f"File: {file_path}, Size: {file_stats['size_mb']:.2f} MB")
             
             return feature_metadata
             
@@ -418,7 +418,7 @@ class FeatureStorage:
                 engine=self.config.engine
             )
             
-            logger.debug(f"Saved metadata for {metadata.ticker} to {metadata_path}")
+            logger.info(f"Saved metadata for {metadata.ticker} to {metadata_path}")
             
         except Exception as e:
             logger.warning(f"Could not save metadata to Parquet: {str(e)}")
@@ -429,7 +429,7 @@ class FeatureStorage:
             metadata_path = self._get_metadata_file_path(ticker, version)
             
             if not metadata_path.exists():
-                logger.debug(f"No metadata file found for {ticker}")
+                logger.info(f"No metadata file found for {ticker}")
                 return None
             
             metadata_df = pd.read_parquet(metadata_path, engine=self.config.engine)
@@ -466,7 +466,7 @@ class FeatureStorage:
             
             if metadata_path.exists():
                 metadata_path.unlink()
-                logger.debug(f"Deleted metadata file for {ticker}")
+                logger.info(f"Deleted metadata file for {ticker}")
                 
         except Exception as e:
             logger.warning(f"Could not delete metadata file: {str(e)}")

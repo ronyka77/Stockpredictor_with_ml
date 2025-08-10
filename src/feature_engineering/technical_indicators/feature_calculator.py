@@ -207,7 +207,7 @@ class FeatureCalculator:
         Returns:
             DataFrame with future price target features
         """
-        logger.debug("Adding future price targets")
+        logger.info("Adding future price targets")
         
         # Future high prices (targets for prediction)
         features_df['Future_High_10D'] = price_data['high'].shift(-9)
@@ -218,7 +218,7 @@ class FeatureCalculator:
         features_df['Future_Close_10D'] = price_data['close'].shift(-9)
         features_df['Future_Close_20D'] = price_data['close'].shift(-19)
         features_df['Future_Close_30D'] = price_data['close'].shift(-29)
-        logger.debug(f"Added {len([col for col in features_df.columns if 'Future_' in col])} future price target features")
+        logger.info(f"Added {len([col for col in features_df.columns if 'Future_' in col])} future price target features")
         
         return features_df
 
@@ -234,7 +234,7 @@ class FeatureCalculator:
         Returns:
             DataFrame with additional basic features
         """
-        logger.debug("Adding basic price features")
+        logger.info("Adding basic price features")
         
         # Price ratios
         features_df['Price_High_Low_Ratio'] = price_data['high'] / price_data['low']
@@ -320,7 +320,7 @@ class FeatureCalculator:
         # Calculate overall quality score
         quality_score = 100 * (1 - missing_pct) * (1 - infinite_pct) * (1 - min(outlier_pct, 0.5))
         
-        logger.debug(f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}")
+        logger.info(f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}")
         
         return max(0.0, min(100.0, quality_score))
     

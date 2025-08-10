@@ -35,7 +35,7 @@ def setup_fundamental_database():
                 # Execute the schema using execute() method which handles complex SQL better
                 try:
                     cursor.execute(sql_schema)
-                    logger.debug("Executed SQL schema successfully")
+                    logger.info("Executed SQL schema successfully")
                 except Exception as e:
                     logger.warning(f"Schema execution failed (may already exist): {e}")
                 

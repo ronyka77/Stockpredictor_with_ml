@@ -129,7 +129,7 @@ class GrowthMetricsCalculator(BaseFundamentalCalculator):
                     })
         
         if len(revenues) < 2:
-            self.logger.debug("Insufficient revenue data for growth calculations")
+            self.logger.info("Insufficient revenue data for growth calculations")
             growth_metrics['revenue_growth_1y'] = None
             growth_metrics['revenue_growth_3y'] = None
             return growth_metrics
@@ -182,7 +182,7 @@ class GrowthMetricsCalculator(BaseFundamentalCalculator):
                     })
         
         if len(earnings) < 2:
-            self.logger.debug("Insufficient earnings data for growth calculations")
+            self.logger.info("Insufficient earnings data for growth calculations")
             growth_metrics['earnings_growth_1y'] = None
             growth_metrics['earnings_growth_3y'] = None
             return growth_metrics
@@ -229,7 +229,7 @@ class GrowthMetricsCalculator(BaseFundamentalCalculator):
                     })
         
         if len(book_values) < 2:
-            self.logger.debug("Insufficient book value data for growth calculations")
+            self.logger.info("Insufficient book value data for growth calculations")
             growth_metrics['book_value_growth_1y'] = None
             growth_metrics['book_value_growth_3y'] = None
             return growth_metrics
@@ -282,7 +282,7 @@ class GrowthMetricsCalculator(BaseFundamentalCalculator):
                     })
         
         if len(assets) < 2:
-            self.logger.debug("Insufficient asset data for growth calculations")
+            self.logger.info("Insufficient asset data for growth calculations")
             growth_metrics['asset_growth_1y'] = None
             growth_metrics['asset_growth_3y'] = None
             return growth_metrics
@@ -413,16 +413,16 @@ class GrowthMetricsCalculator(BaseFundamentalCalculator):
         if beginning_earnings <= 0:
             if ending_earnings > 0:
                 # Turned profitable - return 100% growth
-                self.logger.debug("Company turned profitable during period")
+                self.logger.info("Company turned profitable during period")
                 return 1.0
             else:
                 # Both periods negative - cannot calculate meaningful CAGR
-                self.logger.debug("Negative earnings in both periods")
+                self.logger.info("Negative earnings in both periods")
                 return None
         
         if ending_earnings <= 0:
             # Turned unprofitable - return -100% growth
-            self.logger.debug("Company turned unprofitable during period")
+            self.logger.info("Company turned unprofitable during period")
             return -1.0
         
         # Standard CAGR calculation for positive earnings

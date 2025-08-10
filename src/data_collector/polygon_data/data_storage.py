@@ -94,7 +94,7 @@ class DataStorage:
                         batch_stored = self._insert_batch(batch_df)
                         stored_count += batch_stored
                         
-                    logger.debug(f"Processed batch {i//batch_size + 1}: "
+                    logger.info(f"Processed batch {i//batch_size + 1}: "
                                 f"{len(batch_df)} records")
                     
                 except Exception as e:
@@ -231,7 +231,7 @@ class DataStorage:
                 result = conn.execute(text(query), params)
                 records = [dict(row._mapping) for row in result]
                 
-            logger.debug(f"Retrieved {len(records)} records for {ticker}")
+            logger.info(f"Retrieved {len(records)} records for {ticker}")
             return records
             
         except Exception as e:
@@ -252,7 +252,7 @@ class DataStorage:
                 result = conn.execute(text(query))
                 tickers = [row[0] for row in result]
                 
-            logger.debug(f"Found {len(tickers)} unique tickers in database")
+            logger.info(f"Found {len(tickers)} unique tickers in database")
             return tickers
             
         except Exception as e:
@@ -333,7 +333,7 @@ class DataStorage:
                     else:
                         stats[stat_name] = row[0] if row else 0
             
-            logger.debug(f"Retrieved data statistics: {stats}")
+            logger.info(f"Retrieved data statistics: {stats}")
             return stats
             
         except Exception as e:
@@ -598,7 +598,7 @@ class DataStorage:
                         
                         conn.commit()
                         
-                    logger.debug(f"Processed ticker batch {i//batch_size + 1}: {len(batch_data)} tickers")
+                    logger.info(f"Processed ticker batch {i//batch_size + 1}: {len(batch_data)} tickers")
                     
                 except Exception as e:
                     logger.error(f"Error processing ticker batch {i//batch_size + 1}: {e}")
@@ -667,7 +667,7 @@ class DataStorage:
                     ticker_dict = dict(row._mapping)
                     tickers.append(ticker_dict)
                 
-                logger.debug(f"Retrieved {len(tickers)} tickers from database")
+                logger.info(f"Retrieved {len(tickers)} tickers from database")
                 return tickers
                 
         except Exception as e:
@@ -722,7 +722,7 @@ class DataStorage:
                 result = conn.execute(text(query), params)
                 tickers = [row[0] for row in result]
                 
-                logger.debug(f"Retrieved {len(tickers)} ticker symbols from database")
+                logger.info(f"Retrieved {len(tickers)} ticker symbols from database")
                 return tickers
                 
         except Exception as e:
@@ -762,7 +762,7 @@ class DataStorage:
                 })
                 conn.commit()
                 
-            logger.debug(f"Stored cache for key: {cache_key}")
+            logger.info(f"Stored cache for key: {cache_key}")
             
         except Exception as e:
             logger.error(f"Error storing cache: {e}")

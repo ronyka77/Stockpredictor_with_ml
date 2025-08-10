@@ -122,7 +122,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
         }
         
         if not sic_code:
-            self.logger.debug("No SIC code available for GICS classification")
+            self.logger.info("No SIC code available for GICS classification")
             return classification
         
         try:
@@ -132,7 +132,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
             gics_mapping = self._map_sic_to_gics_hierarchy(sic_int, sic_description)
             classification.update(gics_mapping)
             
-            self.logger.debug(f"GICS classification for SIC {sic_code}: {gics_mapping['gics_sector']}")
+            self.logger.info(f"GICS classification for SIC {sic_code}: {gics_mapping['gics_sector']}")
             
         except (ValueError, TypeError):
             self.logger.warning(f"Invalid SIC code format: {sic_code}")
@@ -316,7 +316,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
                 'debt_to_equity': float(row[8]) if row[8] is not None else None
             }
             
-            self.logger.debug(f"Retrieved external data for {ticker}: SIC={external_data['sic_code']}")
+            self.logger.info(f"Retrieved external data for {ticker}: SIC={external_data['sic_code']}")
             return external_data
             
         except Exception as e:
@@ -336,7 +336,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
         try:
             from src.feature_engineering.data_loader import StockDataLoader
             
-            self.logger.debug(f"Fetching external data and peer data for {ticker}")
+            self.logger.info(f"Fetching external data and peer data for {ticker}")
             
             with StockDataLoader() as data_loader:
                 # First, get external data for the ticker (ratios, SIC code, etc.)
@@ -366,7 +366,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
                 market_peers = self._get_market_peers(data_loader, ticker)
                 peer_data['market'] = market_peers
                 
-                self.logger.debug(f"Retrieved data for {ticker}: "
+                self.logger.info(f"Retrieved data for {ticker}: "
                                 f"external_data={bool(external_data)}, "
                                 f"sector={len(peer_data['sector'])}, "
                                 f"industry={len(peer_data['industry'])}, "
@@ -443,7 +443,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
                 }
                 peer_data.append(peer_dict)
             
-            self.logger.debug(f"Found {len(peer_data)} sector peers for SIC {sic_code}")
+            self.logger.info(f"Found {len(peer_data)} sector peers for SIC {sic_code}")
             return peer_data
             
         except Exception as e:
@@ -493,7 +493,7 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
                 }
                 peer_data.append(peer_dict)
             
-            self.logger.debug(f"Found {len(peer_data)} market peers")
+            self.logger.info(f"Found {len(peer_data)} market peers")
             return peer_data
             
         except Exception as e:

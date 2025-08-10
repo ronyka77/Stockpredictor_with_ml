@@ -37,7 +37,7 @@ def calculate_rsi(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = feature_config.RSI_PERIODS
     
-    # logger.debug(f"Calculating RSI for periods: {periods}")
+    # logger.info(f"Calculating RSI for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -57,7 +57,7 @@ def calculate_rsi(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             result_data[f'RSI_{period}_Oversold'] = (rsi_values < 30).astype(int)
             result_data[f'RSI_{period}_Neutral'] = ((rsi_values >= 30) & (rsi_values <= 70)).astype(int)
             
-            # logger.debug(f"Calculated RSI_{period}: {rsi_values.notna().sum()} valid values")
+            # logger.info(f"Calculated RSI_{period}: {rsi_values.notna().sum()} valid values")
         
         if result_data.empty:
             raise ValueError("No RSI indicators could be calculated")
@@ -107,7 +107,7 @@ def calculate_stochastic(data: pd.DataFrame, k_period: Optional[int] = None,
     if d_period is None:
         d_period = params['d_period']
     
-    # logger.debug(f"Calculating Stochastic with parameters: k_period={k_period}, d_period={d_period}")
+    # logger.info(f"Calculating Stochastic with parameters: k_period={k_period}, d_period={d_period}")
     
     try:
         # Check minimum data requirements
@@ -142,7 +142,7 @@ def calculate_stochastic(data: pd.DataFrame, k_period: Optional[int] = None,
             result_data['Stoch_K'] > result_data['Stoch_D']
         ).astype(int).diff()
         
-        # logger.debug(f"Calculated Stochastic: {result_data['Stoch_K'].notna().sum()} valid values")
+        # logger.info(f"Calculated Stochastic: {result_data['Stoch_K'].notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'momentum',
@@ -184,7 +184,7 @@ def calculate_roc(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = [10, 20, 30]  # Default ROC periods
     
-    # logger.debug(f"Calculating ROC for periods: {periods}")
+    # logger.info(f"Calculating ROC for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -204,7 +204,7 @@ def calculate_roc(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             result_data[f'ROC_{period}_Strong_Positive'] = (roc_values > 5).astype(int)
             result_data[f'ROC_{period}_Strong_Negative'] = (roc_values < -5).astype(int)
             
-            # logger.debug(f"Calculated ROC_{period}: {roc_values.notna().sum()} valid values")
+            # logger.info(f"Calculated ROC_{period}: {roc_values.notna().sum()} valid values")
         
         if result_data.empty:
             raise ValueError("No ROC indicators could be calculated")
@@ -248,7 +248,7 @@ def calculate_williams_r(data: pd.DataFrame, periods: Optional[List[int]] = None
     if periods is None:
         periods = [14, 21]  # Default Williams %R periods
     
-    # logger.debug(f"Calculating Williams %R for periods: {periods}")
+    # logger.info(f"Calculating Williams %R for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -270,7 +270,7 @@ def calculate_williams_r(data: pd.DataFrame, periods: Optional[List[int]] = None
                 (williams_r_values >= -80) & (williams_r_values <= -20)
             ).astype(int)
             
-            # logger.debug(f"Calculated Williams_R_{period}: {williams_r_values.notna().sum()} valid values")
+            # logger.info(f"Calculated Williams_R_{period}: {williams_r_values.notna().sum()} valid values")
         
         if result_data.empty:
             raise ValueError("No Williams %R indicators could be calculated")

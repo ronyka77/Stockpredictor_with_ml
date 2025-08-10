@@ -175,7 +175,7 @@ class CleanedDataCache:
                 if path.exists():
                     try:
                         path.unlink()
-                        logger.debug(f"   Cleaned up partial file: {path}")
+                        logger.info(f"   Cleaned up partial file: {path}")
                     except PermissionError as pe:
                         logger.warning(f"   Could not delete {path}: {pe}")
                     except Exception as cleanup_error:

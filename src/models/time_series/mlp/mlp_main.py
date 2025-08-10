@@ -158,7 +158,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
             raise RuntimeError("No trained model to save")
         
         if experiment_name is None:
-            experiment_name = f"{self.model_name}_experiment"
+            experiment_name = "mlp_stock_predictor"
         
         try:
             # End any existing run before starting a new one
@@ -166,7 +166,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                 mlflow.end_run()
                 logger.info("Ended existing MLflow run before starting new one")
             except Exception as e:
-                logger.debug(f"No existing run to end: {e}")
+                logger.info(f"No existing run to end: {e}")
             
             # Set up MLflow tracking
             mlflow.set_experiment(experiment_name)
@@ -295,7 +295,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
         """
         try:
             if experiment_name is None:
-                experiment_name = f"{self.model_name}_experiment"
+                experiment_name = "mlp_stock_predictor"
             
             # Set the experiment
             mlflow.set_experiment(experiment_name)
@@ -437,18 +437,18 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
         feature_names_from_signature = []
         try:
             # Direct approach: get signature from model URI
-            logger.debug(f"Attempting to load model signature from: {model_uri}")
+            logger.info(f"Attempting to load model signature from: {model_uri}")
             
             # Load model info to get signature
             from mlflow.models import get_model_info
             model_info = get_model_info(model_uri)
-            logger.debug(f"Model info loaded: {model_info is not None}")
+            logger.info(f"Model info loaded: {model_info is not None}")
             
             if model_info and model_info.signature:
-                logger.debug(f"Model signature found: {model_info.signature is not None}")
+                logger.info(f"Model signature found: {model_info.signature is not None}")
                 
                 if model_info.signature.inputs:
-                    logger.debug(f"Signature inputs found: {len(model_info.signature.inputs.inputs) if hasattr(model_info.signature.inputs, 'inputs') else 'No inputs attr'}")
+                    logger.info(f"Signature inputs found: {len(model_info.signature.inputs.inputs) if hasattr(model_info.signature.inputs, 'inputs') else 'No inputs attr'}")
                     
                     # Extract feature names from signature inputs
                     # Handle different signature input formats
@@ -462,13 +462,13 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                         if hasattr(model_info.signature.inputs.schema, 'input_names'):
                             feature_names_from_signature = model_info.signature.inputs.schema.input_names
                     else:
-                        logger.debug(f"Signature inputs type: {type(model_info.signature.inputs)}")
-                        logger.debug(f"Signature inputs attributes: {dir(model_info.signature.inputs)}")
+                        logger.info(f"Signature inputs type: {type(model_info.signature.inputs)}")
+                        logger.info(f"Signature inputs attributes: {dir(model_info.signature.inputs)}")
                     
                     if feature_names_from_signature:
                         self.feature_names = feature_names_from_signature
                         logger.info(f"✅ Loaded {len(self.feature_names)} feature names from {source} signature")
-                        logger.debug(f"First 10 features: {self.feature_names[:10]}")
+                        logger.info(f"First 10 features: {self.feature_names[:10]}")
                     else:
                         logger.warning(f"⚠️ No feature names found in {source} signature inputs")
                 else:
@@ -478,7 +478,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                     
         except Exception as signature_error:
             logger.warning(f"⚠️ Could not extract feature names from {source} signature: {str(signature_error)}")
-            logger.debug(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
+            logger.info(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
             
             # Fallback: Try to extract feature names from the loaded model's input layer
             try:
@@ -512,7 +512,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 100
+        number_of_trials = 40
         # n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)

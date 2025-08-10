@@ -205,10 +205,10 @@ class LSTMPredictor(PyTorchBasePredictor):
         if hasattr(self, 'scaler') and self.scaler is not None:
             X_scaled = self.scaler.transform(X[self.feature_names])
             X_tensor = torch.tensor(X_scaled, dtype=torch.float32)
-            logger.debug("Applied feature scaling for prediction")
+            logger.info("Applied feature scaling for prediction")
         else:
             X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-            logger.debug("No scaler available, using raw features for prediction")
+            logger.info("No scaler available, using raw features for prediction")
         
         # Create overlapping sequences for prediction
         # For prediction, we'll use the last sequence_length samples for each prediction
@@ -292,10 +292,10 @@ class LSTMPredictor(PyTorchBasePredictor):
         if hasattr(self, 'scaler') and self.scaler is not None:
             X_scaled = self.scaler.transform(X[self.feature_names])
             X_tensor = torch.tensor(X_scaled, dtype=torch.float32)
-            logger.debug("Applied feature scaling for predict_proba")
+            logger.info("Applied feature scaling for predict_proba")
         else:
             X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-            logger.debug("No scaler available, using raw features for predict_proba")
+            logger.info("No scaler available, using raw features for predict_proba")
         
         # Create sequences for 2D input
         if len(X_tensor.shape) == 2:
@@ -496,10 +496,10 @@ class LSTMPredictor(PyTorchBasePredictor):
             confidence_scores = self.get_prediction_confidence(X, method='lstm_hidden')
             result['confidence'] = confidence_scores
         
-        logger.debug(f"LSTM predict_proba - Method: {method}")
-        logger.debug(f"  Predictions range: [{mean_predictions.min():.4f}, {mean_predictions.max():.4f}]")
-        logger.debug(f"  Probabilities range: [{probabilities.min():.4f}, {probabilities.max():.4f}]")
-        logger.debug(f"  Uncertainty range: [{std_predictions.min():.4f}, {std_predictions.max():.4f}]")
+        logger.info(f"LSTM predict_proba - Method: {method}")
+        logger.info(f"  Predictions range: [{mean_predictions.min():.4f}, {mean_predictions.max():.4f}]")
+        logger.info(f"  Probabilities range: [{probabilities.min():.4f}, {probabilities.max():.4f}]")
+        logger.info(f"  Uncertainty range: [{std_predictions.min():.4f}, {std_predictions.max():.4f}]")
         
         return result
 
@@ -605,9 +605,9 @@ class LSTMPredictor(PyTorchBasePredictor):
                 n_passes=5  # Reduced for efficiency in confidence calculation
             )
             
-            logger.debug(f"LSTM confidence using {method} -> {proba_method} method")
-            logger.debug(f"LSTM confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
-            logger.debug(f"LSTM confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
+            logger.info(f"LSTM confidence using {method} -> {proba_method} method")
+            logger.info(f"LSTM confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
+            logger.info(f"LSTM confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
             
             return confidence_scores
             
@@ -696,7 +696,7 @@ class LSTMPredictor(PyTorchBasePredictor):
             threshold_evaluator=self.threshold_evaluator
         )
         
-        logger.debug(f"Created new LSTM model '{model_name}' with parameters: {params}")
+        logger.info(f"Created new LSTM model '{model_name}' with parameters: {params}")
         
         return new_model
 
@@ -833,7 +833,7 @@ class LSTMPredictor(PyTorchBasePredictor):
                 )
                 
                 # Run threshold optimization for this trial
-                logger.debug(f"Running threshold optimization for trial {trial.number}")
+                logger.info(f"Running threshold optimization for trial {trial.number}")
                 
                 threshold_results = trial_model.optimize_prediction_threshold(
                     X_test=data_prep['X_test'],
@@ -879,7 +879,7 @@ class LSTMPredictor(PyTorchBasePredictor):
                     
                     self.previous_best = optimized_profit_score
                 else:
-                    logger.debug(f"Trial {trial.number}: Investment Success Rate = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
+                    logger.info(f"Trial {trial.number}: Investment Success Rate = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
                 
                 return optimized_profit_score
                 
@@ -1337,15 +1337,15 @@ class LSTMPredictor(PyTorchBasePredictor):
             try:
                 # Direct approach: get signature from model URI
                 model_uri = f"runs:/{run_info.info.run_id}/model"
-                logger.debug(f"Attempting to load model signature from: {model_uri}")
+                logger.info(f"Attempting to load model signature from: {model_uri}")
                 
                 # Load model info to get signature
                 from mlflow.models import get_model_info
                 model_info = get_model_info(model_uri)
-                logger.debug(f"Model info loaded: {model_info is not None}")
+                logger.info(f"Model info loaded: {model_info is not None}")
                 
                 if model_info and model_info.signature:
-                    logger.debug(f"Model signature found: {model_info.signature is not None}")
+                    logger.info(f"Model signature found: {model_info.signature is not None}")
                     
                     if model_info.signature.inputs:
                         # Extract feature names from signature
@@ -1369,9 +1369,9 @@ class LSTMPredictor(PyTorchBasePredictor):
                         
             except Exception as signature_error:
                 logger.warning(f"⚠️ Could not extract feature names from signature: {str(signature_error)}")
-                logger.debug(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
+                logger.info(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
                 
-            logger.debug("Model metadata loaded successfully")
+            logger.info("Model metadata loaded successfully")
             
         except Exception as e:
             logger.warning(f"⚠️ Could not load all metadata: {str(e)}")
@@ -1450,11 +1450,11 @@ class LSTMPredictor(PyTorchBasePredictor):
                     for metric_name, metric_value in final_metrics.items():
                         if isinstance(metric_value, (int, float)):
                             mlflow.log_metric(metric_name, metric_value)
-                            logger.debug(f"  Logged metric: {metric_name} = {metric_value}")
+                            logger.info(f"  Logged metric: {metric_name} = {metric_value}")
                         else:
                             # Convert non-numeric metrics to string parameters
                             mlflow.log_param(f"final_{metric_name}", str(metric_value))
-                            logger.debug(f"  Logged parameter: final_{metric_name} = {metric_value}")
+                            logger.info(f"  Logged parameter: final_{metric_name} = {metric_value}")
                 
                 # Log the PyTorch model
                 mlflow.pytorch.log_model(

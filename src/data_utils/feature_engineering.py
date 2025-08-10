@@ -41,7 +41,7 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if sma_col in features_enhanced.columns:
             ratio_col = f"{sma_col}_Ratio"
             features_enhanced[ratio_col] = current_price / features_enhanced[sma_col]
-            logger.debug(f"   Added {ratio_col}: close/SMA ratio")
+            logger.info(f"   Added {ratio_col}: close/SMA ratio")
     
     # 2. Bollinger Bands Ratios
     if 'BB_Lower' in features_enhanced.columns:
@@ -56,13 +56,13 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
                 # Price position within bands (0 = at lower band, 1 = at upper band)
                 features_enhanced['BB_Position'] = ((current_price - features_enhanced['BB_Lower']) / 
                                                     (features_enhanced['BB_Upper'] - features_enhanced['BB_Lower']))
-                logger.debug("   Added BB_Position: price position within Bollinger Bands")
+                logger.info("   Added BB_Position: price position within Bollinger Bands")
     
     # 3. ATR-normalized features
     if 'ATR' in features_enhanced.columns:
         # Price volatility relative to ATR
         features_enhanced['Price_ATR_Ratio'] = current_price / features_enhanced['ATR']
-        logger.debug("   Added Price_ATR_Ratio: price relative to volatility")
+        logger.info("   Added Price_ATR_Ratio: price relative to volatility")
     
     # 4. Volume-Price Efficiency
     if 'volume' in features_enhanced.columns:
@@ -70,7 +70,7 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if 'Return_1D' in features_enhanced.columns:
             features_enhanced['Return_Volume_Efficiency'] = (features_enhanced['Return_1D'].abs() / 
                                                             (features_enhanced['volume'] + 1e-8))
-            logger.debug("   Added Return_Volume_Efficiency: price change per volume unit")
+            logger.info("   Added Return_Volume_Efficiency: price change per volume unit")
     
     # 5. Ichimoku Ratios
     ichimoku_cols = [col for col in features_enhanced.columns if col.startswith('Ichimoku_') and 
@@ -79,14 +79,14 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if ich_col in features_enhanced.columns:
             ratio_col = f"{ich_col}_Ratio"
             features_enhanced[ratio_col] = current_price / features_enhanced[ich_col]
-            logger.debug(f"   Added {ratio_col}: close/Ichimoku ratio")
+            logger.info(f"   Added {ratio_col}: close/Ichimoku ratio")
     
     # 6. RSI and other oscillators are already normalized (0-100), so no change needed
     
     # 7. Price momentum ratios
     if 'open' in features_enhanced.columns:
         features_enhanced['Close_Open_Ratio'] = current_price / features_enhanced['open']
-        logger.debug("   Added Close_Open_Ratio: intraday price change")
+        logger.info("   Added Close_Open_Ratio: intraday price change")
     
     new_features_count = len(features_enhanced.columns) - len(features_df.columns)
     logger.info(f"✅ Added {new_features_count} price-normalized features")
@@ -119,7 +119,7 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
         
         # 10-day expected move (assuming random walk)
         features_enhanced['Expected_10D_Move'] = features_enhanced['ATR_Percent'] * np.sqrt(10)
-        logger.debug("   Added expected move features based on ATR")
+        logger.info("   Added expected move features based on ATR")
     
     # 2. Price momentum context
     if 'Return_5D' in features_enhanced.columns:
@@ -130,26 +130,26 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if 'Return_1D' in features_enhanced.columns:
             features_enhanced['Momentum_Acceleration'] = (features_enhanced['Return_1D'] - 
                                                         features_enhanced['Return_5D'] / 5)
-            logger.debug("   Added momentum acceleration feature")
+            logger.info("   Added momentum acceleration feature")
     
     # 3. Volatility regime context
     if 'Vol_Regime_High' in features_enhanced.columns and 'Vol_Regime_Low' in features_enhanced.columns:
         # Current volatility regime helps set expectation bounds
         features_enhanced['Vol_Regime_Context'] = (features_enhanced['Vol_Regime_High'] * 2 + 
                                                  features_enhanced['Vol_Regime_Low'] * 0.5)
-        logger.debug("   Added volatility regime context")
+        logger.info("   Added volatility regime context")
     
     # 4. RSI mean reversion context
     if 'RSI_14' in features_enhanced.columns:
         # RSI distance from 50 (neutral) indicates mean reversion pressure
         features_enhanced['RSI_Mean_Reversion_Pressure'] = abs(features_enhanced['RSI_14'] - 50) / 50
-        logger.debug("   Added RSI mean reversion pressure")
+        logger.info("   Added RSI mean reversion pressure")
     
     # 5. Bollinger Band context
     if 'BB_Percent' in features_enhanced.columns:
         # Position within BB bands indicates typical range
         features_enhanced['BB_Range_Context'] = features_enhanced['BB_Percent']
-        logger.debug("   Added Bollinger Band range context")
+        logger.info("   Added Bollinger Band range context")
     
     new_features_count = len(features_enhanced.columns) - len(features_df.columns)
     logger.info(f"✅ Added {new_features_count} prediction bounds features")
@@ -188,7 +188,7 @@ def clean_data_for_xgboost(df: pd.DataFrame) -> pd.DataFrame:
         # Count extreme values before capping
         extreme_count = ((df_clean[col] > max_val) | (df_clean[col] < min_val)).sum()
         if extreme_count > 0:
-            logger.debug(f"   Capping {extreme_count} extreme values in {col}")
+            logger.info(f"   Capping {extreme_count} extreme values in {col}")
             df_clean[col] = df_clean[col].clip(lower=min_val, upper=max_val)
     
     # 2. Fill NaN values with median (more robust than mean)
@@ -313,7 +313,7 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
         if col in X_clean.columns and X_clean[col].dtype == 'object':
             try:
                 X_clean[col] = pd.to_numeric(X_clean[col], errors='coerce')
-                logger.debug(f"   Converted essential column '{col}' to numeric")
+                logger.info(f"   Converted essential column '{col}' to numeric")
             except:
                 logger.warning(f"   Could not convert essential column '{col}' to numeric")
     

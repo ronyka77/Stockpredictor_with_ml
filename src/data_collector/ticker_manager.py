@@ -76,7 +76,7 @@ class TickerManager:
                 if row:
                     # Convert database row to dictionary
                     details = dict(row._mapping)
-                    logger.debug(f"Retrieved details for {ticker} from database")
+                    logger.info(f"Retrieved details for {ticker} from database")
                     return details
                 
         except Exception as e:
@@ -141,7 +141,7 @@ class TickerManager:
                     break
                     
             except Exception as e:
-                logger.debug(f"Error filtering ticker {ticker}: {e}")
+                logger.info(f"Error filtering ticker {ticker}: {e}")
                 continue
         
         logger.info(f"Filtered to {len(filtered_tickers)} tickers")
@@ -510,7 +510,7 @@ class TickerManager:
                             result = self.storage.store_tickers([ticker_data])
                             if result['stored_count'] > 0:
                                 stats['updated'] += 1
-                                logger.debug(f"✅ Updated details for {ticker}")
+                                logger.info(f"✅ Updated details for {ticker}")
                         else:
                             stats['not_found'] += 1
                             logger.warning(f"⚠️ No details found for {ticker}")

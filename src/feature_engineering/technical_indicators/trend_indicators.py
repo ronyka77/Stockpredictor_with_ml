@@ -38,7 +38,7 @@ def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = feature_config.SMA_PERIODS
     
-    logger.debug(f"Calculating SMA for periods: {periods}")
+    logger.info(f"Calculating SMA for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -53,7 +53,7 @@ def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             sma_values = ta.trend.sma_indicator(data['close'], window=period)
             result_data[f'SMA_{period}'] = sma_values
             
-            # logger.debug(f"Calculated SMA_{period}: {sma_values.notna().sum()} valid values")
+            # logger.info(f"Calculated SMA_{period}: {sma_values.notna().sum()} valid values")
         
         if result_data.empty:
             raise ValueError("No SMA indicators could be calculated")
@@ -96,7 +96,7 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = feature_config.EMA_PERIODS
     
-    logger.debug(f"Calculating EMA for periods: {periods}")
+    logger.info(f"Calculating EMA for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -111,7 +111,7 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             ema_values = ta.trend.ema_indicator(data['close'], window=period)
             result_data[f'EMA_{period}'] = ema_values
             
-            # logger.debug(f"Calculated EMA_{period}: {ema_values.notna().sum()} valid values")
+            # logger.info(f"Calculated EMA_{period}: {ema_values.notna().sum()} valid values")
         
         if result_data.empty:
             raise ValueError("No EMA indicators could be calculated")
@@ -162,7 +162,7 @@ def calculate_macd(data: pd.DataFrame, fast: Optional[int] = None,
     if signal is None:
         signal = feature_config.MACD_PARAMS['signal']
     
-    logger.debug(f"Calculating MACD with parameters: fast={fast}, slow={slow}, signal={signal}")
+    logger.info(f"Calculating MACD with parameters: fast={fast}, slow={slow}, signal={signal}")
     
     try:
         # Check minimum data requirements
@@ -186,7 +186,7 @@ def calculate_macd(data: pd.DataFrame, fast: Optional[int] = None,
         result_data['MACD_Above_Signal'] = (result_data['MACD'] > result_data['MACD_Signal']).astype(int)
         result_data['MACD_Crossover'] = (result_data['MACD'] > result_data['MACD_Signal']).astype(int).diff()
         
-        # logger.debug(f"Calculated MACD: {result_data['MACD'].notna().sum()} valid values")
+        # logger.info(f"Calculated MACD: {result_data['MACD'].notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'trend',
@@ -239,7 +239,7 @@ def calculate_ichimoku(data: pd.DataFrame, tenkan: Optional[int] = None,
     if displacement is None:
         displacement = params['displacement']
     
-    logger.debug(f"Calculating Ichimoku with parameters: tenkan={tenkan}, kijun={kijun}, senkou_b={senkou_b}, displacement={displacement}")
+    logger.info(f"Calculating Ichimoku with parameters: tenkan={tenkan}, kijun={kijun}, senkou_b={senkou_b}, displacement={displacement}")
     
     try:
         # Check minimum data requirements
@@ -286,7 +286,7 @@ def calculate_ichimoku(data: pd.DataFrame, tenkan: Optional[int] = None,
             result_data['Ichimoku_Senkou_A'] - result_data['Ichimoku_Senkou_B']
         )
         
-        # logger.debug(f"Calculated Ichimoku: {result_data['Ichimoku_Tenkan'].notna().sum()} valid values")
+        # logger.info(f"Calculated Ichimoku: {result_data['Ichimoku_Tenkan'].notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'trend',

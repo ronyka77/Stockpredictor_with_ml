@@ -95,7 +95,7 @@ class FundamentalPipeline:
         self.results = []
         
         self.logger.info(f"Initialized FundamentalPipeline with {len(self.calculators)} calculators")
-        self.logger.debug(f"Available calculators: {list(self.calculators.keys())}")
+        self.logger.info(f"Available calculators: {list(self.calculators.keys())}")
     
     async def process_ticker(self, ticker: str) -> PipelineResult:
         """
@@ -379,11 +379,11 @@ class FundamentalPipeline:
             # Check cache first
             cached_data = await self._get_cached_data(ticker)
             if cached_data and self._is_data_fresh(cached_data):
-                self.logger.debug(f"Using cached data for {ticker}")
+                self.logger.info(f"Using cached data for {ticker}")
                 return cached_data
             
             # Fetch fresh data using async context manager
-            self.logger.debug(f"Fetching fresh data for {ticker}")
+            self.logger.info(f"Fetching fresh data for {ticker}")
             async with self.api_client as client:
                 data = await client.get_financials(ticker=ticker)
             
@@ -404,7 +404,7 @@ class FundamentalPipeline:
         # Calculate ratios first (needed by scoring systems)
         if 'ratios' in self.calculators:
             try:
-                self.logger.debug("Calculating ratios metrics")
+                self.logger.info("Calculating ratios metrics")
                 ratios_result = self.calculators['ratios'].calculate(fundamental_data)
                 calculated_metrics['ratios'] = ratios_result
             except Exception as e:
@@ -416,7 +416,7 @@ class FundamentalPipeline:
                 continue  # Already calculated above
                 
             try:
-                self.logger.debug(f"Calculating {calc_name} metrics")
+                self.logger.info(f"Calculating {calc_name} metrics")
                 
                 # Pass pre-calculated ratios to scoring systems to avoid recalculation
                 if calc_name == 'scoring_systems' and 'ratios' in calculated_metrics:
@@ -456,7 +456,7 @@ class FundamentalPipeline:
                 
                 # Commit all changes
                 session.commit()
-                self.logger.debug(f"Database transaction committed for {ticker}")
+                self.logger.info(f"Database transaction committed for {ticker}")
                 
             except Exception as e:
                 session.rollback()

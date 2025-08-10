@@ -356,7 +356,7 @@ class DataValidator:
             except Exception as e:
                 error_msg = f"Record {i}: {str(e)}"
                 metrics.add_error(error_msg)
-                self.logger.debug(error_msg)
+                self.logger.info(error_msg)
         
         # Perform additional quality checks
         if validated_records:

@@ -114,7 +114,7 @@ class PolygonNewsCollector:
                         )
                         
                         if existing_articles:
-                            self.logger.debug(f"Ticker {ticker}: data exists for {current_date.date()}-{batch_end.date()}")
+                            self.logger.info(f"Ticker {ticker}: data exists for {current_date.date()}-{batch_end.date()}")
                             continue
                         
                         # Collect news for this ticker and date range
@@ -231,7 +231,7 @@ class PolygonNewsCollector:
         
         try:
             # Fetch news from Polygon API
-            self.logger.debug(f"Fetching news for {ticker} from {start_date.date()} to {end_date.date()}")
+            self.logger.info(f"Fetching news for {ticker} from {start_date.date()} to {end_date.date()}")
             
             raw_articles = self.news_client.get_news_for_ticker(
                 ticker=ticker,
@@ -244,7 +244,7 @@ class PolygonNewsCollector:
             ticker_stats['articles_fetched'] = len(raw_articles)
             
             if not raw_articles:
-                self.logger.debug(f"No articles found for {ticker}")
+                self.logger.info(f"No articles found for {ticker}")
                 return ticker_stats
             
             # Process articles
@@ -266,7 +266,7 @@ class PolygonNewsCollector:
                         processed_article['relevance_score'] = priority_score / 100.0  # Normalize to 0-1
                         processed_articles.append(processed_article)
                     else:
-                        self.logger.debug(f"Article failed validation: {issues}")
+                        self.logger.info(f"Article failed validation: {issues}")
                         ticker_stats['articles_skipped'] += 1
                 
                 except Exception as e:

@@ -66,19 +66,19 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
                 market_cap = metadata.get('market_cap')
                 if market_cap is not None:
                     market_data['market_cap'] = float(market_cap)
-                    logger.debug(f"Retrieved market cap for {ticker}: ${market_cap:,.0f}")
+                    logger.info(f"Retrieved market cap for {ticker}: ${market_cap:,.0f}")
                 
                 # Extract total employees
                 total_employees = metadata.get('total_employees')
                 if total_employees is not None:
                     market_data['total_employees'] = float(total_employees)
-                    logger.debug(f"Retrieved employee count for {ticker}: {total_employees:,.0f}")
+                    logger.info(f"Retrieved employee count for {ticker}: {total_employees:,.0f}")
                 
                 # Extract weighted shares outstanding
                 shares = metadata.get('weighted_shares_outstanding')
                 if shares is not None:
                     market_data['weighted_shares_outstanding'] = float(shares)
-                    logger.debug(f"Retrieved shares outstanding for {ticker}: {shares:,.0f}")
+                    logger.info(f"Retrieved shares outstanding for {ticker}: {shares:,.0f}")
                 
                 logger.info(f"Successfully retrieved market data for {ticker}")
             else:
@@ -201,11 +201,11 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
         if market_cap and total_liabilities:
             # Use market cap as market value of equity
             mve_tl = self.safe_divide(market_cap, total_liabilities)
-            logger.debug(f"Using market cap for Altman Z-Score: Market Value/Total Liabilities = {mve_tl:.4f}")
+            logger.info(f"Using market cap for Altman Z-Score: Market Value/Total Liabilities = {mve_tl:.4f}")
         elif equity:
             # Fallback to book value of equity
             mve_tl = self.safe_divide(equity, total_liabilities)
-            logger.debug("Using book value of equity for Altman Z-Score (market cap not available)")
+            logger.info("Using book value of equity for Altman Z-Score (market cap not available)")
         else:
             mve_tl = 0
         
@@ -218,7 +218,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
             scores['altman_z_score'] = z_score
             
             # Log the calculation for debugging
-            logger.debug(f"Altman Z-Score calculation: WC/TA={wc_ta:.4f}, EBIT/TA={ebit_ta:.4f}, MVE/TL={mve_tl:.4f}, S/TA={s_ta:.4f}, Z-Score={z_score:.4f}")
+            logger.info(f"Altman Z-Score calculation: WC/TA={wc_ta:.4f}, EBIT/TA={ebit_ta:.4f}, MVE/TL={mve_tl:.4f}, S/TA={s_ta:.4f}, Z-Score={z_score:.4f}")
         
         return scores
     
@@ -251,7 +251,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
         cash_flow = statements.get('cash_flow')
         
         if not balance_sheet or not income_statement:
-            logger.debug("Insufficient data for Ohlson O-Score calculation")
+            logger.info("Insufficient data for Ohlson O-Score calculation")
             return scores
         
         try:
@@ -264,7 +264,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
             
             # Check if we have minimum required data
             if not all([total_assets, total_liabilities, current_assets, current_liabilities, net_income]):
-                logger.debug("Missing required fields for Ohlson O-Score")
+                logger.info("Missing required fields for Ohlson O-Score")
                 return scores
             
             # Calculate intermediate ratios
@@ -314,8 +314,8 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
                 
                 scores['ohlson_o_score'] = ohlson_o_score
                 
-                logger.debug(f"Ohlson O-Score calculated: {ohlson_o_score:.4f}")
-                logger.debug(f"  Components: TL/TA={tl_ta:.4f}, WC/TA={wc_ta:.4f}, NI/TA={ni_ta:.4f}")
+                logger.info(f"Ohlson O-Score calculated: {ohlson_o_score:.4f}")
+                logger.info(f"  Components: TL/TA={tl_ta:.4f}, WC/TA={wc_ta:.4f}, NI/TA={ni_ta:.4f}")
             
         except Exception as e:
             logger.error(f"Error calculating Ohlson O-Score: {e}")
@@ -499,7 +499,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
         if market_cap and total_liabilities:
             market_based_leverage = self.safe_divide(market_cap + total_liabilities, market_cap)
             scores['market_based_financial_leverage'] = market_based_leverage
-            logger.debug(f"Market-based leverage: (Market Cap + Debt) / Market Cap = {market_based_leverage:.4f}")
+            logger.info(f"Market-based leverage: (Market Cap + Debt) / Market Cap = {market_based_leverage:.4f}")
         
         # Debt-to-Market-Cap Ratio
         if market_cap and long_term_debt:
@@ -564,20 +564,20 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
                 if value is not None:
                     scores[key] = float(value)
             
-            logger.debug(f"Using pre-calculated market ratios: P/E={ratios_values.get('pe_ratio')}, P/B={ratios_values.get('pb_ratio')}, P/S={ratios_values.get('ps_ratio')}")
+            logger.info(f"Using pre-calculated market ratios: P/E={ratios_values.get('pe_ratio')}, P/B={ratios_values.get('pb_ratio')}, P/S={ratios_values.get('ps_ratio')}")
             return scores
         
         # Fallback: Try database lookup (legacy behavior)
         income_statement = statements.get('income_statement')
         if not income_statement or not hasattr(income_statement, 'ticker'):
-            logger.debug("No ticker available for market ratios lookup")
+            logger.info("No ticker available for market ratios lookup")
             return self._calculate_basic_market_ratios(statements, market_data)
         
         ticker = income_statement.ticker
         filing_date = income_statement.filing_date
         
         if not ticker or not filing_date:
-            logger.debug("Missing ticker or filing date for market ratios lookup")
+            logger.info("Missing ticker or filing date for market ratios lookup")
             return self._calculate_basic_market_ratios(statements, market_data)
         
         try:
@@ -617,7 +617,7 @@ class ScoringSystemsCalculator(BaseFundamentalCalculator):
                     if value is not None:
                         scores[key] = float(value)
                 
-                logger.debug(f"Retrieved market ratios from database for {ticker}: P/E={row[0]}, P/B={row[1]}, P/S={row[2]}")
+                logger.info(f"Retrieved market ratios from database for {ticker}: P/E={row[0]}, P/B={row[1]}, P/S={row[2]}")
                 
             else:
                 logger.warning(f"No fundamental ratios found in database for {ticker} on or before {filing_date}")

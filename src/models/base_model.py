@@ -305,7 +305,7 @@ class BaseModel(ABC):
         """
         try:
             self.mlflow_integration.log_metrics(metrics, step=step)
-            logger.debug(f"Logged metrics: {list(metrics.keys())}")
+            logger.info(f"Logged metrics: {list(metrics.keys())}")
         except Exception as e:
             logger.warning(f"MLflow metric logging failed: {e}")
     
