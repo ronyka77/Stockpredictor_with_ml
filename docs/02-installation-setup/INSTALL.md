@@ -109,12 +109,11 @@ from datetime import date, timedelta
 
 # Quick data fetch
 pipeline = DataPipeline()
-stats = pipeline.run_incremental_update(
-    days_back=7,
-    ticker_source="popular",
-    max_tickers=10
-)
-print(f"Success rate: {stats.success_rate:.1f}%")
+pipeline.run_grouped_daily_pipeline(
+        start_date=start_date.strftime("%Y-%m-%d"),
+        end_date=end_date.strftime("%Y-%m-%d"),
+        validate_data=True,
+        save_stats=True)
 ```
 
 ## Troubleshooting
@@ -153,15 +152,6 @@ isort src/
 
 # Type checking
 mypy src/
-```
-
-### 3. Testing
-```bash
-# Run basic tests
-python test_polygon.py
-
-# Run examples
-python run_polygon_examples.py
 ```
 
 ## Package Structure

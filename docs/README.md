@@ -23,6 +23,8 @@ Our documentation is organized into logical sections for easy navigation:
   - Fundamental Features Implementation Plan  
   - Fundamental Pipeline README
 - **[Sector Analysis Implementation](./04-feature-engineering/SECTOR_ANALYSIS_IMPLEMENTATION.md)** - Cross-sectional analysis and GICS classification
+ - **[Feature & Target Engineering Guide](./04-feature-engineering/FEATURE_AND_TARGET_ENGINEERING.md)** - APIs and usage for feature/target utilities
+ - **[Feature Engineering Overview](./04-feature-engineering/README.md)** - High-level flow and recommended practices
 
 ### 🤖 [05 - Model Training](./05-model-training/)
 - **[Hyperparameter Ranges](./05-model-training/hyperparameter_ranges.md)** - Extended XGBoost optimization parameters

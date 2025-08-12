@@ -61,5 +61,5 @@ For active development:
 
 After installation:
 1. Review [Data Collection](../03-data-collection/) to set up data sources
-2. Configure [Feature Engineering](../04-feature-engineering/) parameters
+2. Configure [Feature Engineering](../04-feature-engineering/) parameters (see the overview: [Feature Engineering README](../04-feature-engineering/README.md))
 3. Explore [Model Training](../05-model-training/) capabilities 
