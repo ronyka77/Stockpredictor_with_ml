@@ -1063,8 +1063,7 @@ def main():
             prediction_horizon=prediction_horizon,
             split_date='2025-02-01',
             ticker=None,  
-            clean_features=True,
-            use_cache=True,  
+            clean_features=True, 
         )
         
         # Extract prepared data
@@ -1088,6 +1087,18 @@ def main():
         X_train_selected = X_train[selected_features]
         X_test_selected = X_test[selected_features]
         logger.info(f"   DataFrames updated with {len(selected_features)} selected features.")
+        
+
+        # Remove rows with the highest 50 date_int values
+        if 'date_int' in X_test_selected.columns:
+            threshold = X_test_selected['date_int'].copy()
+            threshold = threshold.drop_duplicates().max()-15
+            logger.info(f"📅 Threshold: {threshold}")
+            mask = X_test_selected['date_int'] < threshold
+            X_test_selected, y_test = X_test_selected[mask], y_test[mask]
+            logger.info(f"📅 Removed rows with date_int >= {threshold} (kept {len(X_test_selected)} samples)")
+        else:
+            logger.warning("⚠️ 'date_int' column not found - skipping date filtering")
         
         lgb_model = LightGBMModel(
             model_name="lightgbm_standalone_hypertuned",

@@ -952,7 +952,6 @@ def main():
         prediction_horizon = 10
         number_of_trials = 20
         objective_column = 'test_profit_per_investment'
-        use_cache = True
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
@@ -960,7 +959,6 @@ def main():
             split_date='2025-02-01',
             ticker=None,  # Load ALL tickers
             clean_features=True,  # Apply feature cleaning
-            use_cache=use_cache,  # Apply XGBoost data cleaning
         )
         
         # Extract prepared data

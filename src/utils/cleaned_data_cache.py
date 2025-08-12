@@ -284,7 +284,43 @@ class CleanedDataCache:
         
         return cached_entries 
     
+# Start Generation Here
+    def get_cache_age_hours(self, cache_key: str, data_type: str = "training") -> Optional[float]:
+        """
+        Get the age of cached data in hours
         
+        Args:
+            cache_key: Unique cache identifier
+            data_type: Type of data ('training' or 'prediction')
+            
+        Returns:
+            Age of cache in hours, or None if cache doesn't exist
+        """
+        paths = self._get_cache_paths(cache_key, data_type)
+        
+        # Check if cache exists
+        if not self.cache_exists(cache_key, data_type):
+            return None
+        
+        # Get the modification time of any cache file (use info.json as reference)
+        info_file = paths['info']
+        if not info_file.exists():
+            return None
+            
+        try:
+            # Get file modification time
+            mtime = info_file.stat().st_mtime
+            cache_datetime = datetime.fromtimestamp(mtime)
+            current_datetime = datetime.now()
+            
+            # Calculate age in hours
+            age_hours = (current_datetime - cache_datetime).total_seconds() / 3600
+            return age_hours
+            
+        except Exception as e:
+            logger.error(f"Error getting cache age: {str(e)}")
+            return None
+
 def main():
     """
     Main function to clear the entire cache
