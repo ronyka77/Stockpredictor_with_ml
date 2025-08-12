@@ -123,7 +123,6 @@ python scripts/deploy_sector_analysis.py
 ### **Data Freshness**
 - Uses latest fundamental ratios (within 1 year)
 - Focuses on active tickers only
-- S&P 500 companies for market comparisons
 
 ## 🧪 **Testing Framework**
 

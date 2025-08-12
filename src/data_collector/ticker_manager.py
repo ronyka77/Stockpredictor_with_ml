@@ -462,12 +462,6 @@ class TickerManager:
                 active_result = conn.execute(text("SELECT COUNT(*) FROM tickers WHERE active = true"))
                 active_tickers = active_result.fetchone()[0]
                 
-                sp500_result = conn.execute(text("SELECT COUNT(*) FROM tickers WHERE is_sp500 = true"))
-                sp500_tickers = sp500_result.fetchone()[0]
-                
-                popular_result = conn.execute(text("SELECT COUNT(*) FROM tickers WHERE is_popular = true"))
-                popular_tickers = popular_result.fetchone()[0]
-                
                 # Get market breakdown
                 market_result = conn.execute(text("""
                     SELECT market, COUNT(*) as count 
@@ -481,8 +475,6 @@ class TickerManager:
                 return {
                     'total_tickers': total_tickers,
                     'active_tickers': active_tickers,
-                    'sp500_tickers': sp500_tickers,
-                    'popular_tickers': popular_tickers,
                     'markets': markets
                 }
                 
@@ -491,8 +483,6 @@ class TickerManager:
             return {
                 'total_tickers': 0,
                 'active_tickers': 0,
-                'sp500_tickers': 0,
-                'popular_tickers': 0,
                 'markets': {},
                 'error': str(e)
             }
@@ -524,7 +514,7 @@ def main():
         # )
 
         ticker_manager.refresh_ticker_details(
-            tickers=ticker_manager.get_all_active_tickers(),
+            tickers=ticker_manager.get_all_active_tickers(market="stocks"),
             batch_size=50
         )
         

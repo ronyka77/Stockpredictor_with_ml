@@ -21,7 +21,7 @@ The fundamental analysis pipeline provides:
 
 ### Pipeline Runner (`run_fundamental_pipeline.py`)
 - **FundamentalPipelineRunner**: Command-line interface
-- Supports single ticker, batch, and S&P 500 sample processing
+- Supports single ticker and batch processing
 - Configurable logging and error handling
 
 ### Pipeline Monitor (`fundamental_monitor.py`)
@@ -62,8 +62,7 @@ python src/feature_engineering/run_fundamental_pipeline.py --ticker AAPL
 # Process multiple tickers
 python src/feature_engineering/run_fundamental_pipeline.py --tickers AAPL GOOGL MSFT
 
-# Process S&P 500 sample
-python src/feature_engineering/run_fundamental_pipeline.py --sp500-sample 10
+
 ```
 
 ### Monitoring
@@ -153,7 +152,7 @@ DB_PASSWORD=your_password
 
 1. Set up Polygon API key
 2. Configure database connection
-3. Run initial S&P 500 sample
+3. Run initial sample
 4. Set up monitoring dashboard
 5. Schedule regular updates
 

@@ -21,7 +21,7 @@ The Polygon Stock Data Collector is a comprehensive system for acquiring, proces
 
 ### Core Functionality
 - **Historical Data Acquisition**: Comprehensive OHLCV data collection with configurable timeframes
-- **Ticker Management**: Intelligent ticker discovery and management with S&P 500 integration
+- **Ticker Management**: Intelligent ticker discovery and management
 - **Incremental Updates**: Smart incremental data collection from last stored date
 - **Batch Processing**: Efficient batch operations for large-scale data acquisition
 - **Data Validation**: Comprehensive data quality validation with configurable strictness
@@ -57,7 +57,7 @@ src/data_collector/polygon_data/
 
 ### Data Flow
 
-1. **Ticker Discovery**: Automatic ticker discovery from various sources (S&P 500, popular stocks, all active)
+1. **Ticker Discovery**: Automatic ticker discovery from various sources (popular stocks, all active)
 2. **Data Fetching**: Historical data retrieval with intelligent pagination and rate limiting
 3. **Data Validation**: Quality validation with configurable rules and error detection
 4. **Database Storage**: Efficient batch storage with upsert operations and transaction safety
@@ -194,8 +194,8 @@ data_fetcher = HistoricalDataFetcher(client)
 storage = DataStorage()
 validator = DataValidator()
 
-# Get S&P 500 tickers
-sp500_tickers = ticker_manager.get_sp500_tickers()
+# Get popular tickers
+popular_tickers = ticker_manager.get_popular_tickers(limit=100)
 
 # Fetch data for a specific ticker
 data = data_fetcher.fetch_historical_data(
@@ -305,7 +305,7 @@ Run the complete data acquisition pipeline.
 **Parameters:**
 - `start_date` (str|date): Start date for data collection
 - `end_date` (str|date): End date for data collection
-- `ticker_source` (str): Source of tickers ('popular', 'sp500', 'all')
+ - `ticker_source` (str): Source of tickers ('popular', 'all')
 - `max_tickers` (int, optional): Maximum number of tickers to process
 - `timespan` (str): Time window ('day', 'week', 'month')
 - `validate_data` (bool): Whether to validate data
@@ -397,11 +397,7 @@ Ticker discovery and management operations.
 
 #### Methods
 
-##### `get_sp500_tickers()`
-Get list of S&P 500 ticker symbols.
-
-**Returns:**
-- List of S&P 500 ticker strings
+ 
 
 ##### `get_popular_tickers(limit)`
 Get list of popular ticker symbols.
@@ -521,10 +517,10 @@ from datetime import date, timedelta
 # Initialize pipeline
 pipeline = DataPipeline(requests_per_minute=10)
 
-# Run for S&P 500 stocks, last 7 days
+# Run for popular stocks, last 7 days
 stats = pipeline.run_incremental_update(
     days_back=7,
-    ticker_source="sp500",
+    ticker_source="popular",
     max_tickers=100
 )
 
@@ -616,12 +612,12 @@ data_fetcher = HistoricalDataFetcher(client)
 storage = DataStorage()
 validator = DataValidator(strict_mode=True)
 
-# Get S&P 500 tickers
-sp500_tickers = ticker_manager.get_sp500_tickers()
-print(f"Found {len(sp500_tickers)} S&P 500 tickers")
+# Get popular tickers
+popular_tickers = ticker_manager.get_popular_tickers(limit=50)
+print(f"Found {len(popular_tickers)} popular tickers")
 
 # Process first 5 tickers
-for ticker in sp500_tickers[:5]:
+for ticker in popular_tickers[:5]:
     try:
         # Fetch data
         data = data_fetcher.fetch_historical_data(

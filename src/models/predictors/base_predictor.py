@@ -74,7 +74,6 @@ class BasePredictor(ABC):
         data_result = prepare_ml_data_for_prediction_with_cleaning(
             prediction_horizon=self.prediction_horizon,
             days_back=days_back,
-            use_cache=False
         )
         print(f"   Data shape after cleaning: {data_result['X_test'].shape}")
 
@@ -187,10 +186,36 @@ class BasePredictor(ABC):
         
         print(f"💾 Saving predictions to: {output_path}")
 
+        results_df, avg_profit_per_investment = self._build_results_dataframe_and_profit(
+            features_df=features_df,
+            metadata_df=metadata_df,
+            predictions=predictions,
+        )
+
+        results_df.to_excel(output_path, index=False)
+        print(f"   Saved {len(results_df)} predictions.")
+        return output_path
+
+    def _build_results_dataframe_and_profit(
+        self,
+        *,
+        features_df: pd.DataFrame,
+        metadata_df: pd.DataFrame,
+        predictions: np.ndarray,
+    ) -> Tuple[pd.DataFrame, float]:
+        """
+        Build the results DataFrame and compute the average profit per investment
+        without writing to disk.
+
+        Returns a tuple of (results_df, avg_profit_per_investment).
+        """
+        # 1) Minimal result skeleton from predictions and metadata
         results_df = metadata_df.copy()
         results_df['ticker_id'] = features_df['ticker_id'].values
         results_df['date_int'] = features_df['date_int'].values
-        results_df['date'] = pd.to_datetime(results_df['date_int'], unit='D', origin='2020-01-01').dt.strftime('%Y-%m-%d')
+        results_df['date'] = pd.to_datetime(
+            results_df['date_int'], unit='D', origin='2020-01-01'
+        ).dt.strftime('%Y-%m-%d')
 
         try:
             data_loader = StockDataLoader()
@@ -208,67 +233,102 @@ class BasePredictor(ABC):
 
         current_prices = features_df['close'].values
         results_df['predicted_return'] = predictions
-        results_df['predicted_price'] = convert_percentage_predictions_to_prices(predictions, current_prices, apply_bounds=True)
+        results_df['predicted_price'] = convert_percentage_predictions_to_prices(
+            predictions, current_prices, apply_bounds=True
+        )
         results_df['current_price'] = current_prices
-
         results_df.rename(columns={'target_values': 'actual_return'}, inplace=True)
-        non_nan_mask = ~np.isnan(results_df['actual_return'])
-        
-        if non_nan_mask.any():
-            valid_returns = results_df.loc[non_nan_mask, 'actual_return']
-            valid_prices = current_prices[non_nan_mask]
-            results_df.loc[non_nan_mask, 'actual_price'] = convert_percentage_predictions_to_prices(valid_returns, valid_prices, apply_bounds=True)
-            results_df.loc[non_nan_mask, 'profit_100_investment'] = 100 * valid_returns
-            results_df.loc[non_nan_mask, 'price_prediction_error'] = results_df.loc[non_nan_mask, 'predicted_price'] - results_df.loc[non_nan_mask, 'actual_price']
-            results_df.loc[non_nan_mask, 'prediction_successful'] = (results_df.loc[non_nan_mask, 'actual_price'] > results_df.loc[non_nan_mask, 'predicted_price']).astype(int)
 
-        
-        
+        # 2) Apply threshold filtering and immediately top-10 per date on the filtered set
         if self.optimal_threshold is not None:
             confidence_scores = self.get_confidence_scores(features_df)
             _, threshold_mask = self.apply_threshold_filter(predictions, confidence_scores)
             results_df['confidence_score'] = confidence_scores
             results_df['passes_threshold'] = threshold_mask
             results_df['optimal_threshold'] = self.optimal_threshold
-            
-            # 🔥 NEW: Filter to only include rows that pass the threshold
+
             original_count = len(results_df)
-            results_df = results_df[results_df['passes_threshold'] == True].copy()
+            results_df = results_df[results_df['passes_threshold']].copy()
             threshold_filtered_count = len(results_df)
-            
-            print(f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count/original_count:.1%} kept)")
-            
+            print(
+                f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count/original_count:.1%} kept)"
+            )
+
             if threshold_filtered_count == 0:
-                print("   ⚠️  WARNING: No predictions passed the threshold! Exporting empty file.")
+                print("   ⚠️  WARNING: No predictions passed the threshold!")
             else:
-                # 🔥 NEW: Filter to top 10 highest predicted_return per date
                 print("   🏆 Applying top 10 filtering by predicted_return per date...")
-                
-                # Group by date and get top 10 highest predicted_return for each date
-                top_10_df = results_df.groupby('date').apply(
-                    lambda x: x.nlargest(10, 'predicted_return')
-                ).reset_index(drop=True)
-                
-                top_10_count = len(top_10_df)
-                print(f"   📈 Top 10 filtering: {threshold_filtered_count} → {top_10_count} predictions")
-                
-                # Show summary of dates and counts
-                date_counts = top_10_df['date'].value_counts()
+                results_df = (
+                    results_df
+                    .sort_values(['date', 'predicted_return'], ascending=[True, False])
+                    .groupby('date')
+                    .head(10)
+                    .reset_index(drop=True)
+                )
+                top_10_count = len(results_df)
+                date_counts = results_df['date'].value_counts()
+                print(f"   📈 Top 10 final count: {top_10_count}")
                 print(f"   📅 Dates with predictions: {len(date_counts)}")
-                print(f"   📊 Average predictions per date: {top_10_count/len(date_counts):.1f}")
-                
-                # Update results_df to use the top 10 filtered data
-                results_df = top_10_df.copy()
 
-        # Calculate and log average profit per investment for valid predictions
-        valid_profit_df = results_df[results_df['actual_price'] > 0].copy()
-        avg_profit_per_investment = valid_profit_df['profit_100_investment'].mean()
+        # 3) Compute derived evaluation fields AFTER filtering/top-10
+        non_nan_mask = results_df['actual_return'].notna()
+        if non_nan_mask.any():
+            # Map indices from filtered results back to current_prices by positional alignment
+            filtered_prices = results_df.loc[non_nan_mask, 'current_price'].values
+            filtered_returns = results_df.loc[non_nan_mask, 'actual_return']
+
+            results_df.loc[non_nan_mask, 'actual_price'] = convert_percentage_predictions_to_prices(
+                filtered_returns, filtered_prices, apply_bounds=True
+            )
+            
+            ap = results_df.loc[non_nan_mask, 'actual_price']
+            cp = results_df.loc[non_nan_mask, 'current_price']
+
+            # profit per $100 = (100 / current_price) * (actual_price - current_price)
+            results_df.loc[non_nan_mask, 'profit_100_investment'] = (100.0 / cp) * (ap - cp)
+            results_df.loc[non_nan_mask, 'price_prediction_error'] = (
+                results_df.loc[non_nan_mask, 'predicted_price'] - results_df.loc[non_nan_mask, 'actual_price']
+            )
+            results_df.loc[non_nan_mask, 'prediction_successful'] = (
+                results_df.loc[non_nan_mask, 'actual_price'] > results_df.loc[non_nan_mask, 'predicted_price']
+            ).astype(int)
+
+        # 4) Aggregate profit metric on the final DataFrame
+        if 'actual_price' in results_df.columns:
+            valid_mask = results_df['actual_price'] > 0
+        else:
+            valid_mask = pd.Series([False] * len(results_df), index=results_df.index)
+        valid_profit_df = results_df[valid_mask].copy()
+        avg_profit_per_investment = (
+            float(valid_profit_df['profit_100_investment'].mean()) if not valid_profit_df.empty else float('nan')
+        )
         valid_profit_count = valid_profit_df.shape[0]
-        print(f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)")
+        print(
+            f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
+        )
 
-        results_df.to_excel(output_path, index=False)
-        print(f"   Saved {len(results_df)} predictions.")
-        return output_path
+        return results_df, avg_profit_per_investment
+
+    def evaluate_on_recent_data(
+        self, *, days_back: int = 30
+    ) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
+        """
+        Run the prediction pipeline without writing to disk and return:
+        - results_df
+        - avg_profit_per_investment
+        - features_df
+        - metadata_df
+        - predictions
+        """
+        print(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
+        self.load_model_from_mlflow()
+        self._load_metadata_from_mlflow()
+        features_df, metadata_df = self.load_recent_data(days_back)
+        predictions = self.make_predictions(features_df)
+        results_df, avg_profit = self._build_results_dataframe_and_profit(
+            features_df=features_df, metadata_df=metadata_df, predictions=predictions
+        )
+        return results_df, avg_profit, features_df, metadata_df, predictions
 
     def run_prediction_pipeline(self, days_back: int = 30) -> str:
         """

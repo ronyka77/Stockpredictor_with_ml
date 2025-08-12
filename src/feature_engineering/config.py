@@ -155,8 +155,6 @@ class FeatureCategoryConfig:
     
     # Ticker Filters
     DEFAULT_ACTIVE_ONLY: bool = os.getenv('FE_DEFAULT_ACTIVE_ONLY', 'true').lower() == 'true'
-    DEFAULT_SP500_ONLY: bool = os.getenv('FE_DEFAULT_SP500_ONLY', 'false').lower() == 'false'
-    DEFAULT_POPULAR_ONLY: bool = os.getenv('FE_DEFAULT_POPULAR_ONLY', 'false').lower() == 'false'
 
 @dataclass
 class StorageConfig:

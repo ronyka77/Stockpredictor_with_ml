@@ -476,7 +476,6 @@ class XGBoostModel(BaseModel):
                         if feature_names:
                             self.feature_names = feature_names
                             logger.info(f"✅ Loaded {len(self.feature_names)} feature names from MLflow signature")
-                            logger.info(f"First 10 features: {self.feature_names[:10]}")
                         else:
                             logger.warning("⚠️ No feature names found in model signature inputs")
                     else:
@@ -555,9 +554,6 @@ class XGBoostModel(BaseModel):
             # Calculate average leaf depth across all trees
             confidence_scores = np.mean(leaf_indices, axis=1)
             confidence_scores = np.power(confidence_scores, 2)
-            # Log diagnostic information
-            logger.info(f"Leaf depth confidence - Raw range: [{confidence_scores.min():.2f}, {confidence_scores.max():.2f}]")
-            logger.info(f"Leaf depth confidence - Raw mean: {confidence_scores.mean():.2f}, std: {confidence_scores.std():.2f}")
             
         elif method == 'margin':
             # Use prediction margin (distance from decision boundary)

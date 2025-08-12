@@ -38,7 +38,7 @@ def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = feature_config.SMA_PERIODS
     
-    logger.info(f"Calculating SMA for periods: {periods}")
+    # logger.info(f"Calculating SMA for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -96,7 +96,7 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     if periods is None:
         periods = feature_config.EMA_PERIODS
     
-    logger.info(f"Calculating EMA for periods: {periods}")
+    # logger.info(f"Calculating EMA for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -138,7 +138,7 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
         raise
 
 def calculate_macd(data: pd.DataFrame, fast: Optional[int] = None, 
-                  slow: Optional[int] = None, signal: Optional[int] = None) -> IndicatorResult:
+                    slow: Optional[int] = None, signal: Optional[int] = None) -> IndicatorResult:
     """
     Calculate MACD (Moving Average Convergence Divergence)
     
