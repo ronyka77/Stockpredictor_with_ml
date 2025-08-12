@@ -769,8 +769,7 @@ async def main():
             tickers = data_loader.get_available_tickers(
                 min_data_points=100,  
                 active_only=True,
-                market='stocks',
-                popular_only=True
+                market='stocks'
             )
         
         logger.info(f"Loaded {len(tickers)} tickers for processing")

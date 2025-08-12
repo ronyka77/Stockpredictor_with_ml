@@ -30,33 +30,6 @@ logger = get_logger(__name__)
 # Global cache instance
 _cleaned_data_cache = CleanedDataCache()
 
-def clean_data_in_place_optimized(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Clean data in-place to avoid creating copies
-    """
-    logger.info(f"🧹 Cleaning {len(df)} samples in-place")
-    
-    # Use numpy operations for better memory efficiency
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        # Replace inf values in-place
-        df[col] = df[col].replace([np.inf, -np.inf], np.nan)
-        
-        # Fill NaN with median in-place
-        median_val = df[col].median()
-        if pd.isna(median_val):
-            df[col].fillna(0.0, inplace=True)
-        else:
-            df[col].fillna(median_val, inplace=True)
-        
-        # Cap extreme values in-place
-        max_val = np.finfo(np.float32).max / 10
-        min_val = np.finfo(np.float32).min / 10
-        df[col] = df[col].clip(lower=min_val, upper=max_val)
-    
-    return df
-
 def prepare_ml_data_for_training(prediction_horizon: int = 10, 
                                 split_date: str = '2025-02-01',
                                 ticker: Optional[str] = None,

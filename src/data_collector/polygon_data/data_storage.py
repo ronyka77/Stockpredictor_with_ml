@@ -384,14 +384,6 @@ class DataStorage:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         
-        CREATE TABLE IF NOT EXISTS ticker_cache (
-            id SERIAL PRIMARY KEY,
-            cache_key VARCHAR(255) NOT NULL UNIQUE,
-            cache_data JSONB NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            expires_at TIMESTAMP NOT NULL
-        );
-        
         -- Historical prices indexes
         CREATE INDEX IF NOT EXISTS idx_historical_prices_ticker_date 
         ON historical_prices(ticker, date);
@@ -412,12 +404,6 @@ class DataStorage:
         CREATE INDEX IF NOT EXISTS idx_tickers_active 
         ON tickers(active);
         
-        CREATE INDEX IF NOT EXISTS idx_tickers_sp500 
-        ON tickers(is_sp500);
-        
-        CREATE INDEX IF NOT EXISTS idx_tickers_popular 
-        ON tickers(is_popular);
-        
         CREATE INDEX IF NOT EXISTS idx_tickers_cik 
         ON tickers(cik);
         
@@ -432,13 +418,6 @@ class DataStorage:
         
         CREATE INDEX IF NOT EXISTS idx_tickers_list_date 
         ON tickers(list_date);
-        
-        -- Ticker cache indexes
-        CREATE INDEX IF NOT EXISTS idx_ticker_cache_key 
-        ON ticker_cache(cache_key);
-        
-        CREATE INDEX IF NOT EXISTS idx_ticker_cache_expires 
-        ON ticker_cache(expires_at);
         """
         
         try:
@@ -610,7 +589,6 @@ class DataStorage:
             raise
     
     def get_tickers(self, market: str = 'stocks', active: bool = True, 
-                    is_sp500: Optional[bool] = None, is_popular: Optional[bool] = None,
                     limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Get tickers from database
@@ -618,8 +596,6 @@ class DataStorage:
         Args:
             market: Market type filter
             active: Active status filter
-            is_sp500: S&P 500 filter
-            is_popular: Popular stocks filter
             limit: Maximum number of results
             
         Returns:
@@ -635,14 +611,6 @@ class DataStorage:
         if active is not None:
             query += " AND active = :active"
             params['active'] = active
-        
-        if is_sp500 is not None:
-            query += " AND is_sp500 = :is_sp500"
-            params['is_sp500'] = is_sp500
-        
-        if is_popular is not None:
-            query += " AND is_popular = :is_popular"
-            params['is_popular'] = is_popular
         
         query += " ORDER BY ticker"
         
@@ -666,7 +634,6 @@ class DataStorage:
             raise
     
     def get_ticker_symbols(self, market: str = 'stocks', active: bool = True,
-                            is_sp500: Optional[bool] = None, is_popular: Optional[bool] = None,
                             limit: Optional[int] = None) -> List[str]:
         """
         Get ticker symbols only (for performance)
@@ -674,8 +641,6 @@ class DataStorage:
         Args:
             market: Market type filter
             active: Active status filter
-            is_sp500: S&P 500 filter
-            is_popular: Popular stocks filter
             limit: Maximum number of results
             
         Returns:
@@ -692,14 +657,6 @@ class DataStorage:
             query += " AND active = :active"
             params['active'] = active
         
-        if is_sp500 is not None:
-            query += " AND is_sp500 = :is_sp500"
-            params['is_sp500'] = is_sp500
-        
-        if is_popular is not None:
-            query += " AND is_popular = :is_popular"
-            params['is_popular'] = is_popular
-
         # Add type filter for common stock
         query += " AND type = 'CS' AND market_cap is null" 
         
@@ -720,98 +677,6 @@ class DataStorage:
             logger.error(f"Error retrieving ticker symbols: {e}")
             raise
     
-    def store_cache(self, cache_key: str, data: Any, expires_hours: int = 24) -> None:
-        """
-        Store cache data in database
-        
-        Args:
-            cache_key: Unique cache key
-            data: Data to cache (will be JSON serialized)
-            expires_hours: Hours until cache expires
-        """
-        try:
-            import json
-            from datetime import timedelta
-            
-            expires_at = datetime.now() + timedelta(hours=expires_hours)
-            
-            with self.engine.connect() as conn:
-                upsert_query = text("""
-                    INSERT INTO ticker_cache (cache_key, cache_data, expires_at)
-                    VALUES (:cache_key, :cache_data, :expires_at)
-                    ON CONFLICT (cache_key)
-                    DO UPDATE SET
-                        cache_data = EXCLUDED.cache_data,
-                        expires_at = EXCLUDED.expires_at,
-                        created_at = CURRENT_TIMESTAMP
-                """)
-                
-                conn.execute(upsert_query, {
-                    'cache_key': cache_key,
-                    'cache_data': json.dumps(data),
-                    'expires_at': expires_at
-                })
-                conn.commit()
-                
-            logger.info(f"Stored cache for key: {cache_key}")
-            
-        except Exception as e:
-            logger.error(f"Error storing cache: {e}")
-            raise
-    
-    def get_cache(self, cache_key: str) -> Optional[Any]:
-        """
-        Get cache data from database
-        
-        Args:
-            cache_key: Cache key to retrieve
-            
-        Returns:
-            Cached data or None if not found/expired
-        """
-        try:
-            import json
-            
-            with self.engine.connect() as conn:
-                query = text("""
-                    SELECT cache_data FROM ticker_cache 
-                    WHERE cache_key = :cache_key AND expires_at > CURRENT_TIMESTAMP
-                """)
-                
-                result = conn.execute(query, {'cache_key': cache_key})
-                row = result.fetchone()
-                
-                if row:
-                    return json.loads(row[0])
-                
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error retrieving cache: {e}")
-            return None
-    
-    def clear_expired_cache(self) -> int:
-        """
-        Clear expired cache entries
-        
-        Returns:
-            Number of entries cleared
-        """
-        try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text("""
-                    DELETE FROM ticker_cache WHERE expires_at <= CURRENT_TIMESTAMP
-                """))
-                cleared_count = result.rowcount
-                conn.commit()
-                
-            logger.info(f"Cleared {cleared_count} expired cache entries")
-            return cleared_count
-            
-        except Exception as e:
-            logger.error(f"Error clearing expired cache: {e}")
-            raise
-
     def __exit__(self):
         """Context manager exit"""
         if hasattr(self, 'engine'):

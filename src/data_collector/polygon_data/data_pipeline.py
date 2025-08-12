@@ -110,7 +110,7 @@ class DataPipeline:
         logger.info("Data pipeline initialized")
     
     def run_full_pipeline(self, start_date: Union[str, date], end_date: Union[str, date],
-                            ticker_source: str = "popular", max_tickers: Optional[int] = None,
+                            ticker_source: str = "all", max_tickers: Optional[int] = None,
                             timespan: str = "day", validate_data: bool = True,
                             batch_size: int = 10, save_stats: bool = True) -> PipelineStats:
         """
@@ -119,7 +119,7 @@ class DataPipeline:
         Args:
             start_date: Start date for data collection
             end_date: End date for data collection
-            ticker_source: Source of tickers ('popular', 'sp500', 'all')
+            ticker_source: Source of tickers ('all')
             max_tickers: Maximum number of tickers to process
             timespan: Time window for data (day, week, month)
             validate_data: Whether to validate data
@@ -362,12 +362,7 @@ class DataPipeline:
         """Get list of tickers based on source"""
         logger.info(f"Getting tickers from source: {source}")
         
-        if source == "sp500":
-            tickers = self.ticker_manager.get_sp500_tickers()
-        elif source == "popular":
-            count = max_tickers or 100
-            tickers = self.ticker_manager.get_popular_tickers(count)
-        elif source == "all":
+        if source == "all":
             all_tickers = self.ticker_manager.get_all_active_tickers()
             tickers = self.ticker_manager.filter_tickers_by_criteria(
                 all_tickers, 

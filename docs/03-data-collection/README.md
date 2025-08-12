@@ -9,7 +9,7 @@ Complete documentation for Polygon.io data collection:
 
 #### Stock Data Collector
 - **Historical Data**: OHLCV data with configurable timeframes
-- **Ticker Management**: S&P 500 integration and intelligent discovery
+- **Ticker Management**: Intelligent discovery
 - **Incremental Updates**: Smart updates from last stored date
 - **Data Validation**: Quality checks and outlier detection
 - **Performance**: Adaptive rate limiting and batch processing

@@ -79,7 +79,6 @@ StockPredictor V1
 
 - **Prediction Accuracy**: 60% custom metric (directional + magnitude)
 - **Processing Speed**: <2 seconds per ticker for full analysis
-- **Data Coverage**: 95%+ of S&P 500 tickers
 - **Profit Optimization**: Threshold-optimized profit per investment
 
 ## 🛠️ Development Standards

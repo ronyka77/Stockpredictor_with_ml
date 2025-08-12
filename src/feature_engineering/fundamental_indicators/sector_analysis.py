@@ -474,7 +474,6 @@ class SectorAnalysisCalculator(BaseFundamentalCalculator):
             JOIN tickers t ON fr.ticker = t.ticker
             WHERE fr.ticker != %s
             AND t.active = true
-            AND t.is_sp500 = true  -- Focus on S&P 500 for market comparison
             ORDER BY fr.ticker, fr.date DESC
             LIMIT 500  -- Limit for performance
             """

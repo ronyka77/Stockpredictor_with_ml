@@ -655,7 +655,7 @@ class OptimizedFundamentalProcessor:
         self.collector = OptimizedFundamentalCollector()
         self.data_storage = DataStorage()
     
-    def _get_tickers_from_cache(self, filter_sp500: bool = False, filter_active: bool = True) -> List[str]:
+    def _get_tickers_from_cache(self, filter_active: bool = True) -> List[str]:
         """Get tickers from cached metadata"""
         try:
             logger.info("Loading ticker metadata for processing...")
@@ -669,10 +669,6 @@ class OptimizedFundamentalProcessor:
                 
                 # Apply filters
                 filtered_df = all_metadata_df.copy()
-                
-                if filter_sp500:
-                    filtered_df = filtered_df[filtered_df['is_sp500'] == True]
-                    logger.info(f"Filtered to S&P 500 stocks: {len(filtered_df)} tickers")
                 
                 if filter_active:
                     filtered_df = filtered_df[filtered_df['active'] == True]
@@ -714,7 +710,7 @@ class OptimizedFundamentalProcessor:
     
     async def process_all_fundamentals(self) -> Dict[str, bool]:
         """Process fundamental data for all active stocks - one ticker at a time"""
-        tickers = self._get_tickers_from_cache(filter_sp500=False, filter_active=True)
+        tickers = self._get_tickers_from_cache(filter_active=True)
         
         if not tickers:
             logger.error("No active tickers found")
@@ -723,16 +719,7 @@ class OptimizedFundamentalProcessor:
         logger.info(f"Starting fundamental data collection for {len(tickers)} active tickers - one ticker at a time")
         return await self.process_with_progress(tickers)
     
-    async def process_sp500_fundamentals(self) -> Dict[str, bool]:
-        """Process fundamental data for S&P 500 stocks - one ticker at a time"""
-        tickers = self._get_tickers_from_cache(filter_sp500=True, filter_active=True)
-        
-        if not tickers:
-            logger.error("No S&P 500 tickers found")
-            return {}
-        
-        logger.info(f"Starting S&P 500 fundamental data collection for {len(tickers)} tickers - one ticker at a time")
-        return await self.process_with_progress(tickers)
+    
     
     async def process_custom_tickers(self, tickers: List[str]) -> Dict[str, bool]:
         """Process fundamental data for custom ticker list - one ticker at a time"""
@@ -838,19 +825,6 @@ class FundamentalDataMonitor:
                     FROM raw_fundamental_data
                 """).scalar()
                 
-                # Get S&P 500 tickers
-                sp500_tickers = session.execute(
-                    "SELECT COUNT(*) FROM tickers WHERE is_sp500 = true AND active = true"
-                ).scalar()
-                
-                # Get S&P 500 tickers with data
-                sp500_with_data = session.execute("""
-                    SELECT COUNT(DISTINCT rfd.ticker_id) 
-                    FROM raw_fundamental_data rfd
-                    JOIN tickers t ON rfd.ticker_id = t.id
-                    WHERE t.is_sp500 = true AND t.active = true
-                """).scalar()
-                
                 # Get recent data (last 30 days)
                 recent_data = session.execute("""
                     SELECT COUNT(DISTINCT ticker_id) 
@@ -862,9 +836,6 @@ class FundamentalDataMonitor:
                     'total_tickers': total_tickers,
                     'tickers_with_data': tickers_with_data,
                     'overall_progress': tickers_with_data / total_tickers if total_tickers > 0 else 0,
-                    'sp500_total': sp500_tickers,
-                    'sp500_with_data': sp500_with_data,
-                    'sp500_progress': sp500_with_data / sp500_tickers if sp500_tickers > 0 else 0,
                     'recent_data_count': recent_data
                 }
                 
@@ -968,7 +939,7 @@ async def main():
     progress = monitor.get_collection_progress()
     logger.info("=== Collection Progress ===")
     logger.info(f"Overall progress: {progress.get('overall_progress', 0):.2%}")
-    logger.info(f"S&P 500 progress: {progress.get('sp500_progress', 0):.2%}")
+    
     logger.info(f"Recent data (30 days): {progress.get('recent_data_count', 0)} tickers")
     
     # Get quality summary
@@ -1076,7 +1047,7 @@ print(f"Cache hit rate: {cache_stats['cache_hit_rate']:.2%}")
 
 - **Rate**: 5 requests per minute = 300 requests per hour
 - **Per Ticker**: ~12 seconds (including cache check, API call if needed, processing, and database insert)
-- **S&P 500**: ~500 tickers = ~100 minutes (1.7 hours) with cache optimization
+ 
 - **All Active**: ~4000 tickers = ~800 minutes (13.3 hours) with cache optimization  
 - **Memory Usage**: Minimal per ticker (single ticker processing, connection pooling)
 - **Resume Capability**: Instant skip of tickers with recent data (6-month check)

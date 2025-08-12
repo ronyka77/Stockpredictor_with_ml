@@ -125,7 +125,7 @@ class StockDataLoader:
     
     def get_available_tickers(self, min_data_points: Optional[int] = None, 
                                 active_only: bool = True, market: str = 'stocks',
-                                sp500_only: bool = False, popular_only: bool = False) -> List[str]:
+                                ) -> List[str]:
         """
         Get list of available tickers with sufficient data
         
@@ -133,8 +133,6 @@ class StockDataLoader:
             min_data_points: Minimum number of data points required
             active_only: Only include active tickers
             market: Market type filter (default: 'stocks')
-            sp500_only: Only include S&P 500 tickers
-            popular_only: Only include popular tickers
             
         Returns:
             List of ticker symbols
@@ -147,23 +145,21 @@ class StockDataLoader:
         try:
             # Join tickers table with historical_prices to get active tickers with sufficient data
             query = text("""
-            SELECT t.ticker, COUNT(hp.*) as data_points, t.name, t.market, t.is_sp500, t.is_popular
+            SELECT t.ticker, COUNT(hp.*) as data_points, t.name, t.market
             FROM tickers t
             INNER JOIN historical_prices hp ON t.ticker = hp.ticker
             WHERE (:active_only = false OR t.active = true)
                 AND (:market = 'all' OR t.market = :market)
                 AND t."type" ='CS'
-            GROUP BY t.ticker, t.name, t.market, t.is_sp500, t.is_popular
+            GROUP BY t.ticker, t.name, t.market
             HAVING COUNT(hp.*) >= :min_data_points
-            ORDER BY t.is_sp500 DESC, t.is_popular DESC, COUNT(hp.*) DESC, t.ticker
+            ORDER BY COUNT(hp.*) DESC, t.ticker
             """)
             
             params = {
                 'min_data_points': min_data_points,
                 'active_only': active_only,
                 'market': market if market != 'all' else 'all',
-                'sp500_only': sp500_only,
-                'popular_only': popular_only
             }
             
             df = pd.read_sql_query(query, self.engine, params=params)

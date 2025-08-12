@@ -91,8 +91,7 @@ class BatchFeatureProcessor:
         logger.info("Initialized BatchFeatureProcessor")
     
     def get_available_tickers(self, min_data_points: int = None, 
-                                active_only: bool = None, market: str = None,
-                                sp500_only: bool = None, popular_only: bool = None) -> List[str]:
+                                active_only: bool = None, market: str = None) -> List[str]:
         """
         Get list of tickers with sufficient data for processing
         
@@ -100,8 +99,6 @@ class BatchFeatureProcessor:
             min_data_points: Minimum number of data points required
             active_only: Only include active tickers
             market: Market type filter ('stocks', 'crypto', 'forex', 'all')
-            sp500_only: Only include S&P 500 tickers
-            popular_only: Only include popular tickers
             
         Returns:
             List of ticker symbols
@@ -110,19 +107,15 @@ class BatchFeatureProcessor:
         min_data_points = min_data_points or config.data_quality.MIN_DATA_POINTS
         active_only = active_only if active_only is not None else config.feature_categories.DEFAULT_ACTIVE_ONLY
         market = market or config.feature_categories.DEFAULT_MARKET
-        sp500_only = sp500_only if sp500_only is not None else config.feature_categories.DEFAULT_SP500_ONLY
-        popular_only = popular_only if popular_only is not None else config.feature_categories.DEFAULT_POPULAR_ONLY
         
         logger.info(f"Getting tickers with at least {min_data_points} data points")
-        logger.info(f"Filters: active_only={active_only}, market={market}, sp500_only={sp500_only}, popular_only={popular_only}")
+        logger.info(f"Filters: active_only={active_only}, market={market}")
         
         try:
             tickers = self.data_loader.get_available_tickers(
                 min_data_points=min_data_points,
                 active_only=active_only,
                 market=market,
-                sp500_only=sp500_only,
-                popular_only=popular_only
             )
             
             logger.info(f"Found {len(tickers)} tickers ready for processing")
@@ -555,8 +548,8 @@ def run_production_batch():
     
     # Production configuration
     job_config = BatchJobConfig(
-        batch_size=config.batch_processing.DEFAULT_BATCH_SIZE // 5,  # Conservative batch size
-        max_workers=config.batch_processing.MAX_WORKERS // 2,  # Conservative parallel processing
+        batch_size=config.batch_processing.DEFAULT_BATCH_SIZE,  # Conservative batch size
+        max_workers=config.batch_processing.MAX_WORKERS,  # Conservative parallel processing
         start_date='2024-01-01',  # 2 years of data
         end_date=datetime.now().strftime('%Y-%m-%d'),
         min_data_points=config.data_quality.MIN_DATA_POINTS // 2,  # Reduced requirement for production
@@ -577,11 +570,6 @@ def run_production_batch():
             active_only=True,  # Only process active tickers
             market='stocks'    # Focus on stocks market
         )
-                
-        print(f"   Found {len(all_tickers)} tickers with sufficient data")
-        
-        # Use all tickers ordered by data points (descending order from get_available_tickers)
-        print("📈 Using all tickers ordered by data points (descending)...")
         
         # All tickers are already ordered by data points desc from the query
         selected_tickers = all_tickers

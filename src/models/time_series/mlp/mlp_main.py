@@ -468,7 +468,6 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                     if feature_names_from_signature:
                         self.feature_names = feature_names_from_signature
                         logger.info(f"✅ Loaded {len(self.feature_names)} feature names from {source} signature")
-                        logger.info(f"First 10 features: {self.feature_names[:10]}")
                     else:
                         logger.warning(f"⚠️ No feature names found in {source} signature inputs")
                 else:
