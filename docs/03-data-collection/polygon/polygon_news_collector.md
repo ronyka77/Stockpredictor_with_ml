@@ -67,23 +67,26 @@ src/data_collector/polygon_news/
 
 ### Prerequisites
 
-- Python 3.8+
-- PostgreSQL database
+- Python 3.12+
+- uv package manager
+- PostgreSQL database (existing instance; setup not covered here)
 - Polygon.io API key
-- Required Python packages (see `pyproject.toml`)
 
-### Environment Variables
+### Environment Variables (.env)
 
-```bash
-# Required
-export POLYGON_API_KEY='your_polygon_api_key_here'
+Use `.environment.example` as a template and create `.env` in the project root:
 
-# Optional (with defaults)
-export DATABASE_URL='postgresql://user:password@localhost/stockdb'
-export NEWS_MAX_TICKERS='100'
-export NEWS_DAYS_LOOKBACK='7'
-export NEWS_RETENTION_YEARS='2'
-export NEWS_BATCH_SIZE='100'
+```
+POLYGON_API_KEY=your_polygon_api_key_here
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=stock_data
+DB_USER=postgres
+DB_PASSWORD=your_password
+NEWS_MAX_TICKERS=100
+NEWS_DAYS_LOOKBACK=7
+NEWS_RETENTION_YEARS=2
+NEWS_BATCH_SIZE=100
 ```
 
 ### Database Setup
@@ -154,12 +157,8 @@ success = main()
 ### Command Line Usage
 
 ```bash
-# Run incremental collection
-python -m src.data_collector.polygon_news.news_collector
-
-# Or from the news directory
-cd src/data_collector/polygon_news
-python news_collector.py
+# Run news pipeline (module)
+uv run python -m src.data_collector.polygon_news.news_pipeline
 ```
 
 ### Programmatic Usage
@@ -352,7 +351,7 @@ Get recent market news across major tickers.
 ### Example 1: Basic Incremental Collection
 
 ```python
-from src.data_collector.polygon_news.news_collector import main
+from src.data_collector.polygon_news.news_pipeline import PolygonNewsCollector
 
 # Simple incremental collection
 success = main()

@@ -9,7 +9,7 @@ Complete documentation for Polygon.io data collection:
 
 #### Stock Data Collector
 - **Historical Data**: OHLCV data with configurable timeframes
-- **Ticker Management**: Intelligent discovery
+- **Ticker Management**: Ticker information management
 - **Incremental Updates**: Smart updates from last stored date
 - **Data Validation**: Quality checks and outlier detection
 - **Performance**: Adaptive rate limiting and batch processing
@@ -74,6 +74,10 @@ NEWS_DAYS_LOOKBACK=7
 ## 🔄 Next Steps
 
 After setting up data collection:
-1. Configure [Feature Engineering](../04-feature-engineering/) to process the data
-2. Review [Configuration](../06-configuration/) for fine-tuning
-3. Set up monitoring and scheduling for automated collection 
+1. Run stock data pipeline:
+   - `uv run python -m src.data_collector.polygon_data.data_pipeline`
+2. Run news pipeline:
+   - `uv run python -m src.data_collector.polygon_news.news_pipeline`
+3. Configure [Feature Engineering](../04-feature-engineering/) to process the data
+4. Review [Configuration](../06-configuration/) for fine-tuning
+5. Set up monitoring and scheduling for automated collection
