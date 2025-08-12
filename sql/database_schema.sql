@@ -866,14 +866,12 @@ CREATE TABLE public.tickers (
 	ticker_root varchar(10) NULL,
 	total_employees int4 NULL,
 	list_date date NULL,
-	last_updated_utc timestamp NULL,
 	CONSTRAINT tickers_pkey PRIMARY KEY (id),
 	CONSTRAINT tickers_ticker_key UNIQUE (ticker)
 );
 CREATE INDEX idx_tickers_active ON public.tickers USING btree (active);
 CREATE INDEX idx_tickers_cik ON public.tickers USING btree (cik);
 CREATE INDEX idx_tickers_composite_figi ON public.tickers USING btree (composite_figi);
-CREATE INDEX idx_tickers_last_updated_utc ON public.tickers USING btree (last_updated_utc);
 CREATE INDEX idx_tickers_list_date ON public.tickers USING btree (list_date);
 CREATE INDEX idx_tickers_market ON public.tickers USING btree (market);
 CREATE INDEX idx_tickers_popular ON public.tickers USING btree (is_popular);

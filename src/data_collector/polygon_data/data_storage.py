@@ -380,9 +380,6 @@ class DataStorage:
             ticker_root VARCHAR(10),
             total_employees INTEGER,
             list_date DATE,
-            last_updated_utc TIMESTAMP,
-            is_sp500 BOOLEAN DEFAULT false,
-            is_popular BOOLEAN DEFAULT false,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -435,9 +432,6 @@ class DataStorage:
         
         CREATE INDEX IF NOT EXISTS idx_tickers_list_date 
         ON tickers(list_date);
-        
-        CREATE INDEX IF NOT EXISTS idx_tickers_last_updated_utc 
-        ON tickers(last_updated_utc);
         
         -- Ticker cache indexes
         CREATE INDEX IF NOT EXISTS idx_ticker_cache_key 
@@ -560,10 +554,7 @@ class DataStorage:
                                 'sic_description': ticker_data.get('sic_description'),
                                 'ticker_root': ticker_data.get('ticker_root'),
                                 'total_employees': ticker_data.get('total_employees'),
-                                'list_date': ticker_data.get('list_date'),
-                                'last_updated_utc': ticker_data.get('last_updated_utc'),
-                                'is_sp500': ticker_data.get('is_sp500', False),
-                                'is_popular': ticker_data.get('is_popular', False)
+                                'list_date': ticker_data.get('list_date')
                             }
                             print(upsert_data)
                             # Remove None values

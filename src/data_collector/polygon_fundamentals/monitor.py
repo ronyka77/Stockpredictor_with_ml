@@ -23,7 +23,7 @@ class FundamentalDataMonitor:
             with self.db_pool.get_connection() as conn:
                 with conn.cursor() as cursor:
                     # Get total tickers
-                    cursor.execute("SELECT COUNT(*) FROM tickers WHERE active = true")
+                    cursor.execute("SELECT COUNT(*) FROM tickers WHERE active = true and has_financials = true")
                     total_tickers = cursor.fetchone()['count']
                     
                     # Get tickers with fundamental data
@@ -146,7 +146,6 @@ class FundamentalDataMonitor:
     
     def close(self):
         """Close the monitor and cleanup resources"""
-        # Note: We don't close the connection pool here as it's shared
         # The pool will be closed by the main application when needed
         logger.info("FundamentalDataMonitor closed")
     

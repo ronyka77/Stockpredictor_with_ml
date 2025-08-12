@@ -123,42 +123,6 @@ class StockDataLoader:
             logger.error(f"Error loading data for {ticker}: {str(e)}")
             raise
     
-    def load_multiple_tickers(self, tickers: List[str], start_date: Union[str, date], 
-                                end_date: Union[str, date]) -> Dict[str, pd.DataFrame]:
-        """
-        Load stock data for multiple tickers
-        
-        Args:
-            tickers: List of ticker symbols
-            start_date: Start date for data loading
-            end_date: End date for data loading
-            
-        Returns:
-            Dictionary mapping ticker to DataFrame
-        """
-        logger.info(f"Loading data for {len(tickers)} tickers from {start_date} to {end_date}")
-        
-        results = {}
-        failed_tickers = []
-        
-        for ticker in tickers:
-            try:
-                df = self.load_stock_data(ticker, start_date, end_date)
-                if not df.empty:
-                    results[ticker] = df
-                else:
-                    failed_tickers.append(ticker)
-                    logger.warning(f"No data loaded for {ticker}")
-            except Exception as e:
-                failed_tickers.append(ticker)
-                logger.error(f"Failed to load data for {ticker}: {str(e)}")
-        
-        logger.info(f"Successfully loaded data for {len(results)} tickers")
-        if failed_tickers:
-            logger.warning(f"Failed to load data for {len(failed_tickers)} tickers: {failed_tickers}")
-        
-        return results
-    
     def get_available_tickers(self, min_data_points: Optional[int] = None, 
                                 active_only: bool = True, market: str = 'stocks',
                                 sp500_only: bool = False, popular_only: bool = False) -> List[str]:
@@ -228,9 +192,9 @@ class StockDataLoader:
             query = text("""
             SELECT id, ticker, "name", market, locale, primary_exchange, currency_name, 
                 active, "type", market_cap, weighted_shares_outstanding, round_lot, 
-                is_sp500, is_popular, last_updated, created_at, cik, composite_figi, 
+                last_updated, created_at, cik, composite_figi, 
                 share_class_figi, sic_code, sic_description, ticker_root, total_employees, 
-                list_date, last_updated_utc
+                list_date
             FROM tickers 
             """ + ("WHERE ticker = :ticker" if ticker is not None else "") + """
             ORDER BY ticker
@@ -411,82 +375,6 @@ class StockDataLoader:
             logger.warning(f"Insufficient data for {ticker} after cleaning: {len(df)} < {self.feature_config.data_quality.MIN_DATA_POINTS}")
         
         return df
-    
-    def check_data_availability(self, tickers: List[str], start_date: Union[str, date], 
-                                end_date: Union[str, date]) -> Dict[str, Dict[str, Any]]:
-        """
-        Check data availability for multiple tickers without loading full data
-        
-        Args:
-            tickers: List of ticker symbols
-            start_date: Start date to check
-            end_date: End date to check
-            
-        Returns:
-            Dictionary with availability info for each ticker
-        """
-        logger.info(f"Checking data availability for {len(tickers)} tickers")
-        
-        # Convert dates to strings if needed
-        if isinstance(start_date, date):
-            start_date = start_date.strftime('%Y-%m-%d')
-        if isinstance(end_date, date):
-            end_date = end_date.strftime('%Y-%m-%d')
-        
-        try:
-            # Create a query to check all tickers at once
-            ticker_list = "','".join([t.upper() for t in tickers])
-            
-            query = text(f"""
-            SELECT 
-                ticker,
-                COUNT(*) as available_records,
-                MIN(date) as first_available_date,
-                MAX(date) as last_available_date,
-                COUNT(CASE WHEN date >= :start_date AND date <= :end_date THEN 1 END) as records_in_range
-            FROM historical_prices
-            WHERE ticker IN ('{ticker_list}')
-            GROUP BY ticker
-            """)
-            
-            params = {
-                'start_date': start_date,
-                'end_date': end_date
-            }
-            
-            df = pd.read_sql_query(query, self.engine, params=params)
-            
-            # Create result dictionary
-            results = {}
-            for ticker in tickers:
-                ticker_upper = ticker.upper()
-                ticker_data = df[df['ticker'] == ticker_upper]
-                
-                if ticker_data.empty:
-                    results[ticker] = {
-                        'available': False,
-                        'total_records': 0,
-                        'records_in_range': 0,
-                        'first_date': None,
-                        'last_date': None
-                    }
-                else:
-                    row = ticker_data.iloc[0]
-                    results[ticker] = {
-                        'available': row['records_in_range'] > 0,
-                        'total_records': int(row['available_records']),
-                        'records_in_range': int(row['records_in_range']),
-                        'first_date': row['first_available_date'],
-                        'last_date': row['last_available_date']
-                    }
-            
-            logger.info(f"Data availability check completed for {len(tickers)} tickers")
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error checking data availability: {str(e)}")
-            raise
     
     def execute_query(self, query: str, params: List[Any] = None) -> List[tuple]:
         """

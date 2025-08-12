@@ -184,36 +184,6 @@ class FeatureStorage:
             logger.error(f"Error loading features for {ticker}: {str(e)}")
             raise
     
-    def load_multiple_tickers(self, tickers: List[str], 
-                            start_date: Optional[date] = None,
-                            end_date: Optional[date] = None,
-                            categories: Optional[List[str]] = None) -> Dict[str, Tuple[pd.DataFrame, FeatureMetadata]]:
-        """
-        Load features for multiple tickers
-        
-        Args:
-            tickers: List of ticker symbols
-            start_date: Start date filter
-            end_date: End date filter
-            categories: Feature categories to load
-            
-        Returns:
-            Dictionary mapping ticker to (features, metadata)
-        """
-        results = {}
-        
-        for ticker in tickers:
-            try:
-                features, metadata = self.load_features(
-                    ticker, start_date, end_date, categories
-                )
-                results[ticker] = (features, metadata)
-            except Exception as e:
-                logger.warning(f"Failed to load features for {ticker}: {str(e)}")
-        
-        logger.info(f"Successfully loaded features for {len(results)}/{len(tickers)} tickers")
-        return results
-    
     def get_available_tickers(self, version: Optional[str] = None) -> List[str]:
         """
         Get list of tickers with stored features
@@ -264,36 +234,6 @@ class FeatureStorage:
                     stats['total_size_mb'] = version_stats['total_size_mb']
         
         return stats
-    
-    def delete_ticker_features(self, ticker: str, version: Optional[str] = None) -> bool:
-        """
-        Delete features for a specific ticker
-        
-        Args:
-            ticker: Stock ticker symbol
-            version: Specific version (default: current)
-            
-        Returns:
-            True if deleted successfully
-        """
-        try:
-            file_path = self._get_latest_file_path(ticker, version)
-            
-            if file_path.exists():
-                file_path.unlink()
-                logger.info(f"Deleted features for {ticker}")
-                
-                # Remove metadata file
-                self._delete_metadata_from_parquet(ticker, version)
-                
-                return True
-            else:
-                logger.warning(f"No features found for {ticker}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error deleting features for {ticker}: {str(e)}")
-            return False
     
     def _generate_file_path(self, ticker: str) -> Path:
         """Generate file path for ticker features"""
@@ -392,19 +332,6 @@ class FeatureStorage:
         
         return category_columns
     
-    def _get_version_stats(self, version_dir: Path) -> Dict[str, Any]:
-        """Get statistics for a version directory"""
-        files = list(version_dir.glob("*.parquet"))
-        total_size = sum(f.stat().st_size for f in files)
-        
-        return {
-            'version': version_dir.name,
-            'ticker_count': len(files),
-            'file_count': len(files),
-            'total_size_mb': total_size / (1024 * 1024),
-            'path': str(version_dir)
-        }
-    
     def _save_metadata_to_parquet(self, metadata: FeatureMetadata):
         """Save metadata to Parquet file"""
         try:
@@ -459,18 +386,6 @@ class FeatureStorage:
             logger.warning(f"Could not load metadata from Parquet: {str(e)}")
             return None
     
-    def _delete_metadata_from_parquet(self, ticker: str, version: Optional[str] = None):
-        """Delete metadata Parquet file"""
-        try:
-            metadata_path = self._get_metadata_file_path(ticker, version)
-            
-            if metadata_path.exists():
-                metadata_path.unlink()
-                logger.info(f"Deleted metadata file for {ticker}")
-                
-        except Exception as e:
-            logger.warning(f"Could not delete metadata file: {str(e)}")
-    
     def _get_metadata_file_path(self, ticker: str, version: Optional[str] = None) -> Path:
         """Get metadata file path for ticker"""
         version_path = self.version_path if not version else self.base_path / version
@@ -485,45 +400,3 @@ class FeatureStorage:
             pass
         except Exception as e:
             logger.warning(f"Could not cleanup old versions for {ticker}: {str(e)}")
-
-# Convenience functions
-def save_ticker_features(ticker: str, features_data: pd.DataFrame, 
-                        metadata: Dict[str, Any], storage: Optional[FeatureStorage] = None) -> FeatureMetadata:
-    """
-    Convenience function to save features for a ticker
-    
-    Args:
-        ticker: Stock ticker symbol
-        features_data: DataFrame with calculated features
-        metadata: Feature metadata
-        storage: FeatureStorage instance (creates new if None)
-        
-    Returns:
-        FeatureMetadata object
-    """
-    if storage is None:
-        storage = FeatureStorage()
-    
-    return storage.save_features(ticker, features_data, metadata)
-
-def load_ticker_features(ticker: str, start_date: Optional[date] = None,
-                        end_date: Optional[date] = None,
-                        categories: Optional[List[str]] = None,
-                        storage: Optional[FeatureStorage] = None) -> Tuple[pd.DataFrame, FeatureMetadata]:
-    """
-    Convenience function to load features for a ticker
-    
-    Args:
-        ticker: Stock ticker symbol
-        start_date: Start date filter
-        end_date: End date filter
-        categories: Feature categories to load
-        storage: FeatureStorage instance (creates new if None)
-        
-    Returns:
-        Tuple of (features DataFrame, metadata)
-    """
-    if storage is None:
-        storage = FeatureStorage()
-    
-    return storage.load_features(ticker, start_date, end_date, categories) 

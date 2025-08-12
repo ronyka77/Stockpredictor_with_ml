@@ -147,96 +147,6 @@ class TickerManager:
         logger.info(f"Filtered to {len(filtered_tickers)} tickers")
         return filtered_tickers
     
-    def get_sp500_tickers(self) -> List[str]:
-        """
-        Get S&P 500 ticker symbols from database or JSON file
-        
-        Returns:
-            List of S&P 500 ticker symbols
-        """
-        
-        # JSON file
-        try:
-            import json
-            import os
-            
-            # Get the path to sp500_tickers.json
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(current_dir, '..', '..', 'sp500_tickers.json')
-            
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-                sp500_tickers = [item['symbol'] for item in data['tickers']]
-            
-            logger.info(f"Loaded {len(sp500_tickers)} S&P 500 tickers from JSON file")
-            
-            # Filter to only include tickers that are actually available
-            all_tickers = set(self.get_all_active_tickers())
-            available_sp500 = [ticker for ticker in sp500_tickers if ticker in all_tickers]
-            
-            logger.info(f"Found {len(available_sp500)} S&P 500 tickers available in Polygon.io")
-            return available_sp500
-            
-        except Exception as e:
-            logger.warning(f"Failed to load S&P 500 tickers from JSON file: {e}")
-        
-        # Final fallback to hardcoded list
-        logger.info("Using fallback S&P 500 ticker list")
-        sp500_tickers = [
-            'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'GOOG', 'TSLA', 'BRK.B', 'UNH', 'JNJ', 'XOM',
-            'JPM', 'V', 'PG', 'MA', 'CVX', 'HD', 'PFE', 'ABBV', 'BAC', 'KO',
-            'AVGO', 'PEP', 'TMO', 'COST', 'WMT', 'DIS', 'ABT', 'DHR', 'VZ', 'ADBE',
-            'CRM', 'NFLX', 'CMCSA', 'NKE', 'ACN', 'TXN', 'RTX', 'QCOM', 'HON', 'PM',
-            'UPS', 'NEE', 'T', 'LOW', 'ORCL', 'IBM', 'AMD', 'SPGI', 'CAT', 'GS'
-        ]
-        
-        # Filter to only include tickers that are actually available
-        all_tickers = set(self.get_all_active_tickers())
-        available_sp500 = [ticker for ticker in sp500_tickers if ticker in all_tickers]
-        
-        logger.info(f"Found {len(available_sp500)} S&P 500 tickers available in Polygon.io")
-        return available_sp500
-    
-    def get_popular_tickers(self, count: int = 100) -> List[str]:
-        """
-        Get a list of popular/liquid stock tickers from database
-        
-        Args:
-            count: Number of tickers to return
-            
-        Returns:
-            List of popular ticker symbols
-        """
-        try:
-            # Get from database first
-            popular_tickers = self.storage.get_ticker_symbols(is_popular=True, active=True, limit=count)
-            if popular_tickers and len(popular_tickers) >= count:
-                logger.info(f"Retrieved {len(popular_tickers)} popular tickers from database")
-                return popular_tickers[:count]
-        except Exception as e:
-            logger.warning(f"Failed to get popular tickers from database: {e}")
-        
-        # Fallback: Start with S&P 500 as they are generally the most liquid
-        popular_tickers = self.get_sp500_tickers()
-        
-        if len(popular_tickers) >= count:
-            return popular_tickers[:count]
-        
-        # Add more popular tickers if needed
-        additional_popular = [
-            'QQQ', 'SPY', 'IWM', 'EEM', 'GLD', 'SLV', 'VTI', 'ARKK', 'PLTR', 'GME',
-            'AMC', 'BB', 'NOK', 'SNDL', 'TLRY', 'APHA', 'MVIS', 'CLOV', 'WISH', 'SOFI'
-        ]
-        
-        all_tickers = set(self.get_all_active_tickers())
-        for ticker in additional_popular:
-            if ticker in all_tickers and ticker not in popular_tickers:
-                popular_tickers.append(ticker)
-                if len(popular_tickers) >= count:
-                    break
-        
-        return popular_tickers[:count]
-    
     def _is_valid_ticker_format(self, ticker: str) -> bool:
         """
         Check if ticker has a valid format
@@ -355,8 +265,7 @@ class TickerManager:
                             existing.get('sic_description') != item.get('sic_description') or
                             existing.get('ticker_root') != item.get('ticker_root') or
                             existing.get('total_employees') != item.get('total_employees') or
-                            existing.get('list_date') != item.get('list_date') or
-                            existing.get('last_updated_utc') != item.get('last_updated_utc')):
+                            existing.get('list_date') != item.get('list_date')):
                             should_update = True
                 
                 if should_update:
@@ -380,8 +289,7 @@ class TickerManager:
                         'sic_description': item.get('sic_description'),
                         'ticker_root': item.get('ticker_root'),
                         'total_employees': item.get('total_employees'),
-                        'list_date': item.get('list_date'),
-                        'last_updated_utc': item.get('last_updated_utc')
+                        'list_date': item.get('list_date')
                     }
                     tickers_to_update.append(ticker_info)
                     stats['fetched_from_api'] += 1
@@ -502,8 +410,7 @@ class TickerManager:
                                 'sic_description': details.get('sic_description'),
                                 'ticker_root': details.get('ticker_root'),
                                 'total_employees': details.get('total_employees'),
-                                'list_date': details.get('list_date'),
-                                'last_updated_utc': details.get('last_updated_utc')
+                                'list_date': details.get('list_date')
                             }
                             
                             # Store in database
