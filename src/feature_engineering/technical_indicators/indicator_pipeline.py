@@ -570,11 +570,6 @@ def run_production_batch():
             active_only=True,  # Only process active tickers
             market='stocks'    # Focus on stocks market
         )
-                
-        print(f"   Found {len(all_tickers)} tickers with sufficient data")
-        
-        # Use all tickers ordered by data points (descending order from get_available_tickers)
-        print("📈 Using all tickers ordered by data points (descending)...")
         
         # All tickers are already ordered by data points desc from the query
         selected_tickers = all_tickers

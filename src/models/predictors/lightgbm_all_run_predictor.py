@@ -74,7 +74,7 @@ def run_all_and_export_best(
             print(f"   ❌ Skipping run due to error: {e}")
             continue
 
-        if best_tuple is None or (avg_profit == avg_profit and avg_profit > best_tuple[1]):
+        if best_tuple is None or (avg_profit is not None and avg_profit > best_tuple[1]):
             best_tuple = (run_id, avg_profit, (features_df, metadata_df, predictions))
             print(f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
 
