@@ -114,7 +114,7 @@ class BatchFeatureProcessor:
         popular_only = popular_only if popular_only is not None else config.feature_categories.DEFAULT_POPULAR_ONLY
         
         logger.info(f"Getting tickers with at least {min_data_points} data points")
-        logger.debug(f"Filters: active_only={active_only}, market={market}, sp500_only={sp500_only}, popular_only={popular_only}")
+        logger.info(f"Filters: active_only={active_only}, market={market}, sp500_only={sp500_only}, popular_only={popular_only}")
         
         try:
             tickers = self.data_loader.get_available_tickers(
@@ -156,7 +156,7 @@ class BatchFeatureProcessor:
         }
         
         try:
-            logger.debug(f"Processing ticker {ticker}")
+            logger.info(f"Processing ticker {ticker}")
             
             # Load stock data
             stock_data = self.data_loader.load_stock_data(
@@ -198,7 +198,7 @@ class BatchFeatureProcessor:
                     feature_result.data, 
                     storage_metadata
                 )
-                logger.debug(f"Saved features to Parquet: {parquet_metadata.file_path}")
+                logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
             
             if config.save_to_database:
                 # Save to database (secondary storage)
@@ -208,10 +208,10 @@ class BatchFeatureProcessor:
                     job_id,
                     config.overwrite_existing
                 )
-                logger.debug(f"Saved {saved_count} feature records to database for {ticker}")
+                logger.info(f"Saved {saved_count} feature records to database for {ticker}")
             
             result['success'] = True
-            logger.debug(f"Successfully processed {ticker}: {result['features_calculated']} features")
+            logger.info(f"Successfully processed {ticker}: {result['features_calculated']} features")
             
         except Exception as e:
             result['error'] = str(e)
@@ -405,7 +405,7 @@ class BatchFeatureProcessor:
                         # Skip values that are too large for database precision (15,6)
                         # Database can handle values up to 999,999,999.999999
                         if abs(feature_value) >= 1e9:
-                            logger.debug(f"Skipping {feature_name} value {feature_value} - too large for database precision")
+                            logger.info(f"Skipping {feature_name} value {feature_value} - too large for database precision")
                             continue
                         
                         # Determine feature category

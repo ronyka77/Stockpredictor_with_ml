@@ -111,7 +111,7 @@ class MLPOptimizationMixin:
                 num_workers = data_params.get('num_workers', 12)
                 pin_memory = data_params.get('pin_memory', True)
                 
-                logger.debug(f"🚀 Creating DataLoaders with num_workers={num_workers}, pin_memory={pin_memory}")
+                logger.info(f"🚀 Creating DataLoaders with num_workers={num_workers}, pin_memory={pin_memory}")
                 
                 train_loader, val_loader = MLPDataUtils.create_train_val_dataloaders(
                     X_train, y_train, X_test_scaled, y_test, data_params['batch_size'], num_workers, pin_memory
@@ -124,7 +124,7 @@ class MLPOptimizationMixin:
                 test_current_prices = X_test['close'].values if 'close' in X_test.columns else np.ones(len(X_test))
                 
                 # Run threshold optimization for this trial
-                logger.debug(f"Running threshold optimization for trial {trial.number}")
+                logger.info(f"Running threshold optimization for trial {trial.number}")
                 
                 threshold_results = trial_model.optimize_prediction_threshold(
                     X_test=X_test,
@@ -148,10 +148,10 @@ class MLPOptimizationMixin:
                 }
                 
                 # Log threshold optimization results for this trial
-                logger.debug(f"Trial {trial.number} threshold optimization:")
-                logger.debug(f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
-                logger.debug(f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                logger.debug(f"  Optimized profit per investment: {optimized_profit_score:.3f}")
+                logger.info(f"Trial {trial.number} threshold optimization:")
+                logger.info(f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                logger.info(f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
+                logger.info(f"  Optimized profit per investment: {optimized_profit_score:.3f}")
                 
                 # Check if this is the best trial so far
                 if optimized_profit_score > self.best_investment_success_rate:
@@ -180,7 +180,7 @@ class MLPOptimizationMixin:
                     
                     self.previous_best = optimized_profit_score
                 else:
-                    logger.debug(f"Trial {trial.number}: Profit Per Investment = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
+                    logger.info(f"Trial {trial.number}: Profit Per Investment = {optimized_profit_score:.3f} (Best: {self.best_investment_success_rate:.3f})")
                 
                 return optimized_profit_score
                 

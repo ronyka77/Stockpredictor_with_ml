@@ -54,13 +54,13 @@ class PolygonNewsStorage:
                 # Update existing article if needed
                 updated = self._update_existing_article(existing_article, article_data)
                 if updated:
-                    self.logger.debug(f"Updated existing article: {article_data['polygon_id']}")
+                    self.logger.info(f"Updated existing article: {article_data['polygon_id']}")
                 return existing_article.id
             
             # Create new article
             article_id = self._create_new_article(article_data)
             if article_id:
-                self.logger.debug(f"Created new article: {article_data['polygon_id']}")
+                self.logger.info(f"Created new article: {article_data['polygon_id']}")
             
             return article_id
             
@@ -116,7 +116,7 @@ class PolygonNewsStorage:
                 # Commit every 50 articles to avoid large transactions
                 if stats['total_processed'] % 50 == 0:
                     self.session.commit()
-                    self.logger.debug(f"Committed batch at {stats['total_processed']} articles")
+                    self.logger.info(f"Committed batch at {stats['total_processed']} articles")
                 
             except Exception as e:
                 stats['failed_articles'] += 1

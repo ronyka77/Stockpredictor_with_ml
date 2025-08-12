@@ -32,7 +32,7 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.debug("Calculating On-Balance Volume (OBV)")
+    logger.info("Calculating On-Balance Volume (OBV)")
     
     try:
         # Calculate OBV using ta library
@@ -63,7 +63,7 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
             ((price_change < 0) & (obv_change > 0))
         ).astype(int)
         
-        # logger.debug(f"Calculated OBV: {obv_values.notna().sum()} valid values")
+        # logger.info(f"Calculated OBV: {obv_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -101,7 +101,7 @@ def calculate_vpt(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.debug("Calculating Volume Price Trend (VPT)")
+    logger.info("Calculating Volume Price Trend (VPT)")
     
     try:
         # Calculate VPT using ta library
@@ -128,7 +128,7 @@ def calculate_vpt(data: pd.DataFrame) -> IndicatorResult:
         result_data['VPT_ROC_5'] = vpt_values.pct_change(5) * 100
         result_data['VPT_ROC_10'] = vpt_values.pct_change(10) * 100
         
-        # logger.debug(f"Calculated VPT: {vpt_values.notna().sum()} valid values")
+        # logger.info(f"Calculated VPT: {vpt_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -167,7 +167,7 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.debug("Calculating Accumulation/Distribution Line")
+    logger.info("Calculating Accumulation/Distribution Line")
     
     try:
         # Calculate A/D Line using ta library
@@ -195,7 +195,7 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
         result_data['AD_Oscillator'] = ad_values - ad_ema
         result_data['AD_Oscillator_Above_Zero'] = (result_data['AD_Oscillator'] > 0).astype(int)
         
-        # logger.debug(f"Calculated A/D Line: {ad_values.notna().sum()} valid values")
+        # logger.info(f"Calculated A/D Line: {ad_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -238,7 +238,7 @@ def calculate_volume_profile(data: pd.DataFrame, periods: Optional[List[int]] = 
     if periods is None:
         periods = [10, 20, 50]  # Default volume analysis periods
     
-    logger.debug(f"Calculating Volume Profile for periods: {periods}")
+    logger.info(f"Calculating Volume Profile for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)
@@ -271,7 +271,7 @@ def calculate_volume_profile(data: pd.DataFrame, periods: Optional[List[int]] = 
             )
             result_data[f'Volume_Trend_{period}'] = volume_trend.fillna(0).astype(int)
             
-            # logger.debug(f"Calculated Volume Profile features for period {period}")
+            # logger.info(f"Calculated Volume Profile features for period {period}")
         
         # Volume-Price relationship analysis
         if len(data) >= 20:
@@ -359,7 +359,7 @@ def calculate_money_flow_index(data: pd.DataFrame, period: Optional[int] = None)
     if period is None:
         period = 14  # Default MFI period
     
-    logger.debug(f"Calculating Money Flow Index with period: {period}")
+    logger.info(f"Calculating Money Flow Index with period: {period}")
     
     try:
         # Check minimum data requirements
@@ -395,7 +395,7 @@ def calculate_money_flow_index(data: pd.DataFrame, period: Optional[int] = None)
             ((price_change_5 < 0) & (mfi_change_5 > 0))
         ).astype(int)
         
-        # logger.debug(f"Calculated MFI: {mfi_values.notna().sum()} valid values")
+        # logger.info(f"Calculated MFI: {mfi_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',

@@ -123,7 +123,7 @@ class ThresholdEvaluator:
         min_samples = max(1, int(0.0005 * len(test_confidence)))  # 0.05% minimum
         max_samples = int(0.05 * len(test_confidence))  # 5% maximum
         
-        logger.debug(f"Sample constraints: min={min_samples}, max={max_samples} (total samples={len(test_confidence)})")
+        logger.info(f"Sample constraints: min={min_samples}, max={max_samples} (total samples={len(test_confidence)})")
         
         for i, threshold in enumerate(thresholds):
             mask = threshold_masks[:, i]
@@ -334,8 +334,8 @@ class ThresholdEvaluator:
         # Phase 1: Get predictions
         try:
             test_predictions = model.predict(X_test)
-            logger.debug(f"Predictions shape: {test_predictions.shape}")
-            logger.debug(f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]")
+            logger.info(f"Predictions shape: {test_predictions.shape}")
+            logger.info(f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]")
         except Exception as e:
             logger.error(f"❌ Failed to get predictions: {e}")
             return {'status': 'failed', 'message': f'Prediction failed: {e}'}
@@ -355,9 +355,9 @@ class ThresholdEvaluator:
         # Phase 2: Get confidence scores
         try:
             test_confidence = model.get_prediction_confidence(X_test, method=confidence_method)
-            logger.debug(f"Confidence shape: {test_confidence.shape}")
-            logger.debug(f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
-            logger.debug(f"Confidence mean: {test_confidence.mean():.4f}, std: {test_confidence.std():.4f}")
+            logger.info(f"Confidence shape: {test_confidence.shape}")
+            logger.info(f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
+            logger.info(f"Confidence mean: {test_confidence.mean():.4f}, std: {test_confidence.std():.4f}")
         except Exception as e:
             logger.error(f"❌ Failed to get confidence scores: {e}")
             return {'status': 'failed', 'message': f'Confidence calculation failed: {e}'}

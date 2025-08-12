@@ -94,7 +94,7 @@ class HistoricalDataFetcher:
                             validated_record = OHLCVRecord(**transformed)
                             transformed_records.append(validated_record)
                         except Exception as e:
-                            logger.debug(f"Failed to create record: {e}")
+                            logger.info(f"Failed to create record: {e}")
                             continue
                 
                 metrics = DataQualityMetrics()
@@ -153,7 +153,7 @@ class HistoricalDataFetcher:
                     )
                     results[ticker] = (records, metrics)
                     
-                    logger.debug(f"Completed {ticker}: {len(records)} records, "
+                    logger.info(f"Completed {ticker}: {len(records)} records, "
                                 f"{metrics.success_rate:.1f}% success rate")
                     
                 except Exception as e:
@@ -162,7 +162,7 @@ class HistoricalDataFetcher:
             
             # Delay between batches to respect rate limits
             if batch_num < total_batches - 1 and delay_between_batches > 0:
-                logger.debug(f"Waiting {delay_between_batches}s before next batch")
+                logger.info(f"Waiting {delay_between_batches}s before next batch")
                 time.sleep(delay_between_batches)
         
         successful_tickers = sum(1 for records, _ in results.values() if records)
@@ -239,7 +239,7 @@ class HistoricalDataFetcher:
                             results[ticker] = OHLCVRecord(**transformed)
                             
                 except Exception as e:
-                    logger.debug(f"Failed to process grouped record for {ticker}: {e}")
+                    logger.info(f"Failed to process grouped record for {ticker}: {e}")
                     continue
             
             logger.info(f"Processed {len(results)} valid grouped records")
@@ -294,18 +294,18 @@ class HistoricalDataFetcher:
             required_fields = ['open', 'high', 'low', 'close']
             for field in required_fields:
                 if transformed[field] <= 0:
-                    logger.debug(f"Invalid {field} value: {transformed[field]}")
+                    logger.info(f"Invalid {field} value: {transformed[field]}")
                     return None
             
             # Ensure volume is non-negative
             if transformed['volume'] < 0:
-                logger.debug(f"Invalid volume value: {transformed['volume']}")
+                logger.info(f"Invalid volume value: {transformed['volume']}")
                 return None
             
             return transformed
             
         except (ValueError, TypeError, KeyError) as e:
-            logger.debug(f"Failed to transform record: {e}")
+            logger.info(f"Failed to transform record: {e}")
             return None
     
     def get_data_summary(self, ticker: str, start_date: Union[str, date],

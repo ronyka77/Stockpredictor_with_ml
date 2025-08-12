@@ -101,7 +101,7 @@ class MLPModule(nn.Module):
         
         if activation_name not in activation_map:
             raise ValueError(f"Unsupported activation: {activation_name}. "
-                           f"Supported: {list(activation_map.keys())}")
+                            f"Supported: {list(activation_map.keys())}")
         
         return activation_map[activation_name]
     
@@ -136,7 +136,7 @@ class MLPModule(nn.Module):
             )
         else:
             raise ValueError(f"Unsupported task: {self.task}. "
-                           f"Supported: 'regression', 'classification'")
+                            f"Supported: 'regression', 'classification'")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

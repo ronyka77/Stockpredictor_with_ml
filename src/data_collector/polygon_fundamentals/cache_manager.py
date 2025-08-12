@@ -32,8 +32,8 @@ class FundamentalCacheManager:
     
     def _is_cache_valid(self, file_date: datetime) -> bool:
         """Check if cache file is valid (yesterday or newer)"""
-        yesterday = datetime.now() - timedelta(days=1)
-        return file_date >= yesterday
+        valid_date = datetime.now() - timedelta(days=7)
+        return file_date >= valid_date
     
     def get_cached_data(self, ticker: str) -> Optional[Dict[str, Any]]:
         """
@@ -51,7 +51,7 @@ class FundamentalCacheManager:
             cache_files = list(self.cache_dir.glob(pattern))
             
             if not cache_files:
-                logger.debug(f"No cache files found for {ticker}")
+                logger.info(f"No cache files found for {ticker}")
                 return None
             
             # Find the most recent valid cache file
@@ -62,7 +62,7 @@ class FundamentalCacheManager:
                     valid_caches.append((cache_file, file_date))
             
             if not valid_caches:
-                logger.debug(f"No valid cache files found for {ticker} from {len(cache_files)} files")
+                logger.info(f"No valid cache files found for {ticker} from {len(cache_files)} files")
                 return None
             
             # Get the most recent cache file
@@ -157,7 +157,7 @@ class FundamentalCacheManager:
                 if file_date and not self._is_cache_valid(file_date):
                     cache_file.unlink()
                     removed_count += 1
-                    logger.debug(f"Removed expired cache: {cache_file.name}")
+                    logger.info(f"Removed expired cache: {cache_file.name}")
             
             logger.info(f"Removed {removed_count} expired cache files")
             return removed_count
@@ -165,3 +165,71 @@ class FundamentalCacheManager:
         except Exception as e:
             logger.error(f"Error clearing expired caches: {e}")
             return 0 
+
+    def save_cache(
+        self,
+        ticker: str,
+        data: Dict[str, Any],
+        overwrite: bool = True,
+    ) -> Optional[Path]:
+        """
+        Save fundamental data to cache as JSON.
+
+        The file name follows the pattern: TICKER_financials_YYYYMMDD.json
+
+        Args:
+            ticker: Stock ticker symbol
+            data: Data to be cached (JSON-serializable)
+            as_of: Date to use in the filename; defaults to now if not provided
+            overwrite: If False, will not overwrite an existing file for the same date
+
+        Returns:
+            Path to the saved cache file if successful, None otherwise
+        """
+        try:
+            normalized_ticker = (ticker or "").strip().upper()
+            if not normalized_ticker:
+                logger.error("Ticker is required to save cache")
+                return None
+
+            cache_date = datetime.now()
+            filename = f"{normalized_ticker}_financials_{cache_date.strftime('%Y%m%d')}.json"
+            file_path = self.cache_dir / filename
+
+            if file_path.exists() and not overwrite:
+                logger.info(
+                    f"Cache file already exists and overwrite is False: {file_path.name}"
+                )
+                return None
+
+            # Write JSON with UTF-8 encoding and readable formatting
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    data,
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                    default=self._json_fallback_serializer,
+                )
+
+            logger.info(
+                f"Saved cache for {normalized_ticker} at {file_path.name}"
+            )
+            return file_path
+        except Exception as e:
+            logger.error(f"Error saving cache for {ticker}: {e}")
+            return None
+
+    def _json_fallback_serializer(self, obj: Any) -> str:
+        """Fallback serializer for objects not natively JSON serializable."""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        # Final fallback to string representation
+        try:
+            return str(obj)
+        except Exception:  # pragma: no cover - extremely rare
+            return repr(obj)
+
+if __name__ == "__main__":
+    cache_manager = FundamentalCacheManager()
+    cache_manager.clear_expired_caches()

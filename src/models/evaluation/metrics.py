@@ -74,5 +74,5 @@ class CustomMetrics:
         
         accuracy = np.mean(successful_predictions)
         
-        logger.debug(f"Custom upward accuracy: {accuracy:.4f} ({np.sum(successful_predictions)}/{len(y_true_upward)})")
+        logger.info(f"Custom upward accuracy: {accuracy:.4f} ({np.sum(successful_predictions)}/{len(y_true_upward)})")
         return accuracy 

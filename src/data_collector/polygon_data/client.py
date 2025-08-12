@@ -78,7 +78,7 @@ class PolygonDataClient:
         # Retry logic with exponential backoff
         for attempt in range(config.MAX_RETRIES):
             try:
-                logger.debug(f"Making request to {endpoint} (attempt {attempt + 1}/{config.MAX_RETRIES})")
+                logger.info(f"Making request to {endpoint} (attempt {attempt + 1}/{config.MAX_RETRIES})")
                 
                 response = self.session.get(
                     url, 
@@ -96,7 +96,7 @@ class PolygonDataClient:
                         error_msg = data.get('error', 'Unknown API error')
                         raise PolygonAPIError(f"API Error: {error_msg}", response.status_code, data)
                     
-                    logger.debug(f"Successful request to {endpoint}")
+                    logger.info(f"Successful request to {endpoint}")
                     return data
                 
                 elif response.status_code == 429:  # Rate limit exceeded
@@ -172,7 +172,7 @@ class PolygonDataClient:
         
         while True:
             page_count += 1
-            logger.debug(f"Fetching page {page_count} from {endpoint}")
+            logger.info(f"Fetching page {page_count} from {endpoint}")
             
             if next_url:
                 # Parse next_url to extract parameters
@@ -193,15 +193,15 @@ class PolygonDataClient:
             if 'results' in response and response['results']:
                 results = response['results']
                 all_results.extend(results)
-                logger.debug(f"Page {page_count}: fetched {len(results)} records. "
+                logger.info(f"Page {page_count}: fetched {len(results)} records. "
                            f"Total: {len(all_results)}")
             else:
-                logger.debug(f"Page {page_count}: no results found")
+                logger.info(f"Page {page_count}: no results found")
                 break
             
             # Check for next page
             if 'next_url' not in response or not response['next_url']:
-                logger.debug(f"Pagination complete. Total pages: {page_count}, "
+                logger.info(f"Pagination complete. Total pages: {page_count}, "
                            f"Total records: {len(all_results)}")
                 break
             
@@ -300,7 +300,7 @@ class PolygonDataClient:
         """
         endpoint = f'/v3/reference/tickers/{ticker}'
         
-        logger.debug(f"Fetching details for ticker {ticker}")
+        logger.info(f"Fetching details for ticker {ticker}")
         
         response = self._make_request(endpoint)
         return response.get('results', {})

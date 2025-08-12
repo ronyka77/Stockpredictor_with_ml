@@ -230,7 +230,7 @@ class PyTorchBasePredictor(BaseModel):
             logger.warning(f"All confidence scores are identical ({min_conf:.4f}) - using uniform distribution")
             confidence_scores = np.full_like(confidence_scores, 0.5)
             
-        logger.debug(f"Final confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
-        logger.debug(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
+        logger.info(f"Final confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
+        logger.info(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
         
         return confidence_scores

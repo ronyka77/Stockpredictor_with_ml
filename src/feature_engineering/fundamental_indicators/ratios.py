@@ -57,7 +57,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
                     market_data['market_cap'] = metadata.get('market_cap')
                     market_data['shares_outstanding'] = metadata.get('weighted_shares_outstanding')
                     
-                    self.logger.debug(f"Retrieved metadata for {ticker}: market_cap={market_data['market_cap']}, shares={market_data['shares_outstanding']}")
+                    self.logger.info(f"Retrieved metadata for {ticker}: market_cap={market_data['market_cap']}, shares={market_data['shares_outstanding']}")
                 
                 # Get latest stock price from historical data
                 # Load recent data (last 5 days to ensure we get the latest available)
@@ -72,7 +72,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
                     market_data['current_stock_price'] = float(latest_price)
                     
                     latest_date = price_data.index[-1].strftime('%Y-%m-%d')
-                    self.logger.debug(f"Retrieved latest price for {ticker}: ${latest_price:.2f} on {latest_date}")
+                    self.logger.info(f"Retrieved latest price for {ticker}: ${latest_price:.2f} on {latest_date}")
                 else:
                     self.logger.warning(f"No recent price data found for {ticker}")
                     
@@ -96,7 +96,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
         has_market_cap = market_data.get('market_cap') is not None
         has_shares = market_data.get('shares_outstanding') is not None
         
-        self.logger.debug(f"Market data validation for {ticker}: price={has_price}, market_cap={has_market_cap}, shares={has_shares}")
+        self.logger.info(f"Market data validation for {ticker}: price={has_price}, market_cap={has_market_cap}, shares={has_shares}")
         
         if not any([has_price, has_market_cap, has_shares]):
             self.logger.warning(f"No market data available for {ticker}")
@@ -274,7 +274,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
                 # Convert growth rate to percentage for PEG calculation
                 growth_rate_percentage = earnings_growth_rate * 100
                 ratios['peg_ratio'] = self.safe_divide(pe_ratio, growth_rate_percentage)
-                # self.logger.debug(f"Calculated PEG ratio for {ticker}: {ratios['peg_ratio']:.2f}")
+                # self.logger.info(f"Calculated PEG ratio for {ticker}: {ratios['peg_ratio']:.2f}")
             else:
                 ratios['peg_ratio'] = None
                 self.calculation_errors.append("PEG ratio: earnings growth rate not available")
@@ -399,7 +399,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
         """
         try:
             if not data.income_statements or len(data.income_statements) < 2:
-                self.logger.debug("Insufficient income statement data for growth calculation")
+                self.logger.info("Insufficient income statement data for growth calculation")
                 return None
             
             # Get historical net income values (sorted by date, most recent first)
@@ -415,7 +415,7 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
                     })
             
             if len(earnings_data) < 2:
-                self.logger.debug("Insufficient valid earnings data for growth calculation")
+                self.logger.info("Insufficient valid earnings data for growth calculation")
                 return None
             
             # Sort by filing date (oldest first for CAGR calculation)
@@ -431,24 +431,24 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
             years = time_diff.days / 365.25  # Account for leap years
             
             if years <= 0:
-                self.logger.debug("Invalid time period for growth calculation")
+                self.logger.info("Invalid time period for growth calculation")
                 return None
             
             # Handle negative earnings scenarios
             if beginning_earnings <= 0:
                 if ending_earnings > 0:
                     # Turned profitable - use simple approach
-                    self.logger.debug("Company turned profitable - using simplified growth calculation")
+                    self.logger.info("Company turned profitable - using simplified growth calculation")
                     return 1.0  # 100% growth (turned profitable)
                 else:
                     # Both periods negative - can't calculate meaningful growth
-                    self.logger.debug("Negative earnings in both periods - cannot calculate growth")
+                    self.logger.info("Negative earnings in both periods - cannot calculate growth")
                     return None
             
             # Calculate CAGR: (Ending Value / Beginning Value)^(1/years) - 1
             if ending_earnings <= 0:
                 # Turned unprofitable
-                self.logger.debug("Company turned unprofitable")
+                self.logger.info("Company turned unprofitable")
                 return -1.0  # -100% growth (turned unprofitable)
             
             cagr = (ending_earnings / beginning_earnings) ** (1 / years) - 1
@@ -458,8 +458,8 @@ class FundamentalRatiosCalculator(BaseFundamentalCalculator):
                 self.logger.warning(f"Extreme earnings growth rate calculated: {cagr:.2%}")
                 return None
             
-            # self.logger.debug(f"Calculated earnings CAGR: {cagr:.2%} over {years:.1f} years")
-            # self.logger.debug(f"Earnings growth details: ${beginning_earnings/1e9:.1f}B -> ${ending_earnings/1e9:.1f}B")
+            # self.logger.info(f"Calculated earnings CAGR: {cagr:.2%} over {years:.1f} years")
+            # self.logger.info(f"Earnings growth details: ${beginning_earnings/1e9:.1f}B -> ${ending_earnings/1e9:.1f}B")
             return cagr
             
         except Exception as e:

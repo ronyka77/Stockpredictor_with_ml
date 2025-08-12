@@ -108,7 +108,7 @@ async def main():
     # Step 1: Database Setup
     print("\n📊 Step 1: Database Setup")
     print("-" * 30)
-    setup_success = await setup_database()
+    setup_success = setup_database()
     
     if not setup_success:
         print("❌ Database setup failed. Exiting.")

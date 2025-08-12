@@ -297,7 +297,7 @@ class LightGBMModel(BaseModel):
         # Make predictions
         predictions = self.model.predict(X, num_iteration=self.model.best_iteration)
         
-        logger.debug(f"Generated {len(predictions)} predictions")
+        logger.info(f"Generated {len(predictions)} predictions")
         return predictions
     
     def get_feature_importance(self, importance_type: str = 'split') -> pd.DataFrame:
@@ -376,7 +376,7 @@ class LightGBMModel(BaseModel):
                 test_current_prices = X_test['close'].values
                 
                 # Run threshold optimization for this trial
-                logger.debug(f"Running threshold optimization for trial {trial.number}")
+                logger.info(f"Running threshold optimization for trial {trial.number}")
                 
                 threshold_results = trial_model.optimize_prediction_threshold(
                     X_test=X_test,
@@ -658,18 +658,18 @@ class LightGBMModel(BaseModel):
             try:
                 # Direct approach: get signature from model URI
                 model_uri = f"runs:/{run_info.info.run_id}/model"
-                logger.debug(f"Attempting to load model signature from: {model_uri}")
+                logger.info(f"Attempting to load model signature from: {model_uri}")
                 
                 # Load model info to get signature
                 from mlflow.models import get_model_info
                 model_info = get_model_info(model_uri)
-                logger.debug(f"Model info loaded: {model_info is not None}")
+                logger.info(f"Model info loaded: {model_info is not None}")
                 
                 if model_info and model_info.signature:
-                    logger.debug(f"Model signature found: {model_info.signature is not None}")
+                    logger.info(f"Model signature found: {model_info.signature is not None}")
                     
                     if model_info.signature.inputs:
-                        logger.debug(f"Signature inputs found: {len(model_info.signature.inputs.inputs) if hasattr(model_info.signature.inputs, 'inputs') else 'No inputs attr'}")
+                        logger.info(f"Signature inputs found: {len(model_info.signature.inputs.inputs) if hasattr(model_info.signature.inputs, 'inputs') else 'No inputs attr'}")
                         
                         # Extract feature names from signature inputs
                         feature_names = []
@@ -685,13 +685,13 @@ class LightGBMModel(BaseModel):
                             if hasattr(model_info.signature.inputs.schema, 'input_names'):
                                 feature_names = model_info.signature.inputs.schema.input_names
                         else:
-                            logger.debug(f"Signature inputs type: {type(model_info.signature.inputs)}")
-                            logger.debug(f"Signature inputs attributes: {dir(model_info.signature.inputs)}")
+                            logger.info(f"Signature inputs type: {type(model_info.signature.inputs)}")
+                            logger.info(f"Signature inputs attributes: {dir(model_info.signature.inputs)}")
                         
                         if feature_names:
                             self.feature_names = feature_names
                             logger.info(f"✅ Loaded {len(self.feature_names)} feature names from MLflow signature")
-                            logger.debug(f"First 10 features: {self.feature_names[:10]}")
+                            logger.info(f"First 10 features: {self.feature_names[:10]}")
                         else:
                             logger.warning("⚠️ No feature names found in model signature inputs")
                     else:
@@ -701,9 +701,9 @@ class LightGBMModel(BaseModel):
                         
             except Exception as signature_error:
                 logger.warning(f"⚠️ Could not extract feature names from signature: {str(signature_error)}")
-                logger.debug(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
+                logger.info(f"Signature error details: {type(signature_error).__name__}: {signature_error}")
                 
-            logger.debug("Model metadata loaded successfully")
+            logger.info("Model metadata loaded successfully")
             
         except Exception as e:
             logger.warning(f"⚠ Could not load all metadata: {str(e)}")
@@ -778,8 +778,8 @@ class LightGBMModel(BaseModel):
             confidence_scores = np.mean(leaf_indices, axis=1)
             confidence_scores = np.power(confidence_scores, 2)
             # Log diagnostic information
-            logger.debug(f"Leaf depth confidence - Raw range: [{confidence_scores.min():.2f}, {confidence_scores.max():.2f}]")
-            logger.debug(f"Leaf depth confidence - Raw mean: {confidence_scores.mean():.2f}, std: {confidence_scores.std():.2f}")
+            logger.info(f"Leaf depth confidence - Raw range: [{confidence_scores.min():.2f}, {confidence_scores.max():.2f}]")
+            logger.info(f"Leaf depth confidence - Raw mean: {confidence_scores.mean():.2f}, std: {confidence_scores.std():.2f}")
             
         elif method == 'margin':
             predictions = self.model.predict(X, num_iteration=self.model.best_iteration)
@@ -822,8 +822,8 @@ class LightGBMModel(BaseModel):
             logger.warning(f"All confidence scores are identical ({min_conf:.4f}) - using uniform distribution")
             confidence_scores = np.full_like(confidence_scores, 0.5)
         
-        logger.debug(f"Final confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
-        logger.debug(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
+        logger.info(f"Final confidence - Range: [{confidence_scores.min():.4f}, {confidence_scores.max():.4f}]")
+        logger.info(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
         
         return confidence_scores
     
@@ -978,7 +978,7 @@ def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, X_eval):
             mlflow.end_run()
             logger.info("Ended existing MLflow run before starting new one")
         except Exception as e:
-            logger.debug(f"No existing run to end: {e}")
+            logger.info(f"No existing run to end: {e}")
         
         # Set up MLflow tracking
         mlflow.set_experiment(experiment_name)

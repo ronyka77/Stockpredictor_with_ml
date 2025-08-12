@@ -415,7 +415,7 @@ class DataPipeline:
                         self.stats.total_records_stored += storage_result['stored_count']
                         self.stats.add_ticker_result(ticker, True, len(records))
                         
-                        logger.debug(f"Stored {len(records)} records for {ticker}")
+                        logger.info(f"Stored {len(records)} records for {ticker}")
                     else:
                         self.stats.add_ticker_result(ticker, False, 0, "No data returned")
                         

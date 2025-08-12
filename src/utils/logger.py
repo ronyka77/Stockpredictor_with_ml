@@ -95,6 +95,17 @@ def setup_logging_config(utility: str = "general") -> dict:
                 'handlers': ['console', 'info_file', 'debug_file', 'error_file'],
                 'level': 'DEBUG',
                 'propagate': False
+            },
+            # Silence very chatty third-party libraries that log DEBUG by default
+            'matplotlib': {
+                'handlers': ['console'],
+                'level': 'WARNING',
+                'propagate': False
+            },
+            'graphviz': {
+                'handlers': ['console'],
+                'level': 'WARNING',
+                'propagate': False
             }
         }
     }
@@ -182,7 +193,7 @@ if __name__ == "__main__":
     # Test the logging system
     logger = get_logger(__name__)
     logger.info("Testing centralized logging system")
-    logger.debug("This is a debug message")
+    logger.info("This is a debug message")
     logger.warning("This is a warning message")
     logger.error("This is an error message")
     

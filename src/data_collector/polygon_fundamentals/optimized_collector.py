@@ -135,18 +135,20 @@ class OptimizedFundamentalCollector:
     def _has_recent_data(self, ticker_id: int) -> bool:
         """Check if ticker has recent data (within 6 months)"""
         try:
-            six_months_ago = datetime.now() - timedelta(days=180)
-            
             with self.db_pool.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM raw_fundamental_data 
-                        WHERE ticker_id = %s AND date >= %s
-                    """, (ticker_id, six_months_ago))
-                    
-                    count = cursor.fetchone()['count']
-                    return count > 0
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM raw_fundamental_data
+                            WHERE ticker_id = %s
+                            AND date >= %s::date
+                        ) AS has_recent
+                    """, (ticker_id, (datetime.now() - timedelta(days=180)).date()))
+                    result = cursor.fetchone()
+                    has_recent = result and result['has_recent']
+                    logger.info(f"Ticker ID {ticker_id} recent data: {has_recent}")
+                    return has_recent
                     
         except Exception as e:
             logger.error(f"Error checking recent data for ticker_id {ticker_id}: {e}")
@@ -256,7 +258,7 @@ class OptimizedFundamentalCollector:
                     logger.warning(f"No statement periods stored for {ticker}")
                     self.stats['failed'] += 1
                     return False
-                    
+            
         except Exception as e:
             logger.error(f"Error collecting fundamental data for {ticker}: {e}")
             self.stats['failed'] += 1

@@ -69,7 +69,7 @@ class BaseIndicator(ABC):
         # Standardize column names
         self.standardize_columns()
         
-        logger.debug(f"Initialized {self.__class__.__name__} with {len(self.data)} data points")
+        logger.info(f"Initialized {self.__class__.__name__} with {len(self.data)} data points")
     
     def validate_data(self) -> None:
         """
@@ -97,7 +97,7 @@ class BaseIndicator(ABC):
             if self.data[col].isna().sum() / len(self.data) > self.config.MAX_MISSING_PCT:
                 raise ValueError(f"Too many missing values in column {col}")
         
-        logger.debug("Data validation passed")
+        logger.info("Data validation passed")
     
     def standardize_columns(self) -> None:
         """Standardize column names to lowercase"""
@@ -108,7 +108,7 @@ class BaseIndicator(ABC):
         
         if column_mapping:
             self.data = self.data.rename(columns=column_mapping)
-            logger.debug(f"Standardized columns: {column_mapping}")
+            logger.info(f"Standardized columns: {column_mapping}")
     
     def check_minimum_periods(self, required_periods: int) -> bool:
         """
@@ -216,7 +216,7 @@ class IndicatorValidator:
                 logger.warning(f"Validation failed: Infinite values found in column {col}")
                 return False
         
-        logger.debug("Indicator result validation passed")
+        logger.info("Indicator result validation passed")
         return True
     
     @staticmethod

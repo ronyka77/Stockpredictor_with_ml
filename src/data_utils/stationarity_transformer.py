@@ -67,7 +67,7 @@ def transform_dataframe_to_stationary(df: pd.DataFrame, n_jobs: int = None, verb
         if p_value >= 0.05:
             stationary_cols.add(col)
             transformation_manifest[col] = "none"
-            logger.debug(f"   Column '{col}' is already stationary (KPSS p={p_value:.4f})")
+            logger.info(f"   Column '{col}' is already stationary (KPSS p={p_value:.4f})")
         else:
             non_stationary_cols.append(col)
     logger.info(f"✅ {len(stationary_cols)} columns are already stationary (KPSS).")
@@ -156,7 +156,7 @@ def transform_to_stationary(series: pd.Series, verbose: bool = True) -> Tuple[pd
         return series, None
     # KPSS: Null hypothesis is stationary
     if p_value >= 0.05:
-        logger.debug(f"Series '{series.name}' is already stationary (KPSS).")
+        logger.info(f"Series '{series.name}' is already stationary (KPSS).")
         return series, "none"
     transformations = {
         'percentage_change': series.pct_change(),

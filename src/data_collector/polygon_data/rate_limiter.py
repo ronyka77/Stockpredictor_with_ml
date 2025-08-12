@@ -45,7 +45,7 @@ class RateLimiter:
         if current_time - self.window_start >= 60:
             self.window_start = current_time
             self.request_count = 0
-            logger.debug("Rate limit window reset")
+            logger.info("Rate limit window reset")
         
         # Check if we've hit the limit
         if self.request_count >= self.requests_per_minute:
@@ -60,7 +60,7 @@ class RateLimiter:
         self.request_count += 1
         self.last_request_time = current_time
         
-        logger.debug(f"Request {self.request_count}/{self.requests_per_minute} in current window")
+        logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
         
         # For free tier (5 requests/minute), proactively wait after hitting the limit
         # This prevents hitting 429 errors by being more conservative
