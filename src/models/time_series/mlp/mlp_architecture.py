@@ -376,24 +376,30 @@ class MLPDataUtils:
         Returns:
             DataLoader instance
         """
-        # Convert to tensors
-        X_tensor = torch.FloatTensor(X.values)
-        y_tensor = torch.FloatTensor(y.values)
-        
-        # Create dataset
+        # Convert to zero-copy tensors from C-contiguous float32 numpy arrays
+        X_np = np.ascontiguousarray(X.to_numpy(dtype=np.float32, copy=False))
+        y_np = np.asarray(y, dtype=np.float32)
+
+        X_tensor = torch.from_numpy(X_np)
+        y_tensor = torch.from_numpy(y_np)
+
         dataset = TensorDataset(X_tensor, y_tensor)
-        
-        # Create DataLoader with performance optimizations
-        # Ensure pin_memory is only True when CUDA is available to avoid warnings
+
         pin_memory_final = pin_memory and torch.cuda.is_available()
-        return DataLoader(
-            dataset, 
-            batch_size=batch_size, 
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory_final,
-            persistent_workers=num_workers > 0  # Keep workers alive between epochs
-        )
+
+        loader_kwargs = {
+            "dataset": dataset,
+            "batch_size": batch_size,
+            "shuffle": shuffle,
+            "num_workers": num_workers,
+            "pin_memory": pin_memory_final,
+            "persistent_workers": num_workers > 0,
+        }
+
+        if num_workers > 0:
+            loader_kwargs["prefetch_factor"] = 2
+
+        return DataLoader(**loader_kwargs)
     
     @staticmethod
     def create_train_val_dataloaders(

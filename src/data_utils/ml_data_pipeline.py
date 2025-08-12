@@ -412,11 +412,11 @@ def prepare_ml_data_for_prediction(prediction_horizon: int = 10) -> Dict[str, Un
         raise
 
 
+# Start of Selection
 def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
                                                 split_date: str = '2025-02-01',
                                                 ticker: str = None,
                                                 clean_features: bool = True,
-                                                use_cache: bool = True,
                                                 apply_stationarity_transform: bool = False) -> dict:
     """
     Enhanced version of prepare_ml_data_for_training with integrated data cleaning and caching
@@ -432,17 +432,20 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
         'apply_stationarity_transform': apply_stationarity_transform
     }
     cache_key = _cleaned_data_cache._generate_cache_key(**cache_params)
-    # Check if cached data exists and use_cache is enabled
-    if use_cache and _cleaned_data_cache.cache_exists(cache_key, "training"):
-        logger.info(f"💾 [CACHE] Loading cached cleaned training data (key: {cache_key[:8]}...)")
-        try:
-            result = _cleaned_data_cache.load_cleaned_data(cache_key, "training")
-            logger.info(f"✅ [CACHE] Loaded cached data: {len(result['X_train'])} train, {len(result['X_test'])} test samples, {result['feature_count']} features")
-            logger.info("✅ [END] Data preparation (from cache) complete.")
-            return result
-        except Exception as e:
-            logger.warning(f"⚠️ [CACHE] Failed to load cached data: {str(e)}")
-            logger.info("🔄 [CACHE] Falling back to fresh data preparation...")
+    # Check if cached data exists and is newer than 24 hours
+    if _cleaned_data_cache.cache_exists(cache_key, "training"):
+        cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "training")
+        if cache_age_hours is not None and cache_age_hours > 24:
+            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
+            _cleaned_data_cache.delete_cache(cache_key, "training")
+        else:
+            logger.info(f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)")
+            try:
+                return _cleaned_data_cache.load_cleaned_data(cache_key, "training")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load cached data: {str(e)}")
+                logger.info("🔄 Falling back to fresh data preparation...")
+    
     # 1. Use original data preparation function
     logger.info("Step 1: Running original data preparation pipeline...")
     data_result = prepare_ml_data_for_training(
@@ -490,28 +493,25 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
     if diversity_analysis['constant_feature_count'] > 10:
         logger.warning(f"⚠️ Still {diversity_analysis['constant_feature_count']} constant features after cleaning")
         logger.warning("💡 Consider expanding date range or checking feature engineering")
-    # 5. Cache the cleaned data if use_cache is enabled
-    if use_cache:
-        try:
-            logger.info(f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
-            _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "training")
-            logger.info("✅ [CACHE] Data cached successfully.")
-        except Exception as e:
-            logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
+    # 5. Cache the cleaned data
+    try:
+        logger.info(f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
+        _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "training")
+        logger.info("✅ [CACHE] Data cached successfully.")
+    except Exception as e:
+        logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
     logger.info(f"✅ [END] Enhanced data preparation completed: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features")
     return data_result
 
 
 def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
-                                                days_back: int = 30,
-                                                use_cache: bool = True) -> dict:
+                                                days_back: int = 30) -> dict:
     """
     Enhanced version of prepare_ml_data_for_prediction with integrated data cleaning and caching
     
     Args:
         prediction_horizon: Prediction horizon in days
         days_back: Number of days back to load data from
-        use_cache: Whether to use cached cleaned data if available
         
     Returns:
         Dictionary with cleaned prediction data
@@ -526,14 +526,19 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
     }
     cache_key = _cleaned_data_cache._generate_cache_key(**cache_params)
     
-    # Check if cached data exists and use_cache is enabled
-    if use_cache and _cleaned_data_cache.cache_exists(cache_key, "prediction"):
-        logger.info(f"💾 Loading cached cleaned prediction data (key: {cache_key[:8]}...)")
-        try:
-            return _cleaned_data_cache.load_cleaned_data(cache_key, "prediction")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to load cached data: {str(e)}")
-            logger.info("🔄 Falling back to fresh data preparation...")
+    # Check if cached data exists and is newer than 24 hours
+    if _cleaned_data_cache.cache_exists(cache_key, "prediction"):
+        cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "prediction")
+        if cache_age_hours is not None and cache_age_hours > 24:
+            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
+            _cleaned_data_cache.delete_cache(cache_key, "prediction")
+        else:
+            logger.info(f"💾 Loading cached cleaned prediction data (key: {cache_key[:8]}...)")
+            try:
+                return _cleaned_data_cache.load_cleaned_data(cache_key, "prediction")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load cached data: {str(e)}")
+                logger.info("🔄 Falling back to fresh data preparation...")
     
     # 1. Use original data preparation function
     data_result = prepare_ml_data_for_prediction(prediction_horizon=prediction_horizon)
@@ -558,13 +563,12 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
         logger.warning(f"⚠️ {diversity_analysis['constant_feature_count']} constant features in prediction data")
         logger.warning(f"💡 Consider increasing days_back from {days_back} to add date diversity")
     
-    # 4. Cache the cleaned data if use_cache is enabled
-    if use_cache:
-        try:
-            logger.info(f"💾 Caching cleaned prediction data (key: {cache_key[:8]}...)")
-            _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "prediction")
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to cache cleaned data: {str(e)}")
+    # 4. Cache the cleaned data
+    try:
+        _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "prediction")
+        logger.info("✅ [CACHE] Data cached successfully.")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to cache cleaned data: {str(e)}")
     
     logger.info(f"   Prediction data: {len(data_result['X_test'])} samples, {len(data_result['X_test'].columns)} features")
     
@@ -576,7 +580,6 @@ def prepare_ml_data_for_training_with_cleaning_memory_optimized(
     split_date: str = '2025-02-01',
     ticker: str = None,
     clean_features: bool = True,
-    use_cache: bool = True,
     apply_stationarity_transform: bool = False,
     enable_memory_tracking: bool = True) -> dict:
     """
@@ -594,7 +597,6 @@ def prepare_ml_data_for_training_with_cleaning_memory_optimized(
         split_date: Date to split train/test data
         ticker: Single ticker symbol (None for ALL available tickers)
         clean_features: Whether to apply feature cleaning
-        use_cache: Whether to use cached data
         apply_stationarity_transform: Whether to apply stationarity transformations
         enable_memory_tracking: Whether to enable memory usage tracking
         
@@ -621,9 +623,18 @@ def prepare_ml_data_for_training_with_cleaning_memory_optimized(
     cache_key = _cleaned_data_cache._generate_cache_key(**cache_params)
     
     # Check cache first (memory efficient)
-    if use_cache and _cleaned_data_cache.cache_exists(cache_key, "training"):
+    if _cleaned_data_cache.cache_exists(cache_key, "training"):
         logger.info(f"💾 [CACHE] Loading cached cleaned training data (key: {cache_key[:8]}...)")
+
         try:
+            # Check cache age - delete if older than 24 hours
+            cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "training")
+            if cache_age_hours is not None and cache_age_hours > 24:
+                logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
+                _cleaned_data_cache.delete_cache(cache_key, "training")
+            else:
+                logger.info(f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)")
+                
             with memory_tracker("Loading cached data") if enable_memory_tracking else nullcontext():
                 result = _cleaned_data_cache.load_cleaned_data(cache_key, "training")
             logger.info(f"✅ [CACHE] Loaded cached data: {len(result['X_train'])} train, {len(result['X_test'])} test samples, {result['feature_count']} features")
@@ -712,7 +723,7 @@ def prepare_ml_data_for_training_with_cleaning_memory_optimized(
             logger.warning("💡 Consider expanding date range or checking feature engineering")
     
     # Step 5: Memory-optimized caching
-    if use_cache:
+    try:
         logger.info("Step 5: Caching cleaned data...")
         with memory_tracker("Data caching") if enable_memory_tracking else nullcontext():
             try:
@@ -721,7 +732,9 @@ def prepare_ml_data_for_training_with_cleaning_memory_optimized(
                 logger.info("✅ [CACHE] Data cached successfully.")
             except Exception as e:
                 logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
-    
+    except Exception as e:
+        logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
+
     # Final memory optimization
     if enable_memory_tracking:
         optimize_memory_usage()

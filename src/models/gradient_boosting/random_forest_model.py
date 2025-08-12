@@ -381,7 +381,7 @@ class RandomForestModel(BaseModel):
         return objective
 
     @staticmethod
-    def load_and_prepare_data(prediction_horizon: int = 10, split_date: str = None, ticker: str = None, clean_features: bool = True, use_cache: bool = True, **kwargs):
+    def load_and_prepare_data(prediction_horizon: int = 10, split_date: str = None, ticker: str = None, clean_features: bool = True, **kwargs):
         """
         Load and prepare data for RandomForestModel using the same pipeline as LightGBMModel.
         This uses prepare_ml_data_for_training_with_cleaning and ensures compatibility with sklearn.
@@ -390,7 +390,6 @@ class RandomForestModel(BaseModel):
             split_date: Date to split train/test
             ticker: Optional ticker filter
             clean_features: Whether to clean features
-            use_cache: Whether to use cached data
             **kwargs: Additional arguments for data preparation
         Returns:
             dict: Contains X_train, X_test, y_train, y_test, and metadata
@@ -403,7 +402,6 @@ class RandomForestModel(BaseModel):
             split_date=split_date,
             ticker=ticker,
             clean_features=clean_features,
-            use_cache=use_cache,
             **kwargs
         )
         # Document: If categorical features exist, encoding should be handled in the pipeline or before fit.
@@ -421,7 +419,6 @@ def main():
         split_date='2025-02-01',
         ticker=None,
         clean_features=True,
-        use_cache=True
     )
     X_train = data_result['X_train']
     X_test = data_result['X_test']

@@ -520,8 +520,7 @@ def main():
             prediction_horizon=prediction_horizon,
             split_date='2025-02-01',
             ticker=None, 
-            clean_features=True,  
-            use_cache=True, 
+            clean_features=True,
         )
         
         # Extract prepared data

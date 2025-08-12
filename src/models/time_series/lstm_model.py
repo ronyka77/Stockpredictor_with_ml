@@ -715,7 +715,6 @@ class LSTMPredictor(PyTorchBasePredictor):
         data_dict = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=getattr(self, 'prediction_horizon', 10),
             apply_stationarity_transform=True,
-            use_cache=True
         )
         
         X_train, y_train = data_dict['X_train'], data_dict['y_train']

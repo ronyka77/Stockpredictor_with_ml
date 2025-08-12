@@ -81,8 +81,8 @@ def main():
     """
     Main function for standalone prediction using single instance architecture
     """
-    run_id = "83df1178e2c94ebd84d288de8510e48c"
-    model_id = "m-15b29e83c9724627b81a4bae5bb4bd7e"
+    run_id = "3a87c619aa084205bd2da881fdc2b829"
+    model_id = "m-0615885e3e8a4956a2128d4b83c9172e"
     days_back = 30
     
     # Create predictor with single instance architecture

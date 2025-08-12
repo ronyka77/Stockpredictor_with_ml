@@ -80,7 +80,7 @@ class MLPOptimizationMixin:
             # Data loading parameters (not relevant for model creation)
             data_params = {
                 'batch_size': trial.suggest_categorical('batch_size', (256, 512, 1024, 2048)),
-                'num_workers': 12,  # Fixed based on CPU cores
+                'num_workers': 4,  # Fixed based on CPU cores
                 # Only pin memory if CUDA is available to avoid warnings on CPU
                 'pin_memory': torch.cuda.is_available()
             }
@@ -108,7 +108,7 @@ class MLPOptimizationMixin:
                 self.current_trial_scaler = getattr(self, 'fitted_scaler', None) or fitted_scaler
                 
                 # Create DataLoaders using the cleaned and scaled data
-                num_workers = data_params.get('num_workers', 12)
+                num_workers = data_params.get('num_workers', 4)
                 pin_memory = data_params.get('pin_memory', True)
                 
                 logger.info(f"🚀 Creating DataLoaders with num_workers={num_workers}, pin_memory={pin_memory}")
