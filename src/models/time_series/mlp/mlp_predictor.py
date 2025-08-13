@@ -36,6 +36,8 @@ class MLPPredictor(PyTorchBasePredictor):
             config = {}
         
         self.scaler = None
+        # Default confidence for MLP
+        self.default_confidence_method = 'variance'
 
         # MLP-specific defaults
         # Only set defaults if no config was provided
@@ -631,40 +633,7 @@ class MLPPredictor(PyTorchBasePredictor):
         """Return the training history dictionary."""
         return getattr(self, 'training_history', {})
 
-    def predict_with_threshold(self, X: pd.DataFrame, 
-                                return_confidence: bool = False,
-                                threshold: Optional[float] = None,
-                                confidence_method: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Make predictions with confidence-based filtering
-        
-        Args:
-            X: Feature matrix
-            return_confidence: Whether to return confidence scores
-            threshold: Confidence threshold (uses optimal if None)
-            confidence_method: Confidence method (uses stored if None)
-            
-        Returns:
-            Dictionary with predictions, confidence scores, and filtering info
-        """
-        if self.model is None:
-            raise RuntimeError("Model must be trained before making predictions")
-        
-        # Use stored optimal values if not provided
-        if threshold is None:
-            threshold = getattr(self, 'optimal_threshold', 0.5)
-        
-        if confidence_method is None:
-            confidence_method = getattr(self, 'confidence_method', 'variance')
-        
-        # Use central evaluator for threshold-based predictions
-        return self.threshold_evaluator.predict_with_threshold(
-            model=self,
-            X=X,
-            threshold=threshold,
-            confidence_method=confidence_method,
-            return_confidence=return_confidence
-        ) 
+    # predict_with_threshold now inherited from BaseModel (unified)
 
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'variance') -> np.ndarray:
         """
@@ -763,42 +732,5 @@ class MLPPredictor(PyTorchBasePredictor):
         self.scaler = scaler
         logger.info("✅ Feature scaler set for MLP prediction scaling")
 
-    def optimize_prediction_threshold(self, X_test: pd.DataFrame, y_test: pd.Series,
-                                    current_prices_test: np.ndarray,
-                                    confidence_method: str = 'variance',
-                                    threshold_range: Tuple[float, float] = (0.05, 0.9),
-                                    n_thresholds: int = 170) -> Dict[str, Any]:
-        """
-        Optimize prediction threshold using ThresholdEvaluator.
-        
-        Args:
-            X_test: Test features
-            y_test: Test targets
-            current_prices_test: Current prices for test data
-            confidence_method: Method for confidence calculation
-            threshold_range: Range of thresholds to test
-            n_thresholds: Number of thresholds to test
-            
-        Returns:
-            Dictionary with optimization results
-        """
-        if self.threshold_evaluator is None:
-            raise ValueError("ThresholdEvaluator must be provided for threshold optimization")
-        
-        results = self.threshold_evaluator.optimize_prediction_threshold(
-            model=self,
-            X_test=X_test,
-            y_test=y_test,
-            current_prices_test=current_prices_test,
-            confidence_method=confidence_method,
-            threshold_range=threshold_range,
-            n_thresholds=n_thresholds
-        )
-        
-        # Store optimal threshold and confidence method if optimization was successful
-        if results.get('status') == 'success':
-            self.optimal_threshold = results.get('optimal_threshold')
-            self.confidence_method = results.get('confidence_method')
-        
-        return results
+    # optimize_prediction_threshold now inherited from BaseModel (unified)
 
