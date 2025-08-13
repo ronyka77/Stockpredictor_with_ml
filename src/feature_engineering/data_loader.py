@@ -37,8 +37,11 @@ class StockDataLoader:
                 'port': int(os.getenv('DB_PORT', 5432)),
                 'database': os.getenv('DB_NAME', 'stock_data'),
                 'user': os.getenv('DB_USER', 'postgres'),
-                'password': os.getenv('DB_PASSWORD', 'password')
+                'password': os.getenv('DB_PASSWORD', '')
             }
+        # Fail-fast validation for required credentials
+        if not self.config.get('password'):
+            raise ValueError("DB_PASSWORD environment variable is required for feature engineering data access")
         
         # Create SQLAlchemy engine for pandas compatibility
         connection_string = f"postgresql://{self.config['user']}:{self.config['password']}@{self.config['host']}:{self.config['port']}/{self.config['database']}"

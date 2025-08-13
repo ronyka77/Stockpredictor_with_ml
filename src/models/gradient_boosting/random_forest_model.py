@@ -6,6 +6,7 @@ following the BaseModel and LightGBMModel architecture, with MLflow integration
 and threshold evaluation support.
 """
 from typing import Optional, Dict, Any
+import ast
 
 import numpy as np
 import pandas as pd
@@ -229,8 +230,23 @@ class RandomForestModel(BaseModel):
         run_info = self.mlflow_integration.get_run(run_id)
         params = run_info.data.params
         self.model_name = params.get('model_name', 'Unknown')
-        self.config = eval(params.get('config', '{}')) if params.get('config', '{}') != '{}' else {}
-        self.feature_names = eval(params.get('feature_names', '[]')) if params.get('feature_names', '[]') != '[]' else None
+        # Secure parsing for config
+        config_str = params.get('config', '{}')
+        try:
+            parsed_config = ast.literal_eval(config_str) if config_str != '{}' else {}
+            self.config = parsed_config if isinstance(parsed_config, dict) else {}
+        except (ValueError, SyntaxError):
+            logger.warning("Failed to parse config from MLflow params; using empty dict")
+            self.config = {}
+
+        # Secure parsing for feature_names
+        feature_names_str = params.get('feature_names', '[]')
+        try:
+            parsed_features = ast.literal_eval(feature_names_str) if feature_names_str != '[]' else []
+            self.feature_names = parsed_features if isinstance(parsed_features, list) else None
+        except (ValueError, SyntaxError):
+            logger.warning("Failed to parse feature_names from MLflow params; leaving as None")
+            self.feature_names = None
         self.is_trained = params.get('is_trained', 'True') == 'True'
         self.run_id = run_id
         logger.info(f"Model loaded from MLflow run ID: {run_id}")
