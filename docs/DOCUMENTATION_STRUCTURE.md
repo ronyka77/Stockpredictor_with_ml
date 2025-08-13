@@ -6,7 +6,7 @@ This document provides a complete overview of the reorganized documentation stru
 
 The documentation has been restructured from a flat file structure into a logical, hierarchical organization with **8 main sections** covering different aspects of the project.
 
-## 📂 Complete Directory Structure
+## 📂 Complete Directory Structure (Current)
 
 ```
 docs/
@@ -14,45 +14,40 @@ docs/
 ├── DOCUMENTATION_STRUCTURE.md          # This file - structure overview
 │
 ├── 01-project-overview/                # Business and strategic overview
-│   ├── README.md                       # Section navigation
-│   └── business_overview.md            # Project purpose and methodology
+│   ├── README.md
+│   └── business_overview.md
 │
 ├── 02-installation-setup/              # Setup and installation guides
-│   ├── README.md                       # Section navigation
-│   └── INSTALL.md                      # Complete installation guide
+│   ├── README.md
+│   └── INSTALL.md
 │
 ├── 03-data-collection/                 # Data acquisition documentation
-│   ├── README.md                       # Section navigation
+│   ├── README.md
 │   └── polygon/                        # Polygon.io data collectors
 │       ├── polygon_stock_data_collector.md
 │       └── polygon_news_collector.md
 │
 ├── 04-feature-engineering/             # Feature calculation and analysis
-│   ├── README.md                       # Section navigation (to be created)
 │   ├── SECTOR_ANALYSIS_IMPLEMENTATION.md
 │   └── fundamental/                    # Fundamental analysis documentation
-│       ├── FEATURE_ENGINEERING_IMPLEMENTATION_PLAN.md
-│       ├── FUNDAMENTAL_FEATURES_IMPLEMENTATION_PLAN.md
+│       ├── FUNDAMENTAL_DATA_COLLECTION_PLAN.md
 │       └── FUNDAMENTAL_PIPELINE_README.md
 │
 ├── 05-model-training/                  # ML models and optimization
-│   ├── README.md                       # Section navigation (to be created)
-│   ├── hyperparameter_ranges.md       # XGBoost optimization parameters
-│   ├── XGBOOST_PREDICTOR_USAGE.md     # Model usage guide
-│   └── UNIVERSAL_MLFLOW_LOGGING.md    # Experiment tracking
+│   ├── LIGHTGBM_MODEL_SUMMARY.md
+│   ├── THRESHOLD_OPTIMIZATION.md
+│   └── Xgboost_model_documentation.md
 │
 ├── 06-configuration/                   # System configuration
-│   ├── README.md                       # Section navigation (to be created)
-│   ├── base_rules.md                   # Development standards
-│   └── CONFIGURATION_SUMMARY.md       # Centralized config system
+│   ├── CONFIGURATION_SUMMARY.md
+│   └── base_rules.md
 │
 ├── 07-implementation-guides/           # Implementation documentation
-│   ├── README.md                       # Section navigation (to be created)
-│   └── technical_implementation_summary.md
+│   ├── project_technical_implementation_summary.md
+│   └── test_driven_development_guide.md
 │
 └── 08-technical-reference/             # Technical specifications
-    ├── README.md                       # Section navigation (to be created)
-    └── technical_task_list.md          # Detailed task specifications
+    └── technical_task_list.md
 ```
 
 ## 📋 Section Descriptions
@@ -80,17 +75,15 @@ docs/
 
 ### 04 - Feature Engineering
 **Purpose**: Feature calculation and analysis
-- Fundamental analysis (70+ metrics across 4 categories)
+- Fundamental analysis pipeline and collection plan
 - Sector analysis and GICS classification
-- Technical indicators integration
-- Feature quality monitoring
+- Feature quality and monitoring
 
 ### 05 - Model Training
 **Purpose**: Machine learning models and optimization
-- XGBoost with threshold optimization
-- Extended hyperparameter ranges (16 parameters)
-- MLflow experiment tracking and model management
-- Performance evaluation and monitoring
+- LightGBM model summary and MLflow integration
+- Threshold optimization system and methodology
+- XGBoost model and metrics calculation documentation
 
 ### 06 - Configuration
 **Purpose**: System configuration and standards
@@ -101,9 +94,9 @@ docs/
 
 ### 07 - Implementation Guides
 **Purpose**: Implementation documentation and guides
-- Technical implementation overview
-- Deployment procedures
-- Integration patterns
+- Project technical implementation summary
+- Test-Driven Development (TDD) guide tailored to this project
+- Deployment and integration patterns
 - Best practices
 
 ### 08 - Technical Reference
@@ -117,15 +110,14 @@ docs/
 
 ### Main Hub
 - **`docs/README.md`**: Primary navigation with quick start guide
-- **Visual architecture diagram**: System overview
-- **Cross-references**: Links between related sections
+- Cross-references between related sections
 
 ### Section READMEs
-Each section includes:
-- **Purpose and scope**: What the section covers
-- **Document summaries**: Brief description of each file
-- **Key takeaways**: Important points to remember
-- **Next steps**: Where to go after reading
+Where present, section READMEs include:
+- Purpose and scope
+- Document summaries
+- Key takeaways
+- Next steps
 
 ### Logical Flow
 The sections are numbered to suggest a logical reading order:
@@ -178,10 +170,11 @@ The sections are numbered to suggest a logical reading order:
 ## 🚀 Future Enhancements
 
 ### Planned Additions
-- **API Documentation**: Detailed API references
-- **Tutorials**: Step-by-step tutorials for common tasks
-- **Examples**: More usage examples and code samples
-- **Troubleshooting**: Expanded troubleshooting guides
+- Section-level README files for sections missing them (04, 05, 06, 08)
+- API Documentation: Detailed API references
+- Tutorials: Step-by-step tutorials for common tasks
+- Examples: More usage examples and code samples
+- Troubleshooting: Expanded troubleshooting guides
 
 ### Maintenance
 - **Regular updates**: Keep documentation current with code changes
@@ -191,6 +184,6 @@ The sections are numbered to suggest a logical reading order:
 
 ---
 
-**Last Updated**: January 2025  
+**Last Updated**: August 2025  
 **Reorganization**: Complete  
 **Status**: Production Ready 

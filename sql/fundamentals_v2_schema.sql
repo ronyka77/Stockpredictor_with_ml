@@ -115,7 +115,6 @@ CREATE TRIGGER update_raw_fundamental_updated_at
 ALTER TABLE public.raw_fundamental_data 
 ADD COLUMN IF NOT EXISTS benefits_costs_expenses numeric(15, 2) NULL,
 ADD COLUMN IF NOT EXISTS income_loss_from_continuing_operations_before_tax numeric(15, 2) NULL,
-ADD COLUMN IF NOT EXISTS income_loss_from_continuing_operations_after_tax numeric(15, 2) NULL,
 ADD COLUMN IF NOT EXISTS preferred_stock_dividends_and_other_adjustments numeric(15, 2) NULL,
 ADD COLUMN IF NOT EXISTS acceptance_datetime timestamp NULL,
 ADD COLUMN IF NOT EXISTS sic_code varchar(10) NULL,

@@ -22,12 +22,12 @@ cd StockPredictor_V1
 # 2. Install in development mode
 uv pip install -e .
 
-# 3. Set up environment variables
-cp .environment.example .env
-# Edit .env with your API keys
+# 3. Set up environment variables (Windows cmd)
+copy .environment.example .env
+# Then edit .env with your API keys and settings
 
-# 4. Test installation
-python run_polygon_examples.py
+# 4. Quick health check (Polygon API client)
+uv run python -c "from src.data_collector.polygon_data.client import PolygonDataClient; print(PolygonDataClient().health_check())"
 ```
 
 ## ⚙️ Requirements
@@ -35,8 +35,9 @@ python run_polygon_examples.py
 ### System Requirements
 - **Python**: 3.12 or higher
 - **Package Manager**: `uv` (recommended)
-- **Database**: PostgreSQL 12+
+- **Database**: PostgreSQL 12+ (required for data storage; setup not covered here)
 - **API Access**: Polygon.io API key
+ - **Optional (GPU)**: PyTorch with CUDA 12.8 for neural network models on Windows
 
 ### Environment Variables
 ```bash
@@ -52,13 +53,13 @@ DB_PASSWORD=your_password
 
 For active development:
 1. Install development dependencies: `uv pip install -e ".[dev]"`
-2. Set up pre-commit hooks for code quality
-3. Configure IDE with project structure
-4. Run tests to verify setup
+2. Configure IDE with project structure
+3. Run tests to verify setup: `uv run pytest -q`
+4. Use the centralized logger in `src/utils/logger.py` for any logging needs
 
 ## 🔄 Next Steps
 
 After installation:
 1. Review [Data Collection](../03-data-collection/) to set up data sources
-2. Configure [Feature Engineering](../04-feature-engineering/) parameters
+2. Configure [Feature Engineering](../04-feature-engineering/) parameters (see the overview: [Feature Engineering README](../04-feature-engineering/README.md))
 3. Explore [Model Training](../05-model-training/) capabilities 

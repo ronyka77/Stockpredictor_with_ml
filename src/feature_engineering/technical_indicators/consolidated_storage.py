@@ -70,7 +70,7 @@ class ConsolidatedFeatureStorage:
         
         # Apply year-based partitioning strategy
         if self.config.partitioning_strategy == "by_date":
-            files_created = self._save_by_date(combined_data, metadata)
+            files_created = self._save_by_year(combined_data, metadata)
         else:
             raise ValueError(f"Only 'by_date' (year-based) partitioning is supported. Got: {self.config.partitioning_strategy}")
         
@@ -240,7 +240,7 @@ class ConsolidatedFeatureStorage:
         
         return result
 
-    def _save_by_date(self, data: pd.DataFrame, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _save_by_year(self, data: pd.DataFrame, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Save data partitioned by date (year)"""
         files_created = []
         

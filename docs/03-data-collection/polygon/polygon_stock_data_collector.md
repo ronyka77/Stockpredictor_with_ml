@@ -68,7 +68,7 @@ src/data_collector/polygon_data/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - PostgreSQL database
 - Polygon.io API key
 - Required Python packages (see `pyproject.toml`)
@@ -159,7 +159,7 @@ start_date = end_date - timedelta(days=30)
 stats = pipeline.run_full_pipeline(
     start_date=start_date,
     end_date=end_date,
-    ticker_source="popular",
+    ticker_source="all",
     max_tickers=50
 )
 
@@ -168,12 +168,9 @@ print(f"Pipeline completed: {stats.success_rate:.1f}% success rate")
 
 ### Command Line Usage
 
-```python
-# Run from example_usage.py
-from src.data_collector.polygon_data.example_usage import main
-
-# Run comprehensive examples
-main()
+```bash
+# Run the stock data pipeline (module)
+uv run python -m src.data_collector.polygon_data.data_pipeline
 ```
 
 ### Programmatic Usage
@@ -612,12 +609,12 @@ data_fetcher = HistoricalDataFetcher(client)
 storage = DataStorage()
 validator = DataValidator(strict_mode=True)
 
-# Get popular tickers
-popular_tickers = ticker_manager.get_popular_tickers(limit=50)
-print(f"Found {len(popular_tickers)} popular tickers")
+# Get all active tickers
+all_tickers = ticker_manager.get_all_active_tickers()
+print(f"Found {len(all_tickers)} active tickers")
 
 # Process first 5 tickers
-for ticker in popular_tickers[:5]:
+for ticker in all_tickers[:5]:
     try:
         # Fetch data
         data = data_fetcher.fetch_historical_data(

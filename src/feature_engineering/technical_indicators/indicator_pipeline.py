@@ -544,7 +544,7 @@ class BatchFeatureProcessor:
 
 def run_production_batch():
     """Run production batch processing for all available tickers"""
-    print("🚀 Starting Production Feature Engineering Batch...")
+    logger.info("🚀 Starting Production Feature Engineering Batch...")
     
     # Production configuration
     job_config = BatchJobConfig(
@@ -562,7 +562,7 @@ def run_production_batch():
     
     try:
         # Get all available tickers with sufficient data
-        print("📊 Getting all available tickers...")
+        logger.info("📊 Getting all available tickers...")
         
         # Get all tickers that meet minimum data requirements, ordered by data points desc
         all_tickers = processor.get_available_tickers(
@@ -574,8 +574,9 @@ def run_production_batch():
         # All tickers are already ordered by data points desc from the query
         selected_tickers = all_tickers
         
-        print(f"📈 Processing {len(selected_tickers)} tickers:")
-        print(f"   Sample tickers: {', '.join(selected_tickers[:10])}{'...' if len(selected_tickers) > 10 else ''}")
+        logger.info(f"📈 Processing {len(selected_tickers)} tickers:")
+        if selected_tickers:
+            logger.info(f"   Sample tickers: {', '.join(selected_tickers[:10])}{'...' if len(selected_tickers) > 10 else ''}")
         
         # Run batch processing
         start_time = time.time()
@@ -583,59 +584,58 @@ def run_production_batch():
         processing_time = time.time() - start_time
         
         # Print results
-        print("\n🎉 Batch Processing Completed!")
-        print(f"   Total tickers: {results['total_tickers']}")
-        print(f"   Successful: {results['successful']}")
-        print(f"   Failed: {results['failed']}")
-        print(f"   Success rate: {results['success_rate']:.1f}%")
-        print(f"   Total features: {results['total_features']:,}")
-        print(f"   Processing time: {processing_time:.1f} seconds")
+        logger.info("🎉 Batch Processing Completed!")
+        logger.info(f"   Total tickers: {results['total_tickers']}")
+        logger.info(f"   Successful: {results['successful']}")
+        logger.info(f"   Failed: {results['failed']}")
+        logger.info(f"   Success rate: {results['success_rate']:.1f}%")
+        logger.info(f"   Total features: {results['total_features']:,}")
+        logger.info(f"   Processing time: {processing_time:.1f} seconds")
         
         # Check storage stats
         storage = FeatureStorage()
         stats = storage.get_storage_stats()
-        print("\n📁 Storage Statistics:")
-        print(f"   Total tickers stored: {stats['total_tickers']}")
-        print(f"   Total storage size: {stats['total_size_mb']:.2f} MB")
-        print(f"   Storage path: {stats['base_path']}")
+        logger.info("📁 Storage Statistics:")
+        logger.info(f"   Total tickers stored: {stats['total_tickers']}")
+        logger.info(f"   Total storage size: {stats['total_size_mb']:.2f} MB")
+        logger.info(f"   Storage path: {stats['base_path']}")
         
         # Show failed tickers if any
         if results['failed'] > 0:
             failed_tickers = [r['ticker'] for r in results['results'] if not r['success']]
-            print(f"\n⚠️  Failed tickers: {', '.join(failed_tickers[:10])}")
+            logger.warning(f"Failed tickers: {', '.join(failed_tickers[:10])}")
         
-        # Consolidate into year-based partitions
+        # Consolidate into date-based partitions
         if results['successful'] > 0:
-            print("\n🗓️ Consolidating features into year-based partitions...")
+            logger.info("🗓️ Consolidating features into date-based partitions...")
             try:
                 from src.feature_engineering.technical_indicators.consolidated_storage import consolidate_existing_features
                 
                 consolidation_start = time.time()
-                consolidation_result = consolidate_existing_features(strategy='by_year')
+                consolidation_result = consolidate_existing_features(strategy='by_date')
                 consolidation_time = time.time() - consolidation_start
                 
-                print(f"✅ Year-based consolidation completed in {consolidation_time:.2f} seconds")
-                print(f"   Year-partitioned files: {consolidation_result['files_created']}")
-                print(f"   Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
-                print(f"   Compression ratio: {consolidation_result['compression_ratio']:.1f}x")
+                logger.info(f"✅ Date-based consolidation completed in {consolidation_time:.2f} seconds")
+                logger.info(f"   Date-partitioned files: {consolidation_result['files_created']}")
+                logger.info(f"   Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
+                logger.info(f"   Compression ratio: {consolidation_result['compression_ratio']:.1f}x")
                 
-                # Show year breakdown
-                print("\n📁 Year-based Files:")
+                # Show date breakdown
+                logger.info("📁 Date-based Files:")
                 for file_info in consolidation_result['files']:
-                    print(f"   {file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}")
+                    date_label = file_info.get('date', file_info.get('year'))
+                    logger.info(f"   {file_info['file']}: {file_info['rows']:,} rows, Date: {date_label}")
                 
                 results['consolidation'] = consolidation_result
                 
             except Exception as e:
-                print(f"⚠️  Consolidation failed: {str(e)}")
+                logger.error(f"⚠️  Consolidation failed: {str(e)}")
                 results['consolidation_error'] = str(e)
         
         return results
         
     except Exception as e:
-        print(f"❌ Error in production batch: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Error in production batch: {e}", exc_info=True)
         return None
     finally:
         processor.close()
@@ -644,15 +644,15 @@ def main():
     """Main function for production batch processing"""
     results = run_production_batch()
     if results and results['success_rate'] > 80.0:  # 80% minimum success rate
-        print("\n✅ Production batch completed successfully!")
+        logger.info("✅ Production batch completed successfully!")
         if 'consolidation' in results:
-            print("✅ Year-based consolidation completed successfully!")
-            print("\n💡 Ready for ML workflows:")
-            print("   ✅ Train on 2024 data, test on 2025")
-            print("   ✅ Fast year-specific loading")
-            print("   ✅ Memory efficient processing")
+            logger.info("✅ Date-based consolidation completed successfully!")
+            logger.info("💡 Ready for ML workflows:")
+            logger.info("   ✅ Train on 2024 data, test on 2025")
+            logger.info("   ✅ Fast year-specific loading")
+            logger.info("   ✅ Memory efficient processing")
     else:
-        print("\n⚠️  Production batch completed with issues.")
+        logger.warning("⚠️  Production batch completed with issues.")
 
 if __name__ == "__main__":
     main() 

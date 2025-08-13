@@ -1051,7 +1051,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 1000
+        number_of_trials = 2000
         n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
@@ -1085,7 +1085,7 @@ def main():
         logger.info(f"   DataFrames updated with {len(selected_features)} selected features.")
         
 
-        # Remove rows with the highest 50 date_int values
+        # Remove rows with the highest 15 date_int values
         if 'date_int' in X_test_selected.columns:
             threshold = X_test_selected['date_int'].copy()
             threshold = threshold.drop_duplicates().max()-15

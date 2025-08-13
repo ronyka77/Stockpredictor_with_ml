@@ -36,8 +36,11 @@ class DatabaseConnection:
                 'port': int(os.getenv('DB_PORT', 5432)),
                 'database': os.getenv('DB_NAME', 'stock_data'),
                 'user': os.getenv('DB_USER', 'postgres'),
-                'password': os.getenv('DB_PASSWORD', 'password')
+                'password': os.getenv('DB_PASSWORD', '')
             }
+        # Fail-fast validation for required credentials
+        if not self.config.get('password'):
+            raise ValueError("DB_PASSWORD environment variable is required for database connections")
         
         logger.info(f"Initialized DatabaseConnection for {self.config['host']}:{self.config['port']}/{self.config['database']}")
     
@@ -126,8 +129,11 @@ class DatabaseConnectionPool:
                 'port': int(os.getenv('DB_PORT', 5432)),
                 'database': os.getenv('DB_NAME', 'stock_data'),
                 'user': os.getenv('DB_USER', 'postgres'),
-                'password': os.getenv('DB_PASSWORD', 'password')
+                'password': os.getenv('DB_PASSWORD', '')
             }
+        # Fail-fast validation for required credentials
+        if not self.config.get('password'):
+            raise ValueError("DB_PASSWORD environment variable is required for database connection pooling")
         
         self.min_connections = min_connections
         self.max_connections = max_connections

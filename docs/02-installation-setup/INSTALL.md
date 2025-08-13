@@ -23,8 +23,8 @@ uv pip install -e .
 # 3. Install development dependencies (optional)
 uv pip install -e ".[dev]"
 
-# 4. Verify installation
-python run_polygon_examples.py
+# 4. Verify environment (API client health)
+uv run python -c "from src.data_collector.polygon_data.client import PolygonDataClient; print(PolygonDataClient().health_check())"
 ```
 
 ### Method 2: Regular Installation
@@ -36,8 +36,8 @@ cd StockPredictor_V1
 # 2. Install the package
 uv pip install .
 
-# 3. Run the main script
-stockpredictor
+# 3. Run an example module (no CLI entrypoints required)
+uv run python -m src.data_collector.polygon_data.example_usage
 ```
 
 ### Method 3: Virtual Environment with uv
@@ -47,7 +47,7 @@ stockpredictor
 uv venv stockpredictor-env
 
 # 2. Activate the environment
-# Windows:
+# Windows (cmd):
 stockpredictor-env\Scripts\activate
 # Linux/Mac:
 source stockpredictor-env/bin/activate
@@ -55,8 +55,8 @@ source stockpredictor-env/bin/activate
 # 3. Install the project
 uv pip install -e .
 
-# 4. Run examples
-python run_polygon_examples.py
+# 4. Run examples (module-based)
+uv run python -m src.data_collector.polygon_data.example_usage
 ```
 
 ## Configuration
@@ -79,56 +79,43 @@ DB_PASSWORD=your_password
 
 ### 2. Database Setup
 
-```sql
--- Create database
-CREATE DATABASE stock_predictor;
-
--- Grant permissions (if needed)
-GRANT ALL PRIVILEGES ON DATABASE stock_predictor TO postgres;
-```
+Note: PostgreSQL is required for data storage, but installation and setup are out of scope for this guide.
+Use your existing PostgreSQL instance and set DB_* variables in `.env` accordingly.
 
 ## Usage Examples
 
 ### Quick Test
 ```bash
-# Test basic functionality
-python test_polygon.py
-
-# Or use the installed command
-polygon-test
+# Test API connectivity
+uv run python -c "from src.data_collector.polygon_data.client import PolygonDataClient; print(PolygonDataClient().health_check())"
 ```
 
-### Run Main Application
+### Run Data Collection Examples
 ```bash
-# Using the installed script
-stockpredictor
-
-# Or directly
-python run_polygon_examples.py
+# Stock data example
+uv run python -m src.data_collector.polygon_data.example_usage
 ```
 
 ### Run Specific Examples
 ```bash
-# Run the example module
-python -m src.data_collector.polygon.example_usage
-
-# Or navigate to the module
-cd src/data_collector/polygon
-python example_usage.py
+# Run news pipeline (module)
+uv run python -m src.data_collector.polygon_news.news_pipeline
 ```
 
 ### Programmatic Usage
 ```python
-from src.data_collector.polygon import DataPipeline
+from src.data_collector.polygon_data import DataPipeline
 from datetime import date, timedelta
 
 # Quick data fetch
-with DataPipeline() as pipeline:
-    stats = pipeline.run_incremental_update(
-        days_back=7,
-        max_tickers=10
-    )
-    print(f"Success rate: {stats.success_rate:.1f}%")
+pipeline = DataPipeline()
+end_date = date.today()
+start_date = end_date - timedelta(days=7)
+pipeline.run_grouped_daily_pipeline(
+        start_date=start_date.strftime("%Y-%m-%d"),
+        end_date=end_date.strftime("%Y-%m-%d"),
+        validate_data=True,
+        save_stats=True)
 ```
 
 ## Troubleshooting
@@ -142,17 +129,14 @@ uv pip install -e .
 
 ### Database Connection Issues
 ```bash
-# Check PostgreSQL is running
-pg_isready -h localhost -p 5432
-
-# Test connection
-python -c "from src.data_collector.polygon.data_storage import DataStorage; print(DataStorage().health_check())"
+# Test storage connection (from code)
+uv run python -c "from src.data_collector.polygon_data.data_storage import DataStorage; print(DataStorage().health_check())"
 ```
 
 ### API Issues
 ```bash
 # Test API connectivity
-python -c "from src.data_collector.polygon import PolygonDataClient; print(PolygonDataClient().health_check())"
+uv run python -c "from src.data_collector.polygon_data.client import PolygonDataClient; print(PolygonDataClient().health_check())"
 ```
 
 ## Development Workflow
@@ -172,15 +156,6 @@ isort src/
 mypy src/
 ```
 
-### 3. Testing
-```bash
-# Run basic tests
-python test_polygon.py
-
-# Run examples
-python run_polygon_examples.py
-```
-
 ## Package Structure
 
 After installation, you can import modules like this:
@@ -197,10 +172,10 @@ from src.data_collector.polygon import (
 )
 
 # Configuration
-from src.data_collector.polygon.config import config
+from src.data_collector.polygon_data.config import config
 
 # Data models
-from src.data_collector.polygon.data_validator import OHLCVRecord
+from src.data_collector.polygon_data.data_validator import OHLCVRecord
 ```
 
 ## Performance Tips
@@ -214,7 +189,7 @@ from src.data_collector.polygon.data_validator import OHLCVRecord
 
 If you encounter issues:
 
-1. Check the logs: `tail -f polygon_data_acquisition.log`
-2. Verify configuration: `python -c "from src.data_collector.polygon.config import config; print(config.__dict__)"`
-3. Test components individually using the example scripts
-4. Check database connectivity and API key validity 
+1. Use the centralized logger in `src/utils/logger.py` for consistent logging
+2. Verify configuration: `uv run python -c "from src.data_collector.polygon_data.config import config; print(config.__dict__)"`
+3. Test components individually using the module examples
+4. Check API key validity
