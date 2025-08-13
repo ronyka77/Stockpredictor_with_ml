@@ -68,7 +68,7 @@ src/data_collector/polygon_data/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - PostgreSQL database
 - Polygon.io API key
 - Required Python packages (see `pyproject.toml`)

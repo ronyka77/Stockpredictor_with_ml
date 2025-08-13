@@ -605,25 +605,26 @@ def run_production_batch():
             failed_tickers = [r['ticker'] for r in results['results'] if not r['success']]
             logger.warning(f"Failed tickers: {', '.join(failed_tickers[:10])}")
         
-        # Consolidate into year-based partitions
+        # Consolidate into date-based partitions
         if results['successful'] > 0:
-            logger.info("🗓️ Consolidating features into year-based partitions...")
+            logger.info("🗓️ Consolidating features into date-based partitions...")
             try:
                 from src.feature_engineering.technical_indicators.consolidated_storage import consolidate_existing_features
                 
                 consolidation_start = time.time()
-                consolidation_result = consolidate_existing_features(strategy='by_year')
+                consolidation_result = consolidate_existing_features(strategy='by_date')
                 consolidation_time = time.time() - consolidation_start
                 
-                logger.info(f"✅ Year-based consolidation completed in {consolidation_time:.2f} seconds")
-                logger.info(f"   Year-partitioned files: {consolidation_result['files_created']}")
+                logger.info(f"✅ Date-based consolidation completed in {consolidation_time:.2f} seconds")
+                logger.info(f"   Date-partitioned files: {consolidation_result['files_created']}")
                 logger.info(f"   Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
                 logger.info(f"   Compression ratio: {consolidation_result['compression_ratio']:.1f}x")
                 
-                # Show year breakdown
-                logger.info("📁 Year-based Files:")
+                # Show date breakdown
+                logger.info("📁 Date-based Files:")
                 for file_info in consolidation_result['files']:
-                    logger.info(f"   {file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}")
+                    date_label = file_info.get('date', file_info.get('year'))
+                    logger.info(f"   {file_info['file']}: {file_info['rows']:,} rows, Date: {date_label}")
                 
                 results['consolidation'] = consolidation_result
                 
@@ -645,7 +646,7 @@ def main():
     if results and results['success_rate'] > 80.0:  # 80% minimum success rate
         logger.info("✅ Production batch completed successfully!")
         if 'consolidation' in results:
-            logger.info("✅ Year-based consolidation completed successfully!")
+            logger.info("✅ Date-based consolidation completed successfully!")
             logger.info("💡 Ready for ML workflows:")
             logger.info("   ✅ Train on 2024 data, test on 2025")
             logger.info("   ✅ Fast year-specific loading")

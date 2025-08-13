@@ -410,7 +410,7 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
         cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "training")
         if cache_age_hours is not None and cache_age_hours > 24:
             logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
-            _cleaned_data_cache.delete_cache(cache_key, "training")
+            _cleaned_data_cache.clear_cache(cache_key, "training")
         else:
             logger.info(f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)")
             try:

@@ -184,10 +184,10 @@ result = prepare_ml_data_for_training_with_cleaning(
     apply_stationarity_transform=False
 )
 
-X_train = result['X_train']
-'y_train = result['y_train']
-X_test  = result['X_test']
-'y_test  = result['y_test']
+ X_train = result['X_train']
+ y_train = result['y_train']
+ X_test  = result['X_test']
+ y_test  = result['y_test']
 print("Features:", result['feature_count'], "Train:", len(X_train), "Test:", len(X_test))
 ```
 

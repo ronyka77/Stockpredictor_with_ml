@@ -98,8 +98,8 @@ uv run python -m src.data_collector.polygon_data.example_usage
 
 ### Run Specific Examples
 ```bash
-# Run news collector (module)
-uv run python -m src.data_collector.polygon_news.news_collector
+# Run news pipeline (module)
+uv run python -m src.data_collector.polygon_news.news_pipeline
 ```
 
 ### Programmatic Usage
@@ -109,6 +109,8 @@ from datetime import date, timedelta
 
 # Quick data fetch
 pipeline = DataPipeline()
+end_date = date.today()
+start_date = end_date - timedelta(days=7)
 pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),
         end_date=end_date.strftime("%Y-%m-%d"),

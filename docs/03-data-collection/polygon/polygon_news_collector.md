@@ -148,7 +148,7 @@ class PolygonConfig:
 ### Quick Start
 
 ```python
-from src.data_collector.polygon_news.news_collector import main
+from src.data_collector.polygon_news.news_pipeline import main
 
 # Run incremental collection with main function
 success = main()
@@ -350,15 +350,8 @@ Get recent market news across major tickers.
 
 ### Example 1: Basic Incremental Collection
 
-```python
-from src.data_collector.polygon_news.news_pipeline import PolygonNewsCollector
-
-# Simple incremental collection
-success = main()
-if success:
-    print("News collection completed successfully")
-else:
-    print("News collection failed")
+```bash
+uv run python -m src.data_collector.polygon_news.news_pipeline
 ```
 
 ### Example 2: Custom Collection Parameters

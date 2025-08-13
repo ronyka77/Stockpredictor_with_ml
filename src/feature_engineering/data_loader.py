@@ -375,7 +375,7 @@ class StockDataLoader:
         
         return df
     
-    def execute_query(self, query: str, params: List[Any] = None) -> List[tuple]:
+    def execute_query(self, query: str, params: Optional[List[Any]] = None) -> List[tuple]:
         """
         Execute a raw SQL query and return results
         

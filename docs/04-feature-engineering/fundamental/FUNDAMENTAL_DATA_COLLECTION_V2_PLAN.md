@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS raw_fundamental_json (
     filing_date DATE,
     source TEXT,
     payload_json JSONB NOT NULL,
-    response_hash TEXT UNIQUE,
+    response_hash TEXT NOT NULL,
     ingested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_raw_fund_json_ticker_end ON raw_fundamental_json(ticker_id, period_end DESC);
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS public.fundamental_facts_v2 (
     id BIGSERIAL PRIMARY KEY,
     ticker_id INTEGER NOT NULL,
     "date" DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     filing_date DATE NULL,
     fiscal_period VARCHAR(10) NULL,
     fiscal_year VARCHAR(10) NULL,

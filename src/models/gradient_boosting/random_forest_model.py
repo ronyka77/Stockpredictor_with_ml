@@ -246,7 +246,7 @@ class RandomForestModel(BaseModel):
             self.feature_names = parsed_features if isinstance(parsed_features, list) else None
         except (ValueError, SyntaxError):
             logger.warning("Failed to parse feature_names from MLflow params; leaving as None")
-            self.feature_names = None
+            self.feature_names = []
         self.is_trained = params.get('is_trained', 'True') == 'True'
         self.run_id = run_id
         logger.info(f"Model loaded from MLflow run ID: {run_id}")
