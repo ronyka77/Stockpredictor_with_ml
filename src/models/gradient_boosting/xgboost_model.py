@@ -204,23 +204,48 @@ class XGBoostModel(BaseModel):
         return dtrain, dtest
     
     def fit(self, X_train: pd.DataFrame, y_train: pd.Series, 
-            X_test: pd.DataFrame, y_test: pd.Series,
-            params: Optional[Dict[str, Any]] = None) -> 'XGBoostModel':
+            X_test: Optional[pd.DataFrame] = None, y_test: Optional[pd.Series] = None,
+            params: Optional[Dict[str, Any]] = None,
+            validation_split: Optional[float] = None) -> 'XGBoostModel':
         """
         Train the XGBoost model using pre-split train/test data
         
         Args:
             X_train: Training feature matrix
             y_train: Training target values
-            X_test: Test feature matrix (used for validation during training)
-            y_test: Test target values (used for validation during training)
+            X_test: Test/validation feature matrix (optional if validation_split provided)
+            y_test: Test/validation target values (optional if validation_split provided)
             params: Custom parameters (overrides defaults)
+            validation_split: Optional fraction (0,1) to split from provided X_train/y_train for validation
             
         Returns:
             Self for method chaining
         """
         # logger.info(f"Training XGBoost model with {len(X_train)} samples, {len(X_train.columns)} features")
         
+        # Handle optional validation split when X_test/y_test not provided
+        if (X_test is None or y_test is None) and validation_split is not None:
+            if not (0.0 < validation_split < 1.0):
+                raise ValueError("validation_split must be in (0,1)")
+            n_samples = len(X_train)
+            val_size = max(1, int(n_samples * validation_split))
+            split_idx = n_samples - val_size
+            if split_idx <= 0:
+                split_idx = n_samples - 1
+            X_test = X_train.iloc[split_idx:].copy()
+            y_test = y_train.iloc[split_idx:].copy()
+            X_train = X_train.iloc[:split_idx].copy()
+            y_train = y_train.iloc[:split_idx].copy()
+
+        if X_test is None or y_test is None:
+            # If still None (no split requested), create a tiny holdout from tail to satisfy API
+            n_samples = len(X_train)
+            val_size = max(1, int(n_samples * 0.2))
+            split_idx = n_samples - val_size
+            X_test = X_train.iloc[split_idx:].copy()
+            y_test = y_train.iloc[split_idx:].copy()
+            X_train = X_train.iloc[:split_idx].copy()
+
         # Prepare data
         dtrain, dtest = self._prepare_data(X_train, y_train, X_test, y_test)
         

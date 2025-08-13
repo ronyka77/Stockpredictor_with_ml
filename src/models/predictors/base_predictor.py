@@ -165,14 +165,23 @@ class BasePredictor(ABC):
 
     def apply_threshold_filter(self, predictions: np.ndarray, confidence_scores: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Apply threshold filtering to predictions.
+        Apply threshold filtering to predictions via centralized ThresholdPolicy.
         """
-        if self.optimal_threshold is None:
-            return np.arange(len(predictions)), np.ones(len(predictions), dtype=bool)
-        
-        threshold_mask = confidence_scores >= self.optimal_threshold
-        filtered_indices = np.where(threshold_mask)[0]
-        return filtered_indices, threshold_mask
+        try:
+            from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
+            policy = ThresholdPolicy()
+            threshold_value = self.optimal_threshold if self.optimal_threshold is not None else 0.5
+            cfg = ThresholdConfig(method="ge", value=threshold_value)
+            # Note: BasePredictor does not keep X here; mask on confidence only
+            result = policy.compute_mask(confidence_scores, None, cfg)
+            return result.indices, result.mask
+        except Exception:
+            # Legacy fallback to preserve behavior on unexpected errors
+            if self.optimal_threshold is None:
+                return np.arange(len(predictions)), np.ones(len(predictions), dtype=bool)
+            threshold_mask = confidence_scores >= self.optimal_threshold
+            filtered_indices = np.where(threshold_mask)[0]
+            return filtered_indices, threshold_mask
 
     def save_predictions_to_excel(self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray) -> str:
         """

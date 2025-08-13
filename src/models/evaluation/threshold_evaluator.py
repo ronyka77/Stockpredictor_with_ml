@@ -493,13 +493,17 @@ class ThresholdEvaluator:
         all_predictions = model.predict(X)
         all_confidence = model.get_prediction_confidence(X, method=confidence_method)
         
-        # Apply confidence threshold
-        high_confidence_mask = all_confidence >= threshold
+        # Apply centralized ThresholdPolicy
+        from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
+        policy = ThresholdPolicy()
+        cfg = ThresholdConfig(method='ge', value=float(threshold))
+        policy_result = policy.compute_mask(all_confidence, X, cfg)
+        high_confidence_mask = policy_result.mask
         
         # Filter predictions
         filtered_predictions = all_predictions[high_confidence_mask]
         filtered_confidence = all_confidence[high_confidence_mask]
-        filtered_indices = np.where(high_confidence_mask)[0]
+        filtered_indices = policy_result.indices
         
         result = {
             'all_predictions': all_predictions,
