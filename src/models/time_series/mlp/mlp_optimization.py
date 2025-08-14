@@ -100,11 +100,7 @@ class MLPOptimizationMixin:
                 trial_model.model = trial_model._create_model(params=model_params)
                 trial_model.model.to(trial_model.device)
                 
-                # Create DataLoaders directly in the objective function
-                
-                
                 # Store the fitted scaler for later use in the trial model
-                # Ensure current_trial_scaler is set to the provided fitted_scaler or fitted from data
                 self.current_trial_scaler = getattr(self, 'fitted_scaler', None) or fitted_scaler
                 
                 # Create DataLoaders using the cleaned and scaled data
@@ -113,8 +109,12 @@ class MLPOptimizationMixin:
                 
                 logger.info(f"🚀 Creating DataLoaders with num_workers={num_workers}, pin_memory={pin_memory}")
                 
-                train_loader, val_loader = MLPDataUtils.create_train_val_dataloaders(
-                    X_train, y_train, X_test_scaled, y_test, data_params['batch_size'], num_workers, pin_memory
+                # Create DataLoaders using the cleaned and scaled data
+                train_loader = MLPDataUtils.create_dataloader_from_dataframe(
+                    X_train, y_train, data_params['batch_size'], shuffle=True, num_workers=num_workers, pin_memory=pin_memory
+                )
+                val_loader = MLPDataUtils.create_dataloader_from_dataframe(
+                    X_test_scaled, y_test, data_params['batch_size'], shuffle=False, num_workers=num_workers, pin_memory=pin_memory
                 )
                 
                 # Train the model

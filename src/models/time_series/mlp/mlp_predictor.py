@@ -565,30 +565,24 @@ class MLPPredictor(PyTorchBasePredictor):
         
         self.model.eval()
         
-        # Use centralized preprocessing with loaded scaler
         from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
         try:
-            # Always run centralized cleaning first
             try:
                 cleaned_X = MLPDataUtils.validate_and_clean_data(X)
             except Exception as e:
-                # Retry once for transient errors (tests expect retry behavior)
                 logger.warning(f"⚠️ validate_and_clean_data failed: {e} — retrying once")
                 cleaned_X = MLPDataUtils.validate_and_clean_data(X)
 
-            # Check if scaler is available (from loaded model)
-            if hasattr(self, 'scaler') and self.scaler is not None:
-                # Use loaded scaler for consistent preprocessing
-                # NOTE: call scale_data with original X to match existing test expectations
+            if getattr(self, 'scaler', None) is not None:
                 X_scaled, _ = MLPDataUtils.scale_data(X, self.scaler, False)
                 logger.info("✅ Applied loaded scaler for prediction preprocessing")
             else:
                 # Fallback to basic preprocessing if no scaler available
                 logger.warning("⚠️ No scaler available - using basic preprocessing")
                 X_scaled = cleaned_X.copy()
-                X_scaled = X_scaled.fillna(0)  # Replace NaN with 0
-                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)  # Replace Inf with 0
+                X_scaled = X_scaled.fillna(0)  
+                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
 
                 # Basic normalization to prevent extreme values
                 X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
@@ -598,15 +592,7 @@ class MLPPredictor(PyTorchBasePredictor):
         except Exception as preprocessing_error:
             logger.error(f"❌ Error during preprocessing: {str(preprocessing_error)}")
             logger.info("🔄 Falling back to basic preprocessing")
-
-            # Fallback to basic preprocessing
-            X_scaled = X.copy()
-            X_scaled = X_scaled.fillna(0)  # Replace NaN with 0
-            X_scaled = X_scaled.replace([np.inf, -np.inf], 0)  # Replace Inf with 0
-
-            # Basic normalization to prevent extreme values
-            X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
-            X_tensor = torch.FloatTensor(X_scaled.values)
+            raise preprocessing_error
         
         X_tensor = X_tensor.to(self.device)
         
@@ -633,8 +619,6 @@ class MLPPredictor(PyTorchBasePredictor):
         """Return the training history dictionary."""
         return getattr(self, 'training_history', {})
 
-    # predict_with_threshold now inherited from BaseModel (unified)
-
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'variance') -> np.ndarray:
         """
         Get prediction confidence scores.
@@ -659,16 +643,15 @@ class MLPPredictor(PyTorchBasePredictor):
             cleaned_X = MLPDataUtils.validate_and_clean_data(X)
 
             # Check if scaler is available (from loaded model)
-            if hasattr(self, 'scaler') and self.scaler is not None:
-                # Use loaded scaler for consistent preprocessing
+            if getattr(self, 'scaler', None) is not None:
                 X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
                 logger.info("✅ Applied loaded scaler for confidence calculation preprocessing")
             else:
                 # Fallback to basic preprocessing if no scaler available
                 logger.warning("⚠️ No scaler available - using basic preprocessing for confidence")
                 X_scaled = cleaned_X.copy()
-                X_scaled = X_scaled.fillna(0)  # Replace NaN with 0
-                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)  # Replace Inf with 0
+                X_scaled = X_scaled.fillna(0)  
+                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
 
                 # Basic normalization to prevent extreme values
                 X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
@@ -678,12 +661,7 @@ class MLPPredictor(PyTorchBasePredictor):
         except Exception as preprocessing_error:
             logger.error(f"❌ Error during preprocessing for confidence: {str(preprocessing_error)}")
             logger.info("🔄 Falling back to basic preprocessing for confidence")
-            # Fallback to basic preprocessing instead of raising
-            X_scaled = X.copy()
-            X_scaled = X_scaled.fillna(0)
-            X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
-            X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
-            X_tensor = torch.FloatTensor(X_scaled.values)
+            raise preprocessing_error
         
         X_tensor = X_tensor.to(self.device)
         
@@ -696,10 +674,7 @@ class MLPPredictor(PyTorchBasePredictor):
             predictions_np = predictions_np.flatten()
         
         if method == 'variance':
-            # For MLP, we can use prediction magnitude as confidence
-            # Higher absolute predictions indicate higher confidence
             confidence = np.abs(predictions_np)
-            # Normalize to [0, 1] range
             if confidence.max() > 0:
                 confidence = confidence / confidence.max()
             return confidence
@@ -714,7 +689,6 @@ class MLPPredictor(PyTorchBasePredictor):
         elif method == 'margin':
             # Margin-based confidence (distance from zero)
             confidence = np.abs(predictions_np)
-            # Normalize using tanh for smooth [0, 1] mapping
             confidence = np.tanh(confidence)
             return confidence
             
@@ -731,6 +705,4 @@ class MLPPredictor(PyTorchBasePredictor):
         """
         self.scaler = scaler
         logger.info("✅ Feature scaler set for MLP prediction scaling")
-
-    # optimize_prediction_threshold now inherited from BaseModel (unified)
 

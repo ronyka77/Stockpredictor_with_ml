@@ -43,11 +43,8 @@ class MLPWrapper(nn.Module):
         """
         super().__init__()
         self.predictor = predictor
-        
-        # Extract the actual PyTorch model for forward pass
-        if hasattr(predictor, 'model') and predictor.model is not None:
-            self.model = predictor.model
-        else:
+        self.model = predictor.model
+        if self.model is None:
             raise ValueError("Predictor must have a trained model")
         
         # Preserve all predictor attributes for compatibility
@@ -511,7 +508,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 40
+        number_of_trials = 20
         # n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)

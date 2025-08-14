@@ -166,8 +166,12 @@ def test_data_preparation():
     X_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
     X_test_scaled, _ = MLPDataUtils.scale_data(X_test_clean, scaler, False)
 
-    train_loader, val_loader = MLPDataUtils.create_train_val_dataloaders(
-        X_train_scaled, y_train, X_test_scaled, y_test, batch_size
+    # Create DataLoaders explicitly using the lower-level helper
+    train_loader = MLPDataUtils.create_dataloader_from_dataframe(
+        X_train_scaled, y_train, batch_size, shuffle=True
+    )
+    val_loader = MLPDataUtils.create_dataloader_from_dataframe(
+        X_test_scaled, y_test, batch_size, shuffle=False
     )
 
     # Verify data loaders

@@ -133,6 +133,18 @@ def get_logger(name: str, utility: Optional[str] = None) -> logging.Logger:
             utility = 'data_collector'
         elif 'feature_engineering' in name:
             utility = 'feature_engineering'
+        elif 'mlp' in name:
+            utility = 'mlp'
+        elif 'lstm' in name:
+            utility = 'lstm'
+        elif 'lightgbm' in name:
+            utility = 'lightgbm'
+        elif 'xgboost' in name:
+            utility = 'xgboost'
+        elif 'catboost' in name:
+            utility = 'catboost'
+        elif 'random_forest' in name:
+            utility = 'random_forest'
         else:
             utility = 'general'
     
@@ -149,27 +161,31 @@ def get_polygon_logger(name: str) -> logging.Logger:
     """Convenience function for polygon-specific logging"""
     return get_logger(name, utility='polygon')
 
-def cleanup_old_logs(utility: str, days_to_keep: int = 30) -> None:
+def cleanup_old_logs(days_to_keep: int = 30, min_size_kb: int = 2) -> None:
     """
-    Clean up old log files
+    Clean up old log files and small log files
     
     Args:
         utility: Utility name
         days_to_keep: Number of days of logs to keep
     """
-    log_dir = LOGS_BASE_DIR / utility
+    log_dir = LOGS_BASE_DIR 
     if not log_dir.exists():
         return
     
     cutoff_time = datetime.now().timestamp() - (days_to_keep * 24 * 60 * 60)
+    min_size_bytes = min_size_kb * 1024
     
-    for log_file in log_dir.glob("*.log"):
-        if log_file.stat().st_mtime < cutoff_time:
-            try:
+    # Recursively check all subdirectories
+    for log_file in log_dir.rglob("*.log"):
+        try:
+            file_stat = log_file.stat()
+            # Delete old files or very small files
+            if file_stat.st_mtime < cutoff_time or file_stat.st_size < min_size_bytes:
                 log_file.unlink()
-                print(f"Deleted old log file: {log_file}")
-            except OSError as e:
-                print(f"Failed to delete {log_file}: {e}")
+                logger.info(f"Deleted log file: {log_file} (size: {file_stat.st_size} bytes)")
+        except OSError as e:
+            logger.error(f"Failed to delete {log_file}: {e}")
 
 # Initialize logs directory structure
 def init_logging_structure():
@@ -197,14 +213,4 @@ if __name__ == "__main__":
     logger.warning("This is a warning message")
     logger.error("This is an error message")
     
-    # Test polygon-specific logging
-    polygon_logger = get_polygon_logger("test.polygon.module")
-    polygon_logger.info("Testing polygon-specific logging")
-    
-    print(f"Logs are being written to: {LOGS_BASE_DIR}")
-    print("Check the following directories:")
-    for utility_dir in LOGS_BASE_DIR.iterdir():
-        if utility_dir.is_dir():
-            print(f"  - {utility_dir}")
-            for log_file in utility_dir.glob("*.log"):
-                print(f"    * {log_file.name}") 
+    cleanup_old_logs()
