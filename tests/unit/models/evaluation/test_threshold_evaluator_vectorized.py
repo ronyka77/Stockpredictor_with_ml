@@ -51,7 +51,7 @@ def test_vectorized_threshold_testing_monotonic_mask():
         current_prices_test=prices,
         confidence_method="simple",
         threshold_range=(0.1, 0.9),
-        n_thresholds=9,
+        n_thresholds=50,
     )
 
     assert res["status"] == "success"

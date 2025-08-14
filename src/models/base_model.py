@@ -18,6 +18,20 @@ from src.utils.mlflow_integration import MLflowIntegration
 
 logger = get_logger(__name__)
 
+
+class DefaultHyperparameterConfig:
+    """Small default hyperparameter config provider used when a model
+    implementation does not provide its own hyperparameter configuration.
+    """
+
+    def get_default_params(self) -> dict:
+        # Conservative defaults that work for lightweight tests
+        return {
+            "n_estimators": 100,
+            "learning_rate": 0.1,
+            "max_depth": 6,
+        }
+
 class BaseModel(ABC):
     """
     Abstract base class for all ML models with MLflow integration
@@ -53,6 +67,10 @@ class BaseModel(ABC):
         
         # Unified thresholding defaults
         self.base_threshold = 0.5
+        # Provide a default hyperparameter_config object so gradient-boosting
+        # implementations can call `self.hyperparameter_config.get_default_params()`
+        # without having to instantiate their own config in tests.
+        self.hyperparameter_config = DefaultHyperparameterConfig()
         
         logger.info(f"Initialized {model_name} model")
     

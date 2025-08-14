@@ -249,6 +249,21 @@ class FeatureStorage:
         """Prepare data for Parquet storage"""
         # Reset index to make date a column
         storage_data = data.reset_index()
+        # Ensure index column is named 'date' so round-trip preserves index shape
+        if 'date' not in storage_data.columns:
+            # Try to find a datetime-like column produced by reset_index
+            idx_col = storage_data.columns[0]
+            try:
+                if pd.api.types.is_datetime64_any_dtype(storage_data[idx_col]):
+                    storage_data = storage_data.rename(columns={idx_col: 'date'})
+            except Exception:
+                # If detection fails, explicitly convert the first column to datetime
+                try:
+                    storage_data[idx_col] = pd.to_datetime(storage_data[idx_col])
+                    storage_data = storage_data.rename(columns={idx_col: 'date'})
+                except Exception:
+                    # Leave as-is; tests will surface mismatch if critical
+                    pass
         
         # Ensure date column is properly typed
         if 'date' in storage_data.columns:
