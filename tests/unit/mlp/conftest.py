@@ -12,7 +12,6 @@ def rng_seed():
 
 @pytest.fixture
 def small_df(rng_seed):
-    # Small deterministic DataFrame for unit tests
     data = np.random.randn(16, 5)
     return pd.DataFrame(data, columns=[f"f{i}" for i in range(5)])
 
@@ -30,13 +29,10 @@ def cpu_device():
 
 
 class StubModel:
-    """Simple deterministic model stub that returns a constant prediction."""
-
     def eval(self):
         return None
 
     def __call__(self, x):
-        # Accept pandas.DataFrame or torch.Tensor
         if hasattr(x, "shape"):
             n = x.shape[0]
         else:
@@ -47,3 +43,5 @@ class StubModel:
 @pytest.fixture
 def stub_model():
     return StubModel()
+
+

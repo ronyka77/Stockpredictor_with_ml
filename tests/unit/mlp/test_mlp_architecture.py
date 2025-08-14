@@ -1,12 +1,7 @@
-#!/usr/bin/env python3
-"""
-Test script for MLP Neural Network Architecture
-"""
-
+import torch
+import pytest
 import numpy as np
 import pandas as pd
-import pytest
-import torch
 
 from src.models.time_series.mlp.mlp_architecture import MLPModule
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
@@ -69,3 +64,5 @@ def test_predictor_create_model_and_predict_raises_for_untrained():
     X = pd.DataFrame(np.random.randn(5, 10))
     with pytest.raises(ValueError):
         predictor.predict(X)
+
+

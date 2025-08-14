@@ -5,7 +5,7 @@ This module defines data models for parsing and validating responses
 from the Polygon fundamentals API endpoints.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from src.utils.logger import get_logger
@@ -41,7 +41,10 @@ class FinancialStatement(BaseModel):
     source_filing_url: Optional[str] = None
     source_filing_file_url: Optional[str] = None
     
-    @validator('start_date', 'end_date', 'filing_date', 'period_of_report_date', pre=True)
+    model_config = ConfigDict()
+
+    @field_validator('start_date', 'end_date', 'filing_date', 'period_of_report_date', mode='before')
+    @classmethod
     def parse_date(cls, v):
         """Parse date strings into date objects"""
         if isinstance(v, str):
@@ -212,7 +215,8 @@ class CompanyDetails(BaseModel):
     logo_url: Optional[str] = None
     icon_url: Optional[str] = None
     
-    @validator('list_date', pre=True)
+    @field_validator('list_date', mode='before')
+    @classmethod
     def parse_list_date(cls, v):
         """Parse list date string into date object"""
         if isinstance(v, str):

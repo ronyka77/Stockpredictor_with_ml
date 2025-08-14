@@ -1,3 +1,14 @@
+import pandas as pd
+from src.utils.cleaned_data_cache import CleanedDataCache
+
+
+def test_cleaned_data_cache_basic(tmp_path):
+    cache = CleanedDataCache(cache_dir=tmp_path)
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    cache.set("test_key", df)
+    loaded = cache.get("test_key")
+    assert loaded.equals(df)
+
 import json
 import pandas as pd
 import numpy as np

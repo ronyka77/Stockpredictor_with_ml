@@ -283,6 +283,34 @@ class CleanedDataCache:
                 logger.warning(f"Could not read cache info file {info_file}: {str(e)}")
         
         return cached_entries 
+
+    # Compatibility convenience methods
+    def set(self, cache_key: str, df: pd.DataFrame) -> None:
+        """Compatibility wrapper: save a single DataFrame as prediction X_test cache.
+
+        Creates a minimal data_result and stores it as a 'prediction' cache entry.
+        """
+        data_result = {
+            'X_test': df,
+            'y_test': pd.Series([]),
+            'target_column': '',
+            'feature_count': df.shape[1] if hasattr(df, 'shape') else 0,
+            'prediction_horizon': 0,
+            'train_samples': 0,
+            'test_samples': len(df) if hasattr(df, '__len__') else 0,
+            'removed_features': {},
+            'diversity_analysis': {}
+        }
+        # Use existing save helper with data_type='prediction'
+        self.save_cleaned_data(data_result, cache_key=cache_key, data_type='prediction')
+
+    def get(self, cache_key: str) -> pd.DataFrame:
+        """Compatibility wrapper: load cached prediction X_test for given key."""
+        result = self.load_cleaned_data(cache_key=cache_key, data_type='prediction')
+        # Expect X_test in result
+        if 'X_test' not in result:
+            raise KeyError(f"Cached X_test not found for key: {cache_key}")
+        return result['X_test']
     
 # Start Generation Here
     def get_cache_age_hours(self, cache_key: str, data_type: str = "training") -> Optional[float]:

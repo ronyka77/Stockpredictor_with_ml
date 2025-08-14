@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.models.evaluation.threshold_evaluator import ThresholdEvaluator, ModelProtocol
+from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
 
 
 class DummyModel:
