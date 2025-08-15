@@ -9,6 +9,7 @@ This document provides complete documentation for the threshold optimization sys
 - Removed redundant `calculate_all_metrics` calls
 - Aligned with modular data loading structure
 - Simplified metrics calculation for production use
+- NEW: Centralized threshold masking via `ThresholdPolicy` + `ThresholdConfig` (default `ge` with model's optimal/base threshold)
 
 ## System Architecture
 
@@ -31,6 +32,12 @@ This document provides complete documentation for the threshold optimization sys
    - Automatic threshold loading from MLflow
    - **NEW**: Proper percentage return to price conversion
    - **NEW**: Enhanced Excel output with both returns and prices
+
+4. **ThresholdPolicy (Unified Masking)** (`src/models/evaluation/threshold_policy.py`)
+   - Single source of truth for confidence-based masking
+   - Default behavior: `method='ge'`, `value=optimal_threshold or 0.5`
+   - Sanitizes NaN/Inf, returns stats: `samples_kept_ratio`, `avg_confidence`, counts
+   - Used by both `ThresholdEvaluator.predict_with_threshold` and `BasePredictor.apply_threshold_filter`
 
 ## Key Features
 
@@ -56,6 +63,69 @@ This document provides complete documentation for the threshold optimization sys
 - **Integrated**: Metrics included in threshold optimization results
 
 ### 5. **Integrated MLflow Support**
+### 6. **Unified Threshold Policies**
+- Consistent filtering logic across evaluators and predictors
+- Extensible policy methods (future: quantile, top-k per date, per-ticker, adaptive)
+- Centralized logging via `src/utils/logger.py` with policy params and stats
+
+## Threshold Policies (Unified Masking)
+
+`ThresholdPolicy` centralizes masking logic. Default policy preserves previous behavior: keep samples where `confidence >= threshold`.
+
+### Configuration
+```python
+from dataclasses import dataclass
+
+@dataclass
+class ThresholdConfig:
+    method: str = "ge"      # "ge" (>=), "gt" (>); future: "quantile", "topk", "per_group", "adaptive"
+    value: float | None = None
+    quantile: float | None = None
+    top_k: int | None = None
+    group_key: str | None = None
+    min_ratio: float = 0.0005
+    max_ratio: float = 0.05
+    hysteresis: dict | None = None
+    adaptive: dict | None = None
+```
+
+### Usage
+```python
+from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
+
+policy = ThresholdPolicy()
+cfg = ThresholdConfig(method="ge", value=0.62)
+res = policy.compute_mask(confidence=conf_scores, X=features_df, cfg=cfg)
+# res.mask (bool np.ndarray), res.indices (np.ndarray), res.stats (dict)
+```
+
+Predictor integration (conceptual):
+```python
+cfg = ThresholdConfig(method="ge", value=self.optimal_threshold or 0.5)
+res = policy.compute_mask(confidence_scores, None, cfg)
+filtered_indices, threshold_mask = res.indices, res.mask
+```
+
+Evaluator integration:
+```python
+cfg = ThresholdConfig(method='ge', value=float(threshold))
+res = policy.compute_mask(all_confidence, X, cfg)
+high_confidence_mask = res.mask
+```
+
+### Logging Schema
+- event: `threshold_policy_filter`
+- policy_method: str, policy_params: dict
+- stats: `{samples_kept, total_samples, samples_kept_ratio, avg_confidence, non_finite_confidence_count}`
+
+Example (INFO):
+```text
+threshold_policy_filter policy_method=ge policy_params={"value":0.62} stats={"samples_kept":532,"total_samples":10000,"samples_kept_ratio":0.0532,"avg_confidence":0.73,"non_finite_confidence_count":0}
+```
+
+### Compatibility
+- Default behavior unchanged (>= threshold). Policy is a drop-in replacement under the hood.
+- Future strategies can be added without touching evaluator/predictor call sites.
 - Automatic threshold loading from trained models
 - Seamless integration with hyperparameter optimization
 - Persistent threshold configuration across prediction pipelines
@@ -441,6 +511,13 @@ results_df['predicted_price'] = convert_percentage_predictions_to_prices(
 ```
 
 ### 3. **Updated Import Paths**
+### 4. **Unified Masking via ThresholdPolicy**
+- Evaluator and Predictor now call `ThresholdPolicy.compute_mask` instead of inline comparisons
+- NaN/Inf confidence values are excluded from kept set and logged as warnings
+- Stats are returned and logged centrally
+
+### 5. **XGBoost Fit API Tolerance**
+- `XGBoostModel.fit` now accepts `validation_split: Optional[float]` for convenience in examples/tests (optional, backward-compatible)
 ```python
 # BEFORE: Old compatibility layer
 from src.utils.data_utils import prepare_ml_data_for_prediction_with_cleaning

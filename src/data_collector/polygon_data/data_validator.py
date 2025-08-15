@@ -4,7 +4,7 @@ Data validation schemas and validators for OHLCV stock market data
 
 from datetime import datetime, date
 from typing import List, Dict, Optional, Any, Union, Tuple
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator, field_serializer, Field, ConfigDict
 from enum import Enum
 
 from src.utils.logger import get_polygon_logger
@@ -38,16 +38,19 @@ class OHLCVRecord(BaseModel):
     vwap: Optional[float] = Field(None, gt=0, description="Volume weighted average price")
     adjusted_close: Optional[float] = Field(None, gt=0, description="Adjusted closing price")
     
-    class Config:
-        """Pydantic configuration"""
-        validate_assignment = True
-        use_enum_values = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-            date: lambda v: v.isoformat()
-        }
+    # Pydantic V2 configuration
+    model_config = ConfigDict(
+        validate_assignment=True,
+    )
+
+    @field_serializer("timestamp")
+    def _serialize_timestamp(self, v, _info):
+        if isinstance(v, (datetime, date)):
+            return v.isoformat()
+        return v
     
-    @validator('ticker')
+    @field_validator('ticker')
+    @classmethod
     def validate_ticker(cls, v):
         """Validate ticker symbol format"""
         if not v or not v.strip():
@@ -62,8 +65,10 @@ class OHLCVRecord(BaseModel):
         
         return ticker
     
-    @validator('high')
-    def validate_high_price(cls, v, values):
+    @field_validator('high', mode='after')
+    @classmethod
+    def validate_high_price(cls, v, info):
+        values = info.data or {}
         """Validate that high price is the highest among OHLC"""
         if 'low' in values and v < values['low']:
             raise ValueError(f'High price ({v}) must be >= Low price ({values["low"]})')
@@ -76,8 +81,10 @@ class OHLCVRecord(BaseModel):
         
         return v
     
-    @validator('low')
-    def validate_low_price(cls, v, values):
+    @field_validator('low', mode='after')
+    @classmethod
+    def validate_low_price(cls, v, info):
+        values = info.data or {}
         """Validate that low price is the lowest among OHLC"""
         if 'open' in values and v > values['open']:
             raise ValueError(f'Low price ({v}) must be <= Open price ({values["open"]})')
@@ -87,7 +94,8 @@ class OHLCVRecord(BaseModel):
         
         return v
     
-    @validator('volume')
+    @field_validator('volume')
+    @classmethod
     def validate_volume(cls, v):
         """Validate trading volume"""
         if v < 0:
@@ -99,8 +107,10 @@ class OHLCVRecord(BaseModel):
         
         return v
     
-    @validator('vwap')
-    def validate_vwap(cls, v, values):
+    @field_validator('vwap', mode='after')
+    @classmethod
+    def validate_vwap(cls, v, info):
+        values = info.data or {}
         """Validate volume weighted average price with fallback calculation"""
         if v is None:
             return v
@@ -167,8 +177,10 @@ class OHLCVRecord(BaseModel):
         
         return round(vwap, 4)
     
-    @validator('adjusted_close')
-    def validate_adjusted_close(cls, v, values):
+    @field_validator('adjusted_close')
+    @classmethod
+    def validate_adjusted_close(cls, v, info):
+        # info.data contains other fields if needed
         """Validate adjusted closing price"""
         if v is None:
             return v
@@ -179,7 +191,8 @@ class OHLCVRecord(BaseModel):
         
         return v
     
-    @validator('timestamp')
+    @field_validator('timestamp', mode='before')
+    @classmethod
     def validate_timestamp(cls, v):
         """Validate timestamp"""
         if isinstance(v, str):
@@ -204,8 +217,7 @@ class OHLCVRecord(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage"""
-        data = self.dict()
-        
+        data = self.model_dump()        
         # Convert timestamp to date for database storage
         if isinstance(data['timestamp'], datetime):
             data['date'] = data['timestamp'].date()
@@ -229,12 +241,14 @@ class TickerInfo(BaseModel):
     currency_name: Optional[str] = Field(None, description="Trading currency")
     active: bool = Field(default=True, description="Whether ticker is active")
     
-    @validator('ticker')
+    @field_validator('ticker')
+    @classmethod
     def validate_ticker_format(cls, v):
         """Validate ticker format"""
         return v.strip().upper()
-    
-    @validator('name')
+
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """Validate company/asset name"""
         if not v or not v.strip():

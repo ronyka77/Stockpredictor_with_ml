@@ -314,8 +314,8 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
             try:
                 X_clean[col] = pd.to_numeric(X_clean[col], errors='coerce')
                 logger.info(f"   Converted essential column '{col}' to numeric")
-            except:
-                logger.warning(f"   Could not convert essential column '{col}' to numeric")
+            except Exception as e:
+                logger.error(f"   Error converting essential column '{col}' to numeric: {e}")
     
     # 2. Remove constant features (only check numeric columns for efficiency)
     if remove_constants:

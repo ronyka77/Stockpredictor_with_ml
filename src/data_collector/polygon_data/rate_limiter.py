@@ -62,16 +62,10 @@ class RateLimiter:
         
         logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
         
-        # For free tier (5 requests/minute), proactively wait after hitting the limit
-        # This prevents hitting 429 errors by being more conservative
-        if self.requests_per_minute <= 5 and self.request_count >= self.requests_per_minute:
-            remaining_time = 60 - (current_time - self.window_start)
-            if remaining_time > 0:
-                logger.info(f"Proactive wait: Completed {self.request_count} requests. "
-                            f"Waiting {remaining_time:.1f}s before next batch")
-                time.sleep(remaining_time)
-                self.window_start = time.time()
-                self.request_count = 0
+        # NOTE: removed proactive same-call cooldown to match conventional sliding-window
+        # semantics: if the caller fills the quota, the next caller will observe the
+        # rate limit and sleep/reset there. This keeps the request_count stable for
+        # the call that consumed the final quota and avoids unexpected resets.
     
     def get_remaining_requests(self) -> int:
         """Get number of remaining requests in current window"""

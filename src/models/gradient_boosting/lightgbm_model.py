@@ -60,6 +60,7 @@ class LightGBMModel(BaseModel):
         self.early_stopping_rounds = self.config.get('early_stopping_rounds', 50)
         self.eval_metric = self.config.get('eval_metric', 'rmse')
         self.base_threshold = 0.5
+        self.default_confidence_method = 'leaf_depth'
         
         # Calculate CPU usage limit (75% of available cores by default)
         total_cores = os.cpu_count() or 4
@@ -383,8 +384,8 @@ class LightGBMModel(BaseModel):
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method='leaf_depth', 
-                    threshold_range=(0.1, 0.9),
-                    n_thresholds=80  
+                    threshold_range=(0.01, 0.99),
+                    n_thresholds=90  
                 )
                 
                 # Use threshold-optimized investment success rate
@@ -823,78 +824,9 @@ class LightGBMModel(BaseModel):
         
         return confidence_scores
     
-    def optimize_prediction_threshold(self, X_test: pd.DataFrame, y_test: pd.Series,
-                                    current_prices_test: np.ndarray,
-                                    confidence_method: str = 'leaf_depth',
-                                    threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                    n_thresholds: int = 20) -> Dict[str, Any]:
-        """
-        Optimize prediction threshold based on confidence scores to maximize profit on test data
-        
-        Args:
-            X_test: Test features (unseen data)
-            y_test: Test targets
-            current_prices_test: Current prices for test set
-            confidence_method: Method for calculating confidence scores
-            threshold_range: Range of thresholds to test (min, max)
-            n_thresholds: Number of thresholds to test
-            
-        Returns:
-            Dictionary with optimization results based on test data only
-        """
-        if self.model is None:
-            raise RuntimeError("Model must be trained before optimizing thresholds")
-        
-        # Use central evaluator for threshold optimization
-        results = self.threshold_evaluator.optimize_prediction_threshold(
-            model=self,
-            X_test=X_test,
-            y_test=y_test,
-            current_prices_test=current_prices_test,
-            confidence_method=confidence_method,
-            threshold_range=threshold_range,
-            n_thresholds=n_thresholds
-        )
-        
-        self.optimal_threshold = results['optimal_threshold']
-        self.confidence_method = results['confidence_method']
-        
-        return results
+    # Removed: duplicate optimize_prediction_threshold; now inherited from BaseModel
     
-    def predict_with_threshold(self, X: pd.DataFrame, 
-                                return_confidence: bool = False,
-                                threshold: Optional[float] = None,
-                                confidence_method: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Make predictions with confidence-based filtering
-        
-        Args:
-            X: Feature matrix
-            return_confidence: Whether to return confidence scores
-            threshold: Confidence threshold (uses optimal if None)
-            confidence_method: Confidence method (uses stored if None)
-            
-        Returns:
-            Dictionary with predictions, confidence scores, and filtering info
-        """
-        if self.model is None:
-            raise RuntimeError("Model must be trained before making predictions")
-        
-        # Use stored optimal values if not provided
-        if threshold is None:
-            threshold = self.base_threshold
-        
-        if confidence_method is None:
-            confidence_method = getattr(self, 'confidence_method', 'leaf_depth')
-        
-        # Use central evaluator for threshold-based predictions
-        return self.threshold_evaluator.predict_with_threshold(
-            model=self,
-            X=X,
-            threshold=threshold,
-            confidence_method=confidence_method,
-            return_confidence=return_confidence
-        )
+    # Removed: duplicate predict_with_threshold; now inherited from BaseModel
 
     def select_features(self, X: pd.DataFrame, y: pd.Series, n_features_to_select: int = 50) -> List[str]:
         """
@@ -1051,7 +983,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 2000
+        number_of_trials = 20
         n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)

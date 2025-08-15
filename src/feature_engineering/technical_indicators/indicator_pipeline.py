@@ -561,17 +561,13 @@ def run_production_batch():
     processor = BatchFeatureProcessor()
     
     try:
-        # Get all available tickers with sufficient data
         logger.info("📊 Getting all available tickers...")
-        
-        # Get all tickers that meet minimum data requirements, ordered by data points desc
         all_tickers = processor.get_available_tickers(
             min_data_points=job_config.min_data_points,
-            active_only=True,  # Only process active tickers
-            market='stocks'    # Focus on stocks market
+            active_only=True,  
+            market='stocks'
         )
         
-        # All tickers are already ordered by data points desc from the query
         selected_tickers = all_tickers
         
         logger.info(f"📈 Processing {len(selected_tickers)} tickers:")
@@ -642,17 +638,7 @@ def run_production_batch():
 
 def main():
     """Main function for production batch processing"""
-    results = run_production_batch()
-    if results and results['success_rate'] > 80.0:  # 80% minimum success rate
-        logger.info("✅ Production batch completed successfully!")
-        if 'consolidation' in results:
-            logger.info("✅ Date-based consolidation completed successfully!")
-            logger.info("💡 Ready for ML workflows:")
-            logger.info("   ✅ Train on 2024 data, test on 2025")
-            logger.info("   ✅ Fast year-specific loading")
-            logger.info("   ✅ Memory efficient processing")
-    else:
-        logger.warning("⚠️  Production batch completed with issues.")
+    run_production_batch()
 
 if __name__ == "__main__":
     main() 

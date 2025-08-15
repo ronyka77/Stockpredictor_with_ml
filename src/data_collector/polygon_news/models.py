@@ -3,8 +3,14 @@ SQLAlchemy models for Polygon news data storage
 Optimized for Polygon.io News API response structure with 2-year data retention
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, ARRAY
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
+try:
+    # Prefer JSON for cross-dialect compatibility in tests (SQLite)
+    from sqlalchemy import JSON
+    _JSON_TYPE = JSON
+except Exception:
+    _JSON_TYPE = Text
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
@@ -42,7 +48,8 @@ class PolygonNewsArticle(Base):
     publisher_favicon_url = Column(String(500))
     
     # Content metadata
-    keywords = Column(ARRAY(String))
+    # Use JSON for keywords to support SQLite in tests while remaining compatible with Postgres
+    keywords = Column(_JSON_TYPE)
     
     # Processing metadata
     created_at = Column(DateTime(timezone=True), default=func.now())

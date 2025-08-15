@@ -28,14 +28,14 @@ class MLPModule(nn.Module):
     """
     
     def __init__(self, 
-                 input_size: int,
-                 layer_sizes: List[int],
-                 output_size: int = 1,
-                 activation: str = 'relu',
-                 dropout: float = 0.2,
-                 batch_norm: bool = False,
-                 residual: bool = False,
-                 task: str = 'regression'):
+                input_size: int,
+                layer_sizes: List[int],
+                output_size: int = 1,
+                activation: str = 'relu',
+                dropout: float = 0.2,
+                batch_norm: bool = False,
+                residual: bool = False,
+                task: str = 'regression'):
         """
         Initialize MLP module.
         
@@ -259,11 +259,8 @@ class MLPDataUtils:
         # Create a copy to avoid modifying original data
         cleaned_data = data.copy()
         
-        # Handle NaN values
         # Replace infinite values with NaN first
         cleaned_data = cleaned_data.replace([np.inf, -np.inf], np.nan)
-        
-        # Fill NaN values with mean (following existing patterns from ML feature loader)
         cleaned_data = cleaned_data.fillna(0)
         
         # Check if any NaN values remain (should not happen after fillna)
@@ -291,7 +288,6 @@ class MLPDataUtils:
             raise ValueError(f"Data validation failed: {final_nans} NaNs, {final_infs} Infs remain")
         
         logger.info(f"✅ Data validation and cleaning completed successfully: {len(cleaned_data)} rows, {len(cleaned_data.columns)} columns")
-        
         return cleaned_data
     
     @staticmethod
@@ -319,7 +315,6 @@ class MLPDataUtils:
         if data.empty:
             raise ValueError("Input data is empty")
 
-        # Ensure numeric and no invalid values
         # Replace infinite values with NaN and if NaNs remain, attempt to clean using validate_and_clean_data
         tmp = data.replace([np.inf, -np.inf], np.nan)
         if tmp.isnull().sum().sum() > 0:
@@ -343,8 +338,7 @@ class MLPDataUtils:
             # Use existing scaler (for prediction)
             if scaler is None:
                 raise ValueError("scaler must be provided when fit_scaler=False")
-
-            # Use DataFrame for transform to keep feature name checks consistent
+            
             scaled_array = scaler.transform(tmp)
             logger.info("✅ Applied existing StandardScaler to prediction data")
 
@@ -401,39 +395,10 @@ class MLPDataUtils:
 
         return DataLoader(**loader_kwargs)
     
-    @staticmethod
-    def create_train_val_dataloaders(
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
-        X_val: pd.DataFrame,
-        y_val: pd.Series,
-        batch_size: int = 32,
-        num_workers: int = 0,
-        pin_memory: bool = False
-    ) -> Tuple[DataLoader, DataLoader]:
-        """
-        Create training and validation DataLoaders with performance optimizations.
-        
-        Args:
-            X_train: Training features
-            y_train: Training targets
-            X_val: Validation features
-            y_val: Validation targets
-            batch_size: Batch size for both loaders
-            num_workers: Number of worker processes for data loading
-            pin_memory: Whether to pin memory for faster GPU transfer
-            
-        Returns:
-            Tuple of (train_loader, val_loader)
-        """
-        train_loader = MLPDataUtils.create_dataloader_from_dataframe(
-            X_train, y_train, batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory
-        )
-        val_loader = MLPDataUtils.create_dataloader_from_dataframe(
-            X_val, y_val, batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory
-        )
-        
-        return train_loader, val_loader
+    # NOTE: `create_train_val_dataloaders` removed. Use
+    # `create_dataloader_from_dataframe` directly for each of train/validation
+    # datasets. This was intentionally removed to eliminate a redundant
+    # convenience wrapper and encourage explicit DataLoader creation.
 
 class MLPModelWrapper(nn.Module):
     """

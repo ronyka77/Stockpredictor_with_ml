@@ -1,0 +1,99 @@
+import pytest
+
+from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
+
+
+class FakeCursor:
+    def __init__(self):
+        self.executed = []
+        self._rowcount = 1
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    @property
+    def rowcount(self):
+        return self._rowcount
+
+    def fetchone(self):
+        return None
+
+    def fetchall(self):
+        return []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class FakeConn:
+    def __init__(self):
+        self.cur = FakeCursor()
+        self.commits = 0
+        self.rollbacks = 0
+
+    def cursor(self):
+        return self.cur
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class FakePool:
+    def __init__(self):
+        self.conn = FakeConn()
+
+    def get_connection(self):
+        return self.conn
+
+
+@pytest.mark.unit
+def test_upsert_raw_payload_idempotent(monkeypatch):
+    repo = FundamentalsRepository()
+    # monkeypatch connection pool
+    monkeypatch.setattr(repo, "pool", FakePool())
+
+    payload = {"results": [{"x": 1}], "status": "OK"}
+    repo.upsert_raw_payload(
+        ticker_id=1,
+        period_end="2024-01-01",
+        timeframe="quarter",
+        fiscal_period="Q1",
+        fiscal_year="2024",
+        filing_date="2024-02-15",
+        source="api",
+        payload=payload,
+    )
+
+    # Running again with same payload should hit ON CONFLICT and not error
+    repo.upsert_raw_payload(
+        ticker_id=1,
+        period_end="2024-01-01",
+        timeframe="quarter",
+        fiscal_period="Q1",
+        fiscal_year="2024",
+        filing_date="2024-02-15",
+        source="api",
+        payload=payload,
+    )
+
+    cur = repo.pool.conn.cur
+    # Ensure we executed twice and committed twice
+    assert repo.pool.conn.commits == 2
+    assert len(cur.executed) == 2
+    # Ensure parameters include JSON string for payload
+    _, params = cur.executed[-1]
+    assert isinstance(params["payload"], str)
+
+

@@ -8,7 +8,8 @@ and evaluation capabilities.
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+import ast
 from datetime import datetime
 
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
@@ -16,6 +17,20 @@ from src.utils.logger import get_logger
 from src.utils.mlflow_integration import MLflowIntegration
 
 logger = get_logger(__name__)
+
+
+class DefaultHyperparameterConfig:
+    """Small default hyperparameter config provider used when a model
+    implementation does not provide its own hyperparameter configuration.
+    """
+
+    def get_default_params(self) -> dict:
+        # Conservative defaults that work for lightweight tests
+        return {
+            "n_estimators": 100,
+            "learning_rate": 0.1,
+            "max_depth": 6,
+        }
 
 class BaseModel(ABC):
     """
@@ -49,6 +64,13 @@ class BaseModel(ABC):
             self.threshold_evaluator = threshold_evaluator
         else:
             self.threshold_evaluator = ThresholdEvaluator()
+        
+        # Unified thresholding defaults
+        self.base_threshold = 0.5
+        # Provide a default hyperparameter_config object so gradient-boosting
+        # implementations can call `self.hyperparameter_config.get_default_params()`
+        # without having to instantiate their own config in tests.
+        self.hyperparameter_config = DefaultHyperparameterConfig()
         
         logger.info(f"Initialized {model_name} model")
     
@@ -199,8 +221,28 @@ class BaseModel(ABC):
         params = run_info.data.params
         
         self.model_name = params.get('model_name', 'Unknown')
-        self.config = eval(params.get('config', '{}')) if params.get('config', '{}') != '{}' else {}
-        self.feature_names = eval(params.get('feature_names', '[]')) if params.get('feature_names', '[]') != '[]' else None
+
+        # Secure parsing for config
+        config_str = params.get('config', '{}')
+        try:
+            parsed_config = ast.literal_eval(config_str) if config_str != '{}' else {}
+            self.config = parsed_config if isinstance(parsed_config, dict) else {}
+        except (ValueError, SyntaxError):
+            logger.warning("Failed to parse config from MLflow params; using empty dict")
+            self.config = {}
+
+        # Secure parsing for feature_names
+        feature_names_str = params.get('feature_names', '[]')
+        try:
+            if feature_names_str != '[]':
+                parsed_features = ast.literal_eval(feature_names_str)
+                self.feature_names = parsed_features if isinstance(parsed_features, list) else None
+            else:
+                self.feature_names = None
+        except (ValueError, SyntaxError):
+            logger.warning("Failed to parse feature_names from MLflow params; leaving as None")
+            self.feature_names = None
+
         self.is_trained = params.get('is_trained', 'True') == 'True'
         self.run_id = run_id
         
@@ -259,6 +301,50 @@ class BaseModel(ABC):
                 metrics['threshold_evaluation_error'] = str(e)
         
         return metrics
+    
+    def optimize_prediction_threshold(self, X_test: pd.DataFrame, y_test: pd.Series,
+                                      current_prices_test: np.ndarray,
+                                      confidence_method: str = 'leaf_depth',
+                                      threshold_range: Tuple[float, float] = (0.01, 0.99),
+                                      n_thresholds: int = 90) -> Dict[str, Any]:
+        """
+        Unified wrapper: optimize prediction threshold via central evaluator.
+        """
+        results = self.threshold_evaluator.optimize_prediction_threshold(
+            model=self,
+            X_test=X_test,
+            y_test=y_test,
+            current_prices_test=current_prices_test,
+            confidence_method=confidence_method,
+            threshold_range=threshold_range,
+            n_thresholds=n_thresholds
+        )
+        # Store optimal settings if available
+        if results.get('status') == 'success':
+            self.optimal_threshold = results.get('optimal_threshold')
+            self.confidence_method = results.get('confidence_method', confidence_method)
+        return results
+
+    def predict_with_threshold(self, X: pd.DataFrame,
+                                return_confidence: bool = False,
+                                threshold: Optional[float] = None,
+                                confidence_method: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Unified wrapper: make predictions with confidence-based filtering via central evaluator.
+        """
+        # Defaults: prefer optimal_threshold if available to preserve behavior
+        if threshold is None:
+            threshold = getattr(self, 'optimal_threshold', getattr(self, 'base_threshold', 0.5))
+        if confidence_method is None:
+            confidence_method = getattr(self, 'confidence_method', getattr(self, 'default_confidence_method', 'leaf_depth'))
+        
+        return self.threshold_evaluator.predict_with_threshold(
+            model=self,
+            X=X,
+            threshold=threshold,
+            confidence_method=confidence_method,
+            return_confidence=return_confidence
+        )
     
     def start_mlflow_run(self, experiment_name: Optional[str] = None) -> None:
         """
