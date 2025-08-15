@@ -204,7 +204,8 @@ class FeatureStorage:
             if not file_path.stem.endswith("_metadata"):
                 ticker = file_path.stem
                 tickers.append(ticker)
-                return sorted(tickers)
+        
+        return sorted(tickers)
     
     def get_storage_stats(self) -> Dict[str, Any]:
         """

@@ -3,7 +3,7 @@ News content validator for quality assessment
 """
 
 from typing import Dict, List, Tuple, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.utils.logger import get_polygon_logger
 
@@ -66,12 +66,13 @@ class NewsValidator:
                     pub_date = published_utc
                 
                 # Check if too old (more than 2 years)
-                if pub_date < datetime.now() - timedelta(days=730):
+                now = datetime.now(timezone.utc)
+                if pub_date < now - timedelta(days=730):
                     issues.append("Article too old")
                     quality_score -= 0.1
                 
                 # Check if future date
-                if pub_date > datetime.now():
+                if pub_date > now:
                     issues.append("Future publication date")
                     quality_score -= 0.2
                     
