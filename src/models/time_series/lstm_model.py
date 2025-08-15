@@ -630,8 +630,8 @@ class LSTMPredictor(PyTorchBasePredictor):
     def optimize_prediction_threshold(self, X_test: pd.DataFrame, y_test: pd.Series,
                                     current_prices_test: np.ndarray,
                                     confidence_method: str = 'lstm_hidden',
-                                    threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                    n_thresholds: int = 80) -> Dict[str, Any]:
+                                    threshold_range: Tuple[float, float] = (0.01, 0.99),
+                                    n_thresholds: int = 90) -> Dict[str, Any]:
         """
         Optimize prediction threshold based on confidence scores to maximize profit on test data
         
@@ -839,8 +839,8 @@ class LSTMPredictor(PyTorchBasePredictor):
                     y_test=data_prep['y_test'],
                     current_prices_test=data_prep['current_prices'],
                     confidence_method='lstm_hidden',
-                    threshold_range=(0.1, 0.9),
-                    n_thresholds=80
+                    threshold_range=(0.01, 0.99),
+                    n_thresholds=90
                 )
                 
                 # Use threshold-optimized investment success rate

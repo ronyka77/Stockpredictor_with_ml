@@ -89,13 +89,18 @@ class PolygonDataClient:
                 # Handle different response status codes
                 if response.status_code == 200:
                     self.rate_limiter.handle_successful_request()
-                    data = response.json()
-                    
+                    # Safely parse JSON and convert parsing errors to PolygonAPIError
+                    try:
+                        data = response.json()
+                    except Exception as e:
+                        logger.error(f"Error parsing JSON response from {endpoint}: {e}")
+                        raise PolygonAPIError("Malformed JSON in response", response.status_code)
+
                     # Check for API-level errors in response
                     if data.get('status') == 'ERROR':
                         error_msg = data.get('error', 'Unknown API error')
                         raise PolygonAPIError(f"API Error: {error_msg}", response.status_code, data)
-                    
+
                     logger.info(f"Successful request to {endpoint}")
                     return data
                 

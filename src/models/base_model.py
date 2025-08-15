@@ -305,8 +305,8 @@ class BaseModel(ABC):
     def optimize_prediction_threshold(self, X_test: pd.DataFrame, y_test: pd.Series,
                                       current_prices_test: np.ndarray,
                                       confidence_method: str = 'leaf_depth',
-                                      threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                      n_thresholds: int = 20) -> Dict[str, Any]:
+                                      threshold_range: Tuple[float, float] = (0.01, 0.99),
+                                      n_thresholds: int = 90) -> Dict[str, Any]:
         """
         Unified wrapper: optimize prediction threshold via central evaluator.
         """

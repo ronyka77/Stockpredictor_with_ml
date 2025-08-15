@@ -307,8 +307,8 @@ class ThresholdEvaluator:
                                     X_test: pd.DataFrame, y_test: pd.Series,
                                     current_prices_test: np.ndarray,
                                     confidence_method: str = 'simple',
-                                    threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                    n_thresholds: int = 80) -> Dict[str, Any]:
+                                    threshold_range: Tuple[float, float] = (0.01, 0.99),
+                                    n_thresholds: int = 90) -> Dict[str, Any]:
         """
         Optimize prediction threshold based on confidence scores to maximize investment success rate on test data
         
@@ -429,8 +429,8 @@ class ThresholdEvaluator:
                                         X_test: pd.DataFrame, y_test: pd.Series,
                                         current_prices_test: np.ndarray,
                                         confidence_method: str = 'simple',
-                                        threshold_range: Tuple[float, float] = (0.1, 0.9),
-                                        n_thresholds: int = 80) -> Dict[str, Any]:
+                                        threshold_range: Tuple[float, float] = (0.01, 0.99),
+                                        n_thresholds: int = 90) -> Dict[str, Any]:
         """
         Optimize prediction threshold specifically for LSTM models
         

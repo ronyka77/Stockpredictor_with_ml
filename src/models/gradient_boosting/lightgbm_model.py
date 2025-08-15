@@ -384,8 +384,8 @@ class LightGBMModel(BaseModel):
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method='leaf_depth', 
-                    threshold_range=(0.1, 0.9),
-                    n_thresholds=80  
+                    threshold_range=(0.01, 0.99),
+                    n_thresholds=90  
                 )
                 
                 # Use threshold-optimized investment success rate
