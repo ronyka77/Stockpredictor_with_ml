@@ -164,18 +164,19 @@ def get_polygon_logger(name: str) -> logging.Logger:
 def cleanup_old_logs(days_to_keep: int = 30, min_size_kb: int = 2) -> None:
     """
     Clean up old log files and small log files
-    
+
     Args:
-        utility: Utility name
         days_to_keep: Number of days of logs to keep
+        min_size_kb: Minimum file size in KB to keep
     """
+    logger = get_logger(__name__)
     log_dir = LOGS_BASE_DIR 
     if not log_dir.exists():
         return
-    
+
     cutoff_time = datetime.now().timestamp() - (days_to_keep * 24 * 60 * 60)
     min_size_bytes = min_size_kb * 1024
-    
+
     # Recursively check all subdirectories
     for log_file in log_dir.rglob("*.log"):
         try:
@@ -185,9 +186,7 @@ def cleanup_old_logs(days_to_keep: int = 30, min_size_kb: int = 2) -> None:
                 log_file.unlink()
                 logger.info(f"Deleted log file: {log_file} (size: {file_stat.st_size} bytes)")
         except OSError as e:
-            logger.error(f"Failed to delete {log_file}: {e}")
-
-# Initialize logs directory structure
+            logger.error(f"Failed to delete {log_file}: {e}")# Initialize logs directory structure
 def init_logging_structure():
     """Initialize the logging directory structure"""
     utilities = ['polygon', 'predictor', 'data_collector', 'feature_engineering', 'general']

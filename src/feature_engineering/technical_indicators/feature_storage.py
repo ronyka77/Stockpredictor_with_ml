@@ -138,7 +138,7 @@ class FeatureStorage:
     def load_features(self, ticker: str, start_date: Optional[date] = None, 
                         end_date: Optional[date] = None, 
                         categories: Optional[List[str]] = None,
-                        version: Optional[str] = None) -> Tuple[pd.DataFrame, FeatureMetadata]:
+                        version: Optional[str] = None) -> Tuple[pd.DataFrame, Optional[FeatureMetadata]]:  
         """
         Load features from Parquet file
         
@@ -201,10 +201,10 @@ class FeatureStorage:
         
         tickers = []
         for file_path in version_path.glob("*.parquet"):
-            ticker = file_path.stem
-            tickers.append(ticker)
-        
-        return sorted(tickers)
+            if not file_path.stem.endswith("_metadata"):
+                ticker = file_path.stem
+                tickers.append(ticker)
+                return sorted(tickers)
     
     def get_storage_stats(self) -> Dict[str, Any]:
         """
@@ -410,8 +410,38 @@ class FeatureStorage:
     def _cleanup_old_versions(self, ticker: str):
         """Cleanup old versions of ticker features"""
         try:
-            # This is a simple implementation - in practice you might want
-            # to keep multiple timestamped versions
-            pass
+            # Find all parquet files for the ticker in the current version path
+            pattern = f"{ticker}*.parquet"
+            files = [p for p in self.version_path.glob(pattern) if p.is_file()]
+
+            # Exclude metadata file from deletion list (handled separately)
+            data_files = [p for p in files if not p.stem.endswith("_metadata")]
+
+            # If the number of files is within the limit, nothing to do
+            max_keep = max(1, int(self.config.max_versions))
+            if len(data_files) <= max_keep:
+                return
+
+            # Sort by modification time (newest first)
+            data_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+            # Files to remove are the older ones beyond the keep threshold
+            to_remove = data_files[max_keep:]
+
+            for f in to_remove:
+                try:
+                    # Remove data file
+                    f.unlink()
+                    logger.info(f"Removed old feature file: {f}")
+
+                    # Also attempt to remove corresponding metadata file if present
+                    meta_path = self.version_path / f"{f.stem}_metadata.parquet"
+                    if meta_path.exists():
+                        meta_path.unlink()
+                        logger.info(f"Removed old metadata file: {meta_path}")
+
+                except Exception as ex:
+                    logger.warning(f"Failed to remove old feature file {f}: {ex}")
+
         except Exception as e:
             logger.warning(f"Could not cleanup old versions for {ticker}: {str(e)}")

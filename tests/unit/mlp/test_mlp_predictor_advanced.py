@@ -1,11 +1,7 @@
-import os
-import shutil
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from src.models.evaluation import ThresholdEvaluator
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
 

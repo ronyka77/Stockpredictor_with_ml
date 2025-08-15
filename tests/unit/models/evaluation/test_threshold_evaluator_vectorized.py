@@ -34,12 +34,12 @@ def test_vectorized_profit_calculation_positive_only():
 
 @pytest.mark.unit
 def test_vectorized_threshold_testing_monotonic_mask():
-    n = 100
+    n = 10000
     X = pd.DataFrame({"f": np.arange(n)})
-    y = np.linspace(-0.02, 0.03, n)
+    y = np.linspace(-0.30, 0.50, n)
     preds = y + 0.0
     conf = np.linspace(0.0, 1.0, n)
-    prices = np.full(n, 10.0)
+    prices = np.random.uniform(5.0, 15.0, n)  # Random prices between $5-15
 
     model = DummyModel(predictions=preds, confidence=conf)
     te = ThresholdEvaluator(investment_amount=100.0)
@@ -50,8 +50,8 @@ def test_vectorized_threshold_testing_monotonic_mask():
         y_test=pd.Series(y),
         current_prices_test=prices,
         confidence_method="simple",
-        threshold_range=(0.1, 0.9),
-        n_thresholds=50,
+        threshold_range=(0.01, 0.99),
+        n_thresholds=99,
     )
 
     assert res["status"] == "success"

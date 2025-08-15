@@ -1,6 +1,8 @@
 import pandas as pd
+import json
+import pytest
+from pathlib import Path
 from src.utils.cleaned_data_cache import CleanedDataCache
-
 
 def test_cleaned_data_cache_basic(tmp_path):
     cache = CleanedDataCache(cache_dir=tmp_path)
@@ -8,15 +10,6 @@ def test_cleaned_data_cache_basic(tmp_path):
     cache.set("test_key", df)
     loaded = cache.get("test_key")
     assert loaded.equals(df)
-
-import json
-import pandas as pd
-import numpy as np
-import pytest
-from pathlib import Path
-
-from src.utils.cleaned_data_cache import CleanedDataCache
-
 
 @pytest.mark.unit
 def test_cache_key_and_roundtrip(tmp_path):

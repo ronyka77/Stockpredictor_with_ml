@@ -1,0 +1,110 @@
+import pytest
+from datetime import datetime, timedelta, date
+
+from src.data_collector.polygon_data.data_validator import (
+    OHLCVRecord,
+    DataValidator,
+)
+
+
+def test_ohlcv_record_valid_and_invalid():
+    # valid record should construct and normalize ticker
+    valid = {
+        "ticker": "aapl",
+        "timestamp": "2020-01-02",
+        "open": 100.0,
+        "high": 110.0,
+        "low": 90.0,
+        "close": 105.0,
+        "volume": 1000,
+        "vwap": 102.0,
+    }
+
+    rec = OHLCVRecord(**valid)
+    assert rec.ticker == "AAPL"
+    assert isinstance(rec.timestamp, date)
+
+    # invalid: high lower than low should raise
+    bad = valid.copy()
+    bad.update({"high": 80.0, "low": 90.0})
+    with pytest.raises(ValueError):
+        OHLCVRecord(**bad)
+
+
+def test_vwap_fallback_on_invalid_vwap(caplog):
+    # VWAP <= 0 should trigger fallback calculation (no exception)
+    data = {
+        "ticker": "msft",
+        "timestamp": "2020-01-02",
+        "open": 100.0,
+        "high": 120.0,
+        "low": 90.0,
+        "close": 110.0,
+        "volume": 500,
+        # Provide a VWAP that is unreasonably far from the day's range to trigger fallback
+        "vwap": 1000.0,
+    }
+
+    rec = OHLCVRecord(**data)
+    # fallback uses (high + low + 2*close) / 4 when volume>0 and then rounds
+    expected = round((120.0 + 90.0 + 2 * 110.0) / 4, 4)
+    assert rec.vwap == expected
+
+
+def test_validate_ohlcv_record_polygon_transform_and_ticker_addition():
+    dv = DataValidator(strict_mode=True)
+
+    # Polygon-style payload with milliseconds timestamp and no ticker in payload
+    polygon_record = {"t": 1577923200000, "o": 10, "h": 12, "l": 9, "c": 11, "v": 100}
+    validated = dv.validate_ohlcv_record(polygon_record, ticker="TSLA")
+    assert isinstance(validated, OHLCVRecord)
+    assert validated.ticker == "TSLA"
+    assert isinstance(validated.timestamp, datetime)
+
+
+def test_validate_ohlcv_batch_metrics_and_outliers_and_gaps():
+    dv = DataValidator(strict_mode=False)
+
+    # Build 12 daily records to allow outlier detection (>10 required)
+    base_date = datetime(2020, 1, 1)
+    records = []
+    for i in range(12):
+        # introduce a large gap between day 4 and day 9
+        dt = base_date + timedelta(days=i + (5 if i >= 9 else 0))
+        open_p = 100.0 + i
+        close_p = 100.0 + i
+        # make one day a big jump to trigger price outlier (>20%)
+        if i == 6:
+            close_p = 200.0
+
+        records.append({
+            "ticker": "ABC",
+            "timestamp": dt,
+            "open": open_p,
+            "high": max(open_p, close_p) + 1,
+            "low": min(open_p, close_p) - 1,
+            "close": close_p,
+            "volume": 1000 + i,
+        })
+
+    validated_records, metrics = dv.validate_ohlcv_batch(records, ticker=None)
+    assert metrics.total_records == len(records)
+    assert metrics.valid_records == len(validated_records)
+    # We expect at least one gap (created by the artificial jump in dates)
+    assert len(metrics.data_gaps) >= 1
+    # We expect price outlier detection to have recorded at least one outlier
+    assert len(metrics.outliers) >= 1
+
+
+def test_calculate_batch_vwap():
+    # small sample set
+    recs = [
+        {"high": 10.0, "low": 8.0, "close": 9.0, "volume": 100},
+        {"high": 20.0, "low": 18.0, "close": 19.0, "volume": 200},
+    ]
+
+    vwap = DataValidator.calculate_batch_vwap(recs)
+    # manual calculation: typical prices = 9, 19 => weighted = (9*100 + 19*200) / 300 = (900 + 3800)/300 = 4700/300 = 15.6667
+    assert round(vwap, 4) == round(4700 / 300, 4)
+
+

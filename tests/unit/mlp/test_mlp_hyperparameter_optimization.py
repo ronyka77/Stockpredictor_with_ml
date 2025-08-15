@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 from src.models.evaluation import ThresholdEvaluator
-from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
 
 def create_test_data(n_samples=1000, n_features=20):

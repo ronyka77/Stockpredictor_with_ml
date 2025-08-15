@@ -550,6 +550,58 @@ class MLPPredictor(PyTorchBasePredictor):
             task=task
         )
 
+    def _preprocess_for_prediction(self, X: pd.DataFrame, for_confidence: bool = False) -> torch.FloatTensor:
+        """
+        Centralized preprocessing for prediction and confidence calculation.
+
+        Applies the loaded scaler if present; otherwise falls back to basic
+        preprocessing (fill NaNs, replace infinities, basic normalization).
+
+        Args:
+            X: Input features DataFrame
+            for_confidence: If True, adjust log messages for confidence calc
+
+        Returns:
+            Torch FloatTensor ready to be moved to device for model input.
+        """
+        from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
+
+        try:
+            try:
+                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
+            except Exception as e:
+                logger.warning(f"⚠️ validate_and_clean_data failed: {e} — retrying once")
+                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
+
+            if getattr(self, 'scaler', None) is not None:
+                X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
+                if for_confidence:
+                    logger.info("✅ Applied loaded scaler for confidence calculation preprocessing")
+                else:
+                    logger.info("✅ Applied loaded scaler for prediction preprocessing")
+            else:
+                if for_confidence:
+                    logger.warning("⚠️ No scaler available - using basic preprocessing for confidence")
+                else:
+                    logger.warning("⚠️ No scaler available - using basic preprocessing")
+                X_scaled = cleaned_X.copy()
+                X_scaled = X_scaled.fillna(0)
+                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
+                X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
+
+            X_tensor = torch.FloatTensor(X_scaled.values)
+
+        except Exception as preprocessing_error:
+            if for_confidence:
+                logger.error(f"❌ Error during preprocessing for confidence: {str(preprocessing_error)}")
+                logger.info("🔄 Falling back to basic preprocessing for confidence")
+            else:
+                logger.error(f"❌ Error during preprocessing: {str(preprocessing_error)}")
+                logger.info("🔄 Falling back to basic preprocessing")
+            raise preprocessing_error
+
+        return X_tensor
+
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Make predictions on new data.
@@ -565,35 +617,8 @@ class MLPPredictor(PyTorchBasePredictor):
         
         self.model.eval()
         
-        from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
-
-        try:
-            try:
-                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
-            except Exception as e:
-                logger.warning(f"⚠️ validate_and_clean_data failed: {e} — retrying once")
-                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
-
-            if getattr(self, 'scaler', None) is not None:
-                X_scaled, _ = MLPDataUtils.scale_data(X, self.scaler, False)
-                logger.info("✅ Applied loaded scaler for prediction preprocessing")
-            else:
-                # Fallback to basic preprocessing if no scaler available
-                logger.warning("⚠️ No scaler available - using basic preprocessing")
-                X_scaled = cleaned_X.copy()
-                X_scaled = X_scaled.fillna(0)  
-                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
-
-                # Basic normalization to prevent extreme values
-                X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
-
-            X_tensor = torch.FloatTensor(X_scaled.values)
-
-        except Exception as preprocessing_error:
-            logger.error(f"❌ Error during preprocessing: {str(preprocessing_error)}")
-            logger.info("🔄 Falling back to basic preprocessing")
-            raise preprocessing_error
-        
+        # Centralized preprocessing
+        X_tensor = self._preprocess_for_prediction(X, for_confidence=False)
         X_tensor = X_tensor.to(self.device)
         
         with torch.no_grad():
@@ -635,34 +660,8 @@ class MLPPredictor(PyTorchBasePredictor):
         
         self.model.eval()
         
-        # Use centralized preprocessing with loaded scaler (same as predict method)
-        from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
-        
-        try:
-            # Always clean first
-            cleaned_X = MLPDataUtils.validate_and_clean_data(X)
-
-            # Check if scaler is available (from loaded model)
-            if getattr(self, 'scaler', None) is not None:
-                X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
-                logger.info("✅ Applied loaded scaler for confidence calculation preprocessing")
-            else:
-                # Fallback to basic preprocessing if no scaler available
-                logger.warning("⚠️ No scaler available - using basic preprocessing for confidence")
-                X_scaled = cleaned_X.copy()
-                X_scaled = X_scaled.fillna(0)  
-                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
-
-                # Basic normalization to prevent extreme values
-                X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
-
-            X_tensor = torch.FloatTensor(X_scaled.values)
-
-        except Exception as preprocessing_error:
-            logger.error(f"❌ Error during preprocessing for confidence: {str(preprocessing_error)}")
-            logger.info("🔄 Falling back to basic preprocessing for confidence")
-            raise preprocessing_error
-        
+        # Centralized preprocessing for confidence calculation
+        X_tensor = self._preprocess_for_prediction(X, for_confidence=True)
         X_tensor = X_tensor.to(self.device)
         
         with torch.no_grad():

@@ -217,8 +217,7 @@ class OHLCVRecord(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage"""
-        data = self.dict()
-        
+        data = self.model_dump()        
         # Convert timestamp to date for database storage
         if isinstance(data['timestamp'], datetime):
             data['date'] = data['timestamp'].date()

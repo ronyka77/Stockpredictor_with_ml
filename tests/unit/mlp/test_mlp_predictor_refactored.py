@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 import torch
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor

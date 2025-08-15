@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from tests._fixtures.frozen_time import freeze_time
@@ -7,7 +6,7 @@ from src.data_collector.polygon_data.rate_limiter import RateLimiter, AdaptiveRa
 
 @pytest.mark.unit
 def test_rate_limiter_sliding_window(monkeypatch):
-    with freeze_time(monkeypatch, start=0.0) as clock:
+    with freeze_time(monkeypatch, start=0.0):
         rl = RateLimiter(requests_per_minute=3)
 
         # First 3 requests should not sleep and consume quota

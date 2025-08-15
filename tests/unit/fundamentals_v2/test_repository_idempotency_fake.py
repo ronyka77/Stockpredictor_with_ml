@@ -1,4 +1,3 @@
-import json
 import pytest
 
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository

@@ -320,7 +320,7 @@ class FundamentalDataResponse(BaseModel):
         for stmt_type, field_list in essential_fields.items():
             stmt_list = getattr(self, stmt_type, [])
             for stmt in stmt_list:
-                stmt_dict = stmt.dict()
+                stmt_dict = stmt.model_dump()                
                 for field_name in field_list:
                     total_essential_fields += 1
                     value = stmt_dict.get(field_name)
