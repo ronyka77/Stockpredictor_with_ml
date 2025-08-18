@@ -7,7 +7,7 @@ confidence: 94/100
 ---
 
 Module summary
-- The `mlp` module contains model architecture, data utilities, optimization, and predictor wrappers for MLP time-series models. Key files: `src/models/time_series/mlp/mlp_architecture.py`, `mlp_predictor.py`, `mlp_optimization.py`.
+- The `mlp` module contains model architecture, data utilities, optimization, and predictor wrappers for MLP time-series models. Key files: `src/models/time_series/mlp/mlp_architecture.py`, `src/models/time_series/mlp/mlp_optimization.py`, `src/models/predictors/mlp_predictor.py` (core predictor: `src/models/time_series/mlp/mlp_predictor.py`).
 
 Purpose of tests
 - Ensure correctness of architecture shapes and activations, scaler usage and data cleaning, predictor training loop, prediction outputs, and hyperparameter optimization objective behavior.

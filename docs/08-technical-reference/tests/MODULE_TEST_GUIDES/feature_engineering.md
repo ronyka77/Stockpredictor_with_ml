@@ -33,8 +33,8 @@ Property-based testing recommendation
 - Add Hypothesis tests for indicator functions to fuzz input series shapes and NaN placements.
 
 Priority & estimates (doc-only)
-- High: consolidate naming conventions and add traceability references to test functions (0.5 day).
-- Medium: add Hypothesis examples for `calculate_rsi` and `calculate_sma` (0.5 day).
+- High: consolidate naming conventions and add traceability references to test functions (0.5 days).
+- Medium: add Hypothesis examples for `calculate_rsi` and `calculate_sma` (0.5 days).
 
 How to run
 - Unit tests: `uv run pytest tests/unit/feature_engineering -q -m unit`
