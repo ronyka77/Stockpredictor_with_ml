@@ -295,7 +295,7 @@ if __name__ == "__main__":
     extractor = FundamentalsExtractor()
     extractor.repo.ensure_schema()
     result = extractor.extract_pending_from_db()
-    print(
+    logger.info(
         json.dumps(
             {
                 "status": "ok",

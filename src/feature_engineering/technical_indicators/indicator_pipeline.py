@@ -579,7 +579,7 @@ def run_production_batch():
         results = processor.process_batch(selected_tickers, job_config)
         processing_time = time.time() - start_time
         
-        # Print results
+        # log results
         logger.info("🎉 Batch Processing Completed!")
         logger.info(f"   Total tickers: {results['total_tickers']}")
         logger.info(f"   Successful: {results['successful']}")

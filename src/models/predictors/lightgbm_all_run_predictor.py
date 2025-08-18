@@ -13,6 +13,9 @@ from mlflow.tracking import MlflowClient
 
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.predictors.base_predictor import BasePredictor
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class LightGBMPredictor(BasePredictor):
@@ -23,8 +26,8 @@ class LightGBMPredictor(BasePredictor):
 
     def load_model_from_mlflow(self) -> None:
         self.model = LightGBMModel.load_from_mlflow(self.run_id)
-        print(f"✅ LightGBM model loaded: {self.model.model_name}")
-        print(
+        logger.info(f"✅ LightGBM model loaded: {self.model.model_name}")
+        logger.info(
             f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
@@ -37,14 +40,14 @@ def get_active_run_ids_for_experiment(experiment_name: str) -> List[str]:
 
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
-        print(f"⚠️ Experiment not found: {experiment_name}")
+        logger.warning(f"⚠️ Experiment not found: {experiment_name}")
         return []
 
     runs = client.search_runs(
         [exp.experiment_id], run_view_type=mlflow.entities.ViewType.ACTIVE_ONLY
     )
     run_ids = [r.info.run_id for r in runs]
-    print(f"🔎 Found {len(run_ids)} active runs in experiment '{experiment_name}'")
+    logger.info(f"🔎 Found {len(run_ids)} active runs in experiment '{experiment_name}'")
     return run_ids
 
 
@@ -63,28 +66,28 @@ def run_all_and_export_best(
     best_tuple: Optional[Tuple[str, float, Tuple]] = None  # (run_id, avg_profit, cached_data)
 
     for run_id in run_ids:
-        print("=" * 80)
-        print(f"▶️ Evaluating run: {run_id}")
+        logger.info("=" * 80)
+        logger.info(f"▶️ Evaluating run: {run_id}")
         predictor = LightGBMPredictor(run_id=run_id)
         try:
             results_df, avg_profit, features_df, metadata_df, predictions = predictor.evaluate_on_recent_data(
                 days_back=days_back
             )
         except Exception as e:
-            print(f"   ❌ Skipping run due to error: {e}")
+            logger.warning(f"   ❌ Skipping run due to error: {e}")
             continue
 
         if best_tuple is None or (avg_profit is not None and avg_profit > best_tuple[1]):
             best_tuple = (run_id, avg_profit, (features_df, metadata_df, predictions))
-            print(f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
+            logger.info(f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
 
     if best_tuple is None:
-        print("No valid runs produced predictions.")
+        logger.warning("No valid runs produced predictions.")
         return None
 
     best_run_id, best_avg_profit, cached = best_tuple
-    print("=" * 80)
-    print(f"🏁 Best run: {best_run_id} with avg profit ${best_avg_profit:.2f}")
+    logger.info("=" * 80)
+    logger.info(f"🏁 Best run: {best_run_id} with avg profit ${best_avg_profit:.2f}")
 
     # Export only the best run's predictions using the cached results
     best_predictor = LightGBMPredictor(run_id=best_run_id)
@@ -92,7 +95,7 @@ def run_all_and_export_best(
     best_predictor._load_metadata_from_mlflow()
     features_df, metadata_df, predictions = cached
     output_file = best_predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
-    print(f"📄 Exported best predictions to: {output_file}")
+    logger.info(f"📄 Exported best predictions to: {output_file}")
 
     return best_run_id, best_avg_profit, output_file
 
@@ -103,10 +106,10 @@ def main():
     days_back = 30
     result = run_all_and_export_best(experiment_name=experiment_name, days_back=days_back)
     if result is None:
-        print("No predictions were exported.")
+        logger.warning("No predictions were exported.")
     else:
         best_run_id, best_avg_profit, output_file = result
-        print(
+        logger.info(
             f"Best run {best_run_id} exported with avg profit ${best_avg_profit:.2f} -> {output_file}"
         )
 

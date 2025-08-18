@@ -10,6 +10,9 @@ from torch.utils.data import Dataset
 import numpy as np
 import pandas as pd
 from typing import Tuple
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 class TimeSeriesDataset(Dataset):
     """
@@ -40,7 +43,7 @@ class TimeSeriesDataset(Dataset):
         # Log memory usage for debugging
         features_mb = self.features.nbytes / (1024 * 1024)
         targets_mb = self.targets.nbytes / (1024 * 1024)
-        print(f"📊 TimeSeriesDataset memory: Features={features_mb:.1f}MB, Targets={targets_mb:.1f}MB")
+        logger.info(f"📊 TimeSeriesDataset memory: Features={features_mb:.1f}MB, Targets={targets_mb:.1f}MB")
 
     def __len__(self) -> int:
         """

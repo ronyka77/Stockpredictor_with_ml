@@ -15,6 +15,9 @@ from abc import ABC, abstractmethod
 from src.data_utils.target_engineering import convert_percentage_predictions_to_prices
 from src.feature_engineering.data_loader import StockDataLoader
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class BasePredictor(ABC):
@@ -25,7 +28,6 @@ class BasePredictor(ABC):
     def __init__(self, run_id: str, model_type: str):
         """
         Initialize the predictor.
-
         Args:
             run_id: MLflow run ID to load the model from.
             model_type: The type of the model (e.g., 'lightgbm', 'xgboost').
@@ -61,28 +63,28 @@ class BasePredictor(ABC):
         if 'final_optimal_threshold' in run_metrics:
             self.optimal_threshold = float(run_metrics['final_optimal_threshold'])
 
-        print(f"✅ Model metadata loaded for run: {self.run_id}")
-        print(f"   Prediction horizon: {self.prediction_horizon}")
+        logger.info(f"✅ Model metadata loaded for run: {self.run_id}")
+        logger.info(f"   Prediction horizon: {self.prediction_horizon}")
         if self.optimal_threshold:
-            print(f"   Optimal threshold: {self.optimal_threshold:.3f}")
+            logger.info(f"   Optimal threshold: {self.optimal_threshold:.3f}")
 
     def load_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Load the most recent data for making predictions.
         """
-        print(f"📊 Loading recent data (last {days_back} days)...")
+        logger.info(f"📊 Loading recent data (last {days_back} days)...")
         data_result = prepare_ml_data_for_prediction_with_cleaning(
             prediction_horizon=self.prediction_horizon,
             days_back=days_back,
         )
-        print(f"   Data shape after cleaning: {data_result['X_test'].shape}")
+        logger.info(f"   Data shape after cleaning: {data_result['X_test'].shape}")
 
         recent_features = data_result['X_test'].copy()
         recent_targets = data_result['y_test'].copy()
 
         if 'ticker_id' in recent_features.columns:
             unique_tickers = recent_features['ticker_id'].nunique()
-            print(f"   Unique tickers: {unique_tickers}")
+            logger.info(f"   Unique tickers: {unique_tickers}")
 
         if self.model and hasattr(self.model, 'feature_names') and self.model.feature_names:
             model_features = set(self.model.feature_names)
@@ -90,7 +92,7 @@ class BasePredictor(ABC):
 
             missing_in_data = model_features - data_features
             if missing_in_data:
-                print(f"   ⚠️  Missing features ({len(missing_in_data)}): Filling with 0.0")
+                logger.warning(f"   ⚠️  Missing features ({len(missing_in_data)}): Filling with 0.0")
                 for feature in missing_in_data:
                     recent_features[feature] = 0.0
 
@@ -107,33 +109,33 @@ class BasePredictor(ABC):
         """
         Validate that features show diversity across tickers.
         """
-        print("🔍 Validating feature diversity...")
+        logger.info("🔍 Validating feature diversity...")
         numeric_cols = features_df.select_dtypes(include=[np.number]).columns
         numeric_cols = [col for col in numeric_cols if col not in ['ticker_id', 'date_int']]
 
         if not numeric_cols:
-            print("   ⚠️  No numeric features to validate.")
+            logger.warning("   ⚠️  No numeric features to validate.")
             return
 
         for feature in numeric_cols[:5]:
             stats = features_df[feature].describe()
-            print(f"   {feature}: unique={stats['count']>0}, mean={stats['mean']:.3f}, std={stats['std']:.3f}")
+            logger.info(f"   {feature}: unique={stats['count']>0}, mean={stats['mean']:.3f}, std={stats['std']:.3f}")
 
     def _validate_model_compatibility(self, features_df: pd.DataFrame) -> None:
         """
         Validate that features are compatible with the loaded model.
         """
         if not self.model or not hasattr(self.model, 'feature_names') or not self.model.feature_names:
-            print("   ⚠️  No model feature names available for validation.")
+            logger.warning("   ⚠️  No model feature names available for validation.")
             return
 
-        print("🔗 Validating model compatibility...")
+        logger.info("🔗 Validating model compatibility...")
         model_features = set(self.model.feature_names)
         data_features = set(features_df.columns)
         missing_in_data = model_features - data_features
 
         if missing_in_data:
-            print(f"   🚨 WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality.")
+            logger.warning(f"   🚨 WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality.")
 
     def make_predictions(self, features_df: pd.DataFrame) -> np.ndarray:
         """
@@ -142,13 +144,13 @@ class BasePredictor(ABC):
         if self.model is None:
             raise RuntimeError("Model not loaded. Call load_model_from_mlflow() first.")
 
-        print("🔮 Making predictions...")
+        logger.info("🔮 Making predictions...")
         prediction_features = features_df.copy()
         if self.model.feature_names:
             prediction_features = prediction_features[self.model.feature_names]
 
         predictions = self.model.predict(prediction_features)
-        print(f"   Predictions generated: {len(predictions)}")
+        logger.info(f"   Predictions generated: {len(predictions)}")
         return predictions
 
     def get_confidence_scores(self, features_df: pd.DataFrame) -> np.ndarray:
@@ -193,7 +195,7 @@ class BasePredictor(ABC):
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, file_name)
         
-        print(f"💾 Saving predictions to: {output_path}")
+        logger.info(f"💾 Saving predictions to: {output_path}")
 
         results_df, avg_profit_per_investment = self._build_results_dataframe_and_profit(
             features_df=features_df,
@@ -202,7 +204,7 @@ class BasePredictor(ABC):
         )
 
         results_df.to_excel(output_path, index=False)
-        print(f"   Saved {len(results_df)} predictions.")
+        logger.info(f"   Saved {len(results_df)} predictions.")
         return output_path
 
     def _build_results_dataframe_and_profit(
@@ -236,7 +238,7 @@ class BasePredictor(ABC):
                 results_df['company_name'] = results_df['ticker_id'].map(name_map).fillna('Unknown')
             data_loader.close()
         except Exception as e:
-            print(f"   Could not fetch ticker metadata: {e}")
+            logger.warning(f"   Could not fetch ticker metadata: {e}")
             results_df['ticker'] = results_df['ticker_id']
             results_df['company_name'] = 'Unknown'
 
@@ -259,14 +261,14 @@ class BasePredictor(ABC):
             original_count = len(results_df)
             results_df = results_df[results_df['passes_threshold']].copy()
             threshold_filtered_count = len(results_df)
-            print(
+            logger.info(
                 f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count/original_count:.1%} kept)"
             )
 
             if threshold_filtered_count == 0:
-                print("   ⚠️  WARNING: No predictions passed the threshold!")
+                logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
             else:
-                print("   🏆 Applying top 10 filtering by predicted_return per date...")
+                logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
                 results_df = (
                     results_df
                     .sort_values(['date', 'predicted_return'], ascending=[True, False])
@@ -276,8 +278,8 @@ class BasePredictor(ABC):
                 )
                 top_10_count = len(results_df)
                 date_counts = results_df['date'].value_counts()
-                print(f"   📈 Top 10 final count: {top_10_count}")
-                print(f"   📅 Dates with predictions: {len(date_counts)}")
+                logger.info(f"   📈 Top 10 final count: {top_10_count}")
+                logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df['actual_return'].notna()
@@ -312,7 +314,7 @@ class BasePredictor(ABC):
             float(valid_profit_df['profit_100_investment'].mean()) if not valid_profit_df.empty else float('nan')
         )
         valid_profit_count = valid_profit_df.shape[0]
-        print(
+        logger.info(
             f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
         )
 
@@ -329,7 +331,7 @@ class BasePredictor(ABC):
         - metadata_df
         - predictions
         """
-        print(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
+        logger.info(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
         self.load_model_from_mlflow()
         self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
@@ -343,11 +345,11 @@ class BasePredictor(ABC):
         """
         Run the complete prediction pipeline.
         """
-        print(f"🚀 Starting {self.model_type.upper()} prediction pipeline...")
+        logger.info(f"🚀 Starting {self.model_type.upper()} prediction pipeline...")
         self.load_model_from_mlflow()
         self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
         output_file = self.save_predictions_to_excel(features_df, metadata_df, predictions)
-        print("✅ Prediction pipeline completed!")
+        logger.info("✅ Prediction pipeline completed!")
         return output_file 

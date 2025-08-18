@@ -6,6 +6,10 @@ on the most recent data, saving results to Excel files.
 """
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.predictors.base_predictor import BasePredictor
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class LightGBMPredictor(BasePredictor):
     """
@@ -26,19 +30,19 @@ class LightGBMPredictor(BasePredictor):
         Load the LightGBM model from MLflow using the specified run ID
         """
         self.model = LightGBMModel.load_from_mlflow(self.run_id)
-        print(f"✅ LightGBM model loaded: {self.model.model_name}")
-        print(f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}")
+        logger.info(f"✅ LightGBM model loaded: {self.model.model_name}")
+        logger.info(f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}")
 
 
 def main():
     """
     Main function for standalone prediction
     """
-    run_id = "6b2eaa2a2a404e558d2812638d70c40e"
+    run_id = "33fd8b3b4f8a43d49ff2644f635221c0"
     days_back = 30
     predictor = LightGBMPredictor(run_id=run_id)
     output_file = predictor.run_prediction_pipeline(days_back=days_back)
-    print(f"Predictions saved to: {output_file}")
+    logger.info(f"Predictions saved to: {output_file}")
 
 if __name__ == "__main__":
     main() 

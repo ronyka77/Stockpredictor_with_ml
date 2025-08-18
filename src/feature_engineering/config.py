@@ -9,6 +9,9 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 import dotenv
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 dotenv.load_dotenv()
 
@@ -500,16 +503,16 @@ def validate_configuration() -> None:
 def print_config_summary() -> None:
     """Print a summary of the current configuration"""
     summary = config.get_config_summary()
-    print("Feature Engineering Configuration Summary:")
-    print("=" * 50)
+    logger.info("Feature Engineering Configuration Summary:")
+    logger.info("=" * 50)
     for key, value in summary.items():
-        print(f"{key.replace('_', ' ').title()}: {value}")
+        logger.info(f"{key.replace('_', ' ').title()}: {value}")
 
 if __name__ == "__main__":
     # Validate configuration when run directly
     try:
         validate_configuration()
-        print("✅ Configuration validation passed")
+        logger.info("✅ Configuration validation passed")
         print_config_summary()
     except ValueError as e:
-        print(f"❌ Configuration validation failed: {e}")
+        logger.info(f"❌ Configuration validation failed: {e}")
