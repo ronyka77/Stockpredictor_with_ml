@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
 from src.utils.logger import get_polygon_logger
-from src.data_collector.config import config
 
 Base = declarative_base()
 logger = get_polygon_logger(__name__)

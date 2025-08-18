@@ -1,6 +1,4 @@
 import logging
-import tempfile
-from pathlib import Path
 
 from src.utils import logger as logger_mod
 

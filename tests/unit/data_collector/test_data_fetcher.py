@@ -88,10 +88,7 @@ def test_get_bulk_historical_data_batches(mock_http_client):
         # Each returned list may contain OHLCVRecord objects after validation, or be empty depending on validator
         assert isinstance(metrics, DataQualityMetrics)
 
-import pytest
-from datetime import date
 
-from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
 
 
 def test_get_historical_data_no_data(mock_http_client):

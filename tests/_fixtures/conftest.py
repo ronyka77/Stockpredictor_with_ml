@@ -1,5 +1,4 @@
 import pytest
-from types import SimpleNamespace
 
 
 @pytest.fixture
