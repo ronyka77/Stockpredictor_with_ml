@@ -61,11 +61,6 @@ class RateLimiter:
         self.last_request_time = current_time
         
         logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
-        
-        # NOTE: removed proactive same-call cooldown to match conventional sliding-window
-        # semantics: if the caller fills the quota, the next caller will observe the
-        # rate limit and sleep/reset there. This keeps the request_count stable for
-        # the call that consumed the final quota and avoids unexpected resets.
     
     def get_remaining_requests(self) -> int:
         """Get number of remaining requests in current window"""

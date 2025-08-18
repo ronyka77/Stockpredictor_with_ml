@@ -145,6 +145,17 @@ class PolygonNewsStorage:
                 self.logger.warning(f"Invalid published_utc: {article_data['published_utc']}")
                 return None
             
+            import json
+
+            # Ensure keywords are a Python list when inserting into Postgres text[]
+            keywords_val = article_data.get('keywords', [])
+            if isinstance(keywords_val, str):
+                try:
+                    keywords_val = json.loads(keywords_val)
+                except Exception:
+                    # Fallback: wrap single string in list
+                    keywords_val = [keywords_val]
+
             # Create article
             article = PolygonNewsArticle(
                 polygon_id=article_data['polygon_id'],
@@ -159,7 +170,7 @@ class PolygonNewsStorage:
                 publisher_homepage_url=article_data.get('publisher_homepage_url'),
                 publisher_logo_url=article_data.get('publisher_logo_url'),
                 publisher_favicon_url=article_data.get('publisher_favicon_url'),
-                keywords=article_data.get('keywords', []),
+                keywords=keywords_val,
                 quality_score=article_data.get('quality_score'),
                 relevance_score=article_data.get('relevance_score')
             )

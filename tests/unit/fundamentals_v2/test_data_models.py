@@ -36,8 +36,8 @@ def test_safe_divide_and_growth_and_cagr():
 def test_financial_statement_date_parsing_and_company_details():
     # Create statements with string dates to ensure field_validator parses them
     inc = dm.IncomeStatement(start_date="2020-01-01", filing_date="2021-03-01", fiscal_period="Q1")
-    bal = dm.BalanceSheet(filing_date="2020-12-31", fiscal_period="FY")
-    cf = dm.CashFlowStatement(filing_date="2021-06-30", fiscal_period="Q2")
+    dm.BalanceSheet(filing_date="2020-12-31", fiscal_period="FY")
+    dm.CashFlowStatement(filing_date="2021-06-30", fiscal_period="Q2")
 
     assert isinstance(inc.start_date, date)
     assert isinstance(inc.filing_date, date)

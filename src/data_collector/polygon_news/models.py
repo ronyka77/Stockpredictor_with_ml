@@ -4,12 +4,8 @@ Optimized for Polygon.io News API response structure with 2-year data retention
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
-try:
-    # Prefer JSON for cross-dialect compatibility in tests (SQLite)
-    from sqlalchemy import JSON
-    _JSON_TYPE = JSON
-except Exception:
-    _JSON_TYPE = Text
+from src.data_collector.config import config
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.sql import func
@@ -17,7 +13,6 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
 from src.utils.logger import get_polygon_logger
-from src.data_collector.config import config
 
 Base = declarative_base()
 logger = get_polygon_logger(__name__)
@@ -48,8 +43,8 @@ class PolygonNewsArticle(Base):
     publisher_favicon_url = Column(String(500))
     
     # Content metadata
-    # Use JSON for keywords to support SQLite in tests while remaining compatible with Postgres
-    keywords = Column(_JSON_TYPE)
+    # Use Postgres text[] for keywords
+    keywords = Column(ARRAY(Text))
     
     # Processing metadata
     created_at = Column(DateTime(timezone=True), default=func.now())

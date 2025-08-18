@@ -290,7 +290,6 @@ class VolatilityIndicatorCalculator(BaseIndicator):
             IndicatorResult containing all volatility indicators
         """
         start_time = time.time()
-        # logger.info("Calculating all volatility indicators")
         
         try:
             # Calculate individual indicators
@@ -325,7 +324,6 @@ class VolatilityIndicatorCalculator(BaseIndicator):
             }
             
             calculation_time = time.time() - start_time
-            # logger.info(f"Calculated {len(combined_data.columns)} volatility features in {calculation_time:.2f}s")
             
             return create_indicator_result(
                 data=combined_data,

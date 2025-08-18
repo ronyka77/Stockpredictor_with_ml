@@ -39,8 +39,6 @@ class FeatureCalculator:
         """
         self.config = fe_config or config
         self.validator = IndicatorValidator()
-        
-        logger.info("Initialized FeatureCalculator")
     
     def calculate_all_features(self, data: pd.DataFrame, 
                                 include_categories: Optional[List[str]] = None) -> IndicatorResult:
@@ -90,13 +88,11 @@ class FeatureCalculator:
                     combined_data = pd.concat([combined_data, momentum_result.data], axis=1)
                     calculated_components.append('momentum')
                     all_warnings.extend(momentum_result.warnings)
-                    # logger.info(f"Added {len(momentum_result.data.columns)} momentum features")
                 else:
                     logger.warning("Momentum indicators failed validation")
             
             # Calculate volatility indicators
             if 'volatility' in include_categories:
-                # logger.info("Calculating volatility indicators...")
                 volatility_calc = VolatilityIndicatorCalculator(data)
                 volatility_result = volatility_calc.calculate()
                 
@@ -104,13 +100,11 @@ class FeatureCalculator:
                     combined_data = pd.concat([combined_data, volatility_result.data], axis=1)
                     calculated_components.append('volatility')
                     all_warnings.extend(volatility_result.warnings)
-                    # logger.info(f"Added {len(volatility_result.data.columns)} volatility features")
                 else:
                     logger.warning("Volatility indicators failed validation")
             
             # Calculate volume indicators
             if 'volume' in include_categories:
-                # logger.info("Calculating volume indicators...")
                 volume_calc = VolumeIndicatorCalculator(data)
                 volume_result = volume_calc.calculate()
                 
@@ -118,7 +112,6 @@ class FeatureCalculator:
                     combined_data = pd.concat([combined_data, volume_result.data], axis=1)
                     calculated_components.append('volume')
                     all_warnings.extend(volume_result.warnings)
-                    # logger.info(f"Added {len(volume_result.data.columns)} volume features")
                 else:
                     logger.warning("Volume indicators failed validation")
             
@@ -152,9 +145,6 @@ class FeatureCalculator:
             }
             
             calculation_time = time.time() - start_time
-            
-            # logger.info(f"Feature calculation completed in {calculation_time:.2f} seconds")
-            # logger.info(f"Generated {len(combined_data.columns)} total features")
             
             return IndicatorResult(
                 data=combined_data,

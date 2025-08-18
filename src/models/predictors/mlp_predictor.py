@@ -4,6 +4,7 @@ MLP Model Predictor
 This module loads trained MLP models from MLflow and makes predictions
 on the most recent data, saving results to Excel files.
 """
+import pandas as pd
 from src.models.time_series.mlp.mlp_main import MLPPredictorWithMLflow
 from src.models.predictors.base_predictor import BasePredictor
 
@@ -12,16 +13,14 @@ class MLPPredictorWrapper(BasePredictor):
     MLP Model Predictor for loading models from MLflow and making predictions
     """
     
-    def __init__(self, run_id: str, model_id: str = None):
+    def __init__(self, run_id: str):
         """
-        Initialize the predictor with a specific MLflow run ID and optional model ID
+        Initialize the predictor with a specific MLflow run ID
         
         Args:
             run_id: MLflow run ID to load the model from
-            model_id: Optional model ID for specific model loading
         """
         super().__init__(run_id=run_id, model_type='mlp')
-        self.model_id = model_id
     
     def load_model_from_mlflow(self) -> None:
         """
@@ -33,8 +32,8 @@ class MLPPredictorWrapper(BasePredictor):
             config={'input_size': 0}  # Will be updated from MLflow
         )
         
-        # Load the model from MLflow
-        success = self.model.load_model(self.run_id, model_id=self.model_id)
+        # Load the model from MLflow using only the run_id (runs URI)
+        success = self.model.load_model(self.run_id)
         
         if not success:
             raise RuntimeError(f"Failed to load MLP model from MLflow run {self.run_id}")
@@ -55,6 +54,18 @@ class MLPPredictorWrapper(BasePredictor):
         
         # Log single instance architecture confirmation
         print("   🔄 Single Instance Architecture: Using one MLPPredictorWithMLflow for prediction pipeline")
+
+    def _reorder_features_for_inference(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Ensure incoming features strictly match the saved feature_names order.
+        """
+        if not hasattr(self.model, 'feature_names') or not self.model.feature_names:
+            return features_df
+        missing = [c for c in self.model.feature_names if c not in features_df.columns]
+        if missing:
+            raise ValueError(f"Missing required feature columns for inference: {missing}")
+        # Strict order and dtype
+        return features_df.loc[:, self.model.feature_names].astype('float32')
     
     def get_prediction_with_confidence(self, features_df, confidence_method='variance'):
         """
@@ -70,9 +81,10 @@ class MLPPredictorWrapper(BasePredictor):
         if not hasattr(self, 'model') or self.model is None:
             raise RuntimeError("Model not loaded. Call load_model_from_mlflow() first.")
         
-        # Use the single instance's prediction and confidence methods
-        predictions = self.model.predict(features_df)
-        confidence_scores = self.model.get_prediction_confidence(features_df, method=confidence_method)
+        # Ensure strict feature ordering before prediction
+        ordered_df = self._reorder_features_for_inference(features_df)
+        predictions = self.model.predict(ordered_df)
+        confidence_scores = self.model.get_prediction_confidence(ordered_df, method=confidence_method)
         
         return predictions, confidence_scores
 
@@ -81,12 +93,11 @@ def main():
     """
     Main function for standalone prediction using single instance architecture
     """
-    run_id = "3a87c619aa084205bd2da881fdc2b829"
-    model_id = "m-0615885e3e8a4956a2128d4b83c9172e"
+    run_id = "8e15163ddba44c07aeec60973c326cf5"
     days_back = 30
     
     # Create predictor with single instance architecture
-    predictor = MLPPredictorWrapper(run_id=run_id, model_id=model_id)
+    predictor = MLPPredictorWrapper(run_id=run_id)
     
     # Load model and display information
     predictor.load_model_from_mlflow()

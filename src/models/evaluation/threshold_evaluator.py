@@ -189,7 +189,7 @@ class ThresholdEvaluator:
         best_idx = results_df['test_profit_per_investment'].idxmax()
         best_result = results_df.loc[best_idx]
         
-        logger.info("🎯 Threshold Optimization Results (Test Data Only - Optimized for Profit Per Investment):")
+        logger.info("🎯 Threshold Optimization Results (Optimized for Profit Per Investment):")
         logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
         logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})")
         logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
@@ -405,7 +405,7 @@ class ThresholdEvaluator:
         best_idx = results_df['test_profit_per_investment'].idxmax()
         best_result = results_df.loc[best_idx]
         
-        logger.info("🎯 Threshold Optimization Results (Test Data Only - Optimized for Profit Per Investment):")
+        logger.info("🎯 Threshold Optimization Results (Optimized for Profit Per Investment):")
         logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
         logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})")
         logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
