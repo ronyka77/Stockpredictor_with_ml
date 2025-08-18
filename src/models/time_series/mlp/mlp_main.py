@@ -15,6 +15,8 @@ import pickle
 import os
 from datetime import datetime
 from typing import Dict, Any
+import numpy as np  # noqa: F401 (used in smoke test via alias)
+from sklearn.preprocessing import StandardScaler  # noqa: F401 (used in smoke test via alias)
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 from src.utils.logger import get_logger
@@ -191,7 +193,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                         with open(scaler_path, 'wb') as f:
                             pickle.dump(scaler, f)
                         
-                        mlflow.log_artifact(scaler_path, artifact_path="scaler")
+                        mlflow.log_artifact(scaler_path, artifact_path="preprocessor")
                         
                         # Clean up temp files
                         os.unlink(scaler_path)
@@ -211,65 +213,56 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                             logger.info(f"Converting integer column '{col}' to float64 for signature")
                             input_example[col] = input_example[col].astype("float64")
                 
-                # Create wrapper for MLflow compatibility
-                wrapper = MLPWrapper(self)
-                
-                # Infer signature using the wrapper's predict method
+                # Infer signature using direct model inference on CPU to avoid device issues
                 try:
-                    predictions_example = wrapper.predict(input_example)
-                    logger.info("✅ Signature generated using wrapper predict method")
-                    
-                except Exception as predict_error:
-                    logger.warning(f"⚠️ Could not use wrapper predict method for signature: {str(predict_error)}")
-                    logger.info("🔄 Falling back to direct model inference for signature generation")
-                    
-                    # Fallback to direct model inference
-                    wrapper.eval()
+                    self.model.eval()
+                    try:
+                        original_device = next(self.model.parameters()).device
+                    except Exception:
+                        original_device = torch.device('cpu')
+                    self.model.to(torch.device('cpu'))
                     with torch.no_grad():
-                        input_tensor = torch.FloatTensor(input_example.values)
-                        device = next(wrapper.parameters()).device
-                        input_tensor = input_tensor.to(device)
-                        
-                        if input_tensor.device != device:
-                            logger.warning(f"⚠️ Device mismatch detected: input_tensor on {input_tensor.device}, model on {device}")
-                            input_tensor = input_tensor.to(device)
-                        
-                        predictions_example = wrapper(input_tensor).cpu().numpy()
-                
-                signature = mlflow.models.infer_signature(input_example, predictions_example)
-                
-                # Log the wrapper instead of the predictor
+                        input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32)
+                        predictions_example = self.model(input_tensor).cpu().numpy()
+                    signature = mlflow.models.infer_signature(input_example, predictions_example)
+                finally:
+                    try:
+                        if original_device is not None:
+                            self.model.to(original_device)
+                    except Exception:
+                        pass
+
+                # Persist feature names explicitly for robust loading
                 try:
+                    feature_names = list(X_eval.columns)
+                    mlflow.log_dict({"feature_names": feature_names}, "preprocessor/feature_names.json")
+                    logger.info("✅ Feature names saved to MLflow artifacts (preprocessor/feature_names.json)")
+                except Exception as fn_err:
+                    logger.warning(f"⚠️ Could not save feature names: {str(fn_err)}")
+
+                # Log the raw PyTorch model at a stable artifact path
+                try:
+                    try:
+                        original_device = next(self.model.parameters()).device
+                    except Exception:
+                        original_device = torch.device('cpu')
+                    self.model.to(torch.device('cpu'))
                     mlflow.pytorch.log_model(
-                        pytorch_model=wrapper,
-                        name="model",
+                        pytorch_model=self.model,
+                        artifact_path="model",
                         signature=signature,
+                        input_example=input_example,
                     )
-                    logger.info("✅ MLP Wrapper successfully logged to MLflow")
-                except RuntimeError as model_error:
-                    if "device" in str(model_error).lower():
-                        logger.error(f"❌ Device mismatch error during model logging: {str(model_error)}")
-                        logger.info("🔄 Attempting to move model to CPU for logging...")
-                        try:
-                            # Create a temporary copy for CPU logging
-                            wrapper_cpu = wrapper.cpu()
-                            
-                            mlflow.pytorch.log_model(
-                                pytorch_model=wrapper_cpu,
-                                name="model",
-                                signature=signature,
-                            )
-                            wrapper.to(self.device)
-                            logger.info("✅ Model successfully logged to MLflow (CPU fallback)")
-                        except Exception as cpu_error:
-                            logger.error(f"❌ Failed to log model even with CPU fallback: {str(cpu_error)}")
-                            raise
-                    else:
-                        logger.error(f"❌ Model logging failed: {str(model_error)}")
-                        raise
+                    logger.info("✅ PyTorch model successfully logged to MLflow at artifact path 'model'")
                 except Exception as e:
-                    logger.error(f"❌ Unexpected error during model logging: {str(e)}")
+                    logger.error(f"❌ Model logging failed: {str(e)}")
                     raise
+                finally:
+                    try:
+                        if original_device is not None:
+                            self.model.to(original_device)
+                    except Exception:
+                        pass
                 
                 logger.info(f"✅ MLP model saved successfully. Run ID: {run.info.run_id}")
                 return run.info.run_id
@@ -278,14 +271,13 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
             logger.error(f"Error saving model to MLflow: {str(e)}")
             return None
 
-    def load_model(self, run_id: str, experiment_name: str = None, model_id: str = None) -> bool:
+    def load_model(self, run_id: str, experiment_name: str = None) -> bool:
         """
-        Load a trained MLP model from MLflow based on the given run ID or model ID
+        Load a trained MLP model from MLflow based on the given run ID
         
         Args:
-            run_id: MLflow run ID to load the model from (optional if model_id provided)
+            run_id: MLflow run ID to load the model from
             experiment_name: Experiment name (uses default if None)
-            model_id: Optional model ID for specific model loading (preferred over run_id)
             
         Returns:
             bool: True if model loaded successfully, False otherwise
@@ -297,69 +289,55 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
             # Set the experiment
             mlflow.set_experiment(experiment_name)
             
-            # Get MLflow client for artifact access
-            client = mlflow.tracking.MlflowClient()
-            
-            # Load scaler from run artifacts if run_id is provided
-            scaler_loaded = False
-            if run_id:
-                scaler_loaded = self._load_scaler_from_run(client, run_id)
-            
-            # Try to load model using model_id first (preferred method)
-            model_loaded = False
-            if model_id:
-                try:
-                    logger.info(f"🎯 Loading model using specific model ID: {model_id}")
-                    
-                    # Get the logged model directly using mlflow.get_logged_model()
-                    logged_model_info = mlflow.get_logged_model(model_id)
-                    logger.info(f"✅ Retrieved logged model: {logged_model_info.name}")
-
-                    loaded_wrapper = mlflow.pytorch.load_model(logged_model_info.model_uri)
-                    
-                    # Check if loaded model is a wrapper
-                    if hasattr(loaded_wrapper, 'predictor'):
-                        # It's a wrapper - extract components
-                        self.model = loaded_wrapper.model
-                        self.scaler = loaded_wrapper.scaler
-                        self.feature_names = loaded_wrapper.feature_names
-                        self.config.update(loaded_wrapper.config)
-                        self.device = loaded_wrapper.device
-                        self.model_name = loaded_wrapper.model_name
-                        self.threshold_evaluator = loaded_wrapper.threshold_evaluator
-                        self.is_trained = loaded_wrapper.is_trained
-                        self.optimal_threshold = loaded_wrapper.optimal_threshold
-                        self.confidence_method = loaded_wrapper.confidence_method
-                        self.best_threshold_info = loaded_wrapper.best_threshold_info
-                        logger.info("✅ Model wrapper loaded successfully with all components")
-                    else:
-                        # It's a raw model - use as is
-                        self.model = loaded_wrapper
-                        logger.info("✅ Raw model loaded (no wrapper components)")
-                    
-                    self.model.to(self.device)
-                    model_loaded = True
-                    
-                    logger.info("✅ Model loaded successfully from logged model")
-                    
-                    # Extract feature names from model signature if not already loaded
-                    if not hasattr(self, 'feature_names') or not self.feature_names:
-                        self._extract_feature_names_from_model(logged_model_info.model_uri, "logged model")
-                    
-                except Exception as model_error:
-                    logger.error(f"❌ Failed to load model using model_id {model_id}: {str(model_error)}")
-                    return False
-            
-            if not model_loaded:
-                logger.error("❌ Failed to load model from all available sources")
+            # Load model directly from the run's artifact path (stable URI)
+            try:
+                model_uri = f"runs:/{run_id}/model"
+                self.model = mlflow.pytorch.load_model(model_uri)
+                self.model.to(self.device)
+                logger.info("✅ Model loaded successfully from runs URI")
+            except Exception as model_error:
+                logger.error(f"❌ Failed to load model from runs URI: {str(model_error)}")
                 return False
+
+            # Load preprocessor artifacts
+            scaler_loaded = False
+            feature_names_loaded = False
+            try:
+                scaler_local_path = mlflow.artifacts.download_artifacts(
+                    artifact_uri=f"runs:/{run_id}/preprocessor/scaler.pkl"
+                )
+                with open(scaler_local_path, 'rb') as f:
+                    self.scaler = pickle.load(f)
+                scaler_loaded = True
+                logger.info("✅ Feature scaler loaded from MLflow artifacts (preprocessor/scaler.pkl)")
+            except Exception as scaler_error:
+                logger.info(f"ℹ️ No scaler artifact found or failed to load: {scaler_error}")
+
+            try:
+                feature_names_local_path = mlflow.artifacts.download_artifacts(
+                    artifact_uri=f"runs:/{run_id}/preprocessor/feature_names.json"
+                )
+                import json
+                with open(feature_names_local_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and 'feature_names' in data:
+                    self.feature_names = data['feature_names']
+                    feature_names_loaded = True
+                    logger.info(f"✅ Loaded {len(self.feature_names)} feature names from artifacts")
+            except Exception as fn_error:
+                logger.info(f"ℹ️ No feature_names artifact found or failed to load: {fn_error}")
+
+            # Fallback: attempt to extract from model signature if not loaded
+            if not feature_names_loaded:
+                try:
+                    self._extract_feature_names_from_model(model_uri, "runs model")
+                except Exception:
+                    pass
             
             # Mark as trained
             self.is_trained = True
             
             logger.info("✅ Model loaded successfully")
-            if model_id:
-                logger.info(f"   Model ID: {model_id}")
             if run_id:
                 logger.info(f"   Run ID: {run_id}")
             logger.info(f"   Experiment: {experiment_name}")
@@ -384,43 +362,15 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
             bool: True if scaler loaded successfully, False otherwise
         """
         try:
-            artifacts = client.list_artifacts(run_id)
-            logger.info(f"📦 Found {len(artifacts)} artifacts in run {run_id}")
-            for artifact in artifacts:
-                logger.info(f"   - {artifact.path}")
-            
-            # Find scaler artifact
-            scaler_artifact_path = None
-            for artifact in artifacts:
-                if artifact.path == "scaler" or artifact.path.endswith("scaler.pkl"):
-                    scaler_artifact_path = artifact.path
-                    break
-            
-            if scaler_artifact_path:
-                try:
-                    # Download scaler artifact
-                    local_path = "src/models/scalers"
-                    client.download_artifacts(run_id, scaler_artifact_path, dst_path=local_path)
-                    scaler_local_path = os.path.join(local_path, "scaler", "scaler.pkl")
-                    with open(scaler_local_path, 'rb') as f:
-                        self.scaler = pickle.load(f)
-                    
-                    logger.info("✅ Feature scaler loaded from MLflow artifacts")
-                    
-                    # Clean up downloaded file
-                    os.unlink(scaler_local_path)
-                    
-                    return True
-                    
-                except Exception as scaler_error:
-                    logger.warning(f"⚠️ Could not load scaler: {str(scaler_error)}")
-                    return False
-            else:
-                logger.info("ℹ️ No scaler artifact found - model will use raw features for prediction")
-                return False
-                
+            scaler_local_path = mlflow.artifacts.download_artifacts(
+                artifact_uri=f"runs:/{run_id}/preprocessor/scaler.pkl"
+            )
+            with open(scaler_local_path, 'rb') as f:
+                self.scaler = pickle.load(f)
+            logger.info("✅ Feature scaler loaded from MLflow artifacts (preprocessor/scaler.pkl)")
+            return True
         except Exception as e:
-            logger.warning(f"⚠️ Error listing artifacts for scaler loading: {str(e)}")
+            logger.info(f"ℹ️ No scaler artifact found - model will use raw features for prediction ({e})")
             return False
 
     def _extract_feature_names_from_model(self, model_uri: str, source: str):
@@ -508,7 +458,7 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 20
+        number_of_trials = 10
         # n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
@@ -749,5 +699,70 @@ def main():
         raise
 
 
+def smoke_test_save_and_load():
+    """
+    Quick smoke test: create a tiny MLP, save with scaler & feature names, then load and verify.
+    """
+    logger.info("= " * 40)
+    logger.info("🔬 Running MLP save/load smoke test")
+    logger.info("= " * 40)
+
+    # Set up experiment quickly
+    experiment = "mlp_stock_predictor_test"
+    mlflow.set_experiment(experiment)
+
+    # Create minimal data
+    feature_names = ["f1", "f2", "f3", "f4"]
+    import numpy as _np
+    X_eval = pd.DataFrame(_np.random.RandomState(42).rand(16, 4), columns=feature_names)
+
+    # Minimal model
+    model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 1))
+
+    # Fitted scaler (for artifact check)
+    from sklearn.preprocessing import StandardScaler as _Std
+    scaler = _Std().fit(X_eval.values)
+
+    # Create predictor instance
+    predictor = MLPPredictorWithMLflow(
+        model_name="mlp_smoke_test",
+        config={"input_size": 4},
+    )
+    predictor.model = model
+    predictor.device = torch.device("cpu")
+
+    # Save
+    run_id = predictor.save_model(
+        metrics={"mse": 0.0},
+        params={"layers": "4-8-1"},
+        X_eval=X_eval,
+        experiment_name=experiment,
+        scaler=scaler,
+    )
+
+    if not run_id:
+        raise RuntimeError("Smoke test failed: no run_id returned from save_model")
+
+    logger.info(f"🧪 Saved run_id: {run_id}")
+
+    # Load into a fresh instance
+    loader = MLPPredictorWithMLflow(
+        model_name="mlp_smoke_test_loader",
+        config={"input_size": 4},
+    )
+    loader.device = torch.device("cpu")
+    ok = loader.load_model(run_id=run_id, experiment_name=experiment)
+    if not ok:
+        raise RuntimeError("Smoke test failed: load_model returned False")
+
+    # Basic checks
+    assert loader.model is not None, "Loaded model is None"
+    assert hasattr(loader, 'scaler') and loader.scaler is not None, "Scaler was not loaded"
+    assert hasattr(loader, 'feature_names') and loader.feature_names, "Feature names were not loaded"
+    assert loader.feature_names == feature_names, "Feature names mismatch after load"
+
+    logger.info("✅ Smoke test passed: model, scaler, and feature names loaded correctly")
+
+
 if __name__ == "__main__":
-    main() 
+    main()
