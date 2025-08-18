@@ -343,7 +343,12 @@ CREATE TABLE public.raw_fundamental_data ( id serial4 NOT NULL, ticker_id int4 N
 CASE
     WHEN total_fields_count = 0 THEN 0.0
     ELSE (total_fields_count - missing_data_count)::numeric / total_fields_count::numeric
-END) STORED NULL, data_source_confidence numeric(3, 2) NULL, CONSTRAINT raw_fundamental_data_pkey PRIMARY KEY (id), CONSTRAINT unique_ticker_date_raw_fundamental UNIQUE (ticker_id, date), CONSTRAINT valid_date_raw_fundamental CHECK ((date >= '2020-01-01'::date)), CONSTRAINT fk_raw_fundamental_ticker_id FOREIGN KEY (ticker_id) REFERENCES public.tickers(id) ON DELETE CASCADE);
+END) STORED NULL, data_source_confidence numeric(3, 2) NULL, 
+CONSTRAINT raw_fundamental_data_pkey PRIMARY KEY (id), 
+CONSTRAINT unique_ticker_date_raw_fundamental UNIQUE (ticker_id, date), 
+CONSTRAINT valid_date_raw_fundamental CHECK ((date >= '2020-01-01'::date)), 
+CONSTRAINT fk_raw_fundamental_ticker_id FOREIGN KEY (ticker_id) 
+    REFERENCES public.tickers(id) ON DELETE CASCADE);
 CREATE INDEX idx_raw_fundamental_created_at ON public.raw_fundamental_data USING btree (created_at);
 CREATE INDEX idx_raw_fundamental_date ON public.raw_fundamental_data USING btree (date);
 CREATE INDEX idx_raw_fundamental_filing_date ON public.raw_fundamental_data USING btree (filing_date);
