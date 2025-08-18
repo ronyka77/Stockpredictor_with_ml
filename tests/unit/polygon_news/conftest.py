@@ -10,7 +10,32 @@ from src.data_collector.polygon_news import models
 
 @pytest.fixture(scope="function")
 def db_session():
-    engine = create_engine("sqlite:///:memory:")
+    from dotenv import load_dotenv, dotenv_values
+
+    # Load .env and read values; prefer TEST_DATABASE_URL from .env, otherwise build from TEST_DB_* vars
+    load_dotenv()
+    env_vals = dotenv_values()
+    test_db_url = env_vals.get("TEST_DATABASE_URL")
+
+    if not test_db_url:
+        # Build from individual TEST_DB_* variables
+        host = env_vals.get("TEST_DB_HOST")
+        port = env_vals.get("TEST_DB_PORT")
+        name = env_vals.get("TEST_DB_NAME")
+        user = env_vals.get("TEST_DB_USER")
+        password = env_vals.get("TEST_DB_PASSWORD", "")
+
+        if not (host and name and user):
+            pytest.skip("Polygon news DB tests require TEST_DB_HOST/PORT/NAME/USER in .env or TEST_DATABASE_URL set.")
+
+        test_db_url = f"postgresql://{user}:{password}@{host}:{port}/{name}"
+
+    engine = create_engine(test_db_url)
+    # Ensure a clean schema for tests: drop existing news tables then recreate
+    try:
+        models.Base.metadata.drop_all(engine)
+    except Exception:
+        pass
     models.create_tables(engine)
     Session = sessionmaker(bind=engine)
     session = Session()

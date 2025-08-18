@@ -32,8 +32,6 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.info("Calculating On-Balance Volume (OBV)")
-    
     try:
         # Calculate OBV using ta library
         obv_values = ta.volume.on_balance_volume(data['close'], data['volume'])
@@ -62,8 +60,6 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
             ((price_change > 0) & (obv_change < 0)) | 
             ((price_change < 0) & (obv_change > 0))
         ).astype(int)
-        
-        # logger.info(f"Calculated OBV: {obv_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -101,8 +97,6 @@ def calculate_vpt(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.info("Calculating Volume Price Trend (VPT)")
-    
     try:
         # Calculate VPT using ta library
         vpt_values = ta.volume.volume_price_trend(data['close'], data['volume'])
@@ -127,8 +121,6 @@ def calculate_vpt(data: pd.DataFrame) -> IndicatorResult:
         # VPT rate of change
         result_data['VPT_ROC_5'] = vpt_values.pct_change(5) * 100
         result_data['VPT_ROC_10'] = vpt_values.pct_change(10) * 100
-        
-        # logger.info(f"Calculated VPT: {vpt_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -167,8 +159,6 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
     start_time = time.time()
     warnings = []
     
-    logger.info("Calculating Accumulation/Distribution Line")
-    
     try:
         # Calculate A/D Line using ta library
         ad_values = ta.volume.acc_dist_index(data['high'], data['low'], data['close'], data['volume'])
@@ -194,8 +184,6 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
         ad_ema = ad_values.ewm(span=10).mean()
         result_data['AD_Oscillator'] = ad_values - ad_ema
         result_data['AD_Oscillator_Above_Zero'] = (result_data['AD_Oscillator'] > 0).astype(int)
-        
-        # logger.info(f"Calculated A/D Line: {ad_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -238,8 +226,6 @@ def calculate_volume_profile(data: pd.DataFrame, periods: Optional[List[int]] = 
     if periods is None:
         periods = [10, 20, 50]  # Default volume analysis periods
     
-    logger.info(f"Calculating Volume Profile for periods: {periods}")
-    
     try:
         result_data = pd.DataFrame(index=data.index)
         
@@ -271,7 +257,6 @@ def calculate_volume_profile(data: pd.DataFrame, periods: Optional[List[int]] = 
             )
             result_data[f'Volume_Trend_{period}'] = volume_trend.fillna(0).astype(int)
             
-            # logger.info(f"Calculated Volume Profile features for period {period}")
         
         # Volume-Price relationship analysis
         if len(data) >= 20:
@@ -359,8 +344,6 @@ def calculate_money_flow_index(data: pd.DataFrame, period: Optional[int] = None)
     if period is None:
         period = 14  # Default MFI period
     
-    logger.info(f"Calculating Money Flow Index with period: {period}")
-    
     try:
         # Check minimum data requirements
         if len(data) < period:
@@ -394,8 +377,6 @@ def calculate_money_flow_index(data: pd.DataFrame, period: Optional[int] = None)
             ((price_change_5 > 0) & (mfi_change_5 < 0)) |
             ((price_change_5 < 0) & (mfi_change_5 > 0))
         ).astype(int)
-        
-        # logger.info(f"Calculated MFI: {mfi_values.notna().sum()} valid values")
         
         metadata = {
             'indicator_type': 'volume',
@@ -436,7 +417,6 @@ class VolumeIndicatorCalculator(BaseIndicator):
             IndicatorResult containing all volume indicators
         """
         start_time = time.time()
-        # logger.info("Calculating all volume indicators")
         
         try:
             # Calculate individual indicators
@@ -477,7 +457,6 @@ class VolumeIndicatorCalculator(BaseIndicator):
             }
             
             calculation_time = time.time() - start_time
-            # logger.info(f"Calculated {len(combined_data.columns)} volume features in {calculation_time:.2f}s")
             
             return create_indicator_result(
                 data=combined_data,

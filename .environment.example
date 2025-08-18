@@ -20,6 +20,12 @@ DB_NAME=stock_data
 DB_USER=postgres
 DB_PASSWORD=your_database_password_here
 
+TEST_DB_HOST=localhost
+TEST_DB_PORT=5332
+TEST_DB_NAME=stock_data
+TEST_DB_USER=postgres
+TEST_DB_PASSWORD=your_database_password_here
+
 # Batch Processing Configuration
 DEFAULT_BATCH_SIZE=100
 MAX_WORKERS=4
