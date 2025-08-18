@@ -535,7 +535,6 @@ class DataStorage:
                                 'total_employees': ticker_data.get('total_employees'),
                                 'list_date': ticker_data.get('list_date')
                             }
-                            print(upsert_data)
                             # Remove None values
                             upsert_data = {k: v for k, v in upsert_data.items() if v is not None}
                             

@@ -8,6 +8,10 @@ import mlflow
 import yaml
 from mlflow.tracking import MlflowClient
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 # Add project root to Python path
 try:
     project_root = Path(__file__).parent.parent.parent
@@ -15,11 +19,9 @@ try:
         project_root = Path(r"\\".join(str(project_root).split("\\")))
     sys.path.append(str(project_root))
 except Exception as e:
-    print(f"Error setting project root path: {e}")
+    logger.error(f"Error setting project root path: {e}")
     sys.path.append(os.getcwd().parent)
-    print(f"Current directory mlflow_utils: {os.getcwd().parent}")
-
-from src.utils.logger import get_logger
+    logger.info(f"Current directory mlflow_utils: {os.getcwd().parent}")
 
 
 class MLFlowConfig:
@@ -31,7 +33,7 @@ class MLFlowConfig:
 
         # Ensure paths are absolute and normalized
         self.local_path = self.local_path.resolve()
-        print(f"local_path: {self.local_path}")
+        logger.info(f"local_path: {self.local_path}")
         # Convert to proper MLflow URI format
         local_uri = f"file:///{self.local_path_uri}"
 
@@ -82,17 +84,17 @@ class MLFlowManager:
         """Normalize paths in meta.yaml to match the current machine"""
         try:
             if not meta_path.exists():
-                print(f"Meta.yaml not found at {meta_path}, creating a new one.")
+                logger.info(f"Meta.yaml not found at {meta_path}, creating a new one.")
                 path_parts = str(meta_path).split("\\")
                 if len(path_parts) >= 3 and path_parts[-3].isdigit() and path_parts[-2].isdigit():
                     experiment_id = path_parts[-3]
                     run_id = path_parts[-2]
                     self.create_missing_meta_yaml(meta_path.parent, experiment_id, run_id)
-                    print("Meta.yaml has experiment and run id")
+                    logger.info("Meta.yaml has experiment and run id")
                 elif len(path_parts) >= 2 and path_parts[-2].isdigit():
                     experiment_id = path_parts[-2]
                     self.create_missing_meta_yaml(meta_path.parent, experiment_id)
-                    print("Meta.yaml has only experiment id")
+                    logger.info("Meta.yaml has only experiment id")
                 return
 
             with open(meta_path) as f:
@@ -110,7 +112,7 @@ class MLFlowManager:
                 experiment_id = path_parts[-1]
                 # Construct new path using the base path and relative components
                 new_uri = f"{new_base_path}/{experiment_id}"
-                print(f"new_uri: {new_uri}")
+                logger.info(f"new_uri: {new_uri}")
                 # Update with normalized path
                 meta_data["artifact_location"] = new_uri.replace("\\", "/")
             else:
@@ -128,7 +130,7 @@ class MLFlowManager:
 
                 # Construct new path using the base path and relative components
                 new_uri = f"{new_base_path}/{experiment_id}/{run_id}/artifacts"
-                print(f"new_uri: {new_uri}")
+                logger.info(f"new_uri: {new_uri}")
                 meta_data["artifact_uri"] = new_uri.replace("\\", "/")
             with open(meta_path, "w") as f:
                 yaml.safe_dump(meta_data, f)
@@ -237,6 +239,6 @@ if __name__ == "__main__":
 
     try:
         manager.normalize_all_meta_yaml_paths()
-        print("Successfully processed all meta.yaml files")
+        logger.info("Successfully processed all meta.yaml files")
     except Exception as e:
-        print(f"Error processing meta.yaml files: {e}")
+        logger.error(f"Error processing meta.yaml files: {e}")

@@ -7,6 +7,10 @@ on the most recent data, saving results to Excel files.
 import pandas as pd
 from src.models.time_series.mlp.mlp_main import MLPPredictorWithMLflow
 from src.models.predictors.base_predictor import BasePredictor
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class MLPPredictorWrapper(BasePredictor):
     """
@@ -42,18 +46,18 @@ class MLPPredictorWrapper(BasePredictor):
         if hasattr(self.model, 'model') and self.model.model is not None:
             self.model.model.eval()
         
-        print(f"✅ MLP model loaded: {self.model.model_name}")
-        print(f"   Expected features: {len(self.model.feature_names) if hasattr(self.model, 'feature_names') and self.model.feature_names else 'Unknown'}")
-        print(f"   Input size: {self.model.config.get('input_size', 'Unknown')}")
+        logger.info(f"✅ MLP model loaded: {self.model.model_name}")
+        logger.info(f"   Expected features: {len(self.model.feature_names) if hasattr(self.model, 'feature_names') and self.model.feature_names else 'Unknown'}")
+        logger.info(f"   Input size: {self.model.config.get('input_size', 'Unknown')}")
         
         # Check if scaler was loaded
         if hasattr(self.model, 'scaler') and self.model.scaler is not None:
-            print("   ✅ Scaler loaded from MLflow artifacts")
+            logger.info("   ✅ Scaler loaded from MLflow artifacts")
         else:
-            print("   ℹ️ No scaler found - will use raw features")
+            logger.info("   ℹ️ No scaler found - will use raw features")
         
         # Log single instance architecture confirmation
-        print("   🔄 Single Instance Architecture: Using one MLPPredictorWithMLflow for prediction pipeline")
+        logger.info("   🔄 Single Instance Architecture: Using one MLPPredictorWithMLflow for prediction pipeline")
 
     def _reorder_features_for_inference(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -104,7 +108,7 @@ def main():
     
     # Run prediction pipeline
     output_file = predictor.run_prediction_pipeline(days_back=days_back)
-    print(f"✅ Predictions saved to: {output_file}")
+    logger.info(f"✅ Predictions saved to: {output_file}")
     
 
 if __name__ == "__main__":

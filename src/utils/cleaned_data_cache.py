@@ -355,7 +355,7 @@ def main():
     """
     cache = CleanedDataCache()
     cache.clear_cache()
-    print("🧹 Entire cache cleared successfully!")
+    logger.info("🧹 Entire cache cleared successfully!")
 
 if __name__ == "__main__":
     main()

@@ -27,6 +27,6 @@ async def main() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     out = asyncio.run(main())
-    print(out)
+    logger.info(out)
 
 

@@ -379,7 +379,6 @@ def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
             ticker_data[ticker] = features
         except Exception as e:
             logger.warning(f"Could not load {ticker}: {str(e)}")
-            print(features)
     
     # Create consolidated storage
     config = ConsolidatedStorageConfig(partitioning_strategy=strategy)
@@ -404,17 +403,17 @@ def main():
         # Run consolidation with year-based strategy
         result = consolidate_existing_features(strategy='by_year')
         
-        # Print results
-        print("\n🎉 Feature Consolidation Completed!")
-        print(f"   Files created: {result['files_created']}")
-        print(f"   Total size: {result['total_size_mb']:.2f} MB")
-        print(f"   Compression ratio: {result['compression_ratio']:.1f}x")
+        # log results
+        logger.info("\n🎉 Feature Consolidation Completed!")
+        logger.info(f"   Files created: {result['files_created']}")
+        logger.info(f"   Total size: {result['total_size_mb']:.2f} MB")
+        logger.info(f"   Compression ratio: {result['compression_ratio']:.1f}x")
         
         # Show file breakdown
         if 'files' in result:
-            print("\n📁 Consolidated Files:")
+            logger.info("\n📁 Consolidated Files:")
             for file_info in result['files']:
-                print(f"   {file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}")
+                logger.info(f"   {file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}")
         
         logger.info("✅ Consolidation completed successfully")
         return 0

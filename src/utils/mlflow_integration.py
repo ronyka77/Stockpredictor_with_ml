@@ -249,25 +249,25 @@ def cleanup_deleted_runs(mlruns_dir="mlruns"):
     client = MlflowClient()
     experiments = client.search_experiments()
     for exp in experiments:
-        print(f"Processing Experiment: {exp.name} (ID: {exp.experiment_id})")
+        logger.info(f"Processing Experiment: {exp.name} (ID: {exp.experiment_id})")
         try:
             # Search for runs with lifecycle_stage 'deleted'
             runs = client.search_runs(
                 [exp.experiment_id], run_view_type=mlflow.entities.ViewType.DELETED_ONLY
             )
-            print(f"Found {len(runs)} runs in experiment {exp.name} (ID: {exp.experiment_id})")
+            logger.info(f"Found {len(runs)} runs in experiment {exp.name} (ID: {exp.experiment_id})")
             for run in runs:
                 run_id = run.info.run_id
                 run_path = os.path.join(mlruns_dir, exp.experiment_id, run_id)
                 try:
                     if os.path.exists(run_path):
-                        print(f"Deleting run folder for run_id {run_id} at {run_path}")
+                        logger.info(f"Deleting run folder for run_id {run_id} at {run_path}")
                         shutil.rmtree(run_path)
                 except Exception as e:
-                    print(f"Error deleting run folder for run_id {run_id} at {run_path}: {str(e)}")
+                    logger.error(f"Error deleting run folder for run_id {run_id} at {run_path}: {str(e)}")
                     continue
         except Exception as e:
-            print(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
+            logger.error(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
             continue
 
 def cleanup_empty_experiments(mlruns_dir="mlruns"):
@@ -280,7 +280,7 @@ def cleanup_empty_experiments(mlruns_dir="mlruns"):
     experiments = client.search_experiments()
     
     for exp in experiments:
-        print(f"Checking Experiment: {exp.name} (ID: {exp.experiment_id})")
+        logger.info(f"Checking Experiment: {exp.name} (ID: {exp.experiment_id})")
         try:
             # Search for all runs (active and deleted)
             runs = client.search_runs(
@@ -289,7 +289,7 @@ def cleanup_empty_experiments(mlruns_dir="mlruns"):
             )
             
             if len(runs) == 0 and exp.experiment_id != "0":
-                print(f"Experiment {exp.name} has no runs - deleting...")
+                logger.info(f"Experiment {exp.name} has no runs - deleting...")
                 exp_path = os.path.join(mlruns_dir, exp.experiment_id)
                 
                 # Delete from tracking server
@@ -297,12 +297,12 @@ def cleanup_empty_experiments(mlruns_dir="mlruns"):
                 
                 # Remove experiment directory if it exists
                 if os.path.exists(exp_path):
-                    print(f"Removing experiment directory at {exp_path}")
+                    logger.info(f"Removing experiment directory at {exp_path}")
                     shutil.rmtree(exp_path)
             else:
-                print(f"Experiment {exp.name} has {len(runs)} runs")
+                logger.info(f"Experiment {exp.name} has {len(runs)} runs")
         except Exception as e:
-            print(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
+            logger.error(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
             continue
 
 
