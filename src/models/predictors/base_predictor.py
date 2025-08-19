@@ -276,6 +276,7 @@ class BasePredictor(ABC):
                     .head(10)
                     .reset_index(drop=True)
                 )
+                results_df['day_of_week'] = pd.to_datetime(results_df['date']).dt.day_name()
                 top_10_count = len(results_df)
                 date_counts = results_df['date'].value_counts()
                 logger.info(f"   📈 Top 10 final count: {top_10_count}")
@@ -317,6 +318,28 @@ class BasePredictor(ABC):
         logger.info(
             f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
         )
+
+        # 4a) Weekday-specific profit aggregates (Friday and Monday)
+        if not valid_profit_df.empty:
+            friday_mask = results_df['day_of_week'] == 'Friday'
+            monday_mask = results_df['day_of_week'] == 'Monday'
+
+            friday_df = valid_profit_df[friday_mask]
+            monday_df = valid_profit_df[monday_mask]
+
+            friday_avg_profit = (
+                float(friday_df['profit_100_investment'].mean()) if not friday_df.empty else float('nan')
+            )
+            monday_avg_profit = (
+                float(monday_df['profit_100_investment'].mean()) if not monday_df.empty else float('nan')
+            )
+
+            logger.info(
+                f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
+            )
+            logger.info(
+                f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
+            )
 
         return results_df, avg_profit_per_investment
 

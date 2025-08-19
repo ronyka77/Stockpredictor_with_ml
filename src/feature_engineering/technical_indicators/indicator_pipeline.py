@@ -640,5 +640,9 @@ def main():
     """Main function for production batch processing"""
     run_production_batch()
 
+    from src.utils.cleaned_data_cache import CleanedDataCache
+    cache = CleanedDataCache()
+    cache.clear_cache()
+
 if __name__ == "__main__":
     main() 

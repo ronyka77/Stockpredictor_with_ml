@@ -63,7 +63,13 @@ class PyTorchBasePredictor(BaseModel):
         epochs = self.config.get('epochs', 20)
         learning_rate = self.config.get('learning_rate', 1e-3)
 
-        criterion = nn.MSELoss()
+        # Loss toggle (MSE or Huber)
+        loss_name = self.config.get('loss', 'mse').lower()
+        if loss_name == 'huber':
+            delta = float(self.config.get('huber_delta', 0.1))
+            criterion = nn.HuberLoss(delta=delta)
+        else:
+            criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
         logger.info(f"Starting training for {epochs} epochs...")
