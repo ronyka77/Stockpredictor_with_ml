@@ -677,14 +677,12 @@ class MLPPredictor(PyTorchBasePredictor):
             return confidence
             
         elif method == 'simple':
-            # Simple confidence based on prediction magnitude
             confidence = np.abs(predictions_np)
             # Sigmoid-like normalization
             confidence = 1 / (1 + np.exp(-confidence))
             return confidence
             
         elif method == 'margin':
-            # Margin-based confidence (distance from zero)
             confidence = np.abs(predictions_np)
             confidence = np.tanh(confidence)
             return confidence
