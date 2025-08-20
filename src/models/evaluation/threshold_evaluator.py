@@ -372,7 +372,6 @@ class ThresholdEvaluator:
             return {'status': 'failed', 'message': 'Confidence scores contain infinite values'}
         
         # For percentage returns: invest when predicted return > 0
-        # Ensure test_predictions is 1D
         test_predictions_1d = test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
         invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")

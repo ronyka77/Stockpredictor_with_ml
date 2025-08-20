@@ -18,12 +18,11 @@ class RealMLPModule(nn.Module):
         use_numeric_embedding: bool = True,
         numeric_embedding_dim: int = 16,
         numeric_embedding_out_dim: Optional[int] = None,
-        # Categorical embedding (ticker_id)
         num_categories: Optional[int] = None,
         cat_embed_dim: int = 32,
         embedding_dropout: float = 0.1,
-        output_size: int = 1,
-    ) -> None:
+        output_size: int = 1) -> None:
+        
         super().__init__()
 
         self.input_size = input_size
@@ -49,7 +48,6 @@ class RealMLPModule(nn.Module):
         else:
             self.activation = nn.GELU()
 
-        layers = []
         current_dim = input_size
 
         if self.use_numeric_embedding:
@@ -107,16 +105,21 @@ class RealMLPModule(nn.Module):
             z = self.diag(z)
 
         # Categorical path (optional)
-        if self.cat_embedding is not None and cat_idx is not None:
-            # Ensure 1D indices
-            if cat_idx.dim() > 1:
-                cat_idx_flat = cat_idx.view(cat_idx.size(0))
-            else:
-                cat_idx_flat = cat_idx
-            e = self.cat_embedding(cat_idx_flat)
-            if self.cat_embed_dropout is not None:
-                e = self.cat_embed_dropout(e)
-            z = torch.cat([z, e], dim=1)
+        if self.cat_embedding is not None:
+            # Fallback: if categorical indices are not provided during inference/logging,
+            # use a zero (OOV) index vector to preserve expected trunk input dimensionality
+            if cat_idx is None:
+                cat_idx = torch.zeros(z.size(0), dtype=torch.long, device=z.device)
+            if cat_idx is not None:
+                # Ensure 1D indices
+                if cat_idx.dim() > 1:
+                    cat_idx_flat = cat_idx.view(cat_idx.size(0))
+                else:
+                    cat_idx_flat = cat_idx
+                e = self.cat_embedding(cat_idx_flat)
+                if self.cat_embed_dropout is not None:
+                    e = self.cat_embed_dropout(e)
+                z = torch.cat([z, e], dim=1)
 
         # Trunk
         for i, lin in enumerate(self.linear_blocks):

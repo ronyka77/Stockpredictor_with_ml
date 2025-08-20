@@ -553,10 +553,8 @@ class MLPPredictor(PyTorchBasePredictor):
     def _preprocess_for_prediction(self, X: pd.DataFrame, for_confidence: bool = False) -> torch.FloatTensor:
         """
         Centralized preprocessing for prediction and confidence calculation.
-
         Applies the loaded scaler if present; otherwise falls back to basic
         preprocessing (fill NaNs, replace infinities, basic normalization).
-
         Args:
             X: Input features DataFrame
             for_confidence: If True, adjust log messages for confidence calc

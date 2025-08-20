@@ -24,7 +24,6 @@ class PreprocessorArtifacts:
 class RealMLPPreprocessor:
     """
     Fit/transform utilities for RealMLP.
-
     - Numeric: clip to [q1, q2] per feature, then RobustScaler
     - Categorical: `ticker_id` mapped to indices with OOV index 0
     - Persist: scaler.pkl, clip_stats.json, cat_maps.json, feature_names.json
@@ -35,45 +34,53 @@ class RealMLPPreprocessor:
         *,
         numeric_clip_q1: float = 0.01,
         numeric_clip_q2: float = 0.99,
-        categorical_cols: Optional[List[str]] = None,
         oov_index: int = 0,
-    ) -> None:
+        robust_quantile_range: Tuple[float, float] = (25.0, 75.0),
+        post_scale_clip: Optional[Tuple[float, float]] = (-15.0, 15.0)) -> None:
         self.numeric_clip_q1 = numeric_clip_q1
         self.numeric_clip_q2 = numeric_clip_q2
-        self.categorical_cols = categorical_cols or ["ticker_id"]
+        self.categorical_cols = ["ticker_id"]
         self.oov_index = oov_index
+        self.robust_quantile_range = robust_quantile_range
+        self.post_scale_clip = post_scale_clip
 
         self.scaler: Optional[RobustScaler] = None
         self.clip_stats: Dict[str, Tuple[float, float]] = {}
         self.cat_maps: Dict[str, Dict[str, int]] = {}
         self.feature_names: List[str] = []
 
-    def fit(self, df: pd.DataFrame, *, numeric_cols: List[str]) -> "RealMLPPreprocessor":
+    def fit(self, df: pd.DataFrame, numeric_cols: List[str]) -> "RealMLPPreprocessor":
         self._compute_clip_stats(df, numeric_cols)
         clipped = self._apply_clipping(df[numeric_cols].copy())
-        self.scaler = RobustScaler()
+        self.scaler = RobustScaler(quantile_range=self.robust_quantile_range)
         self.scaler.fit(clipped.values)
         self.feature_names = list(numeric_cols)
-        # Build categorical maps (only ticker_id for now)
         for col in self.categorical_cols:
             if col in df.columns:
                 self.cat_maps[col] = self._build_cat_map(df[col])
         return self
 
-    def transform(self, df: pd.DataFrame, *, numeric_cols: List[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def transform(self, df: pd.DataFrame, numeric_cols: List[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         if self.scaler is None:
             raise RuntimeError("Preprocessor not fitted")
-        # Numeric pipeline
         clipped = self._apply_clipping(df[numeric_cols].copy())
         X_num = self.scaler.transform(clipped.values)
+        if self.post_scale_clip is not None:
+            lo, hi = self.post_scale_clip
+            X_num = np.clip(X_num, lo, hi)
         # Categorical indices (ticker_id)
         cat_idx = None
         for col in self.categorical_cols:
             if col in df.columns and col in self.cat_maps:
                 mapping = self.cat_maps[col]
-                mapped = df[col].astype(str).map(mapping)
-                # Count unseen before fillna
-                unseen_mask = ~df[col].astype(str).isin(mapping.keys())
+                logger.info(f"✅ Mapping for {col} has {len(mapping)} unique values")
+                try:
+                    series_int = df[col].astype("Int32")
+                except Exception:
+                    series_int = df[col]
+                mapped = series_int.astype(str).map(mapping)
+                logger.info(f"✅ Mapped {col} to {len(mapped)} values")
+                unseen_mask = ~series_int.astype(str).isin(mapping.keys())
                 unseen_count = int(unseen_mask.sum())
                 cat_idx = mapped.fillna(self.oov_index).astype(int).to_numpy()
                 if unseen_count > 0:
@@ -93,9 +100,14 @@ class RealMLPPreprocessor:
         return df_num
 
     def _build_cat_map(self, series: pd.Series) -> Dict[str, int]:
+        try:
+            series = series.astype("Int32")
+        except Exception:
+            pass
         unique_vals = sorted(series.dropna().astype(str).unique())
         mapping: Dict[str, int] = {val: idx + 1 for idx, val in enumerate(unique_vals)}
         mapping["__OOV__"] = self.oov_index
+        logger.info(f"✅ Built categorical mapping for {series.name} with {len(mapping)} unique values")
         return mapping
 
     def save_artifacts(self, base_dir: Path) -> None:
