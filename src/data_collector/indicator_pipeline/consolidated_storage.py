@@ -13,8 +13,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from dataclasses import dataclass
 
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage, StorageConfig
-from src.feature_engineering.config import config as fe_config
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
+from src.data_collector.config import config as fe_config
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility='feature_engineering')

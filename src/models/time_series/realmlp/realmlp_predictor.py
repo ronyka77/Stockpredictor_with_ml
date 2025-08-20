@@ -101,7 +101,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
         cat_tensor = None
         if cat_idx is not None:
-            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.long, device=self.device)
+            cat_tensor = torch.as_tensor(cat_idx, device=self.device)
 
         with torch.no_grad():
             outputs = self.model(x_tensor, cat_tensor)
@@ -125,9 +125,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 cat_tensor = torch.as_tensor(cat_idx, dtype=torch.long, device=self.device)
 
             original_training = self.model.training
-            self.model.train()  # enable dropout
+            self.model.train()
             try:
-                n_passes = int(self.config.get("mc_dropout_passes", 20))
+                n_passes = 30
                 preds: List[np.ndarray] = []
                 with torch.no_grad():
                     for _ in range(max(1, n_passes)):
@@ -394,31 +394,44 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     "384,192,96",
                     "256,128,64",
                     "256,128",
-                    "768,384,192,96",
+                    "768,384,192",
+                    "1024,512,256",
+                    "2048,1024,512,256",
+                    "4096,2048,1024,512,256"
                 ),
             )
+            activation = trial.suggest_categorical("activation", ["relu", "gelu"])
             hidden_sizes = [int(x) for x in hidden_sizes_key.split(",")]
-            dropout = trial.suggest_float("dropout", 0.05, 0.5)
-            learning_rate = trial.suggest_float("learning_rate", 1e-4, 5e-3, log=True)
-            weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+            dropout = trial.suggest_float("dropout", 0.08, 0.25)
+            learning_rate = trial.suggest_float("learning_rate", 3e-4, 2e-3, log=True)
+            weight_decay = trial.suggest_float("weight_decay", 3e-6, 3e-4, log=True)
             use_huber = trial.suggest_categorical("use_huber", [True, False])
-            huber_delta = trial.suggest_float("huber_delta", 0.02, 0.2)
-            numeric_embedding_dim = trial.suggest_categorical("numeric_embedding_dim", [8, 12, 16, 24, 32])
+            use_batch_norm = trial.suggest_categorical("use_batch_norm", [True, False])
+            use_diagonal = trial.suggest_categorical("use_diagonal", [True, False])
+            huber_delta = trial.suggest_float("huber_delta", 0.03, 0.12)
+            cat_embedding_dim = trial.suggest_categorical("cat_embedding_dim", [16, 24, 32, 48 ,64])
+            numeric_embedding_dim = trial.suggest_categorical("numeric_embedding_dim", [16, 24, 32, 48 ,64])
+            embedding_dropout = trial.suggest_float("embedding_dropout", 0.05, 0.2)
             epochs = trial.suggest_int("epochs", 5, 25)
 
             trial_config = {
                 **base_config,
                 "hidden_sizes": hidden_sizes,
+                "activation": activation,
                 "dropout": dropout,
                 "learning_rate": learning_rate,
                 "weight_decay": weight_decay,
                 "use_huber": use_huber,
+                "use_batch_norm": use_batch_norm,
+                "use_diagonal": use_diagonal,
                 "huber_delta": huber_delta,
+                "cat_embedding_dim": cat_embedding_dim,
                 "numeric_embedding_dim": numeric_embedding_dim,
+                "embedding_dropout": embedding_dropout,
                 "epochs": epochs,
             }
             # Ensure required keys
-            trial_config["input_size"] = trial_config.get("input_size") or len(preprocessor.feature_names)
+            trial_config["input_size"] = len(preprocessor.feature_names)
 
             # Fresh predictor per trial
             predictor = RealMLPPredictor(model_name="RealMLP", config=trial_config)
@@ -446,7 +459,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     if "optimization" in eval_pack and isinstance(eval_pack["optimization"], dict):
                         opt_dict = eval_pack["optimization"]
                     elif "status" in eval_pack and "best_result" in eval_pack:
-                        # Direct result from optimize_prediction_threshold
                         opt_dict = eval_pack
 
                 best_res = opt_dict.get("best_result", {}) if isinstance(opt_dict, dict) else {}

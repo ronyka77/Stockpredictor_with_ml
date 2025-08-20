@@ -16,9 +16,9 @@ import threading
 from dataclasses import dataclass
 
 from src.feature_engineering.data_loader import StockDataLoader
-from src.feature_engineering.technical_indicators.feature_calculator import FeatureCalculator
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage
-from src.feature_engineering.technical_indicators.consolidated_storage import ConsolidatedFeatureStorage, ConsolidatedStorageConfig
+from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage, ConsolidatedStorageConfig
 from src.utils.logger import get_logger
 from src.feature_engineering.config import config
 
@@ -605,7 +605,7 @@ def run_production_batch():
         if results['successful'] > 0:
             logger.info("🗓️ Consolidating features into date-based partitions...")
             try:
-                from src.feature_engineering.technical_indicators.consolidated_storage import consolidate_existing_features
+                from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
                 
                 consolidation_start = time.time()
                 consolidation_result = consolidate_existing_features(strategy='by_date')

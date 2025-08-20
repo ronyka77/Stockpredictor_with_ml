@@ -14,7 +14,7 @@ try:
 except ImportError:
     raise ImportError("ta is required. Install with: pip install ta")
 
-from src.feature_engineering.technical_indicators.base import BaseIndicator, IndicatorResult, create_indicator_result
+from src.data_collector.indicator_pipeline.base import BaseIndicator, IndicatorResult, create_indicator_result
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility='feature_engineering')
