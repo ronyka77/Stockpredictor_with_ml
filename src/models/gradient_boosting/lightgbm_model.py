@@ -824,10 +824,6 @@ class LightGBMModel(BaseModel):
         
         return confidence_scores
     
-    # Removed: duplicate optimize_prediction_threshold; now inherited from BaseModel
-    
-    # Removed: duplicate predict_with_threshold; now inherited from BaseModel
-
     def select_features(self, X: pd.DataFrame, y: pd.Series, n_features_to_select: int = 50) -> List[str]:
         """
         Selects the best features using a preliminary LightGBM model based on feature importance.
@@ -983,8 +979,8 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 20
-        n_features_to_select = 80
+        number_of_trials = 200
+        n_features_to_select = 100
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
