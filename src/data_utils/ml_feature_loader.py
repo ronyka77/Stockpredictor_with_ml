@@ -12,8 +12,8 @@ from datetime import date
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import train_test_split
 
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage
-from src.feature_engineering.config import config
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
+from src.data_collector.config import config
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility='feature_engineering')
@@ -38,7 +38,7 @@ class MLFeatureLoader:
         
         # Initialize consolidated storage if enabled
         if self.use_consolidated:
-            from src.feature_engineering.technical_indicators.consolidated_storage import ConsolidatedFeatureStorage
+            from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
             self.consolidated_storage = ConsolidatedFeatureStorage()
             logger.info("MLFeatureLoader initialized with consolidated yearly files")
         else:
