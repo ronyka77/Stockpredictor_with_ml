@@ -118,29 +118,63 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 raise ValueError(f"Missing required numeric feature columns for confidence: {missing}")
             X_num, cat_idx = self.preprocessor.transform(X, numeric_cols=numeric_cols)
 
-            self.model.to(self.device)
-            x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
-            cat_tensor = None
-            if cat_idx is not None:
-                cat_tensor = torch.as_tensor(cat_idx, dtype=torch.long, device=self.device)
+            device = self.device
+            self.model.to(device)
 
+            # Prepare batching to avoid global batch-norm effects and reduce memory
+            batch_size = int(self.config.get("confidence_batch_size", 4096))
+            n_samples = int(X_num.shape[0])
+
+            # Enable dropout while freezing BatchNorm running stats
             original_training = self.model.training
             self.model.train()
+            bn_states: List[tuple[nn.BatchNorm1d, bool]] = []
+            for m in self.model.modules():
+                if isinstance(m, nn.BatchNorm1d):
+                    bn_states.append((m, m.training))
+                    m.eval()
+
             try:
-                n_passes = 30
+                n_passes = int(self.config.get("confidence_n_passes", 30))
                 preds: List[np.ndarray] = []
                 with torch.no_grad():
                     for _ in range(max(1, n_passes)):
-                        outputs = self.model(x_tensor, cat_tensor)
-                        preds.append(outputs.detach().cpu().numpy().squeeze())
+                        pass_preds: List[np.ndarray] = []
+                        for start in range(0, n_samples, batch_size):
+                            end = min(start + batch_size, n_samples)
+                            x_batch = torch.as_tensor(X_num[start:end], dtype=torch.float32, device=device)
+                            if cat_idx is not None:
+                                c_batch = torch.as_tensor(cat_idx[start:end], dtype=torch.bfloat16, device=device)
+                            else:
+                                c_batch = None
+                            outputs = self.model(x_batch, c_batch)
+                            pass_preds.append(outputs.detach().cpu().numpy().squeeze())
+                        preds.append(np.concatenate(pass_preds, axis=0))
+
                 arr = np.stack(preds, axis=0)
                 var = arr.var(axis=0)
-                conf = 1.0 / (1.0 + var)
+                inv_var_conf = 1.0 / (1.0 + var)
+
+                # Rank-based normalization to [0,1] to avoid min-max compression by outliers
+                n = inv_var_conf.shape[0]
+                if n <= 1:
+                    conf_norm = np.full_like(inv_var_conf, 0.5)
+                else:
+                    order = np.argsort(inv_var_conf)
+                    ranks = np.empty_like(order, dtype=float)
+                    ranks[order] = np.arange(n, dtype=float)
+                    conf_norm = ranks / float(max(1, n - 1))
             finally:
+                # Restore BatchNorm states
+                for bn, was_training in bn_states:
+                    if was_training:
+                        bn.train()
+                    else:
+                        bn.eval()
                 if not original_training:
                     self.model.eval()
-            mn, mx = float(np.min(conf)), float(np.max(conf))
-            return (conf - mn) / (mx - mn) if mx > mn else np.full_like(conf, 0.5)
+
+            return conf_norm
         elif method == "ensemble":
             if not self.ensemble_models or len(self.ensemble_models) == 0:
                 logger.warning("No ensemble_models set; falling back to variance confidence")
@@ -158,7 +192,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                         x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
                         cat_tensor = None
                         if cat_idx is not None:
-                            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.long, device=self.device)
+                            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.bfloat16, device=self.device)
                         with torch.no_grad():
                             outputs = m.to(self.device)(x_tensor, cat_tensor)
                             preds_list.append(outputs.detach().cpu().numpy().squeeze())
@@ -231,7 +265,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
         cat_tensor = None
         if cat_idx is not None:
-            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.long, device=self.device)
+            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.bfloat16, device=self.device)
 
         m: RealMLPModule = self.model  # type: ignore[assignment]
         with torch.no_grad():
@@ -243,7 +277,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 z = m.diag(z)
             if getattr(m, 'cat_embedding', None) is not None:
                 if cat_tensor is None:
-                    cat_tensor = torch.zeros(z.size(0), dtype=torch.long, device=self.device)
+                    cat_tensor = torch.zeros(z.size(0), dtype=torch.bfloat16, device=self.device)
                 if cat_tensor.dim() > 1:
                     cat_idx_flat = cat_tensor.view(cat_tensor.size(0))
                 else:
@@ -309,7 +343,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         n_thresholds: int = 99) -> Dict[str, Any]:
         """
         Run confidence-threshold optimization on test data, then evaluate performance at the best threshold.
-
         Returns a dict containing optimization and evaluation results.
         """
         if self.model is None or not self.is_trained:
@@ -369,7 +402,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         y_val: pd.Series,
         preprocessor: RealMLPPreprocessor,
         n_trials: int = 30,
-        timeout: Optional[int] = None,
         confidence_method: str = "variance",
     ) -> Dict[str, Any]:
         """
@@ -382,7 +414,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         """
 
         study = optuna.create_study(direction="maximize", sampler=optuna.samplers.RandomSampler(seed=42))
-
         base_config = dict(self.config) if isinstance(self.config, dict) else {}
 
         def objective(trial: optuna.Trial) -> float:
@@ -397,7 +428,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     "768,384,192",
                     "1024,512,256",
                     "2048,1024,512,256",
-                    "4096,2048,1024,512,256"
+                    # "4096,2048,1024,512,256"
                 ),
             )
             activation = trial.suggest_categorical("activation", ["relu", "gelu"])
@@ -413,6 +444,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             numeric_embedding_dim = trial.suggest_categorical("numeric_embedding_dim", [16, 24, 32, 48 ,64])
             embedding_dropout = trial.suggest_float("embedding_dropout", 0.05, 0.2)
             epochs = trial.suggest_int("epochs", 5, 25)
+            early_stopping_patience = trial.suggest_int("early_stopping_patience", 5, 15)
+            early_stopping_min_delta = trial.suggest_float("early_stopping_min_delta", 1e-4, 1e-2, log=True)
+            early_stopping_warmup = trial.suggest_int("early_stopping_warmup", 3, 10)
 
             trial_config = {
                 **base_config,
@@ -429,11 +463,12 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 "numeric_embedding_dim": numeric_embedding_dim,
                 "embedding_dropout": embedding_dropout,
                 "epochs": epochs,
+                "early_stopping_patience": early_stopping_patience,
+                "early_stopping_min_delta": early_stopping_min_delta,
+                "early_stopping_warmup": early_stopping_warmup,
             }
             # Ensure required keys
             trial_config["input_size"] = len(preprocessor.feature_names)
-
-            # Fresh predictor per trial
             predictor = RealMLPPredictor(model_name="RealMLP", config=trial_config)
 
             try:
@@ -538,8 +573,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 pass
             return float(optimized_profit_score)
 
-        study.optimize(objective, n_trials=n_trials, timeout=timeout)
-
+        study.optimize(objective, n_trials=n_trials)
         best_params = study.best_params if len(study.trials) else {}
 
         return {
@@ -603,13 +637,13 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         self.model.to(self.device)
         try:
             with torch.no_grad():
-                input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32)
+                input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32, device=self.device)
                 has_cat = hasattr(self.model, "cat_embedding") and getattr(self.model, "cat_embedding") is not None
                 if has_cat:
-                    dummy_cat = torch.zeros((input_tensor.shape[0],), dtype=torch.long)
-                    predictions_example = self.model(input_tensor, dummy_cat).cpu().numpy()
+                    dummy_cat = torch.zeros((input_tensor.shape[0],), dtype=torch.bfloat16, device=self.device)
+                    predictions_example = self.model(input_tensor, dummy_cat).detach().cpu().numpy()
                 else:
-                    predictions_example = self.model(input_tensor).cpu().numpy()
+                    predictions_example = self.model(input_tensor).detach().cpu().numpy()
             signature = mlflow.models.infer_signature(input_example, predictions_example)
         finally:
             try:

@@ -109,7 +109,7 @@ class RealMLPModule(nn.Module):
             # Fallback: if categorical indices are not provided during inference/logging,
             # use a zero (OOV) index vector to preserve expected trunk input dimensionality
             if cat_idx is None:
-                cat_idx = torch.zeros(z.size(0), dtype=torch.long, device=z.device)
+                cat_idx = torch.zeros(z.size(0), dtype=torch.bfloat16, device=z.device)
             if cat_idx is not None:
                 # Ensure 1D indices
                 if cat_idx.dim() > 1:

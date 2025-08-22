@@ -57,13 +57,13 @@ class RealMLPPreprocessor:
         for col in self.categorical_cols:
             if col in df.columns and col in self.cat_maps:
                 mapping = self.cat_maps[col]
-                logger.info(f"✅ Mapping for {col} has {len(mapping)} unique values")
+                # logger.info(f"✅ Mapping for {col} has {len(mapping)} unique values")
                 try:
                     series_int = df[col].astype("Int32")
                 except Exception:
                     series_int = df[col]
                 mapped = series_int.astype(str).map(mapping)
-                logger.info(f"✅ Mapped {col} to {len(mapped)} values")
+                # logger.info(f"✅ Mapped {col} to {len(mapped)} values")
                 unseen_mask = ~series_int.astype(str).isin(mapping.keys())
                 unseen_count = int(unseen_mask.sum())
                 cat_idx = mapped.fillna(self.oov_index).astype(int).to_numpy()

@@ -96,13 +96,10 @@ class MLPPredictor(PyTorchBasePredictor):
         # Handle feature_names - convert pandas Index to list if needed
         if feature_names is not None:
             if hasattr(feature_names, 'tolist'):
-                # Convert pandas Index to list
                 self.feature_names = feature_names.tolist()
             elif isinstance(feature_names, (list, tuple)):
-                # Already a list or tuple
                 self.feature_names = list(feature_names)
             else:
-                # Convert to list
                 self.feature_names = list(feature_names)
         else:
             self.feature_names = None

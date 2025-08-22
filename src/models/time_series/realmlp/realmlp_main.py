@@ -81,14 +81,14 @@ def main() -> None:
         X_val=X_test,
         y_val=y_test,
         preprocessor=pre,
-        confidence_method="variance",
+        confidence_method="latent_mahalanobis",
         n_trials=num_trials
     )
-    results = results.get("best_trial_info")
+    metrics = results.get("best_trial_info")
 
     # 4) Save to MLflow
     run_id = predictor.save_model(
-        metrics=results,
+        metrics=metrics,
         params=results.get("best_params"),
         X_eval=pd.DataFrame(X_test_num, columns=pre.feature_names),
         preprocessor=pre,
