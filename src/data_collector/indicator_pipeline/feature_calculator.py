@@ -11,14 +11,14 @@ import numpy as np
 import time
 from typing import Dict, List, Optional, Any
 
-from src.feature_engineering.technical_indicators.trend_indicators import TrendIndicatorCalculator
-from src.feature_engineering.technical_indicators.momentum_indicators import MomentumIndicatorCalculator
-from src.feature_engineering.technical_indicators.volatility_indicators import VolatilityIndicatorCalculator
-from src.feature_engineering.technical_indicators.volume_indicators import VolumeIndicatorCalculator
-from src.feature_engineering.technical_indicators.base import IndicatorResult, IndicatorValidator
+from src.data_collector.indicator_pipeline.trend_indicators import TrendIndicatorCalculator
+from src.data_collector.indicator_pipeline.momentum_indicators import MomentumIndicatorCalculator
+from src.data_collector.indicator_pipeline.volatility_indicators import VolatilityIndicatorCalculator
+from src.data_collector.indicator_pipeline.volume_indicators import VolumeIndicatorCalculator
+from src.data_collector.indicator_pipeline.base import IndicatorResult, IndicatorValidator
 
 from src.utils.logger import get_logger
-from src.feature_engineering.config import config
+from src.data_collector.config import config
 
 logger = get_logger(__name__, utility='feature_engineering')
 

@@ -16,9 +16,9 @@ import threading
 from dataclasses import dataclass
 
 from src.feature_engineering.data_loader import StockDataLoader
-from src.feature_engineering.technical_indicators.feature_calculator import FeatureCalculator
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage
-from src.feature_engineering.technical_indicators.consolidated_storage import ConsolidatedFeatureStorage, ConsolidatedStorageConfig
+from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage, ConsolidatedStorageConfig
 from src.utils.logger import get_logger
 from src.feature_engineering.config import config
 
@@ -82,7 +82,6 @@ class BatchFeatureProcessor:
         self.feature_calculator = FeatureCalculator()
         self.feature_storage = FeatureStorage()
         self.consolidated_storage = ConsolidatedFeatureStorage(
-            ConsolidatedStorageConfig(partitioning_strategy="by_date"),
             db_engine=self.data_loader.engine if hasattr(self.data_loader, 'engine') else None
         )
         self.stats = ProcessingStats()
@@ -605,7 +604,7 @@ def run_production_batch():
         if results['successful'] > 0:
             logger.info("🗓️ Consolidating features into date-based partitions...")
             try:
-                from src.feature_engineering.technical_indicators.consolidated_storage import consolidate_existing_features
+                from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
                 
                 consolidation_start = time.time()
                 consolidation_result = consolidate_existing_features(strategy='by_date')
@@ -639,6 +638,10 @@ def run_production_batch():
 def main():
     """Main function for production batch processing"""
     run_production_batch()
+
+    from src.utils.cleaned_data_cache import CleanedDataCache
+    cache = CleanedDataCache()
+    cache.clear_cache()
 
 if __name__ == "__main__":
     main() 

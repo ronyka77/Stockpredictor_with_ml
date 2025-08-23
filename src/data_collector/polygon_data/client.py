@@ -104,7 +104,7 @@ class PolygonDataClient:
                     logger.info(f"Successful request to {endpoint}")
                     return data
                 
-                elif response.status_code == 429:  # Rate limit exceeded
+                elif response.status_code == 429:  # Rate limited
                     self.rate_limiter.handle_rate_limit_error()
                     wait_time = 2 ** attempt
                     logger.warning(f"Rate limit exceeded. Waiting {wait_time}s before retry")

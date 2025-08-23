@@ -38,8 +38,7 @@ class MLflowIntegration:
         mlflow.set_tracking_uri(tracking_uri)
 
     def setup_experiment(
-        self, experiment_name: str, artifact_location: Optional[str] = None
-    ) -> str:
+        self, experiment_name: str, artifact_location: Optional[str] = None) -> str:
         """Set up MLflow experiment.
         Args:
             experiment_name: Name of the experiment
@@ -169,8 +168,6 @@ class MLflowIntegration:
                 log_func = mlflow.sklearn.log_model
             elif flavor == "xgboost":
                 log_func = mlflow.xgboost.log_model
-            elif flavor == "catboost":
-                log_func = mlflow.catboost.log_model
             else:
                 raise ValueError(f"Unsupported model flavor: {flavor}")
 

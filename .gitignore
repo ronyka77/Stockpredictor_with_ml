@@ -35,3 +35,4 @@ docs/07-implementation-guides/test_driven_development_guide.md
 reports/
 .backup/
 .hypothesis/
+AutogluonModels/

@@ -25,7 +25,7 @@ class PolygonFundamentalsConfig:
     # Rate Limiting
     REQUESTS_PER_MINUTE: int = 5  # Conservative rate limit for fundamentals
     RETRY_ATTEMPTS: int = 3
-    RETRY_DELAY: float = 10.0  # seconds
+    RETRY_DELAY: float = 15.0  # seconds
     BACKOFF_FACTOR: float = 2.0
     
     # Data Collection Parameters

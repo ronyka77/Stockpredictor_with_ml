@@ -96,13 +96,10 @@ class MLPPredictor(PyTorchBasePredictor):
         # Handle feature_names - convert pandas Index to list if needed
         if feature_names is not None:
             if hasattr(feature_names, 'tolist'):
-                # Convert pandas Index to list
                 self.feature_names = feature_names.tolist()
             elif isinstance(feature_names, (list, tuple)):
-                # Already a list or tuple
                 self.feature_names = list(feature_names)
             else:
-                # Convert to list
                 self.feature_names = list(feature_names)
         else:
             self.feature_names = None
@@ -553,10 +550,8 @@ class MLPPredictor(PyTorchBasePredictor):
     def _preprocess_for_prediction(self, X: pd.DataFrame, for_confidence: bool = False) -> torch.FloatTensor:
         """
         Centralized preprocessing for prediction and confidence calculation.
-
         Applies the loaded scaler if present; otherwise falls back to basic
         preprocessing (fill NaNs, replace infinities, basic normalization).
-
         Args:
             X: Input features DataFrame
             for_confidence: If True, adjust log messages for confidence calc
@@ -679,14 +674,12 @@ class MLPPredictor(PyTorchBasePredictor):
             return confidence
             
         elif method == 'simple':
-            # Simple confidence based on prediction magnitude
             confidence = np.abs(predictions_np)
             # Sigmoid-like normalization
             confidence = 1 / (1 + np.exp(-confidence))
             return confidence
             
         elif method == 'margin':
-            # Margin-based confidence (distance from zero)
             confidence = np.abs(predictions_np)
             confidence = np.tanh(confidence)
             return confidence

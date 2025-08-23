@@ -412,23 +412,28 @@ class XGBoostModel(BaseModel):
             artifacts = client.list_artifacts(run_id)
             model_artifact_path = None
             
-            # Look for XGBoost model artifact (should be named like "{model_name}_model")
+            # First, try to find the exact "model" directory (most common case)
             for artifact in artifacts:
-                if not artifact.is_dir and 'model' in artifact.path.lower():
-                    # This is likely our model artifact
+                if artifact.is_dir and artifact.path == "model":
                     model_artifact_path = artifact.path
                     break
             
-            # If no specific model found, look for directories that might contain models
+            # If not found, look for any directory with 'model' in the name
             if model_artifact_path is None:
                 for artifact in artifacts:
                     if artifact.is_dir and 'model' in artifact.path.lower():
                         model_artifact_path = artifact.path
                         break
             
-            # Default to the model name we used in save_model
+            # Default to "model" (the standard MLflow artifact path)
             if model_artifact_path is None:
-                model_artifact_path = f"{self.model_name}_model"
+                model_artifact_path = "model"
+                logger.warning("⚠️ No model artifact found, defaulting to 'model' path")
+            
+            # Log available artifacts for debugging
+            logger.info(f"Available artifacts in run {run_id}:")
+            for artifact in artifacts:
+                logger.info(f"  - {artifact.path} ({'dir' if artifact.is_dir else 'file'})")
             
             # Construct model URI and load
             model_uri = f"runs:/{run_id}/{model_artifact_path}"
@@ -628,10 +633,6 @@ class XGBoostModel(BaseModel):
         logger.info(f"Final confidence - Mean: {confidence_scores.mean():.4f}, std: {confidence_scores.std():.4f}")
         
         return confidence_scores
-    
-    # Removed: duplicate optimize_prediction_threshold; now inherited from BaseModel
-    
-    # Removed: duplicate predict_with_threshold; now inherited from BaseModel
     
     def objective(self, X_train: pd.DataFrame, y_train: pd.Series, 
                     X_test: pd.DataFrame, y_test: pd.Series, objective_column: str = 'test_profit_per_investment') -> callable:
@@ -908,8 +909,8 @@ def main():
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
             split_date='2025-02-01',
-            ticker=None,  # Load ALL tickers
-            clean_features=True,  # Apply feature cleaning
+            ticker=None,
+            clean_features=True,
         )
         
         # Extract prepared data

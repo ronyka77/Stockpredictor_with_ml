@@ -2,7 +2,7 @@
 Threshold-Based Model Evaluation
 
 This module provides centralized threshold optimization and profit-based evaluation
-capabilities that can be used by different gradient boosting models (XGBoost, LightGBM, CatBoost).
+capabilities that can be used by different gradient boosting models (XGBoost, LightGBM).
 """
 
 import numpy as np
@@ -47,7 +47,8 @@ class ThresholdEvaluator:
         """
         self.investment_amount = investment_amount
         self.custom_metrics = CustomMetrics()
-        # logger.info(f"ThresholdEvaluator initialized with ${investment_amount:.2f} investment amount")
+        self.min_samples_percentage = 0.0005
+        self.max_samples_percentage = 0.10
     
     def _vectorized_profit_calculation(self, y_true: np.ndarray, y_pred: np.ndarray, 
                                         current_prices: np.ndarray, 
@@ -119,9 +120,8 @@ class ThresholdEvaluator:
         
         results = []
 
-        # Relaxed sample constraints: 0.05% to 5% of the dataset (more suitable for LSTM models)
-        min_samples = max(1, int(0.0005 * len(test_confidence)))  # 0.05% minimum
-        max_samples = int(0.05 * len(test_confidence))  # 5% maximum
+        min_samples = max(1, int(self.min_samples_percentage * len(test_confidence)))
+        max_samples = int(self.max_samples_percentage * len(test_confidence))
         
         logger.info(f"Sample constraints: min={min_samples}, max={max_samples} (total samples={len(test_confidence)})")
         
@@ -180,7 +180,7 @@ class ThresholdEvaluator:
         results_df = pd.DataFrame(results)
         
         if len(results_df) == 0:
-            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.05% to 5%)")
+            logger.warning(f"⚠️ No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage*100}% to {self.max_samples_percentage*100}%)")
             logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]")
             logger.warning(f"   Total samples: {len(test_confidence)}")
             return pd.DataFrame()  # Return empty DataFrame instead of dict
@@ -327,11 +327,6 @@ class ThresholdEvaluator:
         logger.info(f"🎯 Starting threshold optimization on test data using {confidence_method} confidence method")
         logger.info(f"   Testing {n_thresholds} thresholds from {threshold_range[0]:.2f} to {threshold_range[1]:.2f}")
         
-        # Validate model protocol
-        if not isinstance(model, ModelProtocol):
-            raise ValueError("Model must implement ModelProtocol (predict and get_prediction_confidence methods)")
-        
-        # Phase 1: Get predictions
         try:
             test_predictions = model.predict(X_test)
             logger.info(f"Predictions shape: {test_predictions.shape}")
@@ -372,7 +367,6 @@ class ThresholdEvaluator:
             return {'status': 'failed', 'message': 'Confidence scores contain infinite values'}
         
         # For percentage returns: invest when predicted return > 0
-        # Ensure test_predictions is 1D
         test_predictions_1d = test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
         invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
@@ -396,10 +390,10 @@ class ThresholdEvaluator:
         
         # Phase 4: Analyze results
         if len(results_df) == 0:
-            logger.warning("⚠️ No valid thresholds found that satisfy the sample constraints (0.05% to 5%)")
+            logger.warning(f"⚠️ No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage*100}% to {self.max_samples_percentage*100}%)")
             logger.warning(f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f} avg: {test_confidence.mean():.4f} std: {test_confidence.std():.4f}")
             logger.warning(f"   Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f} avg: {test_predictions.mean():.4f} std: {test_predictions.std():.4f}")
-            return {'status': 'failed', 'message': 'No valid thresholds found under the 0.05%-5% sample constraint'}
+            return {'status': 'failed', 'message': f'No valid thresholds found under the {self.min_samples_percentage*100}%-{self.max_samples_percentage*100}% sample constraint'}
         
         # Find best threshold based on profit per investment
         best_idx = results_df['test_profit_per_investment'].idxmax()
@@ -424,50 +418,6 @@ class ThresholdEvaluator:
             'n_thresholds_tested': len(results_df),
             'total_test_samples': len(test_confidence)
         }
-    
-    def optimize_prediction_threshold_lstm(self, model: ModelProtocol,
-                                        X_test: pd.DataFrame, y_test: pd.Series,
-                                        current_prices_test: np.ndarray,
-                                        confidence_method: str = 'simple',
-                                        threshold_range: Tuple[float, float] = (0.01, 0.99),
-                                        n_thresholds: int = 90) -> Dict[str, Any]:
-        """
-        Optimize prediction threshold specifically for LSTM models
-        
-        Args:
-            model: LSTM model instance
-            X_test: Test features
-            y_test: Test targets
-            current_prices_test: Current prices for test set
-            confidence_method: Confidence calculation method (recommended: 'simple', 'margin', 'leaf_depth')
-            threshold_range: Range of thresholds to test
-            n_thresholds: Number of thresholds to test
-            
-        Returns:
-            Dictionary with optimization results
-        """
-        logger.info(f"🧠 LSTM-Specific Threshold Optimization using {confidence_method} confidence method")
-        
-        # For LSTM models, use more conservative confidence methods that don't require dropout
-        if confidence_method in ['variance', 'lstm_hidden']:
-            logger.warning(f"⚠️ Confidence method '{confidence_method}' requires dropout activation for LSTM models")
-            logger.info("   Consider using 'simple', 'margin', or 'leaf_depth' for more stable results")
-        
-        # Use wider threshold range for LSTM models
-        if threshold_range == (0.1, 0.9):
-            threshold_range = (0.05, 0.95)  # Wider range for LSTM
-            logger.info(f"   Using LSTM-optimized threshold range: {threshold_range}")
-        
-        # Call the main optimization method with LSTM-specific parameters
-        return self.optimize_prediction_threshold(
-            model=model,
-            X_test=X_test,
-            y_test=y_test,
-            current_prices_test=current_prices_test,
-            confidence_method=confidence_method,
-            threshold_range=threshold_range,
-            n_thresholds=n_thresholds
-        )
     
     def predict_with_threshold(self, model: ModelProtocol, X: pd.DataFrame, 
                                 threshold: float, confidence_method: str = 'leaf_depth',

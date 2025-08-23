@@ -45,7 +45,7 @@ class CleanedDataCache:
         # Create a string representation of all parameters
         param_str = str(sorted(kwargs.items()))
         # Generate hash
-        cache_key = hashlib.md5(param_str.encode()).hexdigest()
+        cache_key = hashlib.md5(param_str.encode(), usedforsecurity=False).hexdigest()
         return cache_key
     
     def _get_cache_paths(self, cache_key: str, data_type: str = "training") -> Dict[str, Path]:

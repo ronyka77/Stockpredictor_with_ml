@@ -6,8 +6,8 @@ Consolidate existing individual Parquet files into year-partitioned format
 for optimal ML performance and time-series analysis.
 """
 
-from src.feature_engineering.technical_indicators.consolidated_storage import consolidate_existing_features, ConsolidatedFeatureStorage
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage
+from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features, ConsolidatedFeatureStorage
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 import time
 from src.utils.logger import get_logger
 
@@ -77,7 +77,7 @@ def main():
 
 def test_year_loading_performance():
     """Test loading performance of year-based consolidated storage"""
-    from src.feature_engineering.technical_indicators.consolidated_storage import ConsolidatedStorageConfig
+    from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedStorageConfig
     from datetime import date
     
     consolidated_storage = ConsolidatedFeatureStorage(

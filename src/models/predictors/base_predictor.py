@@ -30,7 +30,7 @@ class BasePredictor(ABC):
         Initialize the predictor.
         Args:
             run_id: MLflow run ID to load the model from.
-            model_type: The type of the model (e.g., 'lightgbm', 'xgboost').
+            model_type: The type of the model (e.g., 'lightgbm', 'xgboost', 'autogluon').
         """
         self.run_id = run_id
         self.model_type = model_type
@@ -77,7 +77,7 @@ class BasePredictor(ABC):
             prediction_horizon=self.prediction_horizon,
             days_back=days_back,
         )
-        logger.info(f"   Data shape after cleaning: {data_result['X_test'].shape}")
+        logger.info(f"Data shape after cleaning: {data_result['X_test'].shape}")
 
         recent_features = data_result['X_test'].copy()
         recent_targets = data_result['y_test'].copy()
@@ -207,28 +207,14 @@ class BasePredictor(ABC):
         logger.info(f"   Saved {len(results_df)} predictions.")
         return output_path
 
-    def _build_results_dataframe_and_profit(
-        self,
-        *,
-        features_df: pd.DataFrame,
-        metadata_df: pd.DataFrame,
-        predictions: np.ndarray,
-    ) -> Tuple[pd.DataFrame, float]:
+    def _merge_ticker_metadata(self, results_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Build the results DataFrame and compute the average profit per investment
-        without writing to disk.
-
-        Returns a tuple of (results_df, avg_profit_per_investment).
+        Get ticker metadata from the database.
         """
-        # 1) Minimal result skeleton from predictions and metadata
-        results_df = metadata_df.copy()
-        results_df['ticker_id'] = features_df['ticker_id'].values
-        results_df['date_int'] = features_df['date_int'].values
-        results_df['date'] = pd.to_datetime(
-            results_df['date_int'], unit='D', origin='2020-01-01'
-        ).dt.strftime('%Y-%m-%d')
-
         try:
+            results_df['date'] = pd.to_datetime(
+                results_df['date_int'], unit='D', origin='2020-01-01'
+            ).dt.strftime('%Y-%m-%d')
             data_loader = StockDataLoader()
             all_metadata_df = data_loader.get_ticker_metadata()
             if not all_metadata_df.empty:
@@ -241,6 +227,30 @@ class BasePredictor(ABC):
             logger.warning(f"   Could not fetch ticker metadata: {e}")
             results_df['ticker'] = results_df['ticker_id']
             results_df['company_name'] = 'Unknown'
+        return results_df
+    
+    def _build_results_dataframe_and_profit(
+        self,
+        *,
+        features_df: pd.DataFrame,
+        metadata_df: pd.DataFrame,
+        predictions: np.ndarray) -> Tuple[pd.DataFrame, float]:
+        """
+        Build the results DataFrame and compute the average profit per investment
+        without writing to disk.
+        Returns a tuple of (results_df, avg_profit_per_investment).
+        """
+        # 1) Minimal result skeleton from predictions and metadata
+        results_df = metadata_df.copy()
+        threshold_filtered_count = 0
+        try:
+            results_df['ticker_id'] = features_df['ticker_id'].values
+        except KeyError:
+            logger.warning("   ⚠️  No ticker_id column found in features_df. Using date_int instead.")
+            logger.warning(f"   ⚠️  Features_df columns: {features_df.columns.tolist()}")
+
+        results_df['date_int'] = features_df['date_int'].values
+        results_df = self._merge_ticker_metadata(results_df)
 
         current_prices = features_df['close'].values
         results_df['predicted_return'] = predictions
@@ -265,21 +275,22 @@ class BasePredictor(ABC):
                 f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count/original_count:.1%} kept)"
             )
 
-            if threshold_filtered_count == 0:
-                logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-            else:
-                logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
-                results_df = (
-                    results_df
-                    .sort_values(['date', 'predicted_return'], ascending=[True, False])
-                    .groupby('date')
-                    .head(10)
-                    .reset_index(drop=True)
-                )
-                top_10_count = len(results_df)
-                date_counts = results_df['date'].value_counts()
-                logger.info(f"   📈 Top 10 final count: {top_10_count}")
-                logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
+        if threshold_filtered_count == 0:
+            logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+        else:
+            logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
+            results_df = (
+                results_df
+                .sort_values(['date', 'predicted_return'], ascending=[True, False])
+                .groupby('date')
+                .head(10)
+                .reset_index(drop=True)
+            )
+            results_df['day_of_week'] = pd.to_datetime(results_df['date']).dt.day_name()
+            top_10_count = len(results_df)
+            date_counts = results_df['date'].value_counts()
+            logger.info(f"   📈 Top 10 final count: {top_10_count}")
+            logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df['actual_return'].notna()
@@ -318,11 +329,31 @@ class BasePredictor(ABC):
             f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
         )
 
+        # 4a) Weekday-specific profit aggregates (Friday and Monday)
+        if not valid_profit_df.empty:
+            friday_mask = results_df['day_of_week'] == 'Friday'
+            monday_mask = results_df['day_of_week'] == 'Monday'
+
+            friday_df = valid_profit_df[friday_mask]
+            monday_df = valid_profit_df[monday_mask]
+
+            friday_avg_profit = (
+                float(friday_df['profit_100_investment'].mean()) if not friday_df.empty else float('nan')
+            )
+            monday_avg_profit = (
+                float(monday_df['profit_100_investment'].mean()) if not monday_df.empty else float('nan')
+            )
+
+            logger.info(
+                f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
+            )
+            logger.info(
+                f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
+            )
+
         return results_df, avg_profit_per_investment
 
-    def evaluate_on_recent_data(
-        self, *, days_back: int = 30
-    ) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
+    def evaluate_on_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
         Run the prediction pipeline without writing to disk and return:
         - results_df
@@ -332,8 +363,9 @@ class BasePredictor(ABC):
         - predictions
         """
         logger.info(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
-        self.load_model_from_mlflow()
-        self._load_metadata_from_mlflow()
+        if self.model is None:
+            self.load_model_from_mlflow()
+            self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
         results_df, avg_profit = self._build_results_dataframe_and_profit(

@@ -139,8 +139,7 @@ class MLFlowManager:
             return
 
     def create_missing_meta_yaml(
-        self, run_path: Path, experiment_id: str, run_id: Optional[str] = None
-    ) -> None:
+        self, run_path: Path, experiment_id: str, run_id: Optional[str] = None) -> None:
         """Create meta.yaml file if it doesn't exist"""
         try:
             if isinstance(run_path, str):
