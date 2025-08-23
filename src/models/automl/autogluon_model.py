@@ -20,7 +20,7 @@ from autogluon.tabular import TabularPredictor
 from autogluon.core.metrics import make_scorer
 
 from src.models.base_model import BaseModel
-from src.models.evaluation.threshold_evaluator import ModelProtocol
+from src.models.evaluation.threshold_evaluator import ModelProtocol, ThresholdEvaluator
 from src.utils.logger import get_logger
 
 
@@ -36,38 +36,7 @@ def default_mean_diff(y_true, y_pred, *args, **kwargs):
     y_p = np.asarray(y_pred)
     return np.mean(y_t - y_p)
 
-scorer = make_scorer(name="mean_diff", func=default_mean_diff, greater_is_better=True, optimum=1)
-
-class EvalMetricWrapper:
-    def __init__(self, func=None, needs_proba=False, name=None, greater_is_better_internal=True, worst_possible_value=None):
-        """Wrap a metric function for AutoGluon. If no func provided, default to
-        returning np.mean(y_true - y_pred, *args, **kwargs).
-        Exposes common attributes AutoGluon checks (e.g., needs_proba, needs_quantile,
-        greater_is_better_internal, name, worst_possible_value) to avoid attribute errors.
-        """
-        # Default metric: mean(y_true - y_pred) using module-level function (picklable)
-        if func is None:
-            func = default_mean_diff
-
-        self.func = func
-        # Attributes AutoGluon typically inspects
-        self.needs_proba = needs_proba
-        self.needs_pred = True
-        self.needs_quantile = False
-        # Some AutoGluon code checks for 'needs_class' on metric objects
-        self.needs_class = False
-        self.name = name or getattr(func, "__name__", "custom_metric")
-        self.greater_is_better_internal = greater_is_better_internal
-        # Expose both names for compatibility with Autogluon internal checks
-        self.greater_is_better = greater_is_better_internal
-        self.worst_possible_value = worst_possible_value
-        # Provide `.error` and `.score` expected by some AutoGluon internals
-        self.error = self.func
-        self.score = self.func
-
-    def __call__(self, y_true, y_pred, *args, **kwargs):
-        return self.func(y_true, y_pred, *args, **kwargs)
-
+scorer = make_scorer(name="mean_diff", score_func=default_mean_diff, greater_is_better=True, optimum=1)
 
 class AutoGluonModel(BaseModel, ModelProtocol):
     def __init__(self, *,
@@ -76,6 +45,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         super().__init__(model_name=model_name, config=config or {})
         self.predictor: Optional[TabularPredictor] = None
         self.feature_names: Optional[list[str]] = None
+        self.selected_model_name: Optional[str] = None
+        self.optimal_threshold: Optional[float] = None
 
     def _create_model(self, **kwargs) -> TabularPredictor:
         # AutoGluon predictor created during fit with label specified; no pre-instance here
@@ -90,7 +61,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         label = self.config.get("label", "Future_Return_10")
         eval_metric = scorer
 
-
         # Build train/valid DataFrames with label column
         train_df = X.copy()
         train_df[label] = y.values
@@ -99,14 +69,15 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df = X_val.copy()
             valid_df[label] = y_val.values
 
+        # train_df = train_df.sort_values('date_int', ascending=False).head(200000).reset_index(drop=True)
         combined_df = pd.concat([train_df, valid_df], axis=0)
         combined_df = combined_df.sample(frac=1).reset_index(drop=True)
         logger.info(f"combined_df: {len(combined_df)}")
 
         hyperparams = {
-            "GBM": {},        # LightGBM defaults
-            "XGB": {},        # XGBoost
-            # "REALMLP": {},
+            "REALMLP": {},
+            "GBM": {},        
+            "XGB": {},        
             "TABICL": {}
         }
 
@@ -114,8 +85,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         self.predictor = TabularPredictor(label=label, 
                                 eval_metric=eval_metric, 
                                 problem_type='regression',
-                                verbosity=3,
-                                )
+                                verbosity=3)
+        
         self.predictor.fit(
             time_limit=7200,
             train_data=combined_df,
@@ -126,17 +97,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             num_gpus=1,
             auto_stack=True,
             use_bag_holdout=True
-        )
-        results = self.predictor.fit_summary()
-        logger.info(f"Model names: {self.predictor.model_names()}")
-        logger.info(f"results: {results.to_dict()}")
-        
-
-        self.predictor.leaderboard(
-            data=valid_df,
-            extra_info=True,
-            silent=True,
-            display=True,
         )
 
         # self.predictor.distill(
@@ -149,7 +109,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
 
         # Capture feature names (exclude label)
         self.feature_names = [c for c in train_df.columns if c != label]
-        self.model = self  # for BaseModel predict routing
+        self.model = self
         self.is_trained = True
         logger.info("AutoGluon training completed")
         return self
@@ -160,50 +120,34 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             raise ValueError("Predictor not trained/loaded")
         if self.feature_names is not None:
             X = X[self.feature_names]
-        preds = self.predictor.predict(X)
+        
+        if self.selected_model_name is not None:
+            preds = self.predictor.predict(X, model=self.selected_model_name)
+        else:
+            self.selected_model_name = self.predictor.model_best
+            preds = self.predictor.predict(X, model=self.selected_model_name)
         return preds.to_numpy() if hasattr(preds, "to_numpy") else np.asarray(preds)
 
     # ModelProtocol requirement
-    def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'variance') -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'margin') -> np.ndarray:
         if not self.predictor:
             raise ValueError("Predictor not trained/loaded")
+
         if self.feature_names is not None:
             X = X[self.feature_names]
 
-        method = (method or "variance").lower()
-        # Ensemble variance across base models as default
+        method = method.lower()
         if method == 'variance':
-            model_names = self.predictor.get_model_names()
-            if not model_names:
-                # Fallback to magnitude
-                base = np.abs(self.predict(X))
-                return base / base.max() if base.max() > 0 else base
-
-            all_preds = []
-            for m in model_names:
-                try:
-                    p = self.predictor.predict(X, model=m)
-                    p = p.to_numpy() if hasattr(p, "to_numpy") else np.asarray(p)
-                    all_preds.append(p.reshape(-1))
-                except Exception as e:
-                    logger.warning(f"Failed to predict with model {m}: {e}")
-                    continue
-            if len(all_preds) < 2:
-                base = np.abs(self.predict(X))
-                return base / base.max() if base.max() > 0 else base
-            stacked = np.vstack(all_preds)
-            var = stacked.var(axis=0)
-            conf = 1.0 / (1.0 + var)
-            # Min-max normalize to [0,1]
-            vmin, vmax = conf.min(), conf.max()
-            if vmax > vmin:
-                conf = (conf - vmin) / (vmax - vmin)
-            return conf
-
+            try:
+                p = self.predictor.predict(X)
+                p = p.to_numpy() if hasattr(p, "to_numpy") else np.asarray(p)
+                return p
+            except Exception as e:
+                logger.warning(f"Failed to predict with model {self.selected_model_name}: {e}")
+                return np.ones(len(X))
         if method == 'simple':
-            base = np.abs(self.predict(X))
-            return base / base.max() if base.max() > 0 else base
-
+            base = self.predict(X)
+            return np.abs(base / base.max())
         if method == 'margin':
             base = np.abs(self.predict(X))
             return np.tanh(base)
@@ -238,5 +182,57 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         finally:
             self.end_mlflow_run()
         return self.run_id or ""
+
+    def run_threshold_evaluation(self,
+                                X_test: pd.DataFrame,
+                                y_test: pd.Series,
+                                confidence_method: str = 'margin',
+                                threshold_range: tuple = (0.01, 0.99),
+                                n_thresholds: int = 90,
+                                investment_amount: float = 100.0) -> Dict[str, Any]:
+        """Run centralized threshold optimization using ThresholdEvaluator.
+
+        Returns the evaluator results dict.
+        """
+        if not self.predictor:
+            raise ValueError("Predictor not trained/loaded")
+
+        evaluator = ThresholdEvaluator(investment_amount=investment_amount)
+
+        # Determine current prices
+        if 'close' in X_test.columns:
+            current_prices = X_test['close'].to_numpy()
+        elif 'current_price' in X_test.columns:
+            current_prices = X_test['current_price'].to_numpy()
+        else:
+            current_prices = np.ones(len(X_test))
+
+        logger.info("Running threshold evaluation: method=%s, thresholds=%s, n=%d",
+                    confidence_method, str(threshold_range), n_thresholds)
+        try:
+            results = evaluator.optimize_prediction_threshold(
+                model=self,
+                X_test=X_test,
+                y_test=y_test,
+                current_prices_test=current_prices,
+                confidence_method=confidence_method,
+                threshold_range=threshold_range,
+                n_thresholds=n_thresholds,
+            )
+            logger.info("Threshold evaluation finished. status=%s", results.get('status', 'unknown'))
+            return results
+        except Exception as e:
+            logger.error("Threshold evaluation failed: %s", e)
+            return {'status': 'failed', 'message': str(e)}
+
+
+    def load_from_dir(self, model_dir: str) -> "AutoGluonModel":
+        logger.info("Loading AutoGluon predictor from %s", model_dir)
+        self.predictor = TabularPredictor.load(model_dir)
+        self.model = self
+        self.feature_names = self.predictor.original_features
+        self.is_trained = True
+        logger.info("AutoGluon predictor loaded from %s", model_dir)
+        return self
 
 

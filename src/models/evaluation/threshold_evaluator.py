@@ -419,50 +419,6 @@ class ThresholdEvaluator:
             'total_test_samples': len(test_confidence)
         }
     
-    def optimize_prediction_threshold_lstm(self, model: ModelProtocol,
-                                        X_test: pd.DataFrame, y_test: pd.Series,
-                                        current_prices_test: np.ndarray,
-                                        confidence_method: str = 'simple',
-                                        threshold_range: Tuple[float, float] = (0.01, 0.99),
-                                        n_thresholds: int = 90) -> Dict[str, Any]:
-        """
-        Optimize prediction threshold specifically for LSTM models
-        
-        Args:
-            model: LSTM model instance
-            X_test: Test features
-            y_test: Test targets
-            current_prices_test: Current prices for test set
-            confidence_method: Confidence calculation method (recommended: 'simple', 'margin', 'leaf_depth')
-            threshold_range: Range of thresholds to test
-            n_thresholds: Number of thresholds to test
-            
-        Returns:
-            Dictionary with optimization results
-        """
-        logger.info(f"🧠 LSTM-Specific Threshold Optimization using {confidence_method} confidence method")
-        
-        # For LSTM models, use more conservative confidence methods that don't require dropout
-        if confidence_method in ['variance', 'lstm_hidden']:
-            logger.warning(f"⚠️ Confidence method '{confidence_method}' requires dropout activation for LSTM models")
-            logger.info("   Consider using 'simple', 'margin', or 'leaf_depth' for more stable results")
-        
-        # Use wider threshold range for LSTM models
-        if threshold_range == (0.1, 0.9):
-            threshold_range = (0.05, 0.95)  # Wider range for LSTM
-            logger.info(f"   Using LSTM-optimized threshold range: {threshold_range}")
-        
-        # Call the main optimization method with LSTM-specific parameters
-        return self.optimize_prediction_threshold(
-            model=model,
-            X_test=X_test,
-            y_test=y_test,
-            current_prices_test=current_prices_test,
-            confidence_method=confidence_method,
-            threshold_range=threshold_range,
-            n_thresholds=n_thresholds
-        )
-    
     def predict_with_threshold(self, model: ModelProtocol, X: pd.DataFrame, 
                                 threshold: float, confidence_method: str = 'leaf_depth',
                                 return_confidence: bool = False) -> Dict[str, Any]:
