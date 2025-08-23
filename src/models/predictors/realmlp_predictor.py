@@ -14,17 +14,15 @@ class RealMLPPredictor(BasePredictor):
         super().__init__(run_id=run_id, model_type="realmlp")
 
     def load_model_from_mlflow(self) -> None:
-        # Load RealMLP using its PyTorch predictor with MLflow
         inner = RealMLPInner(model_name="RealMLP_inference", config={})
         ok = inner.load_model(self.run_id, experiment_name="realmlp_stock_predictor")
         if not ok:
             raise RuntimeError(f"Failed to load RealMLP model from MLflow run {self.run_id}")
-        # Expose the inner predictor so BasePredictor can call predict/confidence
         self.model = inner
         logger.info("✅ RealMLP model loaded from MLflow and ready for inference")
 
 if __name__ == "__main__":
-    run_id = "a5da7026398747e0a6eb957c45a9714a"
+    run_id = "a052a3ad71ad4f858906534c69474832"
     days_back = 15
 
     predictor = RealMLPPredictor(run_id=run_id)

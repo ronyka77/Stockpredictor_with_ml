@@ -39,7 +39,6 @@ class FeatureMetadata:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage"""
         data = asdict(self)
-        # Convert dates to strings for JSON serialization
         data['calculation_date'] = self.calculation_date.isoformat()
         data['start_date'] = self.start_date.isoformat()
         data['end_date'] = self.end_date.isoformat()

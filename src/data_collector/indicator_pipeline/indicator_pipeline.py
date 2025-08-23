@@ -82,7 +82,6 @@ class BatchFeatureProcessor:
         self.feature_calculator = FeatureCalculator()
         self.feature_storage = FeatureStorage()
         self.consolidated_storage = ConsolidatedFeatureStorage(
-            ConsolidatedStorageConfig(partitioning_strategy="by_date"),
             db_engine=self.data_loader.engine if hasattr(self.data_loader, 'engine') else None
         )
         self.stats = ProcessingStats()

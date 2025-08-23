@@ -62,7 +62,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         use_diagonal = cfg.get("use_diagonal", True)
         use_numeric_embedding = cfg.get("use_numeric_embedding", True)
         numeric_embedding_dim = cfg.get("numeric_embedding_dim", 16)
-
         num_categories = self.config.get("num_categories")
         cat_embed_dim = self.config.get("cat_embed_dim", 32)
         embedding_dropout = self.config.get("embedding_dropout", 0.1)
@@ -566,7 +565,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 logger.warning(f"Trial failed with error: {e}")
                 score = -1e9
 
-            # Report to Optuna (optional pruning hook)
             try:
                 trial.report(score, step=0)
             except Exception:

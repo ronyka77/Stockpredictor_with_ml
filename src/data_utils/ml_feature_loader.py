@@ -6,14 +6,12 @@ and preparing features for ML models from consolidated yearly parquet files.
 """
 
 import pandas as pd
-import numpy as np
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Tuple, Optional
 from datetime import date
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-from sklearn.model_selection import train_test_split
 
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
-from src.data_collector.config import config
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
+from src.feature_engineering.data_loader import StockDataLoader
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility='feature_engineering')
@@ -24,7 +22,7 @@ class MLFeatureLoader:
     Utility class for loading and preparing features for ML models
     """
     
-    def __init__(self, storage: Optional[FeatureStorage] = None, use_consolidated: bool = True):
+    def __init__(self, use_consolidated: bool = True):
         """
         Initialize ML feature loader
         
@@ -32,54 +30,18 @@ class MLFeatureLoader:
             storage: FeatureStorage instance (creates new if None)
             use_consolidated: Whether to use consolidated yearly files (recommended)
         """
-        self.storage = storage or FeatureStorage()
+        self.storage = FeatureStorage()
         self.use_consolidated = use_consolidated
-        self.scalers = {}
         
-        # Initialize consolidated storage if enabled
         if self.use_consolidated:
-            from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
             self.consolidated_storage = ConsolidatedFeatureStorage()
             logger.info("MLFeatureLoader initialized with consolidated yearly files")
         else:
             logger.info("MLFeatureLoader initialized with individual ticker files")
-        
-    def load_ml_dataset(self, ticker: Optional[str] = None, 
-                        start_date: Optional[date] = "2024-01-01",
-                        end_date: Optional[date] = "2025-07-01",
-                        categories: Optional[List[str]] = None,
-                        target_column: str = None,
-                        prediction_horizon: int = 10) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Load features with pre-calculated future price targets
-        
-        Args:
-            ticker: Single ticker symbol (None for ALL tickers)
-            start_date: Start date filter
-            end_date: End date filter
-            categories: Feature categories to include
-            target_column: Deprecated - uses Future_High_XD columns instead
-            prediction_horizon: Days ahead (determines which Future_High_XD column to use)
-            
-        Returns:
-            Tuple of (features DataFrame, target Series from Future_High_XD)
-        """
-        # Apply config defaults
-        prediction_horizon = prediction_horizon or config.ml.DEFAULT_PREDICTION_HORIZON
-        
-        if ticker is None:
-            logger.info(f"Loading ML dataset for ALL tickers using {'consolidated' if self.use_consolidated else 'individual'} storage")
-        else:
-            logger.info(f"Loading ML dataset for ticker '{ticker}' using {'consolidated' if self.use_consolidated else 'individual'} storage")
-        
-        if self.use_consolidated:
-            return self._load_from_consolidated(ticker, start_date, end_date, categories, prediction_horizon)
-        else:
-            return self._load_from_individual_files(ticker, start_date, end_date, categories, prediction_horizon)
-    
+
     def _load_from_consolidated(self, ticker: Optional[str] = None, 
                                 start_date: Optional[date] = "2024-01-01",
-                                end_date: Optional[date] = "2025-06-28",
+                                end_date: Optional[date] = "2025-09-01",
                                 categories: Optional[List[str]] = None,
                                 prediction_horizon: int = 10) -> Tuple[pd.DataFrame, pd.Series]:
         """Load data from consolidated yearly files with pre-calculated targets"""
@@ -178,7 +140,7 @@ class MLFeatureLoader:
                 
                 # Remove target columns from features to avoid data leakage
                 features_clean = features.drop(columns=[col for col in features.columns 
-                                                       if col.startswith('Future_')])
+                                                        if col.startswith('Future_')])
                 
                 # Remove rows with NaN targets
                 valid_mask = targets.notna()
@@ -201,7 +163,7 @@ class MLFeatureLoader:
                     
                     # Remove target columns from features
                     features_clean = features.drop(columns=[col for col in features.columns 
-                                                           if col.startswith('Future_')])
+                                                            if col.startswith('Future_')])
                     
                     # Remove rows with NaN targets
                     valid_mask = targets.notna()
@@ -216,129 +178,10 @@ class MLFeatureLoader:
         except Exception as e:
             logger.error(f"Error loading features for {ticker}: {str(e)}")
             raise
-    
-    def _handle_missing_values(self, features: pd.DataFrame, target: pd.Series, method: str) -> Tuple[pd.DataFrame, pd.Series]:
-        """Handle missing values in features and target"""
-        if method == 'drop':
-            # Drop rows with any missing values
-            valid_idx = features.dropna().index.intersection(target.dropna().index)
-            return features.loc[valid_idx], target.loc[valid_idx]
-        
-        elif method == 'fill_mean':
-            features_filled = features.fillna(features.mean())
-            return features_filled, target.fillna(target.mean())
-        
-        elif method == 'fill_median':
-            features_filled = features.fillna(features.median())
-            return features_filled, target.fillna(target.median())
-        
-        elif method == 'fill_zero':
-            return features.fillna(0), target.fillna(0)
-        
-        else:
-            raise ValueError(f"Unknown missing value method: {method}")
-    
-    def _select_features(self, features: pd.DataFrame, target: pd.Series, config: Dict) -> pd.DataFrame:
-        """Select features based on configuration"""
-        # This is a placeholder for feature selection logic
-        # Could implement correlation filtering, variance filtering, etc.
-        return features
-    
-    def _create_splits(self, features: pd.DataFrame, target: pd.Series, 
-                        test_size: float, val_size: float) -> Dict[str, Union[pd.DataFrame, pd.Series]]:
-        """Create train/validation/test splits"""
-        # First split: train+val vs test
-        X_temp, X_test, y_temp, y_test = train_test_split(
-            features, target, test_size=test_size, random_state=42, stratify=None
-        )
-        
-        # Second split: train vs val
-        val_size_adjusted = val_size / (1 - test_size)
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_temp, y_temp, test_size=val_size_adjusted, random_state=42, stratify=None
-        )
-        
-        return {
-            'X_train': X_train,
-            'X_val': X_val,
-            'X_test': X_test,
-            'y_train': y_train,
-            'y_val': y_val,
-            'y_test': y_test
-        }
-    
-    def _scale_features(self, splits: Dict, method: str) -> Dict:
-        """Scale features using specified method"""
-        if method == 'standard':
-            scaler = StandardScaler()
-        elif method == 'minmax':
-            scaler = MinMaxScaler()
-        elif method == 'robust':
-            scaler = RobustScaler()
-        else:
-            raise ValueError(f"Unknown scaling method: {method}")
-        
-        # Fit scaler on training data only
-        numeric_columns = splits['X_train'].select_dtypes(include=[np.number]).columns
-        
-        # Fit and transform training data
-        splits['X_train'][numeric_columns] = scaler.fit_transform(splits['X_train'][numeric_columns])
-        
-        # Transform validation and test data
-        splits['X_val'][numeric_columns] = scaler.transform(splits['X_val'][numeric_columns])
-        splits['X_test'][numeric_columns] = scaler.transform(splits['X_test'][numeric_columns])
-        
-        # Store scaler for future use
-        self.scalers[method] = scaler
-        
-        return splits
-    
-    def _get_feature_category(self, feature_name: str) -> str:
-        """Determine feature category from feature name"""
-        feature_name_lower = feature_name.lower()
-        
-        if any(x in feature_name_lower for x in ['sma', 'ema', 'macd', 'ichimoku']):
-            return 'trend'
-        elif any(x in feature_name_lower for x in ['rsi', 'stoch', 'roc', 'williams']):
-            return 'momentum'
-        elif any(x in feature_name_lower for x in ['bb', 'bollinger', 'atr', 'volatility']):
-            return 'volatility'
-        elif any(x in feature_name_lower for x in ['obv', 'vpt', 'ad_line', 'volume', 'mfi']):
-            return 'volume'
-        else:
-            return 'basic'
-
-
-# Convenience functions
-def load_ml_ready_data(ticker: Optional[str] = None, 
-                        categories: Optional[List[str]] = None,
-                        start_date: Optional[date] = None,
-                        end_date: Optional[date] = None,
-                        prediction_horizon: int = 10,
-                        use_consolidated: bool = True) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Convenience function to load ML-ready dataset with pre-calculated future targets
-    
-    Args:
-        ticker: Single ticker symbol (None for ALL tickers)
-        categories: Feature categories to include
-        start_date: Start date filter
-        end_date: End date filter
-        prediction_horizon: Days ahead (determines which Future_High_XD column to use)
-        use_consolidated: Whether to use consolidated yearly files (recommended)
-        
-    Returns:
-        Tuple of (features DataFrame, target Series from Future_High_XD)
-    """
-    loader = MLFeatureLoader(use_consolidated=use_consolidated)
-    return loader.load_ml_dataset(ticker, start_date, end_date, categories, 
-                                    prediction_horizon=prediction_horizon)
-
 
 def load_yearly_data(year: int, 
                         ticker: Optional[str] = None,
-                        categories: Optional[List[str]] = None,
-                        prediction_horizon: int = 10) -> pd.DataFrame:
+                        categories: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Convenience function to load data for a specific year
     
@@ -346,13 +189,10 @@ def load_yearly_data(year: int,
         year: Year to load (e.g., 2024, 2025)
         ticker: Single ticker symbol (None for ALL available)
         categories: Feature categories to include
-        prediction_horizon: Days ahead (determines which Future_High_XD column to use)
         
     Returns:
         DataFrame with features for the specified year
-    """
-    from datetime import date
-    
+    """    
     start_date = date(year, 1, 1)
     end_date = date(year, 12, 31)
     loader = MLFeatureLoader(use_consolidated=True)
@@ -363,35 +203,6 @@ def load_yearly_data(year: int,
                 categories=categories
             )
     return features
-
-
-def load_date_range_data(start_date: date, 
-                        end_date: date,
-                        ticker: Optional[str] = None,
-                        categories: Optional[List[str]] = None,
-                        prediction_horizon: int = 10) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Convenience function to load data for a specific date range with pre-calculated future targets
-    
-    Args:
-        start_date: Start date
-        end_date: End date
-        ticker: Single ticker symbol (None for ALL available)
-        categories: Feature categories to include
-        prediction_horizon: Days ahead (determines which Future_High_XD column to use)
-        
-    Returns:
-        Tuple of (features DataFrame, target Series from Future_High_XD)
-    """
-    loader = MLFeatureLoader(use_consolidated=True)
-    return loader.load_ml_dataset(
-        ticker=ticker,
-        start_date=start_date,
-        end_date=end_date,
-        categories=categories,
-        prediction_horizon=prediction_horizon
-    )
-
 
 def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
     """
@@ -404,12 +215,8 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
         Combined DataFrame with all loaded data
     """
     years_to_load = [2024, 2025]
-    logger.info("=" * 80)
-    logger.info("LOADING ALL DATA FROM YEARLY PARQUET FILES")
-    logger.info("=" * 80)
     
     try:
-        from src.feature_engineering.data_loader import StockDataLoader
         data_loader = StockDataLoader()
         
         # Load data for multiple years
@@ -421,8 +228,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
             try:
                 features = load_yearly_data(
                     year=year,
-                    ticker=ticker,
-                    categories=None
+                    ticker=ticker
                 )
                 
                 if not features.empty:

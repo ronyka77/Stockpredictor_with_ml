@@ -96,7 +96,7 @@ class FeatureEngineeringConfig:
     ENABLE_PARALLEL_PROCESSING: bool = True
     MAX_WORKERS: int = 4
     
-    # Database Configuration (inherits from PolygonConfig)
+    # Database Configuration
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
     DB_NAME: str = os.getenv("DB_NAME", "stock_data")

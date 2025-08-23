@@ -15,8 +15,16 @@ class _NumpyOptionalCatDataset(Dataset):
     """
 
     def __init__(self, *, X_num: np.ndarray, y: np.ndarray, cat_idx: Optional[np.ndarray] = None) -> None:
-        assert X_num.dtype == np.float32, "X_num must be float32"
+        """Support both in-memory numpy arrays and memmapped numpy arrays.
+
+        For very large datasets, users can pass `np.memmap` instances for
+        `X_num` (and `cat_idx`) to avoid copying the whole dataset into RAM.
+        """
+        # Accept either float32 arrays or memmap views; ensure dtype without copying when possible
+        if X_num.dtype != np.float32:
+            X_num = X_num.astype(np.float32)
         self.X_num = X_num
+        # y must be float32; prefer to avoid unnecessary copies if already correct dtype
         self.y = y.astype(np.float32)
         self.cat_idx = cat_idx.astype(np.int64) if cat_idx is not None else None
 
@@ -24,8 +32,11 @@ class _NumpyOptionalCatDataset(Dataset):
         return int(self.y.shape[0])
 
     def __getitem__(self, idx: int):
-        x = torch.from_numpy(self.X_num[idx])
-        y = torch.tensor(self.y[idx])
+        # Indexing memmaps returns numpy arrays without copying large blocks
+        x_np = self.X_num[idx]
+        y_np = self.y[idx]
+        x = torch.from_numpy(x_np)
+        y = torch.tensor(y_np)
         if self.cat_idx is not None:
             c = torch.tensor(self.cat_idx[idx])
             return x, y, c
@@ -47,15 +58,17 @@ def create_dataloader_from_numpy(
     Arguments are designed for tabular models that accept (x_num, y, cat_idx) batches,
     where cat_idx may be None.
     """
-    ds = _NumpyOptionalCatDataset(X_num=X_num.astype(np.float32), y=y, cat_idx=cat_idx)
+    # Do not force a full-copy to float32 here; let dataset handle memmap and dtype coercion
+    ds = _NumpyOptionalCatDataset(X_num=X_num, y=y, cat_idx=cat_idx)
     pin = torch.cuda.is_available() if pin_memory is None else bool(pin_memory)
+    # Keep persistent_workers disabled when num_workers == 0 to avoid extra memory/worker overhead
     return DataLoader(
         ds,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=pin,
-        persistent_workers=num_workers > 0,
+        persistent_workers=(num_workers > 0),
     )
 
 

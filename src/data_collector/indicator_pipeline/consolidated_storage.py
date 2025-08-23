@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 from dataclasses import dataclass
 
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
-from src.data_collector.config import config as fe_config
+from src.feature_engineering.config import config as fe_config
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility='feature_engineering')
@@ -31,7 +31,7 @@ class ConsolidatedFeatureStorage:
     Consolidated storage system for multiple tickers in year-partitioned Parquet files
     """
     
-    def __init__(self, config: Optional[ConsolidatedStorageConfig] = None, db_engine=None):
+    def __init__(self, db_engine=None):
         """
         Initialize consolidated feature storage
         
@@ -39,7 +39,7 @@ class ConsolidatedFeatureStorage:
             config: Consolidated storage configuration
             db_engine: Database engine for metadata storage
         """
-        self.config = config or ConsolidatedStorageConfig()
+        self.config = ConsolidatedStorageConfig()
         self.db_engine = db_engine
         
         # Create storage directories
@@ -123,13 +123,12 @@ class ConsolidatedFeatureStorage:
         if not parquet_files:
             raise FileNotFoundError("No consolidated feature files found")
         
-        # Build filters - only single ticker or None
         filters = self._build_parquet_filters(ticker, start_date, end_date)
         
         all_data = []
         for file_path in parquet_files:
+            logger.info(f"Loading {file_path}")
             try:
-                # Load with filters for efficiency
                 if filters:
                     data = pd.read_parquet(file_path, filters=filters)
                 else:
@@ -147,7 +146,7 @@ class ConsolidatedFeatureStorage:
         
         # Combine all data
         combined_data = pd.concat(all_data, ignore_index=True)
-        # Apply ticker filter if specified (single ticker only)
+        
         if ticker:
             combined_data = combined_data[combined_data['ticker'] == ticker]
             if combined_data.empty:
@@ -157,7 +156,6 @@ class ConsolidatedFeatureStorage:
         # Apply category filter
         if categories:
             category_columns = self._get_columns_by_category(combined_data.columns, categories)
-            # Keep metadata columns + category columns
             keep_columns = ['ticker', 'date'] + category_columns
             combined_data = combined_data[keep_columns]
         

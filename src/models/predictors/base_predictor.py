@@ -77,7 +77,7 @@ class BasePredictor(ABC):
             prediction_horizon=self.prediction_horizon,
             days_back=days_back,
         )
-        logger.info(f"   Data shape after cleaning: {data_result['X_test'].shape}")
+        logger.info(f"Data shape after cleaning: {data_result['X_test'].shape}")
 
         recent_features = data_result['X_test'].copy()
         recent_targets = data_result['y_test'].copy()
@@ -212,8 +212,7 @@ class BasePredictor(ABC):
         *,
         features_df: pd.DataFrame,
         metadata_df: pd.DataFrame,
-        predictions: np.ndarray,
-    ) -> Tuple[pd.DataFrame, float]:
+        predictions: np.ndarray) -> Tuple[pd.DataFrame, float]:
         """
         Build the results DataFrame and compute the average profit per investment
         without writing to disk.
@@ -222,7 +221,12 @@ class BasePredictor(ABC):
         """
         # 1) Minimal result skeleton from predictions and metadata
         results_df = metadata_df.copy()
-        results_df['ticker_id'] = features_df['ticker_id'].values
+        try:
+            results_df['ticker_id'] = features_df['ticker_id'].values
+        except KeyError:
+            logger.warning("   ⚠️  No ticker_id column found in features_df. Using date_int instead.")
+            logger.warning(f"   ⚠️  Features_df columns: {features_df.columns.tolist()}")
+
         results_df['date_int'] = features_df['date_int'].values
         results_df['date'] = pd.to_datetime(
             results_df['date_int'], unit='D', origin='2020-01-01'

@@ -24,7 +24,6 @@ class RealMLPModule(nn.Module):
         output_size: int = 1) -> None:
         
         super().__init__()
-
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
         self.output_size = output_size
