@@ -11,29 +11,26 @@ uv run python -m src.models.automl.autogluon_trainer --preset high_quality
 
 from __future__ import annotations
 
-from typing import Any, Dict
 import numpy as np
 import pandas as pd
+from typing import Any, Dict
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from src.utils.logger import get_logger
-from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
+from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.automl.autogluon_model import AutoGluonModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
 
 
 logger = get_logger(__name__)
 
-
 def train_autogluon(*,
                     prediction_horizon: int = 10,
-                    split_date: str = '2025-02-01',
-                    presets: str = 'high_quality',
-                    num_cpus: int = 12,
-                    eval_metric: str = 'rmse') -> Dict[str, Any]:
-    data = prepare_ml_data_for_training_with_cleaning(
+                    presets: str = 'high_quality') -> Dict[str, Any]:
+    # Use centralized common training data preparation
+    data = prepare_common_training_data(
         prediction_horizon=prediction_horizon,
-        split_date=split_date,
-        clean_features=True,
+        recent_date_int_cut=15,
     )
 
     X_train: pd.DataFrame = data['X_train']
@@ -44,26 +41,21 @@ def train_autogluon(*,
     # Build model
     config = {
         'label': 'Future_Return_10',
-        'eval_metric': eval_metric,
         'presets': presets,
-        'ag_args_fit': {"num_cpus": num_cpus, "num_gpus": 0},
-        'hyperparameters': {
-            "GBM": {}, "XGB": {}, "CAT": {}, "RF": {}, "XT": {}, "REALMLP": {},
-        }
     }
     model = AutoGluonModel(model_name='autogluon', config=config)
     model.fit(X_train, y_train, X_val=X_test, y_val=y_test)
 
     # Evaluate baseline RMSE/MAE/R2
     preds = model.predict(X_test)
-    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+    
     metrics = {
         'rmse': float(np.sqrt(mean_squared_error(y_test, preds))),
         'mae': float(mean_absolute_error(y_test, preds)),
         'r2': float(r2_score(y_test, preds)),
     }
     logger.info(f"Baseline metrics: {metrics}")
-
+    model.feature_importance(X_test)
     # Threshold optimization with profit evaluation
     evaluator = ThresholdEvaluator()
     try:
@@ -86,8 +78,6 @@ def train_autogluon(*,
     params_to_log = {
         'prediction_horizon': prediction_horizon,
         'presets': presets,
-        'num_cpus': num_cpus,
-        'eval_metric': eval_metric,
     }
     model.save_to_mlflow(params=params_to_log, metrics=metrics, experiment_name='stock_prediction_autogluon')
 
@@ -101,10 +91,7 @@ def train_autogluon(*,
 def main():
     train_autogluon(
         prediction_horizon=10,
-        split_date='2025-02-01',
         presets='high_quality',
-        num_cpus=12,
-        eval_metric='rmse',
     )
 
 

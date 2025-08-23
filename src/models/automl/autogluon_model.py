@@ -26,6 +26,41 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def default_mean_diff(y_true, y_pred, *args, **kwargs):
+    """Top-level default metric function to compute mean(y_true - y_pred).
+    Defined at module scope so it can be pickled when AutoGluon serializes the
+    predictor.
+    """
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    return np.mean(y_t - y_p)
+
+class EvalMetricWrapper:
+    def __init__(self, func=None, needs_proba=False, name=None, greater_is_better_internal=True, worst_possible_value=None):
+        """Wrap a metric function for AutoGluon. If no func provided, default to
+        returning np.mean(y_true - y_pred, *args, **kwargs).
+        Exposes common attributes AutoGluon checks (e.g., needs_proba, needs_quantile,
+        greater_is_better_internal, name, worst_possible_value) to avoid attribute errors.
+        """
+        # Default metric: mean(y_true - y_pred) using module-level function (picklable)
+        if func is None:
+            func = default_mean_diff
+
+        self.func = func
+        # Attributes AutoGluon typically inspects
+        self.needs_proba = needs_proba
+        self.needs_pred = True
+        self.needs_quantile = False
+        self.name = name or getattr(func, "__name__", "custom_metric")
+        self.greater_is_better_internal = greater_is_better_internal
+        # Expose both names for compatibility with Autogluon internal checks
+        self.greater_is_better = greater_is_better_internal
+        self.worst_possible_value = worst_possible_value
+
+    def __call__(self, y_true, y_pred, *args, **kwargs):
+        return self.func(y_true, y_pred, *args, **kwargs)
+
+
 class AutoGluonModel(BaseModel, ModelProtocol):
     def __init__(self, *,
                 model_name: str = "autogluon",
@@ -45,13 +80,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             y_val: Optional[pd.Series] = None,
             **kwargs) -> "AutoGluonModel":
         label = self.config.get("label", "Future_Return_10")
-        eval_metric = self.config.get("eval_metric", "rmse")
+        eval_metric = EvalMetricWrapper(name="mean_diff", greater_is_better_internal=True)
         presets = self.config.get("presets", "high_quality")
-        ag_args_fit = self.config.get("ag_args_fit", {"num_cpus": 12, "num_gpus": 0})
-        hyperparameters = self.config.get("hyperparameters", {
-            "GBM": {}, "XGB": {}, "CAT": {}, "RF": {}, "XT": {}, "REALMLP": {},
-            "KNN": None,
-        })
 
         # Build train/valid DataFrames with label column
         train_df = X.copy()
@@ -61,16 +91,45 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df = X_val.copy()
             valid_df[label] = y_val.values
 
+        hyperparams = {
+            "GBM": {},        # LightGBM defaults
+            "XGB": {},        # XGBoost
+            "CAT": {},        # CatBoost
+            "NN_TORCH": {},   # Tabular neural net
+            "RF": {},
+            "XT": {},
+            "REALMLP": {},
+        }
+
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
-        self.predictor = TabularPredictor(label=label, eval_metric=eval_metric)
+        self.predictor = TabularPredictor(label=label, 
+                                eval_metric=eval_metric, 
+                                problem_type='regression',
+                                verbosity=3,
+                                )
         self.predictor.fit(
+            time_limit=7200,
             train_data=train_df,
             tuning_data=valid_df,
             presets=presets,
-            ag_args_fit=ag_args_fit,
-            hyperparameters=hyperparameters,
-            # Enable using provided validation in bagged mode per AutoGluon requirement
+            hyperparameters=hyperparams,
+            dynamic_stacking=False,
+            num_cpus=12,
+            num_gpus=1,
             use_bag_holdout=True if valid_df is not None else False,
+        )
+        self.predictor.leaderboard(
+            extra_info=True,
+            silent=True,
+            display=True,
+        )
+
+        self.predictor.distill(
+            time_limit=7200,
+            train_data=train_df,
+            tuning_data=valid_df,
+            presets=presets,
+            hyperparameters=hyperparams,
         )
 
         # Capture feature names (exclude label)
@@ -111,7 +170,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                     p = self.predictor.predict(X, model=m)
                     p = p.to_numpy() if hasattr(p, "to_numpy") else np.asarray(p)
                     all_preds.append(p.reshape(-1))
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to predict with model {m}: {e}")
                     continue
             if len(all_preds) < 2:
                 base = np.abs(self.predict(X))

@@ -215,7 +215,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
         Combined DataFrame with all loaded data
     """
     years_to_load = [2024, 2025]
-    
+    data_loader = None
     try:
         data_loader = StockDataLoader()
         
@@ -304,14 +304,22 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                     logger.error(f"❌ Error fetching all ticker metadata: {str(e)}")
                     combined_features['ticker_id'] = None
             
-            # Close data loader connection
-            data_loader.close()
-            
             return combined_features
         else:
             logger.warning("No yearly data could be loaded")
+            # Ensure data loader closed before early return
+            try:
+                if data_loader is not None:
+                    data_loader.close()
+            except Exception as e:
+                logger.warning(f"Failed to close data_loader before early return: {e}")
             return pd.DataFrame()
-            
     except Exception as e:
         logger.error(f"CRITICAL ERROR in load_all_data: {str(e)}")
-        raise 
+        raise
+    finally:
+        try:
+            if data_loader is not None:
+                data_loader.close()
+        except Exception as e:
+            logger.warning(f"Failed to close data_loader in finally: {e}")

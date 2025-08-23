@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from src.models.time_series.realmlp.realmlp_architecture import RealMLPModule
-from src.models.time_series.common.dataloader_utils import create_dataloader_from_numpy
+from src.models.common.dataloader_utils import create_dataloader_from_numpy
 from src.models.time_series.realmlp.realmlp_preprocessing import RealMLPPreprocessor
 from src.utils.logger import get_logger
 
@@ -383,7 +383,12 @@ class RealMLPTrainingMixin:
                         # Restore the best checkpoint if available
                         if best_ckpt_path is not None:
                             try:
-                                state = torch.load(best_ckpt_path, map_location=device)
+                                # Prefer weights_only when available to avoid arbitrary object unpickling
+                                try:
+                                    state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
+                                except TypeError:
+                                    # Older torch doesn't support weights_only
+                                    state = torch.load(best_ckpt_path, map_location=device)
                                 self.model.load_state_dict(state.get("model_state", {}))
                                 logger.info("✅ Restored best model weights from checkpoint")
                             except Exception as e:
@@ -397,7 +402,12 @@ class RealMLPTrainingMixin:
         # Finalize by restoring best weights if training finished without trigger
         if best_ckpt_path is not None:
             try:
-                state = torch.load(best_ckpt_path, map_location=device)
+                # Prefer weights_only when available to avoid arbitrary object unpickling
+                try:
+                    state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
+                except TypeError:
+                    # Older torch doesn't support weights_only
+                    state = torch.load(best_ckpt_path, map_location=device)
                 self.model.load_state_dict(state.get("model_state", {}))
                 logger.info(f"✅ Finalized with best checkpoint weights (val_mse={best_val:.6f})")
             except Exception as e:

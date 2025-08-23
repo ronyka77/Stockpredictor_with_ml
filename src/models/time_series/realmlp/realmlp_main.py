@@ -15,7 +15,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from src.models.time_series.common.training_data_prep import prepare_common_training_data
+from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.time_series.realmlp.realmlp_preprocessing import RealMLPPreprocessor
 from src.models.time_series.realmlp.realmlp_predictor import RealMLPPredictor
 from src.utils.logger import get_logger
@@ -34,7 +34,7 @@ def main() -> None:
     logger.info("🎯 RealMLP TRAINING & EVALUATION")
     logger.info("=" * 80)
 
-    num_trials = 10
+    num_trials = 20
     # 1) Centralized data preparation
     prep = prepare_common_training_data(
         prediction_horizon=10,
@@ -84,7 +84,7 @@ def main() -> None:
         confidence_method="latent_mahalanobis",
         n_trials=num_trials
     )
-    metrics = results.get("best_trial_info")
+    metrics = results.get("best_value")
 
     # 4) Save to MLflow
     run_id = predictor.save_model(

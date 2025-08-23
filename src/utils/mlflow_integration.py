@@ -38,8 +38,7 @@ class MLflowIntegration:
         mlflow.set_tracking_uri(tracking_uri)
 
     def setup_experiment(
-        self, experiment_name: str, artifact_location: Optional[str] = None
-    ) -> str:
+        self, experiment_name: str, artifact_location: Optional[str] = None) -> str:
         """Set up MLflow experiment.
         Args:
             experiment_name: Name of the experiment
