@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 from autogluon.tabular import TabularPredictor
+from autogluon.core.metrics import make_scorer
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ModelProtocol
@@ -35,6 +36,8 @@ def default_mean_diff(y_true, y_pred, *args, **kwargs):
     y_p = np.asarray(y_pred)
     return np.mean(y_t - y_p)
 
+scorer = make_scorer(name="mean_diff", func=default_mean_diff, greater_is_better=True, optimum=1)
+
 class EvalMetricWrapper:
     def __init__(self, func=None, needs_proba=False, name=None, greater_is_better_internal=True, worst_possible_value=None):
         """Wrap a metric function for AutoGluon. If no func provided, default to
@@ -51,11 +54,16 @@ class EvalMetricWrapper:
         self.needs_proba = needs_proba
         self.needs_pred = True
         self.needs_quantile = False
+        # Some AutoGluon code checks for 'needs_class' on metric objects
+        self.needs_class = False
         self.name = name or getattr(func, "__name__", "custom_metric")
         self.greater_is_better_internal = greater_is_better_internal
         # Expose both names for compatibility with Autogluon internal checks
         self.greater_is_better = greater_is_better_internal
         self.worst_possible_value = worst_possible_value
+        # Provide `.error` and `.score` expected by some AutoGluon internals
+        self.error = self.func
+        self.score = self.func
 
     def __call__(self, y_true, y_pred, *args, **kwargs):
         return self.func(y_true, y_pred, *args, **kwargs)
@@ -80,8 +88,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             y_val: Optional[pd.Series] = None,
             **kwargs) -> "AutoGluonModel":
         label = self.config.get("label", "Future_Return_10")
-        eval_metric = EvalMetricWrapper(name="mean_diff", greater_is_better_internal=True)
-        presets = self.config.get("presets", "high_quality")
+        eval_metric = scorer
+
 
         # Build train/valid DataFrames with label column
         train_df = X.copy()
@@ -91,14 +99,15 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df = X_val.copy()
             valid_df[label] = y_val.values
 
+        combined_df = pd.concat([train_df, valid_df], axis=0)
+        combined_df = combined_df.sample(frac=1).reset_index(drop=True)
+        logger.info(f"combined_df: {len(combined_df)}")
+
         hyperparams = {
             "GBM": {},        # LightGBM defaults
             "XGB": {},        # XGBoost
-            "CAT": {},        # CatBoost
-            "NN_TORCH": {},   # Tabular neural net
-            "RF": {},
-            "XT": {},
-            "REALMLP": {},
+            # "REALMLP": {},
+            "TABICL": {}
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
@@ -109,28 +118,34 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                                 )
         self.predictor.fit(
             time_limit=7200,
-            train_data=train_df,
-            tuning_data=valid_df,
-            presets=presets,
+            train_data=combined_df,
+            presets='high',
             hyperparameters=hyperparams,
             dynamic_stacking=False,
-            num_cpus=12,
+            num_cpus=14,
             num_gpus=1,
-            use_bag_holdout=True if valid_df is not None else False,
+            auto_stack=True,
+            use_bag_holdout=True
         )
+        results = self.predictor.fit_summary()
+        logger.info(f"Model names: {self.predictor.model_names()}")
+        logger.info(f"results: {results.to_dict()}")
+        
+
         self.predictor.leaderboard(
+            data=valid_df,
             extra_info=True,
             silent=True,
             display=True,
         )
 
-        self.predictor.distill(
-            time_limit=7200,
-            train_data=train_df,
-            tuning_data=valid_df,
-            presets=presets,
-            hyperparameters=hyperparams,
-        )
+        # self.predictor.distill(
+        #     time_limit=7200,
+        #     train_data=train_df,
+        #     tuning_data=valid_df,
+        #     presets=presets,
+        #     hyperparameters=hyperparams,
+        # )
 
         # Capture feature names (exclude label)
         self.feature_names = [c for c in train_df.columns if c != label]

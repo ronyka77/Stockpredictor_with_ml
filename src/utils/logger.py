@@ -141,8 +141,6 @@ def get_logger(name: str, utility: Optional[str] = None) -> logging.Logger:
             utility = 'lightgbm'
         elif 'xgboost' in name:
             utility = 'xgboost'
-        elif 'catboost' in name:
-            utility = 'catboost'
         elif 'random_forest' in name:
             utility = 'random_forest'
         else:

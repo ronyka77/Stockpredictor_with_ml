@@ -168,8 +168,6 @@ class MLflowIntegration:
                 log_func = mlflow.sklearn.log_model
             elif flavor == "xgboost":
                 log_func = mlflow.xgboost.log_model
-            elif flavor == "catboost":
-                log_func = mlflow.catboost.log_model
             else:
                 raise ValueError(f"Unsupported model flavor: {flavor}")
 

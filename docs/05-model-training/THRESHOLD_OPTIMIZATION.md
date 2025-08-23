@@ -476,7 +476,7 @@ evaluator = ThresholdEvaluator(investment_amount=500.0)
 
 ### Model Protocol Compliance
 - Works with any model implementing ModelProtocol
-- Easy extension to LightGBM, CatBoost, etc.
+- Easy extension to LightGBM, etc.
 - Consistent evaluation methodology across models
 
 ### Data Loading Integration

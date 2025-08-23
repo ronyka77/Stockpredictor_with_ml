@@ -55,7 +55,10 @@ def train_autogluon(*,
         'r2': float(r2_score(y_test, preds)),
     }
     logger.info(f"Baseline metrics: {metrics}")
-    model.feature_importance(X_test)
+
+    feature_importance = model.feature_importance(X_test)
+    logger.info(f"Feature importance: {feature_importance}")
+    
     # Threshold optimization with profit evaluation
     evaluator = ThresholdEvaluator()
     try:

@@ -400,7 +400,7 @@ class BaseModel(ABC):
         Log model to MLflow
         
         Args:
-            flavor: MLflow model flavor (sklearn, xgboost, catboost, etc.)
+            flavor: MLflow model flavor (sklearn, xgboost, etc.)
         """
         try:
             if self.is_trained:

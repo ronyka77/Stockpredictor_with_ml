@@ -2,7 +2,7 @@
 Threshold-Based Model Evaluation
 
 This module provides centralized threshold optimization and profit-based evaluation
-capabilities that can be used by different gradient boosting models (XGBoost, LightGBM, CatBoost).
+capabilities that can be used by different gradient boosting models (XGBoost, LightGBM).
 """
 
 import numpy as np
