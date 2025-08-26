@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 _cleaned_data_cache = CleanedDataCache()
 
 def prepare_ml_data_for_training(prediction_horizon: int = 10, 
-                                split_date: str = '2025-02-01',
+                                split_date: str = '2025-03-15',
                                 ticker: Optional[str] = None,
                                 apply_stationarity_transform: bool = False) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
@@ -118,8 +118,6 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         
         # Remove the date column after temporal features are created
         X = X.drop(columns=['date'])
-        
-        logger.info("✅ Added temporal features: date_int, year, month, day_of_year, quarter")
         logger.info(f"📋 Total features: {len(X.columns)}")
         
         # 5. Clean data
@@ -173,15 +171,15 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         test_dates = dates_clean[test_mask]
         
         # Filter test set to include only Mondays and Fridays
-        if not test_dates.empty:
-            logger.info("📅 Filtering test set to include only Mondays and Fridays.")
-            is_monday_or_friday = (test_dates.dt.dayofweek == 0) | (test_dates.dt.dayofweek == 4)
+        # if not test_dates.empty:
+        #     logger.info("📅 Filtering test set to include only Mondays and Fridays.")
+        #     is_monday_or_friday = (test_dates.dt.dayofweek == 0) | (test_dates.dt.dayofweek == 4)
             
-            X_test = X_test[is_monday_or_friday]
-            y_test = y_test[is_monday_or_friday]
+        #     X_test = X_test[is_monday_or_friday]
+        #     y_test = y_test[is_monday_or_friday]
             
-            # Update test_dates to reflect the change for logging and further processing
-            test_dates = test_dates[is_monday_or_friday]
+        #     # Update test_dates to reflect the change for logging and further processing
+        #     test_dates = test_dates[is_monday_or_friday]
 
         # Reserve last 3 days of test data for unseen prediction
         if not test_dates.empty:
@@ -314,7 +312,7 @@ def prepare_ml_data_for_prediction(prediction_horizon: int = 10) -> Dict[str, Un
         if not pd.api.types.is_datetime64_any_dtype(date_col):
             date_col = pd.to_datetime(date_col)
         
-        split_date_dt = pd.to_datetime('2025-02-01')
+        split_date_dt = pd.to_datetime('2025-03-15')
         
         test_mask = date_col >= split_date_dt
         X_test = X[test_mask].copy()
@@ -365,7 +363,7 @@ def prepare_ml_data_for_prediction(prediction_horizon: int = 10) -> Dict[str, Un
         raise
 
 def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
-                                                split_date: str = '2025-02-01',
+                                                split_date: str = '2025-03-15',
                                                 ticker: str = None,
                                                 clean_features: bool = True,
                                                 apply_stationarity_transform: bool = False) -> dict:
@@ -410,7 +408,6 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
     logger.info("Step 2: Applying XGBoost data cleaning to combined train/test set...")
     combined_X = pd.concat([data_result['X_train'], data_result['X_test']], ignore_index=True)
     combined_y = pd.concat([data_result['y_train'], data_result['y_test']], ignore_index=True)
-    logger.info(f"   Combined set: {len(combined_X)} samples, {combined_X.shape[1]} features")
     combined_X_clean = clean_data_for_xgboost(combined_X)
     logger.info(f"   After cleaning: {len(combined_X_clean)} samples, {combined_X_clean.shape[1]} features")
     # Split back into train/test

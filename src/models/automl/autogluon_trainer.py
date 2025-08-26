@@ -2,7 +2,7 @@
 AutoGluon training entrypoint
 
 Uses prepare_ml_data_for_training_with_cleaning to obtain X_train/y_train and
-X_test/y_test, constructs train_df/valid_df with `Future_Return_10`, trains an
+X_test/y_test, constructs train_df/valid_df with `Future_Return_10D`, trains an
 AutoGluonModel, and logs artifacts/metrics to MLflow.
 
 Run:
@@ -30,8 +30,10 @@ def train_autogluon(*,
         prediction_horizon=prediction_horizon,
         recent_date_int_cut=25,
     )
+    logger.info(f"target_column: {data.get('target_column')}")
 
     X_train: pd.DataFrame = data['X_train']
+    logger.info(f"X_train: {X_train.columns.tolist()}")
     y_train: pd.Series = data['y_train']
     X_test: pd.DataFrame = data['X_test']
     y_test: pd.Series = data['y_test']
@@ -40,7 +42,7 @@ def train_autogluon(*,
 
     # Build model
     config = {
-        'label': 'Future_Return_10',
+        'label': 'Future_Return_10D',
         'presets': presets,
     }
     model = AutoGluonModel(model_name='autogluon', config=config)

@@ -7,11 +7,11 @@ from datetime import datetime, date
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
 from src.data_collector.config import config
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class DataStorage:
@@ -147,7 +147,6 @@ class DataStorage:
             conn.execute(upsert_query, batch_df.to_dict('records'))
             conn.commit()
             
-            # For simplicity, return the batch size as inserted
             # In a real implementation, you might want to track actual inserts vs updates
             return len(batch_df), 0
     

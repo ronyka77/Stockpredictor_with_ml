@@ -543,9 +543,9 @@ collector.collect_incremental_news(
 All components use centralized logging. Check logs for detailed error information:
 
 ```python
-from src.logger import get_polygon_logger
+from src.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 logger.info("Custom log message")
 ```
 

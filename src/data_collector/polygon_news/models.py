@@ -12,10 +12,10 @@ from sqlalchemy.sql import func
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
 Base = declarative_base()
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PolygonNewsArticle(Base):

@@ -7,9 +7,9 @@ from typing import List, Dict, Optional, Any, Union, Tuple
 from pydantic import BaseModel, field_validator, field_serializer, Field, ConfigDict
 from enum import Enum
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class MarketType(str, Enum):
@@ -302,7 +302,7 @@ class DataValidator:
             strict_mode: Whether to use strict validation rules
         """
         self.strict_mode = strict_mode
-        self.logger = get_polygon_logger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}", utility="data_collector")
     
     def validate_ohlcv_record(self, record: Dict[str, Any], ticker: Optional[str] = None) -> Optional[OHLCVRecord]:
         """

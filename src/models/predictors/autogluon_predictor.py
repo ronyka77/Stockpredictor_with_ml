@@ -51,8 +51,7 @@ class AutoGluonPredictor(BasePredictor):
         else:
             logger.warning("AG_MODEL_DIR is set but path does not exist: %s", self.model_dir)
 
-def main():
-    model_dir = "AutogluonModels/ag-20250823_181444"
+def predict_best_model(model_dir: str):
     predictor = AutoGluonPredictor(model_dir=model_dir)
     predictor.load_model_from_mlflow()
     predictor._load_metadata()
@@ -61,7 +60,23 @@ def main():
     predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
     logger.info("✅ Prediction pipeline completed!")
 
+
+def predict_all_model(model_dir: str):
+    predictor = AutoGluonPredictor(model_dir=model_dir)
+    predictor.load_model_from_mlflow()
+    predictor._load_metadata()
+    features_df_base, metadata_df_base = predictor.load_recent_data(days_back=30)
+    model_names = predictor.model.selected_model_name
+    for model_name in model_names:
+        features_df = features_df_base.copy()
+        metadata_df = metadata_df_base.copy()
+        predictor.selected_model_name = model_name
+        predictions = predictor.make_predictions(features_df)
+        predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
+        logger.info("✅ Prediction pipeline completed!")
+
 if __name__ == "__main__":
-    main()
+    model_dir = "AutogluonModels/ag-20250825_200122"    
+    predict_best_model(model_dir)
 
 

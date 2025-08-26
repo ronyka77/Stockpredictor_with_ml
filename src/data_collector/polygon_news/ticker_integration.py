@@ -5,9 +5,9 @@ Provides intelligent ticker selection based on market cap and trading volume
 
 from typing import List, Dict, Optional, Tuple, Any
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.ticker_manager import TickerManager
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class NewsTickerIntegration:
@@ -24,7 +24,7 @@ class NewsTickerIntegration:
             ticker_manager: Optional existing TickerManager instance
         """
         self.ticker_manager = ticker_manager
-        self.logger = get_polygon_logger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
         
         # Fallback ticker lists if ticker_manager is unavailable
         self.fallback_major_tickers = [

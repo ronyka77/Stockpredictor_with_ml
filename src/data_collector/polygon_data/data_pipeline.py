@@ -8,14 +8,14 @@ import time
 import json
 from pathlib import Path
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.ticker_manager import TickerManager
 from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.data_validator import DataValidator
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PipelineStats:
@@ -471,7 +471,7 @@ if __name__ == "__main__":
     
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=5)
+    start_date = end_date - timedelta(days=720)
     
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

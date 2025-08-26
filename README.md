@@ -316,7 +316,7 @@ from src.data_utils import prepare_ml_data_for_training_with_cleaning
 
 result = prepare_ml_data_for_training_with_cleaning(
     prediction_horizon=10,
-    split_date='2025-02-01',
+    split_date='2025-03-15',
     ticker=None,  # all available
     clean_features=True,
     apply_stationarity_transform=False

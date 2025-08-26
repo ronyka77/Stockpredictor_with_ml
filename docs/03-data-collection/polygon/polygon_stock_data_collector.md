@@ -807,9 +807,9 @@ print(f"Ticker exists: {'TICKER' in ticker_symbols}")
 All components use centralized logging:
 
 ```python
-from src.logger import get_polygon_logger
+from src.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 logger.info("Custom debug message")
 
 # Enable debug logging for specific components

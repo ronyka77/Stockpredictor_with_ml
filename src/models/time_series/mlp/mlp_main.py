@@ -458,13 +458,13 @@ def main():
         
         # Define prediction horizon
         prediction_horizon = 10
-        number_of_trials = 10
+        number_of_trials = 200
         # n_features_to_select = 80
         
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
-            split_date='2025-02-01',
+            split_date='2025-03-15',
             ticker=None, 
             clean_features=True,
         )

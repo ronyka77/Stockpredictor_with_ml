@@ -6,9 +6,9 @@ Handles content cleaning and metadata extraction
 from typing import Dict, List, Any
 import re
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class NewsProcessor:
@@ -18,7 +18,7 @@ class NewsProcessor:
     """
     
     def __init__(self):
-        self.logger = get_polygon_logger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
     
     def process_article(self, article_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """

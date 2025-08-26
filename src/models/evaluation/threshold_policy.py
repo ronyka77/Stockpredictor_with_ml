@@ -63,6 +63,8 @@ class ThresholdPolicy:
         # Ensure 1D numpy array
         conf = np.asarray(confidence).reshape(-1)
         total_samples = conf.shape[0]
+        avg_confidence = float(conf.mean())
+        max_confidence = float(conf.max())
 
         # Sanitize non-finite
         finite_mask = np.isfinite(conf)
@@ -82,9 +84,6 @@ class ThresholdPolicy:
             if cfg.value is None:
                 raise ValueError("ThresholdConfig.value is required for method 'gt'")
             raw_mask = conf > float(cfg.value)
-        elif method in {"quantile", "topk", "per_group", "adaptive"}:
-            # Reserved for future slices
-            raise NotImplementedError(f"Method '{method}' not implemented yet")
         else:
             raise ValueError(
                 f"Unknown threshold method '{cfg.method}'. Supported: 'ge', 'gt'"
@@ -96,7 +95,7 @@ class ThresholdPolicy:
 
         samples_kept = int(final_mask.sum())
         samples_kept_ratio = float(samples_kept / total_samples) if total_samples else 0.0
-        avg_confidence = float(conf[final_mask].mean()) if samples_kept > 0 else float("nan")
+        
 
         stats = {
             "samples_kept": samples_kept,
@@ -111,7 +110,7 @@ class ThresholdPolicy:
         logger.info(
             f"threshold_policy_filter policy_method={method} policy_params={{'value': {cfg.value}}} "
             f"stats={{'samples_kept': {samples_kept}, 'total_samples': {total_samples}, "
-            f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence if samples_kept>0 else 'nan'}, "
+            f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence}, 'max_confidence': {max_confidence}, "
             f"'non_finite_confidence_count': {non_finite_count}}}"
         )
 

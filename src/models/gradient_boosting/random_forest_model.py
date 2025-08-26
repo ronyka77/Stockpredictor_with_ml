@@ -432,7 +432,7 @@ def main():
     logger.info("Loading and preparing data...")
     data_result = RandomForestModel.load_and_prepare_data(
         prediction_horizon=10,
-        split_date='2025-02-01',
+        split_date='2025-03-15',
         ticker=None,
         clean_features=True,
     )

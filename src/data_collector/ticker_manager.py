@@ -4,13 +4,12 @@ Ticker management and discovery functionality for Polygon.io data
 
 from typing import List, Dict, Optional
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.polygon_data.data_validator import DataValidator
 from src.data_collector.polygon_data.data_storage import DataStorage
 
-logger = get_polygon_logger(__name__)
-
+logger = get_logger(__name__, utility="data_collector")
 
 class TickerManager:
     """

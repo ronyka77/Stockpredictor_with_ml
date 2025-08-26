@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.config import config
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PolygonNewsClient(PolygonDataClient):

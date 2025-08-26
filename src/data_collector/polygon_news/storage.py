@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 
 from src.data_collector.polygon_news.models import PolygonNewsArticle, PolygonNewsTicker, PolygonNewsInsight, validate_article_data
 from src.data_collector.config import config
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PolygonNewsStorage:
@@ -27,7 +27,7 @@ class PolygonNewsStorage:
             session: SQLAlchemy database session
         """
         self.session = session
-        self.logger = get_polygon_logger(self.__class__.__name__)
+        self.logger = get_logger(__name__, utility="data_collector")
     
     def store_article(self, article_data: Dict[str, Any]) -> Optional[int]:
         """

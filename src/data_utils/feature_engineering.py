@@ -81,9 +81,7 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
             features_enhanced[ratio_col] = current_price / features_enhanced[ich_col]
             logger.info(f"   Added {ratio_col}: close/Ichimoku ratio")
     
-    # 6. RSI and other oscillators are already normalized (0-100), so no change needed
-    
-    # 7. Price momentum ratios
+    # 6. Price momentum ratios
     if 'open' in features_enhanced.columns:
         features_enhanced['Close_Open_Ratio'] = current_price / features_enhanced['open']
         logger.info("   Added Close_Open_Ratio: intraday price change")
@@ -114,7 +112,6 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
     
     # 1. Historical volatility context
     if 'ATR_Percent' in features_enhanced.columns:
-        # Typical daily move expectation (ATR as percentage)
         features_enhanced['Expected_Daily_Move'] = features_enhanced['ATR_Percent']
         
         # 10-day expected move (assuming random walk)
@@ -295,12 +292,10 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
         'non_numeric': []
     }
     
-    # 1. Remove non-numeric columns (XGBoost requirement) but preserve essential price columns
-    # Essential columns that must be preserved for XGBoost evaluation and threshold optimization
+    # 1. Remove non-numeric columns but preserve essential price columns
     essential_columns = ['close', 'ticker_id', 'date_int']
     
     non_numeric_cols = X_clean.select_dtypes(exclude=[np.number]).columns.tolist()
-    # Filter out essential columns from removal list
     non_numeric_to_remove = [col for col in non_numeric_cols if col not in essential_columns]
     
     if non_numeric_to_remove:
@@ -317,7 +312,7 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
             except Exception as e:
                 logger.error(f"   Error converting essential column '{col}' to numeric: {e}")
     
-    # 2. Remove constant features (only check numeric columns for efficiency)
+    # 2. Remove constant features
     if remove_constants:
         constant_features = []
         numeric_cols = X_clean.select_dtypes(include=[np.number]).columns
@@ -330,7 +325,7 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
             removed_features['constant'] = constant_features
             X_clean = X_clean.drop(columns=constant_features)
     
-    # 3. Remove zero variance features (only numeric columns)
+    # 3. Remove zero variance features
     if remove_zero_variance:
         numeric_X = X_clean.select_dtypes(include=[np.number])
         if not numeric_X.empty:
@@ -393,7 +388,6 @@ def add_temporal_features(features_df: pd.DataFrame,
     Returns:
         DataFrame with additional temporal features
     """
-    logger.info("📅 Adding temporal features...")
     
     if date_column not in features_df.columns:
         logger.warning(f"Date column '{date_column}' not found. Skipping temporal features.")
@@ -407,7 +401,6 @@ def add_temporal_features(features_df: pd.DataFrame,
         date_col = pd.to_datetime(date_col)
     
     # Create date-based features
-    # Date as integer (days since reference date)
     features_enhanced['date_int'] = (date_col - pd.Timestamp('2020-01-01')).dt.days
     features_enhanced['year'] = date_col.dt.year
     features_enhanced['month'] = date_col.dt.month

@@ -38,7 +38,7 @@ def main():
     """
     Main function for standalone prediction
     """
-    run_id = "38c5cfb19df14285aba5d2136c890058"
+    run_id = "a5da7026398747e0a6eb957c45a9714a"
     days_back = 15
 
     predictor = XGBoostPredictor(run_id=run_id)

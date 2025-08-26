@@ -29,7 +29,7 @@ def load_autogluon_predictor(model_dir: str) -> TabularPredictor:
     logger.info("Loaded predictor. Problem type: %s", getattr(predictor, "problem_type", "unknown"))
     return predictor
 
-def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataFrame) -> pd.DataFrame:
+def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataFrame, model_names: list[str] = None) -> pd.DataFrame:
     """Generate the Autogluon leaderboard using valid_df and log it.
     Returns the leaderboard DataFrame.
     """
@@ -40,10 +40,14 @@ def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataF
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         leaderboard.to_excel(f"pipeline_stats/leaderboard_{timestamp}.xlsx", index=False)
-
-        feature_importance = predictor.feature_importance(valid_df)
-        feature_importance.to_excel(f"pipeline_stats/feature_importance_{timestamp}.xlsx")
-        logger.info(f"Feature importance: {feature_importance}")
+        for model_name in model_names:
+            feature_importance = predictor.feature_importance(valid_df, 
+                                            confidence_level=0.95, 
+                                            model=model_name, 
+                                            subsample_size=20000,
+                                            num_shuffle_sets=10)
+            feature_importance.to_excel(f"pipeline_stats/feature_importance_{model_name}_{timestamp}.xlsx")
+            logger.info(f"Feature importance: {feature_importance}")
         return leaderboard
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Failed to create leaderboard: %s", exc)
@@ -58,7 +62,7 @@ def load_model_and_log(model_dir: str, prediction_horizon: int = 1) -> Dict[str,
     data = prepare_common_training_data(prediction_horizon=prediction_horizon)
     X_test: pd.DataFrame = data.get("X_test")
     y_test = data.get("y_test")
-    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10')], axis=1)
+    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
     valid_df = valid_df.sample(frac=1).reset_index(drop=True)
 
     # 2) Load predictor
@@ -81,7 +85,7 @@ def make_prediction(model_dir: str, prediction_horizon: int = 10) -> Dict[str, A
     data = prepare_ml_data_for_prediction_with_cleaning(prediction_horizon=prediction_horizon)
     X_test: pd.DataFrame = data.get("X_test")
     y_test = data.get("y_test")
-    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10')], axis=1)
+    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
     valid_df = valid_df.sample(frac=1).reset_index(drop=True)
     predictor = load_autogluon_predictor(model_dir)
     prediction = predictor.predict(valid_df)
@@ -101,24 +105,30 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()
         predictor_class._load_metadata()
-        features_df, metadata_df = predictor_class.load_recent_data(days_back=60)
-        X_test = features_df.copy()
-        y_test = metadata_df['target_values'].copy()
-        valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10')], axis=1)
-        valid_df = valid_df.sample(frac=1).reset_index(drop=True)
-        valid_df = valid_df.dropna(subset=['Future_Return_10'])
-        X_test_valid = valid_df.drop(columns=['Future_Return_10'])
-        y_test_valid = valid_df['Future_Return_10']
+        data = prepare_ml_data_for_prediction_with_cleaning(prediction_horizon=prediction_horizon, days_back=60)
+        X_test = data.get("X_test")
+        y_test = data.get("y_test")
+        logger.info(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
+        valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
+        valid_df = valid_df.reset_index(drop=True)
+        valid_df = valid_df.dropna(subset=['Future_Return_10D'])
+        X_test_valid = valid_df.copy()
+        y_test_valid = valid_df['Future_Return_10D']
         # 2) Load predictor
         model = predictor_class.model
         predictor = model.predictor
-        X_test_valid = X_test_valid[model.feature_names]
+        feature_names = model.feature_names
+        logger.info(f"feature_names: {len(feature_names)}")
+        X_test_valid = X_test_valid[feature_names]
+        close_price_min = X_test_valid['close'].min()
+        close_price_max = X_test_valid['close'].max()
+        logger.info(f"close_price_min: {close_price_min}, close_price_max: {close_price_max}")
 
         # 3) Generate and log leaderboard
-        leaderboard = generate_and_log_leaderboard(predictor, valid_df)
-
         model_names = predictor.model_names()
         predictor.persist(models=model_names)
+        # generate_and_log_leaderboard(predictor, valid_df, model_names)
+
         best_score = 0
         optimal_threshold = None
         for model_name in model_names:
@@ -148,8 +158,8 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
         logger.info(f"Saved model metadata to: {metadata_path}")
 
         # 4) Delete models
-        models_to_delete = [model_name for model_name in model_names if model_name != best_model_name]
-        predictor.delete_models(models_to_delete=models_to_delete, delete_from_disk=True)
+        # models_to_delete = [model_name for model_name in model_names if model_name != best_model_name]
+        # predictor.delete_models(models_to_delete=models_to_delete, delete_from_disk=True)
         
     except Exception as e:
         logger.error("Script failed: %s", e)
@@ -157,7 +167,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
 
 if __name__ == "__main__":
     try:
-        model_dir = "AutogluonModels/ag-20250823_214827"
+        model_dir = "AutogluonModels/ag-20250825_200122"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

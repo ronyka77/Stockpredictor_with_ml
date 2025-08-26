@@ -6,12 +6,12 @@ from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Any, Union
 import time
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.polygon_data.data_validator import DataValidator, OHLCVRecord, DataQualityMetrics
 from src.data_collector.config import config
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class HistoricalDataFetcher:

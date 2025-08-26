@@ -33,9 +33,8 @@ def convert_absolute_to_percentage_returns(combined_data: pd.DataFrame,
     new_target_column = f"Future_Return_{prediction_horizon}D"
     
     logger.info(f"🎯 Converting absolute targets to percentage returns (horizon: {prediction_horizon}d)")
-    
+    # Look for any Future_High_XD column as fallback
     if target_column not in combined_data.columns:
-        # Look for any Future_High_XD column as fallback
         future_cols = [col for col in combined_data.columns if col.startswith('Future_High_')]
         if not future_cols:
             raise ValueError(f"No future price target columns found. Expected '{target_column}' or similar.")
@@ -50,11 +49,7 @@ def convert_absolute_to_percentage_returns(combined_data: pd.DataFrame,
     # Formula: (Future_High - Current_Close) / Current_Close * 100
     future_prices = combined_data[target_column]
     current_prices = combined_data['close']
-    
-    # Calculate percentage returns (as decimals: 0.05 = 5%, -0.07 = -7%)
     percentage_returns = (future_prices - current_prices) / current_prices
-    
-    # Add new target column
     combined_data[new_target_column] = percentage_returns
     
     # Log transformation statistics
@@ -67,10 +62,10 @@ def convert_absolute_to_percentage_returns(combined_data: pd.DataFrame,
         logger.info(f"   Std return: {valid_returns.std():.4f} ({valid_returns.std()*100:.2f}%)")
         
         # Sanity check - warn if returns are too extreme (in decimal format)
-        extreme_positive = (valid_returns > 0.5).sum()  # >50% return (0.5 in decimal)
-        extreme_negative = (valid_returns < -0.5).sum()  # <-50% return (-0.5 in decimal)
+        extreme_positive = (valid_returns > 0.7).sum()  # >70% return
+        extreme_negative = (valid_returns < -0.7).sum()  # <-70% return
         if extreme_positive > 0 or extreme_negative > 0:
-            logger.warning(f"⚠ Found extreme returns: {extreme_positive} > +50%, {extreme_negative} < -50%")
+            logger.warning(f"⚠ Found extreme returns: {extreme_positive} > +70%, {extreme_negative} < -70%")
     
     return combined_data, new_target_column
 
@@ -101,7 +96,7 @@ def convert_percentage_predictions_to_prices(predictions: np.ndarray,
     
     if apply_bounds:
         # For 10-day horizon, reasonable bounds might be ±30% (3% per day on average)
-        max_10d_move = max_daily_move * np.sqrt(10)  # Scale for 10-day horizon
+        max_10d_move = max_daily_move * np.sqrt(10)
         
         # Calculate bounds (convert percentage to decimal)
         upper_bound = current_prices * (1 + max_10d_move / 100)
@@ -115,7 +110,6 @@ def convert_percentage_predictions_to_prices(predictions: np.ndarray,
         capped_low = (predicted_prices < lower_bound).sum()
         
         if capped_high > 0 or capped_low > 0:
-            # logger.info(f"🛡️ Applied prediction bounds: {capped_high} capped high, {capped_low} capped low")
             logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
         
         return bounded_predictions
@@ -175,7 +169,6 @@ def create_target_features(data: pd.DataFrame,
     
     # 3. Target trend features
     if len(target_series) >= 10:
-        # Simple trend direction
         enhanced_data['Target_Trend_5D'] = (target_series > target_series.shift(5)).astype(int)
         enhanced_data['Target_Trend_10D'] = (target_series > target_series.shift(10)).astype(int)
     

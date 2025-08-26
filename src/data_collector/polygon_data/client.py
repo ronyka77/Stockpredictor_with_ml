@@ -7,11 +7,11 @@ import requests
 from typing import Dict, List, Optional, Any
 from urllib.parse import urljoin, urlparse, parse_qs
 
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PolygonAPIError(Exception):

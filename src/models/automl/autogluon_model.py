@@ -58,7 +58,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             X_val: Optional[pd.DataFrame] = None,
             y_val: Optional[pd.Series] = None,
             **kwargs) -> "AutoGluonModel":
-        label = self.config.get("label", "Future_Return_10")
+        label = self.config.get("label", "Future_Return_10D")
         eval_metric = scorer
 
         # Build train/valid DataFrames with label column
@@ -69,36 +69,43 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df = X_val.copy()
             valid_df[label] = y_val.values
 
-        # train_df = train_df.sort_values('date_int', ascending=False).head(200000).reset_index(drop=True)
+        # train_df = train_df.sort_values('date_int', ascending=False).head(100000).reset_index(drop=True)
         combined_df = pd.concat([train_df, valid_df], axis=0)
-        combined_df = combined_df.sample(frac=1).reset_index(drop=True)
+        combined_df = combined_df.reset_index(drop=True)
         logger.info(f"combined_df: {len(combined_df)}")
 
         hyperparams = {
-            "REALMLP": {},
+            "FASTAI": {},
             "GBM": {},        
-            "XGB": {},        
-            "TABICL": {}
+            # "TABM": {}, 
+            # "RF": {},       
+            # "CAT": {}
+            # "REALMLP": {},
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(label=label, 
-                                eval_metric=eval_metric, 
+                                eval_metric='mae', 
                                 problem_type='regression',
                                 verbosity=3)
         
         self.predictor.fit(
-            time_limit=7200,
+            time_limit=21600,
             train_data=combined_df,
-            presets='high',
+            tuning_data=valid_df,
+            presets='best_quality',
             hyperparameters=hyperparams,
             dynamic_stacking=False,
-            num_cpus=14,
+            # num_cpus=14,
             num_gpus=1,
             auto_stack=True,
-            use_bag_holdout=True
+            num_bag_folds=10,
+            use_bag_holdout=True,
+            ag_args={'fold_fitting_strategy': 'sequential_local'},
+            ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'}
         )
-
+        summary = self.predictor.fit_summary(show_plot=True)
+        logger.info(summary)
         # self.predictor.distill(
         #     time_limit=7200,
         #     train_data=train_df,

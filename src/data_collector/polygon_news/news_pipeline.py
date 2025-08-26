@@ -12,9 +12,9 @@ from src.data_collector.polygon_news.storage import PolygonNewsStorage
 from src.data_collector.polygon_news.ticker_integration import NewsTickerIntegration
 from src.data_collector.polygon_news.processor import NewsProcessor
 from src.data_collector.polygon_news.validator import NewsValidator
-from src.utils.logger import get_polygon_logger
+from src.utils.logger import get_logger
 
-logger = get_polygon_logger(__name__)
+logger = get_logger(__name__, utility="data_collector")
 
 
 class PolygonNewsCollector:
@@ -40,7 +40,7 @@ class PolygonNewsCollector:
             requests_per_minute: Rate limit for API requests
         """
         self.db_session = db_session
-        self.logger = get_polygon_logger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
         
         # Initialize components
         self.news_client = PolygonNewsClient(polygon_api_key, requests_per_minute)
@@ -386,46 +386,43 @@ def main():
     from src.data_collector.polygon_news.models import create_tables
     from src.data_collector.config import config
     
-    # Setup logging for main function
-    main_logger = get_polygon_logger(__name__ + ".main")
-    
     try:
-        main_logger.info("=" * 60)
-        main_logger.info("Starting Polygon News Collection - Incremental Update")
-        main_logger.info("=" * 60)
+        logger.info("=" * 60)
+        logger.info("Starting Polygon News Collection - Incremental Update")
+        logger.info("=" * 60)
         
         # Check for required API key from config
         if not config.API_KEY:
-            main_logger.error("POLYGON_API_KEY environment variable not set")
-            main_logger.error("Please set your Polygon.io API key:")
-            main_logger.error("export POLYGON_API_KEY='your_api_key_here'")
+            logger.error("POLYGON_API_KEY environment variable not set")
+            logger.error("Please set your Polygon.io API key:")
+            logger.error("export POLYGON_API_KEY='your_api_key_here'")
             return False
         
         # Database connection using centralized config
         database_url = os.getenv('DATABASE_URL', config.database_url)
-        main_logger.info("Connecting to database...")
-        main_logger.info(f"Using database: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
+        logger.info("Connecting to database...")
+        logger.info(f"Using database: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
         
         try:
             engine = create_engine(database_url)
             
             # Create tables if they don't exist (safe for existing tables)
-            main_logger.info("Ensuring database tables exist...")
+            logger.info("Ensuring database tables exist...")
             create_tables(engine)
             
             # Create session
             Session = sessionmaker(bind=engine)
             session = Session()
             
-            main_logger.info("Database connection established successfully")
+            logger.info("Database connection established successfully")
         except Exception as e:
-            main_logger.error(f"Failed to connect to database: {e}")
-            main_logger.error("Please check your DATABASE_URL environment variable")
+            logger.error(f"Failed to connect to database: {e}")
+            logger.error("Please check your DATABASE_URL environment variable")
             return False
         
         # Initialize news collector
         try:
-            main_logger.info("Initializing Polygon News Collector...")
+            logger.info("Initializing Polygon News Collector...")
             
             collector = PolygonNewsCollector(
                 db_session=session,
@@ -433,27 +430,27 @@ def main():
                 requests_per_minute=config.REQUESTS_PER_MINUTE
             )
             
-            main_logger.info("News collector initialized successfully")
+            logger.info("News collector initialized successfully")
         except Exception as e:
-            main_logger.error(f"Failed to initialize news collector: {e}")
+            logger.error(f"Failed to initialize news collector: {e}")
             session.close()
             engine.dispose()
             return False
         
         # Run incremental news collection
         try:
-            main_logger.info("Starting incremental news collection...")
-            main_logger.info("This will collect news from the last stored date to current date")
+            logger.info("Starting incremental news collection...")
+            logger.info("This will collect news from the last stored date to current date")
             
             # Configuration for incremental collection from centralized config
             max_tickers = config.NEWS_MAX_TICKERS
             days_lookback = config.NEWS_DAYS_LOOKBACK
             
-            main_logger.info("Configuration:")
-            main_logger.info(f"  - Max tickers: {max_tickers}")
-            main_logger.info(f"  - Days lookback (for new tickers): {days_lookback}")
-            main_logger.info(f"  - Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
-            main_logger.info(f"  - Retention period: {config.NEWS_RETENTION_YEARS} years")
+            logger.info("Configuration:")
+            logger.info(f"  - Max tickers: {max_tickers}")
+            logger.info(f"  - Days lookback (for new tickers): {days_lookback}")
+            logger.info(f"  - Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
+            logger.info(f"  - Retention period: {config.NEWS_RETENTION_YEARS} years")
             
             # Execute collection
             stats_historical = collector.collect_historical_news(
@@ -463,57 +460,57 @@ def main():
             )
             
             # Log results
-            main_logger.info("=" * 60)
-            main_logger.info("COLLECTION COMPLETED SUCCESSFULLY")
-            main_logger.info("=" * 60)
-            main_logger.info("Collection Statistics:")
-            main_logger.info(f"  - Total API calls: {stats_historical['total_api_calls']}")
-            main_logger.info(f"  - Articles fetched: {stats_historical['total_articles_fetched']}")
-            main_logger.info(f"  - Articles stored: {stats_historical['total_articles_stored']}")
-            main_logger.info(f"  - Articles updated: {stats_historical['total_articles_updated']}")
-            main_logger.info(f"  - Articles skipped: {stats_historical['total_articles_skipped']}")
-            main_logger.info(f"  - Failed tickers: {len(stats_historical['failed_tickers'])}")
+            logger.info("=" * 60)
+            logger.info("COLLECTION COMPLETED SUCCESSFULLY")
+            logger.info("=" * 60)
+            logger.info("Collection Statistics:")
+            logger.info(f"  - Total API calls: {stats_historical['total_api_calls']}")
+            logger.info(f"  - Articles fetched: {stats_historical['total_articles_fetched']}")
+            logger.info(f"  - Articles stored: {stats_historical['total_articles_stored']}")
+            logger.info(f"  - Articles updated: {stats_historical['total_articles_updated']}")
+            logger.info(f"  - Articles skipped: {stats_historical['total_articles_skipped']}")
+            logger.info(f"  - Failed tickers: {len(stats_historical['failed_tickers'])}")
             
             if stats_historical['failed_tickers']:
-                main_logger.warning(f"Failed tickers: {stats_historical['failed_tickers']}")
+                logger.warning(f"Failed tickers: {stats_historical['failed_tickers']}")
             
             if stats_historical['processing_errors']:
-                main_logger.warning(f"Processing errors: {len(stats_historical['processing_errors'])}")
+                logger.warning(f"Processing errors: {len(stats_historical['processing_errors'])}")
                 for error in stats_historical['processing_errors'][:5]:  # Show first 5 errors
-                    main_logger.warning(f"  - {error}")
+                    logger.warning(f"  - {error}")
             
             # Duration
             if stats_historical['start_time'] and stats_historical['end_time']:
                 duration = stats_historical['end_time'] - stats_historical['start_time']
-                main_logger.info(f"  - Duration: {duration}")
+                logger.info(f"  - Duration: {duration}")
             
             # Get system status
             try:
                 status = collector.get_collection_status()
-                main_logger.info("System Status:")
-                main_logger.info(f"  - Database health: {status.get('status', 'unknown')}")
-                main_logger.info(f"  - Latest article date: {status.get('latest_article_date', 'None')}")
+                logger.info("System Status:")
+                logger.info(f"  - Database health: {status.get('status', 'unknown')}")
+                logger.info(f"  - Latest article date: {status.get('latest_article_date', 'None')}")
                 
                 if 'recent_statistics' in status:
                     recent_stats = status['recent_statistics']
-                    main_logger.info(f"  - Total articles in DB: {recent_stats.get('total_articles', 0)}")
+                    logger.info(f"  - Total articles in DB: {recent_stats.get('total_articles', 0)}")
                     
                     top_tickers = recent_stats.get('top_tickers', {})
                     if top_tickers:
-                        main_logger.info(f"  - Top tickers: {dict(list(top_tickers.items())[:5])}")
+                        logger.info(f"  - Top tickers: {dict(list(top_tickers.items())[:5])}")
                     
                     sentiment_dist = recent_stats.get('sentiment_distribution', {})
                     if sentiment_dist:
-                        main_logger.info(f"  - Sentiment distribution: {sentiment_dist}")
+                        logger.info(f"  - Sentiment distribution: {sentiment_dist}")
                         
             except Exception as e:
-                main_logger.warning(f"Could not retrieve system status: {e}")
+                logger.warning(f"Could not retrieve system status: {e}")
             
-            main_logger.info("=" * 60)
+            logger.info("=" * 60)
             return True
         except Exception as e:
-            main_logger.error(f"News collection failed: {e}")
-            main_logger.error("Check the error logs for detailed information")
+            logger.error(f"News collection failed: {e}")
+            logger.error("Check the error logs for detailed information")
             return False
             
         finally:
@@ -521,16 +518,16 @@ def main():
             try:
                 session.close()
                 engine.dispose()
-                main_logger.info("Database connection closed")
+                logger.info("Database connection closed")
             except Exception as e:
-                main_logger.warning(f"Error during cleanup: {e}")
+                logger.warning(f"Error during cleanup: {e}")
     
     except KeyboardInterrupt:
-        main_logger.info("Collection interrupted by user")
+        logger.info("Collection interrupted by user")
         return False
         
     except Exception as e:
-        main_logger.error(f"Unexpected error in main function: {e}")
+        logger.error(f"Unexpected error in main function: {e}")
         return False
 
 

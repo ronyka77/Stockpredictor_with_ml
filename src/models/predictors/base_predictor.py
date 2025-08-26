@@ -202,7 +202,8 @@ class BasePredictor(ABC):
             metadata_df=metadata_df,
             predictions=predictions,
         )
-
+        # Drop threshold-related columns before saving
+        results_df = results_df.drop(['passes_threshold', 'optimal_threshold', 'date_int'], axis=1, errors='ignore')
         results_df.to_excel(output_path, index=False)
         logger.info(f"   Saved {len(results_df)} predictions.")
         return output_path
@@ -300,7 +301,7 @@ class BasePredictor(ABC):
             filtered_returns = results_df.loc[non_nan_mask, 'actual_return']
 
             results_df.loc[non_nan_mask, 'actual_price'] = convert_percentage_predictions_to_prices(
-                filtered_returns, filtered_prices, apply_bounds=True
+                filtered_returns, filtered_prices, apply_bounds=False
             )
             
             ap = results_df.loc[non_nan_mask, 'actual_price']
