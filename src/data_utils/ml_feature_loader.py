@@ -214,7 +214,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
     Returns:
         Combined DataFrame with all loaded data
     """
-    years_to_load = [2024, 2025]
+    years_to_load = [2023, 2024, 2025]
     data_loader = None
     try:
         data_loader = StockDataLoader()

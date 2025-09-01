@@ -78,9 +78,9 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             "FASTAI": {},
             "GBM": {},        
             # "TABM": {}, 
-            # "RF": {},       
+            "RF": {},       
             # "CAT": {}
-            # "REALMLP": {},
+            "REALMLP": {},
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
@@ -90,7 +90,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                                 verbosity=3)
         
         self.predictor.fit(
-            time_limit=21600,
+            time_limit=39600,
             train_data=combined_df,
             tuning_data=valid_df,
             presets='best_quality',

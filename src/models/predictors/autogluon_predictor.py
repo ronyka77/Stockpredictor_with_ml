@@ -66,17 +66,18 @@ def predict_all_model(model_dir: str):
     predictor.load_model_from_mlflow()
     predictor._load_metadata()
     features_df_base, metadata_df_base = predictor.load_recent_data(days_back=30)
-    model_names = predictor.model.selected_model_name
+    model_names = predictor.model.predictor.model_names()
     for model_name in model_names:
+        logger.info(f"Predicting model: {model_name}")
         features_df = features_df_base.copy()
         metadata_df = metadata_df_base.copy()
-        predictor.selected_model_name = model_name
+        predictor.model.selected_model_name = model_name
         predictions = predictor.make_predictions(features_df)
-        predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
+        predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
         logger.info("✅ Prediction pipeline completed!")
 
 if __name__ == "__main__":
     model_dir = "AutogluonModels/ag-20250825_200122"    
-    predict_best_model(model_dir)
+    predict_all_model(model_dir)
 
 

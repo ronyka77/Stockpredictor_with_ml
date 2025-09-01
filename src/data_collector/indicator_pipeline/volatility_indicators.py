@@ -44,8 +44,6 @@ def calculate_bollinger_bands(data: pd.DataFrame, period: Optional[int] = None,
     if std_dev is None:
         std_dev = params['std']
     
-    logger.info(f"Calculating Bollinger Bands with parameters: period={period}, std_dev={std_dev}")
-    
     try:
         # Check minimum data requirements
         if len(data) < period:
@@ -122,8 +120,6 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
     if period is None:
         period = feature_config.ATR_PERIOD
     
-    logger.info(f"Calculating ATR with period: {period}")
-    
     try:
         # Check minimum data requirements
         if len(data) < period:
@@ -192,8 +188,6 @@ def calculate_custom_volatility(data: pd.DataFrame, periods: Optional[List[int]]
     
     if periods is None:
         periods = [10, 20, 30]  # Default volatility periods
-    
-    logger.info(f"Calculating custom volatility for periods: {periods}")
     
     try:
         result_data = pd.DataFrame(index=data.index)

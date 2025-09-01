@@ -8,7 +8,8 @@ for all tickers in the database and store results in the technical_features tabl
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date
+from src.feature_engineering.config import config
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,9 +19,9 @@ from dataclasses import dataclass
 from src.feature_engineering.data_loader import StockDataLoader
 from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
-from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage, ConsolidatedStorageConfig
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 from src.utils.logger import get_logger
-from src.feature_engineering.config import config
+from src.utils.feature_categories import classify_feature_name
 
 logger = get_logger(__name__, utility='feature_engineering')
 
@@ -29,8 +30,8 @@ class BatchJobConfig:
     """Configuration for batch processing jobs"""
     batch_size: int = config.batch_processing.DEFAULT_BATCH_SIZE
     max_workers: int = config.batch_processing.MAX_WORKERS
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: Optional[str] = datetime(datetime.now().year - config.fundamental.HISTORICAL_YEARS, 1, 1)
+    end_date: Optional[str] = date.today().strftime('%Y-%m-%d')
     feature_categories: List[str] = None
     min_data_points: int = config.data_quality.MIN_DATA_POINTS
     save_to_database: bool = config.storage.SAVE_TO_DATABASE
@@ -401,7 +402,7 @@ class BatchFeatureProcessor:
                             continue
                         
                         # Determine feature category
-                        category = self._get_feature_category(feature_name)
+                        category = classify_feature_name(feature_name)
                         
                         # Check if feature already exists
                         if not overwrite:
@@ -451,21 +452,6 @@ class BatchFeatureProcessor:
         except Exception as e:
             logger.error(f"Error saving features for {ticker}: {str(e)}")
             raise
-    
-    def _get_feature_category(self, feature_name: str) -> str:
-        """Determine feature category from feature name"""
-        feature_name_lower = feature_name.lower()
-        
-        if any(x in feature_name_lower for x in ['sma', 'ema', 'macd', 'ichimoku']):
-            return 'trend'
-        elif any(x in feature_name_lower for x in ['rsi', 'stoch', 'roc', 'williams']):
-            return 'momentum'
-        elif any(x in feature_name_lower for x in ['bb', 'bollinger', 'atr', 'volatility']):
-            return 'volatility'
-        elif any(x in feature_name_lower for x in ['obv', 'vpt', 'ad_line', 'volume', 'mfi']):
-            return 'volume'
-        else:
-            return 'basic'
     
     def _create_job_record(self, job_id: str, tickers: List[str], config: BatchJobConfig):
         """Create a job tracking record in the database"""
@@ -549,7 +535,7 @@ def run_production_batch():
     job_config = BatchJobConfig(
         batch_size=config.batch_processing.DEFAULT_BATCH_SIZE,  # Conservative batch size
         max_workers=config.batch_processing.MAX_WORKERS,  # Conservative parallel processing
-        start_date='2024-01-01',  # 2 years of data
+        start_date='2023-01-01',  # 2 years of data
         end_date=datetime.now().strftime('%Y-%m-%d'),
         min_data_points=config.data_quality.MIN_DATA_POINTS // 2,  # Reduced requirement for production
         save_to_parquet=config.storage.SAVE_TO_PARQUET,

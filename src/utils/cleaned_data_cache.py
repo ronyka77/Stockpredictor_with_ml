@@ -30,7 +30,6 @@ class CleanedDataCache:
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        # logger.info(f"CleanedDataCache initialized with cache directory: {self.cache_dir}")
     
     def _generate_cache_key(self, **kwargs) -> str:
         """

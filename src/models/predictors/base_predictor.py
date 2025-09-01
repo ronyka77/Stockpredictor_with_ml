@@ -185,12 +185,19 @@ class BasePredictor(ABC):
             filtered_indices = np.where(threshold_mask)[0]
             return filtered_indices, threshold_mask
 
-    def save_predictions_to_excel(self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray) -> str:
+    def save_predictions_to_excel(self, features_df: pd.DataFrame, 
+    metadata_df: pd.DataFrame, 
+    predictions: np.ndarray,
+    model_name = None) -> str:
         """
         Save predictions to an Excel file.
         """
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        file_name = f"predictions_{self.run_id[:8]}_{timestamp}.xlsx"
+        if model_name is not None:
+            file_name = f"predictions_{model_name}_{timestamp}.xlsx"
+        else:
+            file_name = f"predictions_{self.run_id[:8]}_{timestamp}.xlsx"
+        
         output_dir = os.path.join("predictions", self.model_type)
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, file_name)
@@ -279,7 +286,7 @@ class BasePredictor(ABC):
         if threshold_filtered_count == 0:
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
         else:
-            logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
+            # logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
             results_df = (
                 results_df
                 .sort_values(['date', 'predicted_return'], ascending=[True, False])
@@ -289,9 +296,9 @@ class BasePredictor(ABC):
             )
             results_df['day_of_week'] = pd.to_datetime(results_df['date']).dt.day_name()
             top_10_count = len(results_df)
-            date_counts = results_df['date'].value_counts()
+            # date_counts = results_df['date'].value_counts()
             logger.info(f"   📈 Top 10 final count: {top_10_count}")
-            logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
+            # logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df['actual_return'].notna()

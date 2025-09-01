@@ -245,14 +245,14 @@ class DatabaseConfig:
     DB_PASSWORD: str = os.getenv('DB_PASSWORD', '')
     
     # Query Limits
-    TICKER_QUERY_LIMIT: int = int(os.getenv('FE_TICKER_QUERY_LIMIT', '1000'))
-    FEATURE_HISTORY_LIMIT: int = int(os.getenv('FE_FEATURE_HISTORY_LIMIT', '20'))
-    BATCH_INSERT_SIZE: int = int(os.getenv('FE_BATCH_INSERT_SIZE', '1000'))
+    TICKER_QUERY_LIMIT: int = 1000
+    FEATURE_HISTORY_LIMIT: int = 20
+    BATCH_INSERT_SIZE: int = 1000
     
     # Connection Pool
-    DB_POOL_SIZE: int = int(os.getenv('FE_DB_POOL_SIZE', '5'))
-    DB_MAX_OVERFLOW: int = int(os.getenv('FE_DB_MAX_OVERFLOW', '10'))
-    DB_POOL_TIMEOUT: int = int(os.getenv('FE_DB_POOL_TIMEOUT', '30'))
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
     
     @property
     def database_url(self) -> str:
@@ -319,15 +319,7 @@ class FundamentalConfig:
     # Data Collection
     POLYGON_FUNDAMENTALS_ENDPOINT: str = os.getenv('FE_FUNDAMENTAL_POLYGON_ENDPOINT', 'https://api.polygon.io/vX/reference/financials')
     UPDATE_FREQUENCY: str = os.getenv('FE_FUNDAMENTAL_UPDATE_FREQUENCY', 'daily')
-    HISTORICAL_YEARS: int = int(os.getenv('FE_FUNDAMENTAL_HISTORICAL_YEARS', '2'))
-    
-    # Data Processing
-    MISSING_DATA_STRATEGY: str = os.getenv('FE_FUNDAMENTAL_MISSING_DATA_STRATEGY', 'forward_fill')
-    OUTLIER_CAPPING: bool = os.getenv('FE_FUNDAMENTAL_OUTLIER_CAPPING', 'true').lower() == 'true'
-    SECTOR_CLASSIFICATION: str = os.getenv('FE_FUNDAMENTAL_SECTOR_CLASSIFICATION', 'GICS')
-    
-    # Calculation Limits
-    MAX_RATIO_VALUE: float = float(os.getenv('FE_MAX_RATIO_VALUE', '1e6'))  # Maximum ratio value before flagging as extreme
+    HISTORICAL_YEARS: int = 3
     
     # Ratio Limits (for outlier capping)
     PE_RATIO_CAP: Tuple[float, float] = field(default_factory=lambda: _parse_tuple_float('FE_PE_RATIO_CAP', (-100, 100)))

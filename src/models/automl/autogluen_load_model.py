@@ -7,27 +7,12 @@ from datetime import datetime
 from autogluon.tabular import TabularPredictor
 
 from src.utils.logger import get_logger
-from src.models.common.training_data_prep import prepare_common_training_data
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
-from src.models.automl.autogluon_model import AutoGluonModel
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 
 
 logger = get_logger(__name__)
 
-
-def load_autogluon_predictor(model_dir: str) -> TabularPredictor:
-    """Load a fitted Autogluon TabularPredictor from disk.
-    Raises FileNotFoundError when the directory does not exist.
-    """
-    logger.info("Loading Autogluon predictor from '%s'", model_dir)
-    if not os.path.exists(model_dir):
-        logger.error("Model directory not found: %s", model_dir)
-        raise FileNotFoundError(f"Model directory not found: {model_dir}")
-
-    predictor = TabularPredictor.load(model_dir)
-    logger.info("Loaded predictor. Problem type: %s", getattr(predictor, "problem_type", "unknown"))
-    return predictor
 
 def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataFrame, model_names: list[str] = None) -> pd.DataFrame:
     """Generate the Autogluon leaderboard using valid_df and log it.
@@ -53,48 +38,6 @@ def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataF
         logger.error("Failed to create leaderboard: %s", exc)
         raise
 
-def load_model_and_log(model_dir: str, prediction_horizon: int = 1) -> Dict[str, Any]:
-    """Load training data, load the Autogluon model and log leaderboard computed on valid_df.
-    Returns a dict containing the predictor, leaderboard, X_test and y_test.
-    """
-    # 1) Prepare data
-    logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
-    data = prepare_common_training_data(prediction_horizon=prediction_horizon)
-    X_test: pd.DataFrame = data.get("X_test")
-    y_test = data.get("y_test")
-    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
-    valid_df = valid_df.sample(frac=1).reset_index(drop=True)
-
-    # 2) Load predictor
-    ag_model_wrapper = AutoGluonModel.load_from_dir(model_dir)
-    predictor = ag_model_wrapper.predictor
-
-    # 3) Generate and log leaderboard
-    leaderboard = generate_and_log_leaderboard(predictor, valid_df)
-
-    return {
-        "predictor": predictor,
-        "leaderboard": leaderboard,
-        "valid_df": valid_df,
-    }
-
-def make_prediction(model_dir: str, prediction_horizon: int = 10) -> Dict[str, Any]:
-    """Make a prediction using the Autogluon model.
-    Returns a dict containing the prediction, X_test and y_test.
-    """
-    data = prepare_ml_data_for_prediction_with_cleaning(prediction_horizon=prediction_horizon)
-    X_test: pd.DataFrame = data.get("X_test")
-    y_test = data.get("y_test")
-    valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
-    valid_df = valid_df.sample(frac=1).reset_index(drop=True)
-    predictor = load_autogluon_predictor(model_dir)
-    prediction = predictor.predict(valid_df)
-    return {
-        "prediction": prediction,
-        "X_test": X_test,
-        "y_test": y_test,
-    }
-
 def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[str, Any]:
     """Run the model evaluation.
     Returns a dict containing the evaluation results.
@@ -102,6 +45,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
     try:
         # 1) Prepare data
         logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
+        label_name = f"Future_Return_{prediction_horizon}D"
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()
         predictor_class._load_metadata()
@@ -109,14 +53,20 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
         X_test = data.get("X_test")
         y_test = data.get("y_test")
         logger.info(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
-        valid_df = pd.concat([X_test, pd.Series(y_test, name='Future_Return_10D')], axis=1)
+        valid_df = pd.concat([X_test, pd.Series(y_test, name=label_name)], axis=1)
         valid_df = valid_df.reset_index(drop=True)
-        valid_df = valid_df.dropna(subset=['Future_Return_10D'])
+        valid_df = valid_df.dropna(subset=[label_name], inplace=True)
         X_test_valid = valid_df.copy()
-        y_test_valid = valid_df['Future_Return_10D']
+        y_test_valid = valid_df[label_name]
         # 2) Load predictor
         model = predictor_class.model
+        if model is None:
+            logger.error("Model not found")
+            raise ValueError("Model not found")
         predictor = model.predictor
+        if predictor is None:
+            logger.error("Predictor not found")
+            raise ValueError("Predictor not found")
         feature_names = model.feature_names
         logger.info(f"feature_names: {len(feature_names)}")
         X_test_valid = X_test_valid[feature_names]
@@ -146,6 +96,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
         model.optimal_threshold = optimal_threshold
         logger.info(f"Best model: {best_model_name} with score: {best_score:.2f}")
         logger.info(f"Best result: {best_result}")
+        
         # Save optimal threshold and best model name to JSON
         metadata_path = os.path.join(model_dir, "best_model_metadata.json")
         metadata = {

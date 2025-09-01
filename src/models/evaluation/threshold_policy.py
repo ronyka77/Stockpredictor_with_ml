@@ -107,12 +107,12 @@ class ThresholdPolicy:
             "policy_value": float(cfg.value) if cfg.value is not None else None,
         }
 
-        logger.info(
-            f"threshold_policy_filter policy_method={method} policy_params={{'value': {cfg.value}}} "
-            f"stats={{'samples_kept': {samples_kept}, 'total_samples': {total_samples}, "
-            f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence}, 'max_confidence': {max_confidence}, "
-            f"'non_finite_confidence_count': {non_finite_count}}}"
-        )
+        # logger.info(
+        #     f"threshold_policy_filter policy_method={method} policy_params={{'value': {cfg.value}}} "
+        #     f"stats={{'samples_kept': {samples_kept}, 'total_samples': {total_samples}, "
+        #     f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence}, 'max_confidence': {max_confidence}, "
+        #     f"'non_finite_confidence_count': {non_finite_count}}}"
+        # )
 
         return ThresholdResult(mask=final_mask, indices=indices, stats=stats)
 

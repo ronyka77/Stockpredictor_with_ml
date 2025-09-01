@@ -195,7 +195,7 @@ validator = DataValidator()
 popular_tickers = ticker_manager.get_popular_tickers(limit=100)
 
 # Fetch data for a specific ticker
-data = data_fetcher.fetch_historical_data(
+data = data_fetcher.get_historical_data(
     ticker="AAPL",
     start_date="2024-01-01",
     end_date="2024-12-31",
@@ -617,7 +617,7 @@ print(f"Found {len(all_tickers)} active tickers")
 for ticker in all_tickers[:5]:
     try:
         # Fetch data
-        data = data_fetcher.fetch_historical_data(
+        data = data_fetcher.get_historical_data(
             ticker=ticker,
             start_date="2024-01-01",
             end_date="2024-12-31"

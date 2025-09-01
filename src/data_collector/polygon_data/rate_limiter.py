@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 
 from src.utils.logger import get_logger
+from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -157,3 +158,36 @@ class AdaptiveRateLimiter(RateLimiter):
         base_str = super().__str__()
         return f"{base_str[:-1]}, errors: {self.consecutive_errors}, " \
                 f"original_limit: {self.original_limit})" 
+
+
+class NoOpRateLimiter(RateLimiter):
+    """
+    No-op limiter that performs no waiting or backoff. Used when rate limiting is disabled.
+    """
+
+    def __init__(self):
+        # Initialize with very high limits but effectively do nothing
+        super().__init__(requests_per_minute=10_000_000)
+
+    def wait_if_needed(self) -> None:
+        # Do nothing
+        return
+
+    def get_remaining_requests(self) -> int:
+        return 10_000_000
+
+    def get_time_until_reset(self) -> float:
+        return 0.0
+
+    def reset(self) -> None:
+        return
+
+
+def get_rate_limiter(requests_per_minute: int) -> RateLimiter:
+    """
+    Factory to return the appropriate rate limiter depending on configuration.
+    """
+    if getattr(config, 'DISABLE_RATE_LIMITING', False):
+        logger.info("Rate limiting disabled via config. Using NoOpRateLimiter.")
+        return NoOpRateLimiter()
+    return AdaptiveRateLimiter(requests_per_minute=requests_per_minute)

@@ -22,6 +22,7 @@ from src.data_collector.polygon_fundamentals.data_models import (
     FinancialValue
 )
 from src.utils.logger import get_logger
+from src.data_collector.config import config
 logger = get_logger(__name__)
 
 class RateLimiter:
@@ -113,7 +114,9 @@ class PolygonFundamentalsClient:
         if not self.session:
             raise RuntimeError("Client session not initialized. Use async context manager.")
         
-        await self.rate_limiter.wait_if_needed()
+        # Skip rate limiting if globally disabled
+        if not getattr(config, 'DISABLE_RATE_LIMITING', False):
+            await self.rate_limiter.wait_if_needed()
         
         for attempt in range(self.config.RETRY_ATTEMPTS):
             try:
@@ -122,6 +125,9 @@ class PolygonFundamentalsClient:
                         data = await response.json()
                         return data
                     elif response.status == 429:  # Rate limited
+                        if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                            logger.warning("Received 429 but rate limiting disabled. Retrying immediately.")
+                            continue
                         wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR ** attempt)
                         logger.warning(f"Rate limited, waiting {wait_time} seconds")
                         await asyncio.sleep(wait_time)
@@ -134,6 +140,9 @@ class PolygonFundamentalsClient:
                 logger.error(f"Request failed (attempt {attempt + 1}): {e}")
             
             if attempt < self.config.RETRY_ATTEMPTS - 1:
+                if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    # No delay between retries when disabled
+                    continue
                 wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR ** attempt)
                 await asyncio.sleep(wait_time)
         

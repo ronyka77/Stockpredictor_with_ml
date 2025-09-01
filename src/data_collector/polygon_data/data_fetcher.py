@@ -160,10 +160,11 @@ class HistoricalDataFetcher:
                     logger.error(f"Failed to fetch data for {ticker}: {e}")
                     results[ticker] = ([], DataQualityMetrics())
             
-            # Delay between batches to respect rate limits
+            # Delay between batches – skip when rate limiting disabled
             if batch_num < total_batches - 1 and delay_between_batches > 0:
-                logger.info(f"Waiting {delay_between_batches}s before next batch")
-                time.sleep(delay_between_batches)
+                if not getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    logger.info(f"Waiting {delay_between_batches}s before next batch")
+                    time.sleep(delay_between_batches)
         
         successful_tickers = sum(1 for records, _ in results.values() if records)
         logger.info(f"Bulk fetch complete: {successful_tickers}/{len(tickers)} tickers successful")

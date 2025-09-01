@@ -29,7 +29,7 @@ class PolygonFundamentalsConfig:
     BACKOFF_FACTOR: float = 2.0
     
     # Data Collection Parameters
-    HISTORICAL_YEARS: int = 2
+    HISTORICAL_YEARS: int = 3
     FILING_TYPES: List[str] = None  # Will default to ['10-K', '10-Q']
     TIMEFRAME: str = "quarterly"  # quarterly or annual
     INCLUDE_SOURCES: bool = True
@@ -68,7 +68,7 @@ class PolygonFundamentalsConfig:
     @property
     def start_date(self) -> str:
         """Get start date for historical data collection"""
-        start = datetime.now() - timedelta(days=self.HISTORICAL_YEARS * 365)
+        start = datetime(datetime.now().year - self.HISTORICAL_YEARS, 1, 1)
         return start.strftime('%Y-%m-%d')
     
     @property

@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 from dataclasses import dataclass, asdict
 
 from src.utils.logger import get_logger
+from src.utils.feature_categories import filter_columns_by_categories
 from src.feature_engineering.config import config
 
 logger = get_logger(__name__, utility='feature_engineering')
@@ -168,8 +169,8 @@ class FeatureStorage:
                 features_data = features_data[features_data.index <= pd.Timestamp(end_date)]
             
             if categories:
-                # Filter columns by category
-                category_columns = self._get_columns_by_category(features_data.columns, categories)
+                # Filter columns by category using centralized taxonomy
+                category_columns = filter_columns_by_categories(list(features_data.columns), categories)
                 features_data = features_data[category_columns]
             
             # Load metadata
@@ -324,28 +325,6 @@ class FeatureStorage:
             'total_size_mb': total_size / (1024 * 1024),
             'path': str(version_dir)
         }
-    
-    def _get_columns_by_category(self, columns: List[str], categories: List[str]) -> List[str]:
-        """Filter columns by feature categories"""
-        category_columns = []
-        
-        for col in columns:
-            col_lower = col.lower()
-            for category in categories:
-                if category == 'trend' and any(x in col_lower for x in ['sma', 'ema', 'macd', 'ichimoku']):
-                    category_columns.append(col)
-                    break
-                elif category == 'momentum' and any(x in col_lower for x in ['rsi', 'stoch', 'roc', 'williams']):
-                    category_columns.append(col)
-                    break
-                elif category == 'volatility' and any(x in col_lower for x in ['bb', 'bollinger', 'atr', 'volatility']):
-                    category_columns.append(col)
-                    break
-                elif category == 'volume' and any(x in col_lower for x in ['obv', 'vpt', 'ad_line', 'volume', 'mfi']):
-                    category_columns.append(col)
-                    break
-        
-        return category_columns
     
     def _save_metadata_to_parquet(self, metadata: FeatureMetadata):
         """Save metadata to Parquet file"""

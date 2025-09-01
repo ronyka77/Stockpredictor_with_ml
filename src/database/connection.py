@@ -156,7 +156,6 @@ class DatabaseConnectionPool:
                 password=self.config['password'],
                 cursor_factory=RealDictCursor
             )
-            logger.info("Connection pool initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize connection pool: {str(e)}")
             raise

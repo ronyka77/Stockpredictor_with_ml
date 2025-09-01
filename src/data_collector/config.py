@@ -17,8 +17,10 @@ class PolygonConfig:
     API_KEY: str = os.getenv("POLYGON_API_KEY")
     BASE_URL: str = "https://api.polygon.io"
     
-    # Rate Limiting (Free Tier)
+    # Rate Limiting
     REQUESTS_PER_MINUTE: int = 5
+    # When True, all client-side rate limiting/backoff sleeps are disabled
+    DISABLE_RATE_LIMITING: bool = os.getenv("DISABLE_RATE_LIMITING", "TRUE")
     MAX_RETRIES: int = 3
     REQUEST_TIMEOUT: int = 30
     
@@ -55,6 +57,8 @@ class PolygonConfig:
             DB_NAME=os.getenv("DB_NAME", cls.DB_NAME),
             DB_USER=os.getenv("DB_USER", cls.DB_USER),
             DB_PASSWORD=os.getenv("DB_PASSWORD", cls.DB_PASSWORD),
+            REQUESTS_PER_MINUTE=int(os.getenv("REQUESTS_PER_MINUTE", str(cls.REQUESTS_PER_MINUTE))),
+            DISABLE_RATE_LIMITING=os.getenv("DISABLE_RATE_LIMITING", "1").strip().lower() in {"1", "true", "yes"},
         )
 
 @dataclass

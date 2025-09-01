@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
 from src.feature_engineering.config import config as fe_config
 from src.utils.logger import get_logger
+from src.utils.feature_categories import filter_columns_by_categories
 
 logger = get_logger(__name__, utility='feature_engineering')
 
@@ -155,7 +156,7 @@ class ConsolidatedFeatureStorage:
         
         # Apply category filter
         if categories:
-            category_columns = self._get_columns_by_category(combined_data.columns, categories)
+            category_columns = [c for c in filter_columns_by_categories(list(combined_data.columns), categories) if c not in ['ticker', 'date']]
             keep_columns = ['ticker', 'date'] + category_columns
             combined_data = combined_data[keep_columns]
         
@@ -292,31 +293,6 @@ class ConsolidatedFeatureStorage:
             filters.append(('date', '<=', pd.Timestamp(end_date)))
         
         return filters if filters else None
-    
-    def _get_columns_by_category(self, columns: List[str], categories: List[str]) -> List[str]:
-        """Filter columns by feature categories"""
-        category_columns = []
-        
-        for col in columns:
-            if col in ['ticker', 'date']:  # Skip metadata columns
-                continue
-                
-            col_lower = col.lower()
-            for category in categories:
-                if category == 'trend' and any(x in col_lower for x in ['sma', 'ema', 'macd', 'ichimoku']):
-                    category_columns.append(col)
-                    break
-                elif category == 'momentum' and any(x in col_lower for x in ['rsi', 'stoch', 'roc', 'williams']):
-                    category_columns.append(col)
-                    break
-                elif category == 'volatility' and any(x in col_lower for x in ['bb', 'bollinger', 'atr', 'volatility']):
-                    category_columns.append(col)
-                    break
-                elif category == 'volume' and any(x in col_lower for x in ['obv', 'vpt', 'ad_line', 'volume', 'mfi']):
-                    category_columns.append(col)
-                    break
-        
-        return category_columns
     
     def _calculate_compression_ratio(self, data: pd.DataFrame, compressed_size_mb: float) -> float:
         """Calculate compression ratio compared to uncompressed CSV"""

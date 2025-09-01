@@ -58,7 +58,6 @@ def create_dataloader_from_numpy(
     Arguments are designed for tabular models that accept (x_num, y, cat_idx) batches,
     where cat_idx may be None.
     """
-    # Do not force a full-copy to float32 here; let dataset handle memmap and dtype coercion
     ds = _NumpyOptionalCatDataset(X_num=X_num, y=y, cat_idx=cat_idx)
     pin = torch.cuda.is_available() if pin_memory is None else bool(pin_memory)
     # Keep persistent_workers disabled when num_workers == 0 to avoid extra memory/worker overhead

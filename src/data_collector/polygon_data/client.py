@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urljoin, urlparse, parse_qs
 
 from src.utils.logger import get_logger
-from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
+from src.data_collector.polygon_data.rate_limiter import get_rate_limiter
 from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="data_collector")
@@ -42,7 +42,7 @@ class PolygonDataClient:
         """
         self.api_key = api_key or config.API_KEY
         self.base_url = config.BASE_URL
-        self.rate_limiter = AdaptiveRateLimiter(requests_per_minute)
+        self.rate_limiter = get_rate_limiter(requests_per_minute)
         self.session = requests.Session()
         
         # Set up session headers
@@ -67,7 +67,7 @@ class PolygonDataClient:
         Raises:
             PolygonAPIError: For API-related errors
         """
-        # Apply rate limiting
+        # Apply rate limiting (no-op if disabled)
         self.rate_limiter.wait_if_needed()
         
         # Prepare request
@@ -88,7 +88,11 @@ class PolygonDataClient:
                 
                 # Handle different response status codes
                 if response.status_code == 200:
-                    self.rate_limiter.handle_successful_request()
+                    try:
+                        # Optional on some limiter implementations
+                        self.rate_limiter.handle_successful_request()
+                    except Exception:
+                        pass
                     # Safely parse JSON and convert parsing errors to PolygonAPIError
                     try:
                         data = response.json()
@@ -105,11 +109,21 @@ class PolygonDataClient:
                     return data
                 
                 elif response.status_code == 429:  # Rate limited
-                    self.rate_limiter.handle_rate_limit_error()
-                    wait_time = 2 ** attempt
-                    logger.warning(f"Rate limit exceeded. Waiting {wait_time}s before retry")
-                    time.sleep(wait_time)
-                    continue
+                    if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                        # If plan has no limits, treat as transient and retry immediately without sleeping
+                        logger.warning("Received 429 but rate limiting disabled. Retrying immediately.")
+                        continue
+                    else:
+                        # Backoff path when limiting enabled
+                        try:
+                            # Not all limiters implement this; guard call
+                            self.rate_limiter.handle_rate_limit_error()
+                        except Exception:
+                            pass
+                        wait_time = 2 ** attempt
+                        logger.warning(f"Rate limit exceeded. Waiting {wait_time}s before retry")
+                        time.sleep(wait_time)
+                        continue
                 
                 elif response.status_code == 401:  # Unauthorized
                     raise PolygonAPIError("Invalid API key", response.status_code)
@@ -136,18 +150,24 @@ class PolygonDataClient:
                 
             except requests.exceptions.Timeout:
                 wait_time = 2 ** attempt
-                logger.warning(f"Request timeout. Retrying in {wait_time}s")
-                if attempt < config.MAX_RETRIES - 1:
-                    time.sleep(wait_time)
-                    continue
+                if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    logger.warning("Request timeout. Retrying without delay (rate limiting disabled)")
+                else:
+                    logger.warning(f"Request timeout. Retrying in {wait_time}s")
+                    if attempt < config.MAX_RETRIES - 1:
+                        time.sleep(wait_time)
+                        continue
                 raise PolygonAPIError("Request timeout after all retries")
             
             except requests.exceptions.ConnectionError:
                 wait_time = 2 ** attempt
-                logger.warning(f"Connection error. Retrying in {wait_time}s")
-                if attempt < config.MAX_RETRIES - 1:
-                    time.sleep(wait_time)
-                    continue
+                if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    logger.warning("Connection error. Retrying without delay (rate limiting disabled)")
+                else:
+                    logger.warning(f"Connection error. Retrying in {wait_time}s")
+                    if attempt < config.MAX_RETRIES - 1:
+                        time.sleep(wait_time)
+                        continue
                 raise PolygonAPIError("Connection error after all retries")
             
             except requests.exceptions.RequestException as e:
@@ -155,8 +175,11 @@ class PolygonDataClient:
                     raise PolygonAPIError(f"Request failed: {str(e)}")
                 
                 wait_time = 2 ** attempt
-                logger.warning(f"Request failed: {e}. Retrying in {wait_time}s")
-                time.sleep(wait_time)
+                if getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    logger.warning(f"Request failed: {e}. Retrying without delay (rate limiting disabled)")
+                else:
+                    logger.warning(f"Request failed: {e}. Retrying in {wait_time}s")
+                    time.sleep(wait_time)
         
         raise PolygonAPIError(f"Failed to complete request after {config.MAX_RETRIES} attempts")
     

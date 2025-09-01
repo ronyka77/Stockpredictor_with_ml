@@ -14,6 +14,7 @@ from src.data_collector.ticker_manager import TickerManager
 from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.data_validator import DataValidator
+from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -318,9 +319,10 @@ class DataPipeline:
                     logger.error(f"Error processing date {target_date}: {e}")
                     self.stats.add_ticker_result(f"date_{target_date}", False, 0, str(e))
                 
-                # Brief pause between dates to respect rate limits
+                # Brief pause between dates – skip when rate limiting disabled
                 if i < len(dates_to_process):
-                    time.sleep(0.5)
+                    if not getattr(config, 'DISABLE_RATE_LIMITING', False):
+                        time.sleep(0.5)
             
             # Step 4: Finalize
             self.stats.finish()
@@ -422,9 +424,10 @@ class DataPipeline:
             logger.info(f"Batch {batch_num + 1} complete: "
                         f"{self.stats.tickers_successful}/{self.stats.tickers_processed} successful")
             
-            # Rate limiting between batches
+            # Inter-batch pause – skip when rate limiting disabled
             if batch_num < total_batches - 1:
-                time.sleep(1.0)  # Brief pause between batches
+                if not getattr(config, 'DISABLE_RATE_LIMITING', False):
+                    time.sleep(1.0)
     
     def _save_pipeline_stats(self) -> None:
         """Save pipeline statistics to file"""
@@ -471,7 +474,7 @@ if __name__ == "__main__":
     
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=720)
+    start_date = datetime.now() - timedelta(days=7)
     
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

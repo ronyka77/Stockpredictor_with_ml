@@ -224,7 +224,6 @@ class FeatureCalculator:
         Returns:
             DataFrame with additional basic features
         """
-        logger.info("Adding basic price features")
         
         # Price ratios
         features_df['Price_High_Low_Ratio'] = price_data['high'] / price_data['low']

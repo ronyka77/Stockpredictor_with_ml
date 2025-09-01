@@ -26,6 +26,11 @@ TEST_DB_NAME=stock_data
 TEST_DB_USER=postgres
 TEST_DB_PASSWORD=your_database_password_here
 
+# Database Connection Pool
+FE_DB_POOL_SIZE=5
+FE_DB_MAX_OVERFLOW=10
+FE_DB_POOL_TIMEOUT=30
+
 # Batch Processing Configuration
 DEFAULT_BATCH_SIZE=100
 MAX_WORKERS=4
@@ -37,11 +42,6 @@ MIN_DATA_POINTS=100
 MAX_MISSING_PCT=0.05
 OUTLIER_THRESHOLD=3.0
 QUALITY_SCORE_THRESHOLD=50.0
-
-# Database Connection Pool
-FE_DB_POOL_SIZE=5
-FE_DB_MAX_OVERFLOW=10
-FE_DB_POOL_TIMEOUT=30
 
 # =============================================================================
 # FEATURE ENGINEERING - DATA QUALITY
@@ -96,15 +96,6 @@ FE_FIBONACCI_LOOKBACK=100
 # Data Collection
 FE_FUNDAMENTAL_POLYGON_ENDPOINT=https://api.polygon.io/vX/reference/financials
 FE_FUNDAMENTAL_UPDATE_FREQUENCY=daily
-FE_FUNDAMENTAL_HISTORICAL_YEARS=2
-
-# Data Processing
-FE_FUNDAMENTAL_MISSING_DATA_STRATEGY=forward_fill
-FE_FUNDAMENTAL_OUTLIER_CAPPING=true
-FE_FUNDAMENTAL_SECTOR_CLASSIFICATION=GICS
-
-# Calculation Limits
-FE_MAX_RATIO_VALUE=1e6
 
 # Ratio Limits (for outlier capping) - format: min,max
 FE_PE_RATIO_CAP=-100,100
@@ -230,46 +221,3 @@ FEATURES_STORAGE_PATH=data/features
 FEATURE_VERSION=v1.0
 PARQUET_COMPRESSION=snappy
 SAVE_TO_DATABASE=true
-
-# =============================================================================
-# FUNDAMENTAL PIPELINE CONFIGURATION
-# =============================================================================
-# Single ticker to process
-FE_PIPELINE_TICKER=
-
-# Multiple tickers (comma-separated)
-FE_PIPELINE_TICKERS=
-
-# Number of S&P 500 tickers to sample
-FE_PIPELINE_SP500_SAMPLE=0
-
-# Logging level for pipeline
-FE_PIPELINE_LOG_LEVEL=INFO
-
-# Default sample size when no specific configuration provided
-FE_PIPELINE_DEFAULT_SAMPLE=5
-
-# =============================================================================
-# FUNDAMENTAL PIPELINE MONITORING
-# =============================================================================
-# Perform health check
-FE_MONITOR_HEALTH_CHECK=false
-
-# Show pipeline metrics
-FE_MONITOR_METRICS=false
-
-# Generate report (path to output file, optional)
-FE_MONITOR_REPORT=
-
-# Check status of specific ticker
-FE_MONITOR_TICKER=
-
-# List tickers with stale data
-FE_MONITOR_STALE_TICKERS=false
-
-# =============================================================================
-# DATABASE QUERY LIMITS
-# =============================================================================
-FE_TICKER_QUERY_LIMIT=1000
-FE_FEATURE_HISTORY_LIMIT=20
-FE_BATCH_INSERT_SIZE=1000

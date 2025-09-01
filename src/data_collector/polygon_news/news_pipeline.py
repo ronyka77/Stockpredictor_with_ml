@@ -429,8 +429,6 @@ def main():
                 polygon_api_key=config.API_KEY,
                 requests_per_minute=config.REQUESTS_PER_MINUTE
             )
-            
-            logger.info("News collector initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize news collector: {e}")
             session.close()

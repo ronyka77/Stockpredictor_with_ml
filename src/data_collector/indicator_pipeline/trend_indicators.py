@@ -162,7 +162,7 @@ def calculate_macd(data: pd.DataFrame, fast: Optional[int] = None,
     if signal is None:
         signal = feature_config.MACD_PARAMS['signal']
     
-    logger.info(f"Calculating MACD with parameters: fast={fast}, slow={slow}, signal={signal}")
+    # logger.info(f"Calculating MACD with parameters: fast={fast}, slow={slow}, signal={signal}")
     
     try:
         # Check minimum data requirements
@@ -367,9 +367,7 @@ class TrendIndicatorCalculator(BaseIndicator):
                 }
             }
             
-            calculation_time = time.time() - start_time
-            # logger.info(f"Calculated {len(combined_data.columns)} trend features in {calculation_time:.2f}s")
-            
+            calculation_time = time.time() - start_time            
             return create_indicator_result(
                 data=combined_data,
                 metadata=metadata,

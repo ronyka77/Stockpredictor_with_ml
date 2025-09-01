@@ -27,8 +27,6 @@ class TickerManager:
         self.client = client
         self.storage = storage or DataStorage()
         self.validator = DataValidator(strict_mode=False)
-        
-        logger.info("Ticker manager initialized with database storage")
     
     def get_all_active_tickers(self, market: str = "stocks") -> List[str]:
         """

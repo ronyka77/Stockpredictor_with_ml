@@ -102,15 +102,12 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
             logger.info(f"✅ Applied {len(transformation_manifest)} stationarity transformations in parallel.")
         
         # PHASE 2 FIX: Add price-normalized features
-        logger.info("3.1. Adding price-normalized features...")
         X = add_price_normalized_features(X)
         
         # PHASE 2 FIX: Add prediction bounds features
-        logger.info("3.2. Adding prediction bounds features...")
         X = add_prediction_bounds_features(X)
         
         # 4. Add temporal features
-        logger.info("4. Adding temporal features...")
         
         # Add the date column to features temporarily for temporal feature creation
         X['date'] = combined_data['date'].copy()

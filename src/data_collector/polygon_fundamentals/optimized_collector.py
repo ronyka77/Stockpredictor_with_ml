@@ -15,6 +15,7 @@ from src.data_collector.polygon_fundamentals.config import PolygonFundamentalsCo
 from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCacheManager
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
+from src.data_collector.config import config
 from src.utils.logger import get_logger
 from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
 
@@ -35,9 +36,10 @@ class FundamentalRateLimiter:
         self.rate_limiter = AdaptiveRateLimiter()
     
     async def acquire(self):
-        """Acquire rate limit using existing framework"""
-        # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so we just call it
-        self.rate_limiter.wait_if_needed()
+        """Acquire rate limit using existing framework (skip if disabled)"""
+        if not getattr(config, 'DISABLE_RATE_LIMITING', False):
+            # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so we just call it
+            self.rate_limiter.wait_if_needed()
     
     def release(self):
         """Release rate limit using existing framework"""

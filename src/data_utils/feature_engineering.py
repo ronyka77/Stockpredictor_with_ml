@@ -26,7 +26,6 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with additional normalized features
     """
-    logger.info("🔧 Adding price-normalized features...")
     
     if 'close' not in features_df.columns:
         logger.warning("⚠ 'close' column not found. Skipping price normalization.")
@@ -106,7 +105,6 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with additional bound-related features
     """
-    logger.info("🎯 Adding prediction bounds features...")
     
     features_enhanced = features_df.copy()
     

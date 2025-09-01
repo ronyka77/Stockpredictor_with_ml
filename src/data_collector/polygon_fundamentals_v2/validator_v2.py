@@ -22,7 +22,6 @@ class ExtendedValidation:
 
     @property
     def quality_score(self) -> float:
-        # keep base score as canonical for now
         return self.base.quality_score
 
 
