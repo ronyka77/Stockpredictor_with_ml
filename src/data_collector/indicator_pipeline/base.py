@@ -62,14 +62,8 @@ class BaseIndicator(ABC):
         self.data = data.copy()
         self.params = params
         self.config = feature_config
-        
-        # Validate input data
         self.validate_data()
-        
-        # Standardize column names
         self.standardize_columns()
-        
-        # logger.info(f"Initialized {self.__class__.__name__} with {len(self.data)} data points")
     
     def validate_data(self) -> None:
         """
@@ -215,33 +209,6 @@ class IndicatorValidator:
         
         # logger.info("Indicator result validation passed")
         return True
-    
-    @staticmethod
-    def check_data_continuity(data: pd.DataFrame, max_gap_days: int = 7) -> List[str]:
-        """
-        Check for gaps in time series data
-        
-        Args:
-            data: DataFrame with datetime index
-            max_gap_days: Maximum acceptable gap in days
-            
-        Returns:
-            List of warnings about data gaps
-        """
-        warnings = []
-        
-        if len(data) < 2:
-            return warnings
-        
-        # Calculate gaps between consecutive dates
-        date_diffs = data.index.to_series().diff().dt.days
-        large_gaps = date_diffs[date_diffs > max_gap_days]
-        
-        if not large_gaps.empty:
-            for date, gap in large_gaps.items():
-                warnings.append(f"Data gap of {gap} days found at {date}")
-        
-        return warnings
 
 def create_indicator_result(data: pd.DataFrame, metadata: Dict[str, Any], 
                             warnings: List[str] = None, calculation_time: float = 0.0) -> IndicatorResult:

@@ -321,7 +321,6 @@ class DataValidator:
                 transformed_record = self._transform_polygon_record(record, ticker)
             else:
                 transformed_record = record
-                # Add ticker if provided and not present
                 if ticker and 'ticker' not in transformed_record:
                     transformed_record['ticker'] = ticker
             
@@ -355,7 +354,6 @@ class DataValidator:
         
         for i, record in enumerate(records):
             try:
-                # Add ticker to record if provided and not present
                 if ticker and 'ticker' not in record:
                     record['ticker'] = ticker
                 

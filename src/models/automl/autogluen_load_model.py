@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
+import warnings
 
 from autogluon.tabular import TabularPredictor
 
@@ -10,8 +11,11 @@ from src.utils.logger import get_logger
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 
-
 logger = get_logger(__name__)
+# Quiet Autogluon and common noisy libraries
+for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+    warnings.getLogger(lg).setLevel(warnings.WARNING)
+warnings.filterwarnings("ignore")
 
 
 def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataFrame, model_names: list[str] = None) -> pd.DataFrame:
@@ -45,17 +49,19 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
     try:
         # 1) Prepare data
         logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
-        label_name = f"Future_Return_{prediction_horizon}D"
+        label_name = f"Future_Return_{prediction_horizon}"
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()
         predictor_class._load_metadata()
         data = prepare_ml_data_for_prediction_with_cleaning(prediction_horizon=prediction_horizon, days_back=60)
         X_test = data.get("X_test")
         y_test = data.get("y_test")
-        logger.info(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
         valid_df = pd.concat([X_test, pd.Series(y_test, name=label_name)], axis=1)
         valid_df = valid_df.reset_index(drop=True)
-        valid_df = valid_df.dropna(subset=[label_name], inplace=True)
+        initial_rows = len(valid_df)
+        valid_df = valid_df.dropna(subset=[label_name])
+        dropped_rows = initial_rows - len(valid_df)
+        logger.info(f"Dropped {dropped_rows} rows with missing values in {label_name} and length: {len(valid_df)}")
         X_test_valid = valid_df.copy()
         y_test_valid = valid_df[label_name]
         # 2) Load predictor
@@ -107,18 +113,13 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
         logger.info(f"Saved model metadata to: {metadata_path}")
-
-        # 4) Delete models
-        # models_to_delete = [model_name for model_name in model_names if model_name != best_model_name]
-        # predictor.delete_models(models_to_delete=models_to_delete, delete_from_disk=True)
-        
     except Exception as e:
         logger.error("Script failed: %s", e)
         raise
 
 if __name__ == "__main__":
     try:
-        model_dir = "AutogluonModels/ag-20250825_200122"
+        model_dir = "AutogluonModels/ag-20250901_200612"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

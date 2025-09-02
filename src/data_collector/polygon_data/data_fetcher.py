@@ -36,18 +36,16 @@ class HistoricalDataFetcher:
     
     def get_historical_data(self, ticker: str, start_date: Union[str, date], 
                             end_date: Union[str, date], timespan: str = "day",
-                            multiplier: int = 1, adjusted: bool = True,
+                            multiplier: int = 1,
                             validate_data: bool = True) -> tuple[List[OHLCVRecord], DataQualityMetrics]:
         """
         Fetch historical OHLCV data for a ticker
-        
         Args:
             ticker: Stock ticker symbol
             start_date: Start date (YYYY-MM-DD string or date object)
             end_date: End date (YYYY-MM-DD string or date object)
             timespan: Time window (day, week, month, quarter, year)
             multiplier: Size of the timespan multiplier
-            adjusted: Whether to return adjusted data
             validate_data: Whether to validate the data
             
         Returns:
@@ -67,8 +65,6 @@ class HistoricalDataFetcher:
                 timespan=timespan,
                 from_date=start_str,
                 to_date=end_str,
-                adjusted=adjusted,
-                sort="asc",
                 limit=config.MAX_RECORDS_PER_REQUEST
             )
             

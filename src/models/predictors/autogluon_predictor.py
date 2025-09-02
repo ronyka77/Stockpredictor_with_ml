@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import os
 import json
-
+import warnings
 from src.models.predictors.base_predictor import BasePredictor
 from src.models.automl.autogluon_model import AutoGluonModel
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
+# Quiet Autogluon and common noisy libraries
+for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+    warnings.getLogger(lg).setLevel(warnings.WARNING)
+warnings.filterwarnings("ignore")
 
 class AutoGluonPredictor(BasePredictor):
     def __init__(self, model_dir: str):
@@ -77,7 +80,7 @@ def predict_all_model(model_dir: str):
         logger.info("✅ Prediction pipeline completed!")
 
 if __name__ == "__main__":
-    model_dir = "AutogluonModels/ag-20250825_200122"    
+    model_dir = "AutogluonModels/ag-20250901_200612"    
     predict_all_model(model_dir)
 
 

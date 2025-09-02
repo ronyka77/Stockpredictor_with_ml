@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict
 from dotenv import load_dotenv
-# Load environment variables from a .env file if present
 load_dotenv()
 
 @dataclass
@@ -27,7 +26,6 @@ class PolygonConfig:
     # Data Configuration
     DEFAULT_TIMESPAN: str = "day"
     MAX_RECORDS_PER_REQUEST: int = 50000
-    ADJUSTED_DATA: bool = True
     
     # News Collection Configuration
     NEWS_MAX_TICKERS: int = int(os.getenv('NEWS_MAX_TICKERS', '100'))
@@ -81,10 +79,10 @@ class FeatureEngineeringConfig:
     FIBONACCI_LOOKBACK: int = 100
     
     # Storage Configuration
-    FEATURES_STORAGE_PATH: str = os.getenv("FEATURES_STORAGE_PATH", "data/features")
+    FEATURES_STORAGE_PATH: str = os.getenv("FE_STORAGE_PATH", "data/features")
     FEATURE_VERSION: str = os.getenv("FEATURE_VERSION", "v1.0")
-    PARQUET_COMPRESSION: str = "snappy"  # Options: snappy, gzip, brotli
-    PARQUET_ENGINE: str = "pyarrow"      # Options: pyarrow, fastparquet
+    PARQUET_COMPRESSION: str = os.getenv('FE_PARQUET_COMPRESSION', 'snappy')  # snappy, gzip, brotli
+    PARQUET_ENGINE: str = os.getenv('FE_PARQUET_ENGINE', 'pyarrow')  # pyarrow, fastparquet
     
     # Validation Settings
     MAX_MISSING_PCT: float = 0.05  # 5% max missing data allowed
@@ -93,12 +91,12 @@ class FeatureEngineeringConfig:
     
     # File Management
     CLEANUP_OLD_VERSIONS: bool = True
-    MAX_VERSIONS_TO_KEEP: int = 3
+    MAX_VERSIONS_TO_KEEP: int = int(os.getenv('FE_MAX_VERSIONS_TO_KEEP', '3'))
     
     # Performance Settings
-    PARQUET_ROW_GROUP_SIZE: int = 50000
+    PARQUET_ROW_GROUP_SIZE: int = int(os.getenv('FE_PARQUET_ROW_GROUP_SIZE', '50000'))
     ENABLE_PARALLEL_PROCESSING: bool = True
-    MAX_WORKERS: int = 4
+    MAX_WORKERS: int = int(os.getenv('FE_MAX_WORKERS', '4'))
     
     # Database Configuration
     DB_HOST: str = os.getenv("DB_HOST", "localhost")

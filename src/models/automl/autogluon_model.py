@@ -106,13 +106,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         )
         summary = self.predictor.fit_summary(show_plot=True)
         logger.info(summary)
-        # self.predictor.distill(
-        #     time_limit=7200,
-        #     train_data=train_df,
-        #     tuning_data=valid_df,
-        #     presets=presets,
-        #     hyperparameters=hyperparams,
-        # )
 
         # Capture feature names (exclude label)
         self.feature_names = [c for c in train_df.columns if c != label]
@@ -197,8 +190,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                                 threshold_range: tuple = (0.01, 0.99),
                                 n_thresholds: int = 90,
                                 investment_amount: float = 100.0) -> Dict[str, Any]:
-        """Run centralized threshold optimization using ThresholdEvaluator.
-
+        """
+        Run centralized threshold optimization using ThresholdEvaluator.
         Returns the evaluator results dict.
         """
         if not self.predictor:
@@ -214,8 +207,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         else:
             current_prices = np.ones(len(X_test))
 
-        logger.info("Running threshold evaluation: method=%s, thresholds=%s, n=%d",
-                    confidence_method, str(threshold_range), n_thresholds)
+        logger.info(f"Running threshold evaluation: method={confidence_method}, thresholds={str(threshold_range)}, n={n_thresholds}")
         try:
             results = evaluator.optimize_prediction_threshold(
                 model=self,
@@ -226,20 +218,20 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 threshold_range=threshold_range,
                 n_thresholds=n_thresholds,
             )
-            logger.info("Threshold evaluation finished. status=%s", results.get('status', 'unknown'))
+            logger.info(f"Threshold evaluation finished. status={results.get('status', 'unknown')}")
             return results
         except Exception as e:
-            logger.error("Threshold evaluation failed: %s", e)
+            logger.error(f"Threshold evaluation failed: {e}")
             return {'status': 'failed', 'message': str(e)}
 
 
     def load_from_dir(self, model_dir: str) -> "AutoGluonModel":
-        logger.info("Loading AutoGluon predictor from %s", model_dir)
+        logger.info(f"Loading AutoGluon predictor from {model_dir}")
         self.predictor = TabularPredictor.load(model_dir)
         self.model = self
         self.feature_names = self.predictor.original_features
         self.is_trained = True
-        logger.info("AutoGluon predictor loaded from %s", model_dir)
+        logger.info(f"AutoGluon predictor loaded from {model_dir}")
         return self
 
 

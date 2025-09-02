@@ -7,8 +7,9 @@ consolidating parameters that were previously scattered across multiple files.
 
 import os
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 import dotenv
+from sqlalchemy import true
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,23 +21,10 @@ class DataQualityConfig:
     """Configuration for data quality and validation parameters"""
     
     # Data Requirements
-    MIN_DATA_POINTS: int = int(os.getenv('FE_MIN_DATA_POINTS', '100'))
-    MIN_DATA_POINTS_RSI: int = int(os.getenv('FE_MIN_DATA_POINTS_RSI', '100'))  # RSI needs 2x for stability
-    
+    MIN_DATA_POINTS: int = int(os.getenv('MIN_DATA_POINTS', '100'))
+
     # Data Quality Thresholds
-    MAX_MISSING_PCT: float = float(os.getenv('FE_MAX_MISSING_PCT', '0.05'))  # 5% max missing data
-    OUTLIER_THRESHOLD: float = float(os.getenv('FE_OUTLIER_THRESHOLD', '3.0'))  # Z-score threshold
-    QUALITY_SCORE_THRESHOLD: float = float(os.getenv('FE_QUALITY_SCORE_THRESHOLD', '50.0'))
-    
-    # Data Continuity
-    DATA_CONTINUITY_MAX_GAP_DAYS: int = int(os.getenv('FE_MAX_GAP_DAYS', '7'))
-    
-    # Database Precision Limits
-    MAX_DB_VALUE: float = float(os.getenv('FE_MAX_DB_VALUE', '1e8'))  # 100 million max for DB compatibility
-    
-    # Validation Settings
-    ENABLE_DATA_VALIDATION: bool = os.getenv('FE_ENABLE_VALIDATION', 'true').lower() == 'true'
-    STRICT_VALIDATION: bool = os.getenv('FE_STRICT_VALIDATION', 'false').lower() == 'true'
+    MAX_MISSING_PCT: float = 0.05  # 5% max missing data allowed
 
 @dataclass
 class BatchProcessingConfig:
@@ -45,21 +33,6 @@ class BatchProcessingConfig:
     # Batch Processing
     DEFAULT_BATCH_SIZE: int = int(os.getenv('FE_BATCH_SIZE', '50'))
     MAX_WORKERS: int = int(os.getenv('FE_MAX_WORKERS', '4'))
-    THREAD_POOL_SIZE: int = int(os.getenv('FE_THREAD_POOL_SIZE', '4'))
-    
-    # Processing Timeouts
-    PROCESSING_TIMEOUT: int = int(os.getenv('FE_PROCESSING_TIMEOUT', '300'))  # seconds
-    SINGLE_TICKER_TIMEOUT: int = int(os.getenv('FE_SINGLE_TICKER_TIMEOUT', '60'))  # seconds
-    
-    # Progress Reporting
-    PROGRESS_REPORT_INTERVAL: int = int(os.getenv('FE_PROGRESS_INTERVAL', '10'))  # Log every N tickers
-    
-    # Error Handling
-    MAX_RETRY_ATTEMPTS: int = int(os.getenv('FE_MAX_RETRIES', '3'))
-    RETRY_DELAY: float = float(os.getenv('FE_RETRY_DELAY', '1.0'))  # seconds
-    CONTINUE_ON_ERROR: bool = os.getenv('FE_CONTINUE_ON_ERROR', 'true').lower() == 'true'
-
-    MIN_SUCCESS_RATE: float = float(os.getenv('FE_MIN_SUCCESS_RATE', '0.5'))
 
 @dataclass
 class TechnicalIndicatorConfig:
@@ -165,7 +138,7 @@ class StorageConfig:
     
     # Base Storage Settings
     FEATURES_STORAGE_PATH: str = os.getenv('FE_STORAGE_PATH', 'data/features')
-    FEATURE_VERSION: str = os.getenv('FE_FEATURE_VERSION', 'v1.0')
+    FEATURE_VERSION: str = os.getenv('FEATURE_VERSION', 'v1.0')
     
     # Parquet Settings
     PARQUET_COMPRESSION: str = os.getenv('FE_PARQUET_COMPRESSION', 'snappy')  # snappy, gzip, brotli
@@ -173,21 +146,21 @@ class StorageConfig:
     PARQUET_ROW_GROUP_SIZE: int = int(os.getenv('FE_PARQUET_ROW_GROUP_SIZE', '50000'))
     
     # Storage Behavior
-    SAVE_TO_DATABASE: bool = os.getenv('FE_SAVE_TO_DATABASE', 'true').lower() == 'true'
-    SAVE_TO_PARQUET: bool = os.getenv('FE_SAVE_TO_PARQUET', 'true').lower() == 'true'
-    USE_CONSOLIDATED_STORAGE: bool = os.getenv('FE_USE_CONSOLIDATED_STORAGE', 'true').lower() == 'true'
+    SAVE_TO_DATABASE: bool = true
+    SAVE_TO_PARQUET: bool = true
+    USE_CONSOLIDATED_STORAGE: bool = true
     OVERWRITE_EXISTING: bool = os.getenv('FE_OVERWRITE_EXISTING', 'false').lower() == 'true'
     
     # Partitioning
-    PARTITIONING_STRATEGY: str = os.getenv('FE_PARTITIONING_STRATEGY', 'by_date')  # Only year-based supported
+    PARTITIONING_STRATEGY: str = 'by_date' # Only year-based supported
     
     # File Management
-    CLEANUP_OLD_VERSIONS: bool = os.getenv('FE_CLEANUP_OLD_VERSIONS', 'true').lower() == 'true'
+    CLEANUP_OLD_VERSIONS: bool = true
     MAX_VERSIONS_TO_KEEP: int = int(os.getenv('FE_MAX_VERSIONS_TO_KEEP', '3'))
     
     # Consolidated Storage
     MAX_ROWS_PER_FILE: int = int(os.getenv('FE_MAX_ROWS_PER_FILE', '5000000'))  # 5M rows
-    INCLUDE_METADATA_COLUMNS: bool = os.getenv('FE_INCLUDE_METADATA_COLUMNS', 'true').lower() == 'true'
+    INCLUDE_METADATA_COLUMNS: bool = true
 
 @dataclass
 class MLConfig:
@@ -207,31 +180,7 @@ class MLConfig:
     
     # Target Variable
     DEFAULT_TARGET_COLUMN: str = os.getenv('FE_ML_TARGET_COLUMN', 'close')
-    DEFAULT_PREDICTION_HORIZON: int = int(os.getenv('FE_ML_PREDICTION_HORIZON', '1'))  # days ahead
-    
-    # Feature Selection
-    ENABLE_FEATURE_SELECTION: bool = os.getenv('FE_ML_ENABLE_FEATURE_SELECTION', 'false').lower() == 'true'
-    MAX_FEATURES: Optional[int] = int(os.getenv('FE_ML_MAX_FEATURES', '0')) or None
-
-@dataclass
-class MonitoringConfig:
-    """Configuration for monitoring and logging"""
-    
-    # Monitoring Intervals
-    RECENT_ACTIVITY_DAYS: int = int(os.getenv('FE_RECENT_ACTIVITY_DAYS', '7'))
-    STATS_REFRESH_INTERVAL: int = int(os.getenv('FE_STATS_REFRESH_INTERVAL', '300'))  # seconds
-    
-    # History Limits
-    MAX_JOB_HISTORY_RECORDS: int = int(os.getenv('FE_MAX_JOB_HISTORY', '20'))
-    MAX_ERROR_LOG_ENTRIES: int = int(os.getenv('FE_MAX_ERROR_LOG_ENTRIES', '100'))
-    
-    # Performance Monitoring
-    MEMORY_USAGE_THRESHOLD: float = float(os.getenv('FE_MEMORY_THRESHOLD', '0.8'))  # 80%
-    PROCESSING_TIME_WARNING_THRESHOLD: int = int(os.getenv('FE_PROCESSING_TIME_WARNING', '300'))  # seconds
-    
-    # Alerting
-    ENABLE_ALERTS: bool = os.getenv('FE_ENABLE_ALERTS', 'false').lower() == 'true'
-    ALERT_EMAIL: Optional[str] = os.getenv('FE_ALERT_EMAIL')
+    DEFAULT_PREDICTION_HORIZON: int = int(os.getenv('FE_ML_PREDICTION_HORIZON', '10'))  # days ahead
 
 @dataclass
 class DatabaseConfig:
@@ -243,11 +192,6 @@ class DatabaseConfig:
     DB_NAME: str = os.getenv('DB_NAME', 'stock_data')
     DB_USER: str = os.getenv('DB_USER', 'postgres')
     DB_PASSWORD: str = os.getenv('DB_PASSWORD', '')
-    
-    # Query Limits
-    TICKER_QUERY_LIMIT: int = 1000
-    FEATURE_HISTORY_LIMIT: int = 20
-    BATCH_INSERT_SIZE: int = 1000
     
     # Connection Pool
     DB_POOL_SIZE: int = 5
@@ -382,7 +326,6 @@ class FeatureEngineeringConfig:
     feature_categories: FeatureCategoryConfig = field(default_factory=FeatureCategoryConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     ml: MLConfig = field(default_factory=MLConfig)
-    monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     cli: CommandLineConfig = field(default_factory=CommandLineConfig)
     fundamental: FundamentalConfig = field(default_factory=FundamentalConfig)

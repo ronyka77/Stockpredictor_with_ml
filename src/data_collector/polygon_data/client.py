@@ -265,8 +265,8 @@ class PolygonDataClient:
         return self._fetch_paginated_data('/v3/reference/tickers', params)
     
     def get_aggregates(self, ticker: str, multiplier: int, timespan: str,
-                        from_date: str, to_date: str, adjusted: bool = True,
-                        sort: str = "asc", limit: int = 50000) -> List[Dict]:
+                        from_date: str, to_date: str,
+                        limit: int = 50000) -> List[Dict]:
         """
         Get aggregate (OHLCV) data for a ticker
         
@@ -276,8 +276,6 @@ class PolygonDataClient:
             timespan: Size of the time window (minute, hour, day, week, month, quarter, year)
             from_date: Start date (YYYY-MM-DD)
             to_date: End date (YYYY-MM-DD)
-            adjusted: Whether to return adjusted data
-            sort: Sort order (asc or desc)
             limit: Number of results to return
             
         Returns:
@@ -286,9 +284,9 @@ class PolygonDataClient:
         endpoint = f'/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from_date}/{to_date}'
         
         params = {
-            'adjusted': str(adjusted).lower(),
-            'sort': sort,
-            'limit': min(limit, 50000)  # API maximum
+            'adjusted': "true",
+            'sort': "asc",
+            'limit': min(limit, 50000)
         }
         
         logger.info(f"Fetching {timespan} aggregates for {ticker} from {from_date} to {to_date}")
@@ -296,13 +294,12 @@ class PolygonDataClient:
         response = self._make_request(endpoint, params)
         return response.get('results', [])
     
-    def get_grouped_daily(self, date: str, adjusted: bool = True) -> List[Dict]:
+    def get_grouped_daily(self, date: str) -> List[Dict]:
         """
         Get grouped daily (OHLCV) data for all stocks on a specific date
         
         Args:
             date: Date in YYYY-MM-DD format
-            adjusted: Whether to return adjusted data
             
         Returns:
             List of OHLCV records for all stocks
@@ -310,7 +307,7 @@ class PolygonDataClient:
         endpoint = f'/v2/aggs/grouped/locale/us/market/stocks/{date}'
         
         params = {
-            'adjusted': str(adjusted).lower()
+            'adjusted': "true"
         }
         
         logger.info(f"Fetching grouped daily data for {date}")

@@ -110,127 +110,6 @@ class DataPipeline:
         
         logger.info("Data pipeline initialized")
     
-    def run_full_pipeline(self, start_date: Union[str, date], end_date: Union[str, date],
-                            ticker_source: str = "all", max_tickers: Optional[int] = None,
-                            timespan: str = "day", validate_data: bool = True,
-                            batch_size: int = 10, save_stats: bool = True) -> PipelineStats:
-        """
-        Run the complete data acquisition pipeline
-        
-        Args:
-            start_date: Start date for data collection
-            end_date: End date for data collection
-            ticker_source: Source of tickers ('all')
-            max_tickers: Maximum number of tickers to process
-            timespan: Time window for data (day, week, month)
-            validate_data: Whether to validate data
-            batch_size: Number of tickers to process in each batch
-            save_stats: Whether to save pipeline statistics
-            
-        Returns:
-            Pipeline statistics
-        """
-        logger.info(f"Starting full pipeline: {start_date} to {end_date}")
-        logger.info(f"Configuration: source={ticker_source}, max_tickers={max_tickers}, "
-                    f"timespan={timespan}, validate={validate_data}")
-        
-        try:
-            # Step 1: Health checks
-            self._perform_health_checks()
-            
-            # Step 2: Get tickers
-            tickers = self._get_tickers(ticker_source, max_tickers)
-            logger.info(f"Processing {len(tickers)} tickers")
-            
-            # Step 3: Process tickers in batches
-            self._process_tickers_batch(
-                tickers=tickers,
-                start_date=start_date,
-                end_date=end_date,
-                timespan=timespan,
-                validate_data=validate_data,
-                batch_size=batch_size
-            )
-            
-            # Step 4: Finalize
-            self.stats.finish()
-            
-            logger.info(f"Pipeline completed: {self.stats.tickers_successful}/{self.stats.tickers_processed} "
-                        f"tickers successful ({self.stats.success_rate:.1f}%)")
-            logger.info(f"Total records: {self.stats.total_records_fetched} fetched, "
-                        f"{self.stats.total_records_stored} stored")
-            
-            # Save statistics if requested
-            if save_stats:
-                self._save_pipeline_stats()
-            
-            return self.stats
-            
-        except Exception as e:
-            logger.error(f"Pipeline failed: {e}")
-            self.stats.finish()
-            raise
-    
-    def run_single_ticker(self, ticker: str, start_date: Union[str, date],
-                            end_date: Union[str, date], timespan: str = "day",
-                            validate_data: bool = True) -> Dict[str, Any]:
-        """
-        Run pipeline for a single ticker
-        
-        Args:
-            ticker: Stock ticker symbol
-            start_date: Start date
-            end_date: End date
-            timespan: Time window
-            validate_data: Whether to validate data
-            
-        Returns:
-            Dictionary with processing results
-        """
-        logger.info(f"Processing single ticker: {ticker}")
-        
-        try:
-            # Fetch data
-            records, metrics = self.data_fetcher.get_historical_data(
-                ticker=ticker,
-                start_date=start_date,
-                end_date=end_date,
-                timespan=timespan,
-                validate_data=validate_data
-            )
-            
-            if not records:
-                return {
-                    'ticker': ticker,
-                    'success': False,
-                    'error': 'No data returned',
-                    'records_count': 0
-                }
-            
-            # Store data
-            storage_result = self.storage.store_historical_data(records)
-            
-            # Create quality metrics dict with computed properties
-            quality_metrics_dict = metrics.dict()
-            quality_metrics_dict['success_rate'] = metrics.success_rate
-            
-            return {
-                'ticker': ticker,
-                'success': True,
-                'records_count': len(records),
-                'quality_metrics': quality_metrics_dict,
-                'storage_result': storage_result
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing {ticker}: {e}")
-            return {
-                'ticker': ticker,
-                'success': False,
-                'error': str(e),
-                'records_count': 0
-            }
-    
     def run_grouped_daily_pipeline(self, start_date: Union[str, date], 
                                     end_date: Union[str, date],
                                     validate_data: bool = True,
@@ -297,7 +176,6 @@ class DataPipeline:
                     records_to_store = list(grouped_data.values())
                     
                     if records_to_store:
-                        # Store the data
                         storage_result = self.storage.store_historical_data(records_to_store)
                         stored_count = storage_result.get('stored_count', 0)
                         
