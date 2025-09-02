@@ -204,16 +204,20 @@ class BasePredictor(ABC):
         
         logger.info(f"💾 Saving predictions to: {output_path}")
 
-        results_df, avg_profit_per_investment = self._build_results_dataframe_and_profit(
+        results_df = self._build_results_dataframe_and_profit(
             features_df=features_df,
             metadata_df=metadata_df,
             predictions=predictions,
         )
-        # Drop threshold-related columns before saving
-        results_df = results_df.drop(['passes_threshold', 'optimal_threshold', 'date_int'], axis=1, errors='ignore')
-        results_df.to_excel(output_path, index=False)
-        logger.info(f"   Saved {len(results_df)} predictions.")
-        return output_path
+        if not results_df.empty:
+            # Drop threshold-related columns before saving
+            results_df = results_df.drop(['passes_threshold', 'optimal_threshold', 'date_int'], axis=1, errors='ignore')
+            results_df.to_excel(output_path, index=False)
+            logger.info(f"   Saved {len(results_df)} predictions.")
+            return output_path
+        else:
+            logger.info("No predictions to save")
+            return None
 
     def _merge_ticker_metadata(self, results_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -285,6 +289,7 @@ class BasePredictor(ABC):
 
         if threshold_filtered_count == 0:
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+            return pd.DataFrame()
         else:
             # logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
             results_df = (
@@ -296,9 +301,7 @@ class BasePredictor(ABC):
             )
             results_df['day_of_week'] = pd.to_datetime(results_df['date']).dt.day_name()
             top_10_count = len(results_df)
-            # date_counts = results_df['date'].value_counts()
             logger.info(f"   📈 Top 10 final count: {top_10_count}")
-            # logger.info(f"   📅 Dates with predictions: {len(date_counts)}")
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df['actual_return'].notna()
@@ -359,7 +362,7 @@ class BasePredictor(ABC):
                 f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
             )
 
-        return results_df, avg_profit_per_investment
+        return results_df
 
     def evaluate_on_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
