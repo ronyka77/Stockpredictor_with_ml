@@ -36,3 +36,4 @@ reports/
 .backup/
 .hypothesis/
 AutogluonModels/
+docs/external/

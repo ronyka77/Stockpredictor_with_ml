@@ -66,7 +66,7 @@ We standardize on uv with Python 3.12+.
 
 Dev extras are defined in pyproject.toml. If you need additional tooling for development (e.g., ruff, black, isort, mypy, pytest-cov), add them under the dev group in pyproject.toml and run `uv sync`.
 
-Optional GPU: Install CUDA 12.8 and a compatible PyTorch build per official guidance before running MLP modules.
+Optional GPU: Install the CUDA toolkit version that matches your chosen PyTorch build per the official compatibility matrix (or use the matching CUDA-enabled PyTorch wheel/container). See the [PyTorch compatibility matrix](https://pytorch.org/get-started/previous-versions/).
 
 ---
 
