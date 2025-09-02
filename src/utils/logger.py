@@ -166,7 +166,8 @@ def shutdown_logging() -> None:
         for sid in list(_file_sink_ids.values()):
             try:
                 _loguru_logger.remove(sid)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error removing file sink: {e}")
                 pass
         _file_sink_ids.clear()
 
@@ -174,7 +175,8 @@ def shutdown_logging() -> None:
         try:
             if _console_sink_id is not None:
                 _loguru_logger.remove(_console_sink_id)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error removing console sink: {e}")
             pass
     finally:
         _sinks_initialized = False

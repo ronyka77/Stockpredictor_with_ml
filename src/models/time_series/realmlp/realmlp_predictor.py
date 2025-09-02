@@ -755,7 +755,8 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 try:
                     if original_device is not None:
                         self.model.to(original_device)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Error setting model to original device: {e}")
                     pass
 
             # Persist local state: expose combined feature names to consumers, keep preprocessor for transforms

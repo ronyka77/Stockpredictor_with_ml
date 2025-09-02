@@ -139,9 +139,9 @@ class RealMLPTrainingMixin:
                         }
                     except Exception:
                         last_nonfinite_stats = {}
-                    logger.warning(
-                        f"Skipping batch {batch_idx} due to non-finite loss (AMP). stats={last_nonfinite_stats} skipped_consecutive={skipped_consecutive}/{max_skips}"
-                    )
+                        logger.warning(
+                            f"Skipping batch {batch_idx} due to non-finite loss (AMP). stats={last_nonfinite_stats} skipped_consecutive={skipped_consecutive}/{max_skips}"
+                        )
                     if skipped_consecutive >= fallback_consecutive_nonfinite:
                         fallback_triggered = True
                     if skipped_consecutive >= max_skips:
@@ -154,7 +154,8 @@ class RealMLPTrainingMixin:
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 try:
                     grad_norm_sum += self._calculate_gradient_norm(model)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Error calculating gradient norm: {e}")
                     pass
                 optimizer.step()
             else:
@@ -189,7 +190,8 @@ class RealMLPTrainingMixin:
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 try:
                     grad_norm_sum += self._calculate_gradient_norm(model)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Error calculating gradient norm: {e}")
                     pass
                 optimizer.step()
             # successful step -> reset consecutive skip counter
@@ -344,7 +346,8 @@ class RealMLPTrainingMixin:
                 for g in optimizer.param_groups:
                     lr_now = float(g.get("lr", None))
                     break
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error getting learning rate: {e}")
                 pass
             skipped_pct = (skipped_batches / max(1, total_batches)) * 100.0
             logger.info(
@@ -384,11 +387,7 @@ class RealMLPTrainingMixin:
                         if best_ckpt_path is not None:
                             try:
                                 # Prefer weights_only when available to avoid arbitrary object unpickling
-                                try:
-                                    state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
-                                except TypeError:
-                                    # Older torch doesn't support weights_only
-                                    state = torch.load(best_ckpt_path, map_location=device)
+                                state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
                                 self.model.load_state_dict(state.get("model_state", {}))
                                 logger.info("✅ Restored best model weights from checkpoint")
                             except Exception as e:
@@ -403,11 +402,7 @@ class RealMLPTrainingMixin:
         if best_ckpt_path is not None:
             try:
                 # Prefer weights_only when available to avoid arbitrary object unpickling
-                try:
-                    state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
-                except TypeError:
-                    # Older torch doesn't support weights_only
-                    state = torch.load(best_ckpt_path, map_location=device)
+                state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
                 self.model.load_state_dict(state.get("model_state", {}))
                 logger.info(f"✅ Finalized with best checkpoint weights (val_mse={best_val:.6f})")
             except Exception as e:
