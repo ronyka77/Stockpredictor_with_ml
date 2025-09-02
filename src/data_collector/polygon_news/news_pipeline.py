@@ -362,23 +362,8 @@ class PolygonNewsCollector:
 def main():
     """
     Main function to run incremental news collection
-    
     This function sets up the database connection, initializes the news collector,
     and runs incremental news collection with proper error handling and logging.
-    
-    Environment Variables Required:
-        - POLYGON_API_KEY: Your Polygon.io API key
-        - DATABASE_URL: PostgreSQL connection string (optional, uses centralized config)
-        - NEWS_MAX_TICKERS: Maximum tickers to process (optional, default: 100)
-        - NEWS_DAYS_LOOKBACK: Days to look back for new tickers (optional, default: 7)
-        - NEWS_RETENTION_YEARS: Years to retain news data (optional, default: 2)
-    
-    Usage:
-        python -m src.data_collector.polygon_news.news_collector
-        
-    Or from another script:
-        from src.data_collector.polygon_news.news_collector import main
-        main()
     """
     import os
     from sqlalchemy import create_engine
@@ -394,13 +379,10 @@ def main():
         # Check for required API key from config
         if not config.API_KEY:
             logger.error("POLYGON_API_KEY environment variable not set")
-            logger.error("Please set your Polygon.io API key:")
-            logger.error("export POLYGON_API_KEY='your_api_key_here'")
             return False
         
         # Database connection using centralized config
         database_url = os.getenv('DATABASE_URL', config.database_url)
-        logger.info("Connecting to database...")
         logger.info(f"Using database: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
         
         try:
@@ -413,8 +395,6 @@ def main():
             # Create session
             Session = sessionmaker(bind=engine)
             session = Session()
-            
-            logger.info("Database connection established successfully")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
             logger.error("Please check your DATABASE_URL environment variable")
@@ -512,7 +492,6 @@ def main():
             return False
             
         finally:
-            # Cleanup
             try:
                 session.close()
                 engine.dispose()
@@ -532,16 +511,5 @@ def main():
 if __name__ == "__main__":
     """
     Entry point when running the module directly
-    
-    Usage:
-        python -m src.data_collector.polygon_news.news_collector
-        
-    Or:
-        cd src/data_collector/polygon_news
-        python news_collector.py
     """
-    import sys
-    
-    # Run main function and exit with appropriate code
     success = main()
-    sys.exit(0 if success else 1) 

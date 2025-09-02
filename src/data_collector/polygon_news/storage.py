@@ -346,7 +346,7 @@ class PolygonNewsStorage:
                 PolygonNewsArticle.publisher_name,
                 self.session.query(PolygonNewsArticle).filter(
                     PolygonNewsArticle.publisher_name == PolygonNewsArticle.publisher_name
-                ).count().label('count')
+                ).count()
             ).group_by(PolygonNewsArticle.publisher_name).limit(10).all()
             
             return {
