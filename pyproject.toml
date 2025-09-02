@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.11",
-    "dotenv>=0.9.9",
     "fastparquet>=2024.11.0",
     "great-expectations>=0.18.8",
     "hypothesis>=6",
@@ -46,6 +45,7 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "psycopg2>=2.9.10",
     "loguru>=0.7.3",
+    "python-dotenv>=1.1.1",
 ]
 
 [project.scripts]

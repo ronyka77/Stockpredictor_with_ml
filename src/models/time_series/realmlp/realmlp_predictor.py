@@ -563,11 +563,12 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     )
             except Exception as e:
                 logger.warning(f"Trial failed with error: {e}")
-                score = -1e9
+                optimized_profit_score = -1e9
 
             try:
-                trial.report(score, step=0)
-            except Exception:
+                trial.report(optimized_profit_score, step=0)
+            except Exception as e:
+                logger.error(f"Error reporting trial: {e}")
                 pass
             return float(optimized_profit_score)
 

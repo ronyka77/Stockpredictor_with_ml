@@ -37,6 +37,10 @@ class RealMLPTrainingConfig:
     num_workers: int = 1
     max_consecutive_skips: int = 10
 
+    def get(self, key: str, default=None):
+        """Compatibility helper: allow dict-style lookups like config.get(key, default)."""
+        return getattr(self, key, default)
+
 
 class RealMLPTrainingMixin:
     def _calculate_gradient_norm(self, model: nn.Module) -> float:

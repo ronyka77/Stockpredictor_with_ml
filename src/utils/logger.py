@@ -35,7 +35,7 @@ class InterceptHandler(logging.Handler):
         # Retrieve corresponding Loguru level if it exists
         try:
             level = _loguru_logger.level(record.levelname).name
-        except Exception:
+        except (ValueError, AttributeError):
             level = record.levelno
 
         # Find caller from where logging was called
@@ -134,7 +134,7 @@ def _initialize_sinks_once() -> None:
 
 def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
     """Add a file sink for the given utility if not already added for this process run.
-    File name includes timestamp and PID to avoid cross-process collisions.
+    File name includes timestamp to avoid cross-process collisions.
     """
     global _file_sink_ids
     if utility in _file_sink_ids:
@@ -161,25 +161,33 @@ def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
 def shutdown_logging() -> None:
     """Remove all Loguru sinks to flush queued messages. Safe to call multiple times."""
     global _sinks_initialized, _console_sink_id, _file_sink_ids
-    try:
-        # Remove file sinks
-        for sid in list(_file_sink_ids.values()):
-            try:
-                _loguru_logger.remove(sid)
-            except Exception as e:
-                logger.error(f"Error removing file sink: {e}")
-                pass
-        _file_sink_ids.clear()
-
-        # Remove console sink
+    # Attempt to remove file sinks; log failures at debug level with exception info
+    for sid in list(_file_sink_ids.values()):
         try:
-            if _console_sink_id is not None:
-                _loguru_logger.remove(_console_sink_id)
+            _loguru_logger.remove(sid)
         except Exception as e:
-            logger.error(f"Error removing console sink: {e}")
-            pass
+            try:
+                logger.debug(f"Error removing file sink id={sid}", exc_info=True)
+            except Exception:
+                # If logger is not available or logging fails, fallback to stderr
+                sys.stderr.write(f"Error removing file sink id={sid}: {e}\n")
+    # Clear file sink registry regardless of removal success
+    _file_sink_ids.clear()
+
+    # Attempt to remove console sink; ensure console sink id is reset regardless
+    try:
+        if _console_sink_id is not None:
+            _loguru_logger.remove(_console_sink_id)
+    except Exception as e:
+        try:
+            logger.debug(f"Error removing console sink id={_console_sink_id}", exc_info=True)
+        except Exception:
+            sys.stderr.write(f"Error removing console sink id={_console_sink_id}: {e}\n")
     finally:
-        _sinks_initialized = False
+        _console_sink_id = None
+
+    # Ensure initialized flag is reset so state is consistent
+    _sinks_initialized = False
 
 
 # Register shutdown to flush sinks on graceful exit

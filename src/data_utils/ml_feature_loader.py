@@ -22,18 +22,19 @@ class MLFeatureLoader:
     Utility class for loading and preparing features for ML models
     """
     
-    def __init__(self, use_consolidated: bool = True):
+    def __init__(self, storage: Optional[FeatureStorage] = None, use_consolidated: bool = True):
         """
         Initialize ML feature loader
-        
         Args:
             storage: FeatureStorage instance (creates new if None)
             use_consolidated: Whether to use consolidated yearly files (recommended)
         """
-        self.storage = FeatureStorage()
+        # Preserve backward compatibility: use provided storage if available
+        self.storage = storage if storage is not None else FeatureStorage()
         self.use_consolidated = use_consolidated
-        
+
         if self.use_consolidated:
+            # Lazily initialize consolidated storage only when requested
             self.consolidated_storage = ConsolidatedFeatureStorage()
             logger.info("MLFeatureLoader initialized with consolidated yearly files")
         else:
@@ -215,7 +216,6 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
         Combined DataFrame with all loaded data
     """
     years_to_load = [2023, 2024, 2025]
-    data_loader = None
     try:
         data_loader = StockDataLoader()
         

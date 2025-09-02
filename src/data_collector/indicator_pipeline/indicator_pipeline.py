@@ -7,7 +7,7 @@ for all tickers in the database and store results in the technical_features tabl
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, date
 from src.feature_engineering.config import config
 import time
@@ -27,11 +27,16 @@ logger = get_logger(__name__, utility='feature_engineering')
 
 @dataclass
 class BatchJobConfig:
-    """Configuration for batch processing jobs"""
+    """Configuration for batch processing jobs
+
+    start_date and end_date accept either an ISO date string (`YYYY-MM-DD`) or a
+    `datetime.date` object. They are normalized to `date` objects in
+    `__post_init__` for consistent internal usage.
+    """
     batch_size: int = config.batch_processing.DEFAULT_BATCH_SIZE
     max_workers: int = config.batch_processing.MAX_WORKERS
-    start_date: Optional[str] = datetime(datetime.now().year - config.fundamental.HISTORICAL_YEARS, 1, 1)
-    end_date: Optional[str] = date.today().strftime('%Y-%m-%d')
+    start_date: Optional[Union[str, date]] = None
+    end_date: Optional[Union[str, date]] = None
     feature_categories: List[str] = None
     min_data_points: int = config.data_quality.MIN_DATA_POINTS
     save_to_database: bool = config.storage.SAVE_TO_DATABASE
@@ -39,10 +44,34 @@ class BatchJobConfig:
     use_consolidated_storage: bool = config.storage.USE_CONSOLIDATED_STORAGE
     partitioning_strategy: str = config.storage.PARTITIONING_STRATEGY
     overwrite_existing: bool = config.storage.OVERWRITE_EXISTING
-    
+
     def __post_init__(self):
         if self.feature_categories is None:
             self.feature_categories = config.feature_categories.DEFAULT_CATEGORIES
+
+        # Default start_date to HISTORICAL_YEARS start and end_date to today
+        if self.start_date is None:
+            self.start_date = date(datetime.now().year - config.fundamental.HISTORICAL_YEARS, 1, 1)
+        else:
+            # Accept ISO strings or datetime/date objects
+            if isinstance(self.start_date, str):
+                try:
+                    self.start_date = date.fromisoformat(self.start_date)
+                except Exception:
+                    self.start_date = datetime.strptime(self.start_date, "%Y-%m-%d").date()
+            elif isinstance(self.start_date, datetime):
+                self.start_date = self.start_date.date()
+
+        if self.end_date is None:
+            self.end_date = date.today()
+        else:
+            if isinstance(self.end_date, str):
+                try:
+                    self.end_date = date.fromisoformat(self.end_date)
+                except Exception:
+                    self.end_date = datetime.strptime(self.end_date, "%Y-%m-%d").date()
+            elif isinstance(self.end_date, datetime):
+                self.end_date = self.end_date.date()
 
 @dataclass
 class ProcessingStats:
