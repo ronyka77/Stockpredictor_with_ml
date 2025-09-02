@@ -721,7 +721,8 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 finally:
                     try:
                         shutil.rmtree(tmp_dir, ignore_errors=True)
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error removing temporary directory: {e}")
                         pass
 
             # Log the PyTorch model
@@ -799,7 +800,8 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                             self.feature_names = data
                         elif isinstance(data, dict) and "feature_names" in data:
                             self.feature_names = data["feature_names"]
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error loading feature_names.json: {e}")
                         pass
                 logger.info("✅ RealMLP preprocessor artifacts loaded from MLflow")
             except Exception as e:

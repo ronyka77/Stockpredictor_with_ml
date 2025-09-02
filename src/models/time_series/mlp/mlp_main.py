@@ -229,7 +229,8 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                     try:
                         if original_device is not None:
                             self.model.to(original_device)
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error setting model to original device: {e}")
                         pass
 
                 # Persist feature names explicitly for robust loading
@@ -261,7 +262,8 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                     try:
                         if original_device is not None:
                             self.model.to(original_device)
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error setting model to original device: {e}")
                         pass
                 
                 logger.info(f"✅ MLP model saved successfully. Run ID: {run.info.run_id}")

@@ -8,7 +8,9 @@ from src.data_collector.polygon_fundamentals.data_validator import (
     FundamentalDataValidator,
     ValidationResult,
 )
+from src.utils.logger import get_logger
 
+logger = get_logger(__name__)
 
 @dataclass
 class ExtendedValidation:
@@ -57,7 +59,8 @@ class FundamentalDataValidatorV2:
                 denom = abs(assets) if assets else 1.0
                 if abs(assets - (liabilities + equity)) > 0.02 * denom:
                     cross_warnings.append("Balance sheet equation off by >2%")
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in balance sheet equation: {e}")
             pass
 
         # CF components sum (warning)
@@ -77,7 +80,8 @@ class FundamentalDataValidatorV2:
                 denom = abs(total) if total else 1.0
                 if abs(net - total) > 0.05 * denom:
                     cross_warnings.append("Cash flow components don't sum within 5% tolerance")
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in cash flow components sum: {e}")
             pass
 
         return ExtendedValidation(base=base, cross_errors=cross_errors, cross_warnings=cross_warnings)

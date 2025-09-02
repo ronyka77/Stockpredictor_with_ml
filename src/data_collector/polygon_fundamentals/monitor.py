@@ -153,5 +153,6 @@ class FundamentalDataMonitor:
         """Destructor to ensure cleanup"""
         try:
             self.close()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in destructor: {e}")
             pass 

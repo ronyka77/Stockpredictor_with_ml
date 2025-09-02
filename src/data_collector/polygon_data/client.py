@@ -91,7 +91,8 @@ class PolygonDataClient:
                     try:
                         # Optional on some limiter implementations
                         self.rate_limiter.handle_successful_request()
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error handling successful request: {e}")
                         pass
                     # Safely parse JSON and convert parsing errors to PolygonAPIError
                     try:
@@ -118,7 +119,8 @@ class PolygonDataClient:
                         try:
                             # Not all limiters implement this; guard call
                             self.rate_limiter.handle_rate_limit_error()
-                        except Exception:
+                        except Exception as e:
+                            logger.error(f"Error handling rate limit error: {e}")
                             pass
                         wait_time = 2 ** attempt
                         logger.warning(f"Rate limit exceeded. Waiting {wait_time}s before retry")

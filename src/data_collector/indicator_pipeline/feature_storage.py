@@ -262,8 +262,8 @@ class FeatureStorage:
                 try:
                     storage_data[idx_col] = pd.to_datetime(storage_data[idx_col])
                     storage_data = storage_data.rename(columns={idx_col: 'date'})
-                except Exception:
-                    # Leave as-is; tests will surface mismatch if critical
+                except Exception as e:
+                    logger.error(f"Error converting {idx_col} to datetime: {e}")
                     pass
         
         # Ensure date column is properly typed
