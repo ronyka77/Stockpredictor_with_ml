@@ -6,46 +6,41 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.11",
+    "autoflake>=2.3.1",
+    "autogluon-tabular[tabicl]>=1.4.0",
+    "autogluon[tabarena]>=1.4.0",
+    "bokeh>=3.7.3",
     "fastparquet>=2024.11.0",
     "great-expectations>=0.18.8",
     "hypothesis>=6",
     "joblib>=1.4.2",
     "lightgbm>=4.6.0",
     "lion-pytorch>=0.2.3",
+    "loguru>=0.7.3",
     "mlflow>=2.22.0",
     "numpy>=2.0.0",
     "openpyxl>=3.1.5",
     "optuna>=4.4.0",
     "pandas>=2.3.0",
     "psutil>=6.0.0",
+    "psycopg2-binary>=2.9.10",
+    "psycopg2>=2.9.10",
     "pyarrow>=19.0.1",
     "pydantic>=2.11.5",
-    "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
-    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.1",
+    "pytabkit>=1.6.1",
+    "python-dotenv>=1.1.1",
     "requests>=2.32.3",
     "scikit-learn>=1.4.0",
     "sqlalchemy>=2.0.41",
     "statsmodels>=0.14.2",
     "ta>=0.11.0",
     "torch>=2.7.0",
-    "torchvision>=0.22.0",
     "torchaudio>=2.7.0",
-    "torch-optimizer>=0.3.0",
+    "torchvision>=0.22.0",
     "xgboost>=3.0.2",
-    "flake8>=7.3.0",
-    "isort>=6.0.1",
-    "autoflake>=2.3.1",
-    "black>=25.1.0",
-    "autogluon[tabarena]>=1.4.0",
-    "pytabkit>=1.6.1",
-    "autogluon-tabular[tabicl]>=1.4.0",
-    "bokeh>=3.7.3",
-    "psycopg2-binary>=2.9.10",
-    "psycopg2>=2.9.10",
-    "loguru>=0.7.3",
-    "python-dotenv>=1.1.1",
 ]
 
 [project.scripts]
@@ -55,7 +50,6 @@ polygon-test = "test_polygon:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "black>=23.0.0",
     "isort>=5.0.0",
     "mypy>=1.0.0",
 ]
@@ -89,9 +83,6 @@ torchvision = [
 torchaudio = [
     { index = "pytorch", marker = "sys_platform == 'win32'" },
 ]
-
-[tool.flake8]
-max-line-length = 88
 
 [tool.pytest.ini_options]
 # Align pytest configuration with project-level settings so pytest recognizes custom markers

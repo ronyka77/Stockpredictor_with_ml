@@ -8,7 +8,7 @@ from the Polygon API.
 import os
 from dataclasses import dataclass
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 # Load environment variables from a .env file if present
 load_dotenv()

@@ -64,7 +64,6 @@ class ThresholdPolicy:
         conf = np.asarray(confidence).reshape(-1)
         total_samples = conf.shape[0]
         avg_confidence = float(conf.mean())
-        max_confidence = float(conf.max())
 
         # Sanitize non-finite
         finite_mask = np.isfinite(conf)
