@@ -396,7 +396,6 @@ class PolygonNewsStorage:
         except Exception as e:
             # Last resort: try common formats
             try:
-                from datetime import timezone
                 # Try parsing date-only strings
                 return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z")
             except Exception:

@@ -339,7 +339,7 @@ class FeatureStorage:
                 engine=self.config.engine
             )
             
-            logger.info(f"Saved metadata for {metadata.ticker} to {metadata_path}")
+            # logger.info(f"Saved metadata for {metadata.ticker} to {metadata_path}")
             
         except Exception as e:
             logger.warning(f"Could not save metadata to Parquet: {str(e)}")

@@ -1,4 +1,3 @@
-import pytest
 
 from src.data_collector.polygon_fundamentals import monitor as monitor_mod
 

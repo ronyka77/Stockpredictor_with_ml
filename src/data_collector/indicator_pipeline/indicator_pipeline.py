@@ -215,12 +215,12 @@ class BatchFeatureProcessor:
                     'warnings': feature_result.warnings,
                     'job_id': job_id
                 }
-                parquet_metadata = self.feature_storage.save_features(
+                self.feature_storage.save_features(
                     ticker, 
                     feature_result.data, 
                     storage_metadata
                 )
-                logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
+                # logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
             
             if config.save_to_database:
                 saved_count = self._save_features_to_database(

@@ -238,9 +238,7 @@ def calculate_ichimoku(data: pd.DataFrame, tenkan: Optional[int] = None,
         senkou_b = params['senkou_b']
     if displacement is None:
         displacement = params['displacement']
-    
-    logger.info(f"Calculating Ichimoku with parameters: tenkan={tenkan}, kijun={kijun}, senkou_b={senkou_b}, displacement={displacement}")
-    
+        
     try:
         # Check minimum data requirements
         min_required = max(tenkan, kijun, senkou_b) + displacement

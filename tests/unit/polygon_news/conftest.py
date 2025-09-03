@@ -15,17 +15,7 @@ def db_session():
     # Load .env and read values; prefer TEST_DATABASE_URL from .env, otherwise build from TEST_DB_* vars
     load_dotenv()
     env_vals = dotenv_values()
-    test_db_url = env_vals.get("TEST_DATABASE_URL")
-
-    if not test_db_url:
-        # Attempt to fall back to an in-memory SQLite DB for tests when TEST DB not configured
-        # This allows CI and local runs without PostgreSQL to still run unit tests.
-        test_db_url = env_vals.get("TEST_DATABASE_URL")
-
-    if not test_db_url:
-        # Use SQLite in-memory
-        test_db_url = "sqlite:///:memory:"
-
+    test_db_url = f"postgresql://{env_vals.get('TEST_DB_USER', 'postgres')}:{env_vals.get('TEST_DB_PASSWORD')}@{env_vals.get('TEST_DB_HOST', 'localhost')}:{env_vals.get('TEST_DB_PORT', '5332')}/{env_vals.get('TEST_DB_NAME', 'stock_data')}"
     engine = create_engine(test_db_url)
     # Ensure a clean schema for tests: drop existing news tables then recreate
     try:
