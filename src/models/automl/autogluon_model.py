@@ -147,7 +147,22 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 return np.ones(len(X))
         if method == 'simple':
             base = self.predict(X)
-            return np.abs(base / base.max())
+            base_arr = np.asarray(base)
+            # Compute max and guard against zero (or near-zero) to avoid div-by-zero
+            try:
+                max_val = base_arr.max()
+            except Exception:
+                # Fallback in case base_arr has unexpected structure
+                max_val = float(np.max(base_arr))
+
+            # Determine output dtype: preserve float dtype, otherwise cast to float
+            out_dtype = base_arr.dtype if np.issubdtype(base_arr.dtype, np.floating) else float
+
+            if np.isclose(max_val, 0):
+                # Return zeros with same shape and an appropriate dtype
+                return np.zeros_like(base_arr, dtype=out_dtype)
+
+            return np.abs(base_arr / float(max_val))
         if method == 'margin':
             base = np.abs(self.predict(X))
             return np.tanh(base)

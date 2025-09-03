@@ -341,13 +341,15 @@ class PolygonNewsStorage:
                 self.session, start_date, end_date
             )
             
-            # Get publisher counts
-            publisher_counts = self.session.query(
-                PolygonNewsArticle.publisher_name,
-                self.session.query(PolygonNewsArticle).filter(
-                    PolygonNewsArticle.publisher_name == PolygonNewsArticle.publisher_name
-                ).count()
-            ).group_by(PolygonNewsArticle.publisher_name).limit(10).all()
+            # Get publisher counts (name -> count)
+            from sqlalchemy import func as sa_func
+            publisher_counts = (
+                self.session.query(PolygonNewsArticle.publisher_name, sa_func.count(PolygonNewsArticle.id))
+                .group_by(PolygonNewsArticle.publisher_name)
+                .order_by(sa_func.count(PolygonNewsArticle.id).desc())
+                .limit(10)
+                .all()
+            )
             
             return {
                 'total_articles': total_articles,
@@ -380,16 +382,26 @@ class PolygonNewsStorage:
         """Parse datetime string from Polygon API"""
         if not date_str:
             return None
-        
+
+        # If already a datetime object, return as-is
+        if isinstance(date_str, datetime):
+            return date_str
+
         try:
-            # Handle ISO format with Z suffix
-            if date_str.endswith('Z'):
+            # Handle ISO format with Z suffix for UTC
+            if isinstance(date_str, str) and date_str.endswith('Z'):
                 date_str = date_str[:-1] + '+00:00'
-            
+
             return datetime.fromisoformat(date_str)
-        except ValueError as e:
-            self.logger.warning(f"Failed to parse datetime: {date_str} - {e}")
-            return None
+        except Exception as e:
+            # Last resort: try common formats
+            try:
+                from datetime import timezone
+                # Try parsing date-only strings
+                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z")
+            except Exception:
+                self.logger.warning(f"Failed to parse datetime: {date_str} - {e}")
+                return None
     
     def health_check(self) -> Dict[str, Any]:
         """Perform health check on database connection and data"""

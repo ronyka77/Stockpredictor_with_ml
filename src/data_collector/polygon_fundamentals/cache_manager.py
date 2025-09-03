@@ -203,13 +203,16 @@ class FundamentalCacheManager:
                 return None
 
             # Write JSON with UTF-8 encoding and readable formatting
+            # Use centralized fallback serializer to ensure consistent formatting
+            from src.utils.serialization import json_fallback_serializer
+
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(
                     data,
                     f,
                     ensure_ascii=False,
                     indent=2,
-                    default=self._json_fallback_serializer,
+                    default=json_fallback_serializer,
                 )
 
             logger.info(

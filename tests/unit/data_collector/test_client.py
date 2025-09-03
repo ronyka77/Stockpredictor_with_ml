@@ -13,32 +13,32 @@ class DummyResponse:
         return self._json
 
 
-def test_make_request_success(monkeypatch):
+def test_make_request_success(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
-    # Monkeypatch session.get to return a successful response
+    # mocker session.get to return a successful response
     def fake_get(url, params=None, timeout=None):
         return DummyResponse(200, {"results": [1, 2, 3]})
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     data = client._make_request("/test/endpoint")
     assert "results" in data
 
 
-def test_make_request_401_raises(monkeypatch):
+def test_make_request_401_raises(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
     def fake_get(url, params=None, timeout=None):
         return DummyResponse(401, {})
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     with pytest.raises(PolygonAPIError):
         client._make_request("/private")
 
 
-def test_make_request_rate_limit_retries(monkeypatch):
+def test_make_request_rate_limit_retries(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
     calls = {"n": 0}
@@ -50,19 +50,19 @@ def test_make_request_rate_limit_retries(monkeypatch):
             return DummyResponse(429, {})
         return DummyResponse(200, {"status": "OK", "results": []})
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     data = client._make_request("/test/rate")
     assert data.get("status") == "OK"
 
 
-def test_make_request_timeout_then_fail(monkeypatch):
+def test_make_request_timeout_then_fail(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
     def fake_get(url, params=None, timeout=None):
         raise requests.exceptions.Timeout()
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     with pytest.raises(PolygonAPIError):
         client._make_request("/timeout")

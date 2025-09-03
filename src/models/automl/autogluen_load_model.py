@@ -4,6 +4,7 @@ import json
 import pandas as pd
 from datetime import datetime
 import warnings
+import logging
 
 from autogluon.tabular import TabularPredictor
 
@@ -12,11 +13,10 @@ from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 
 logger = get_logger(__name__)
-# Quiet Autogluon and common noisy libraries
+# Narrowly ignore common user warnings from Autogluon modules
 for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-    warnings.getLogger(lg).setLevel(warnings.WARNING)
-warnings.filterwarnings("ignore")
-
+    logging.getLogger(lg).setLevel(logging.WARNING)
+warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
 
 def generate_and_log_leaderboard(predictor: TabularPredictor, valid_df: pd.DataFrame, model_names: list[str] = None) -> pd.DataFrame:
     """Generate the Autogluon leaderboard using valid_df and log it.
@@ -49,7 +49,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
     try:
         # 1) Prepare data
         logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
-        label_name = f"Future_Return_{prediction_horizon}"
+        label_name = f"Future_Return_{prediction_horizon}D"
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()
         predictor_class._load_metadata()
@@ -119,7 +119,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
 
 if __name__ == "__main__":
     try:
-        model_dir = "AutogluonModels/ag-20250901_200612"
+        model_dir = "AutogluonModels/ag-20250826_173422"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

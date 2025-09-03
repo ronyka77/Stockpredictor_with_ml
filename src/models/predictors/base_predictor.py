@@ -210,8 +210,8 @@ class BasePredictor(ABC):
             predictions=predictions,
         )
         if not results_df.empty:
-            # Drop threshold-related columns before saving
-            results_df = results_df.drop(['passes_threshold', 'optimal_threshold', 'date_int'], axis=1, errors='ignore')
+            # Drop threshold-related columns before saving (keep date_int for schema compatibility)
+            results_df = results_df.drop(['passes_threshold', 'optimal_threshold'], axis=1, errors='ignore')
             results_df.to_excel(output_path, index=False)
             logger.info(f"   Saved {len(results_df)} predictions.")
             return output_path
@@ -394,5 +394,4 @@ class BasePredictor(ABC):
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
         output_file = self.save_predictions_to_excel(features_df, metadata_df, predictions)
-        logger.info("✅ Prediction pipeline completed!")
         return output_file 

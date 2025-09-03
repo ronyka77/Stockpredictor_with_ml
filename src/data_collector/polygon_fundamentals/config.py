@@ -51,14 +51,13 @@ class PolygonFundamentalsConfig:
         """Initialize default values after dataclass creation"""
         if self.FILING_TYPES is None:
             self.FILING_TYPES = ['10-K', '10-Q']
-        
-        # Validate API key
-        if not self.API_KEY:
-            raise ValueError("POLYGON_API_KEY environment variable is required")
     
     @property
     def headers(self) -> Dict[str, str]:
         """Get HTTP headers for API requests"""
+        if not self.API_KEY:
+            raise ValueError("POLYGON_API_KEY environment variable is required for API requests")
+
         return {
             'Authorization': f'Bearer {self.API_KEY}',
             'Content-Type': 'application/json',

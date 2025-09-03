@@ -5,8 +5,8 @@ from src.data_collector.polygon_data.rate_limiter import RateLimiter, AdaptiveRa
 
 
 @pytest.mark.unit
-def test_rate_limiter_sliding_window(monkeypatch):
-    with freeze_time(monkeypatch, start=0.0):
+def test_rate_limiter_sliding_window(mocker):
+    with freeze_time(mocker, start=0.0):
         rl = RateLimiter(requests_per_minute=3)
 
         # First 3 requests should not sleep and consume quota
@@ -29,8 +29,8 @@ def test_rate_limiter_sliding_window(monkeypatch):
 
 
 @pytest.mark.unit
-def test_rate_limiter_manual_reset(monkeypatch):
-    with freeze_time(monkeypatch, start=100.0):
+def test_rate_limiter_manual_reset(mocker):
+    with freeze_time(mocker, start=100.0):
         rl = RateLimiter(requests_per_minute=5)
         for _ in range(4):
             rl.wait_if_needed()
@@ -42,8 +42,8 @@ def test_rate_limiter_manual_reset(monkeypatch):
 
 
 @pytest.mark.unit
-def test_adaptive_rate_limiter_backoff_and_restore(monkeypatch):
-    with freeze_time(monkeypatch, start=1000.0):
+def test_adaptive_rate_limiter_backoff_and_restore(mocker):
+    with freeze_time(mocker, start=1000.0):
         arl = AdaptiveRateLimiter(requests_per_minute=5, backoff_factor=0.5)
 
         # Trigger rate limit error → backoff and cooldown sleep(30)

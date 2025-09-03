@@ -87,8 +87,6 @@ class StockDataLoader:
                 'end_date': end_date
             }
             
-            logger.info(f"Executing query for {ticker}: {start_date} to {end_date}")
-            
             # Use SQLAlchemy engine with pandas
             df = pd.read_sql_query(
                 query, 
@@ -298,11 +296,7 @@ class StockDataLoader:
         Returns:
             Cleaned DataFrame
         """
-        logger.info(f"Validating and cleaning data for {ticker}")
-        
         original_length = len(df)
-        
-        # Check for required columns
         required_columns = ['open', 'high', 'low', 'close', 'volume']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
@@ -349,7 +343,6 @@ class StockDataLoader:
             if extreme_changes.any():
                 extreme_count = extreme_changes.sum()
                 logger.warning(f"Found {extreme_count} extreme price changes for {ticker}")
-                # Don't remove these automatically, just log them
         
         # Sort by date to ensure chronological order
         df = df.sort_index()

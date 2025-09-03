@@ -23,7 +23,7 @@ class DummyPredictor(BasePredictor):
 
 
 @pytest.mark.integration
-def test_excel_export_schema(tmp_path, monkeypatch):
+def test_excel_export_schema(tmp_path, mocker):
     p = DummyPredictor()
 
     # Prepare tiny features/metadata
@@ -36,13 +36,16 @@ def test_excel_export_schema(tmp_path, monkeypatch):
     predictions = np.array([0.02, -0.01, 0.03, 0.00])
 
     # Run in tmp working directory so outputs are created under tmp_path
-    monkeypatch.chdir(tmp_path)
+    old_cwd = os.getcwd()
+    os.chdir(str(tmp_path))
+    try:
+        output_path = p.save_predictions_to_excel(features_df, metadata_df, predictions)
+        assert output_path.endswith(".xlsx")
+        assert os.path.exists(output_path)
 
-    output_path = p.save_predictions_to_excel(features_df, metadata_df, predictions)
-    assert output_path.endswith(".xlsx")
-    assert os.path.exists(output_path)
-
-    df = pd.read_excel(output_path)
+        df = pd.read_excel(output_path)
+    finally:
+        os.chdir(old_cwd)
     expected_columns = {
         "ticker_id", "date_int", "date", "ticker", "company_name",
         "predicted_return", "predicted_price", "current_price", "actual_return",

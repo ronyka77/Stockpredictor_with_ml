@@ -47,7 +47,7 @@ class ThresholdEvaluator:
         """
         self.investment_amount = investment_amount
         self.custom_metrics = CustomMetrics()
-        self.min_samples_percentage = 0.0005
+        self.min_samples_percentage = 0.002
         self.max_samples_percentage = 0.10
     
     def _vectorized_profit_calculation(self, y_true: np.ndarray, y_pred: np.ndarray, 
@@ -187,15 +187,7 @@ class ThresholdEvaluator:
         
         # Find best threshold based on profit per investment
         best_idx = results_df['test_profit_per_investment'].idxmax()
-        best_result = results_df.loc[best_idx]
-        
-        logger.info("🎯 Threshold Optimization Results (Optimized for Profit Per Investment):")
-        logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
-        logger.info(f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})")
-        logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
-        logger.info(f"   Test profit per investment: ${best_result['test_profit_per_investment']:.2f}")
-        logger.info(f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
-        logger.info(f"   Total test profit: ${best_result['test_profit']:.2f}")
+        results_df.loc[best_idx]
         
         return results_df
     
@@ -370,7 +362,7 @@ class ThresholdEvaluator:
         test_predictions_1d = test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
         invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
-        logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")        
+        # logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")        
         if invest_mask.sum() > 0:
             # Ensure y_test.values and test_predictions are 1D
             y_test_1d = y_test.values.flatten() if y_test.values.ndim > 1 else y_test.values

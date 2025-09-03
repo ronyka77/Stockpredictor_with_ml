@@ -10,14 +10,14 @@ from __future__ import annotations
 import os
 import json
 import warnings
+import logging
 from src.models.predictors.base_predictor import BasePredictor
 from src.models.automl.autogluon_model import AutoGluonModel
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-# Quiet Autogluon and common noisy libraries
 for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-    warnings.getLogger(lg).setLevel(warnings.WARNING)
+    logging.getLogger(lg).setLevel(logging.WARNING)
 warnings.filterwarnings("ignore")
 
 class AutoGluonPredictor(BasePredictor):
@@ -61,7 +61,6 @@ def predict_best_model(model_dir: str):
     features_df, metadata_df = predictor.load_recent_data(days_back=30)
     predictions = predictor.make_predictions(features_df)
     predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
-    logger.info("✅ Prediction pipeline completed!")
 
 
 def predict_all_model(model_dir: str):
@@ -77,7 +76,6 @@ def predict_all_model(model_dir: str):
         predictor.model.selected_model_name = model_name
         predictions = predictor.make_predictions(features_df)
         predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
-        logger.info("✅ Prediction pipeline completed!")
 
 if __name__ == "__main__":
     model_dir = "AutogluonModels/ag-20250901_200612"    

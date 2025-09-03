@@ -5,11 +5,11 @@ from src.data_collector.polygon_news.news_pipeline import PolygonNewsCollector
 
 
 @pytest.mark.unit
-def test__collect_ticker_news_no_raw_articles(db_session, monkeypatch):
+def test__collect_ticker_news_no_raw_articles(db_session, mocker):
     collector = PolygonNewsCollector(db_session=db_session)
 
-    # Monkeypatch client to return no articles
-    monkeypatch.setattr(collector.news_client, "get_news_for_ticker", lambda **kw: [])
+    # mocker client to return no articles
+    mocker.patch.object(collector.news_client, "get_news_for_ticker", lambda **kw: [])
 
     stats = collector._collect_ticker_news("ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50)
 
@@ -18,15 +18,15 @@ def test__collect_ticker_news_no_raw_articles(db_session, monkeypatch):
 
 
 @pytest.mark.unit
-def test__collect_ticker_news_happy_flow(db_session, monkeypatch, processed_article_expected):
+def test__collect_ticker_news_happy_flow(db_session, mocker, processed_article_expected):
     collector = PolygonNewsCollector(db_session=db_session)
 
     raw_articles = [{"id": "a1"}]
-    monkeypatch.setattr(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
-    monkeypatch.setattr(collector.news_client, "extract_article_metadata", lambda raw: processed_article_expected)
-    monkeypatch.setattr(collector.processor, "process_article", lambda meta: processed_article_expected)
-    monkeypatch.setattr(collector.validator, "validate_article", lambda art: (True, 0.9, []))
-    monkeypatch.setattr(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 0})
+    mocker.patch.object(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
+    mocker.patch.object(collector.news_client, "extract_article_metadata", lambda raw: processed_article_expected)
+    mocker.patch.object(collector.processor, "process_article", lambda meta: processed_article_expected)
+    mocker.patch.object(collector.validator, "validate_article", lambda art: (True, 0.9, []))
+    mocker.patch.object(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 0})
 
     stats = collector._collect_ticker_news("ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50)
 
@@ -36,20 +36,20 @@ def test__collect_ticker_news_happy_flow(db_session, monkeypatch, processed_arti
 
 
 @pytest.mark.unit
-def test__collect_ticker_news_skips_invalid(db_session, monkeypatch, processed_article_expected):
+def test__collect_ticker_news_skips_invalid(db_session, mocker, processed_article_expected):
     collector = PolygonNewsCollector(db_session=db_session)
 
     raw_articles = [{"id": "a1"}, {"id": "a2"}]
-    monkeypatch.setattr(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
-    monkeypatch.setattr(collector.news_client, "extract_article_metadata", lambda raw: processed_article_expected)
+    mocker.patch.object(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
+    mocker.patch.object(collector.news_client, "extract_article_metadata", lambda raw: processed_article_expected)
     # First article valid, second invalid
     def validator_seq(article):
         if article.get("polygon_id") == processed_article_expected.get("polygon_id"):
             return (True, 0.8, [])
         return (False, 0.0, ["No associated tickers"])
 
-    monkeypatch.setattr(collector.validator, "validate_article", lambda art: (True, 0.8, []))
-    # simulate one invalid by changing processed list mid-loop via monkeypatch of processor
+    mocker.patch.object(collector.validator, "validate_article", lambda art: (True, 0.8, []))
+    # simulate one invalid by changing processed list mid-loop via mocker of processor
     calls = {"n": 0}
     def proc(meta):
         calls["n"] += 1
@@ -61,8 +61,8 @@ def test__collect_ticker_news_skips_invalid(db_session, monkeypatch, processed_a
             a["tickers"] = []
             return a
 
-    monkeypatch.setattr(collector.processor, "process_article", proc)
-    monkeypatch.setattr(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 1})
+    mocker.patch.object(collector.processor, "process_article", proc)
+    mocker.patch.object(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 1})
 
     stats = collector._collect_ticker_news("ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50, limit=2)
 
@@ -72,21 +72,21 @@ def test__collect_ticker_news_skips_invalid(db_session, monkeypatch, processed_a
 
 
 @pytest.mark.unit
-def test__collect_ticker_news_processing_exception_per_article(db_session, monkeypatch):
+def test__collect_ticker_news_processing_exception_per_article(db_session, mocker):
     collector = PolygonNewsCollector(db_session=db_session)
 
     raw_articles = [{"id": "a1"}, {"id": "a2"}]
-    monkeypatch.setattr(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
+    mocker.patch.object(collector.news_client, "get_news_for_ticker", lambda **kw: raw_articles)
     # first article raises processing error
     def proc(meta):
         if meta.get("id") == "a1":
             raise RuntimeError("processing failed")
         return {"polygon_id": "art-2", "title": "T", "article_url": "u", "published_utc": datetime.now(timezone.utc).isoformat(), "tickers": ["X"]}
 
-    monkeypatch.setattr(collector.news_client, "extract_article_metadata", lambda raw: raw)
-    monkeypatch.setattr(collector.processor, "process_article", proc)
-    monkeypatch.setattr(collector.validator, "validate_article", lambda art: (True, 0.8, []))
-    monkeypatch.setattr(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 0})
+    mocker.patch.object(collector.news_client, "extract_article_metadata", lambda raw: raw)
+    mocker.patch.object(collector.processor, "process_article", proc)
+    mocker.patch.object(collector.validator, "validate_article", lambda art: (True, 0.8, []))
+    mocker.patch.object(collector.storage, "store_articles_batch", lambda arts: {"new_articles": 1, "updated_articles": 0, "skipped_articles": 0})
 
     stats = collector._collect_ticker_news("ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50, limit=2)
 
@@ -96,13 +96,13 @@ def test__collect_ticker_news_processing_exception_per_article(db_session, monke
 
 
 @pytest.mark.unit
-def test_collect_targeted_news_happy_flow(db_session, monkeypatch):
+def test_collect_targeted_news_happy_flow(db_session, mocker):
     collector = PolygonNewsCollector(db_session=db_session)
 
     # validate_ticker_list -> one valid
-    monkeypatch.setattr(collector.ticker_integration, "validate_ticker_list", lambda tickers: (tickers, []))
-    monkeypatch.setattr(collector.ticker_integration, "get_ticker_info", lambda t: {"priority_score": 50})
-    monkeypatch.setattr(collector, "_collect_ticker_news", lambda ticker, s, e, p, limit=100: {"api_calls": 1, "articles_fetched": 2, "articles_stored": 1, "articles_updated": 0, "articles_skipped": 0})
+    mocker.patch.object(collector.ticker_integration, "validate_ticker_list", lambda tickers: (tickers, []))
+    mocker.patch.object(collector.ticker_integration, "get_ticker_info", lambda t: {"priority_score": 50})
+    mocker.patch.object(collector, "_collect_ticker_news", lambda ticker, s, e, p, limit=100: {"api_calls": 1, "articles_fetched": 2, "articles_stored": 1, "articles_updated": 0, "articles_skipped": 0})
 
     start = datetime.now(timezone.utc) - timedelta(days=2)
     end = datetime.now(timezone.utc)
@@ -113,12 +113,12 @@ def test_collect_targeted_news_happy_flow(db_session, monkeypatch):
 
 
 @pytest.mark.unit
-def test_get_collection_status_handles_healthy_and_error(db_session, monkeypatch):
+def test_get_collection_status_handles_healthy_and_error(db_session, mocker):
     collector = PolygonNewsCollector(db_session=db_session)
 
-    monkeypatch.setattr(collector.storage, "health_check", lambda: {"status": "healthy"})
-    monkeypatch.setattr(collector.storage, "get_latest_date_overall", lambda: datetime.now(timezone.utc))
-    monkeypatch.setattr(collector.storage, "get_article_statistics", lambda start_date=None: {"total_articles": 5})
+    mocker.patch.object(collector.storage, "health_check", lambda: {"status": "healthy"})
+    mocker.patch.object(collector.storage, "get_latest_date_overall", lambda: datetime.now(timezone.utc))
+    mocker.patch.object(collector.storage, "get_article_statistics", lambda start_date=None: {"total_articles": 5})
 
     status = collector.get_collection_status()
     assert status["status"] == "healthy"
@@ -128,7 +128,7 @@ def test_get_collection_status_handles_healthy_and_error(db_session, monkeypatch
     def raise_err():
         raise RuntimeError("db fail")
 
-    monkeypatch.setattr(collector.storage, "health_check", raise_err)
+    mocker.patch.object(collector.storage, "health_check", raise_err)
     status2 = collector.get_collection_status()
     assert status2["status"] == "error"
     assert "error" in status2

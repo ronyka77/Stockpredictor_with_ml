@@ -281,14 +281,6 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                         # Map ticker_id to the combined features
                         combined_features['ticker_id'] = combined_features['ticker'].map(ticker_id_mapping)
                         
-                        # Calculate success statistics
-                        # successful_mappings = combined_features['ticker_id'].notna().sum()
-                        # total_records = len(combined_features)
-                        # unique_mapped = len([t for t in unique_tickers if t in ticker_id_mapping])
-                        
-                        # logger.info(f"✅ Successfully mapped ticker_id for {unique_mapped}/{len(unique_tickers)} unique tickers")
-                        # logger.info(f"✅ {successful_mappings:,}/{total_records:,} total records have ticker_id")
-                        
                         # Log statistics about ticker_id mapping
                         null_ticker_ids = combined_features['ticker_id'].isnull().sum()
                         if null_ticker_ids > 0:
@@ -307,7 +299,6 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
             return combined_features
         else:
             logger.warning("No yearly data could be loaded")
-            # Ensure data loader closed before early return
             try:
                 if data_loader is not None:
                     data_loader.close()

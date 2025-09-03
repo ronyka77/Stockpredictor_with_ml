@@ -197,7 +197,6 @@ class FeatureCalculator:
         Returns:
             DataFrame with future price target features
         """
-        logger.info("Adding future price targets")
         
         # Future high prices (targets for prediction)
         features_df['Future_High_10D'] = price_data['high'].shift(-9)

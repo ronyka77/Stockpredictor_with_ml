@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.feature_engineering.technical_indicators.trend_indicators import calculate_sma, calculate_ema
-from src.feature_engineering.technical_indicators.momentum_indicators import calculate_rsi
+from src.data_collector.indicator_pipeline.trend_indicators import calculate_sma, calculate_ema
+from src.data_collector.indicator_pipeline.momentum_indicators import calculate_rsi
 
 
 def make_ohlcv(n=60, seed=42):

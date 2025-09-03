@@ -223,7 +223,6 @@ class BatchFeatureProcessor:
                 logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
             
             if config.save_to_database:
-                # Save to database (secondary storage)
                 saved_count = self._save_features_to_database(
                     ticker, 
                     feature_result, 
@@ -276,7 +275,6 @@ class BatchFeatureProcessor:
                     for ticker in tickers
                 }
                 
-                # Process completed tasks
                 for future in as_completed(future_to_ticker):
                     ticker = future_to_ticker[future]
                     logger.info(f"Processing ticker {ticker}")
@@ -293,7 +291,6 @@ class BatchFeatureProcessor:
                             else:
                                 self.stats.failed_tickers += 1
                         
-                        # Log progress
                         progress = (self.stats.processed_tickers + self.stats.failed_tickers) / self.stats.total_tickers * 100
                         logger.info(f"Progress: {progress:.1f}% - Processed {ticker} ({'✓' if result['success'] else '✗'})")
                         
@@ -566,9 +563,9 @@ def run_production_batch():
         max_workers=config.batch_processing.MAX_WORKERS,  # Conservative parallel processing
         start_date='2023-01-01',  # 2 years of data
         end_date=datetime.now().strftime('%Y-%m-%d'),
-        min_data_points=config.data_quality.MIN_DATA_POINTS // 2,  # Reduced requirement for production
+        min_data_points=config.data_quality.MIN_DATA_POINTS // 2,
         save_to_parquet=config.storage.SAVE_TO_PARQUET,
-        save_to_database=False,  # Skip database for now
+        save_to_database=False,
         overwrite_existing=config.storage.OVERWRITE_EXISTING
     )
     

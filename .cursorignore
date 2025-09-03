@@ -2,7 +2,8 @@
 .venv/
 logs/
 mlruns/
-data/
+data/features/
+data/cache/
 pipeline_stats/
 pipeline_reports/
 catboost_info/

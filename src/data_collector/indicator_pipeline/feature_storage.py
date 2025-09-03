@@ -127,7 +127,7 @@ class FeatureStorage:
                 self._cleanup_old_versions(ticker)
             
             logger.info(f"Saved {len(features_data)} records with {len(features_data.columns)} features for {ticker}")
-            logger.info(f"File: {file_path}, Size: {file_stats['size_mb']:.2f} MB")
+            # logger.info(f"File: {file_path}, Size: {file_stats['size_mb']:.2f} MB")
             
             return feature_metadata
             

@@ -18,17 +18,13 @@ def db_session():
     test_db_url = env_vals.get("TEST_DATABASE_URL")
 
     if not test_db_url:
-        # Build from individual TEST_DB_* variables
-        host = env_vals.get("TEST_DB_HOST")
-        port = env_vals.get("TEST_DB_PORT")
-        name = env_vals.get("TEST_DB_NAME")
-        user = env_vals.get("TEST_DB_USER")
-        password = env_vals.get("TEST_DB_PASSWORD", "")
+        # Attempt to fall back to an in-memory SQLite DB for tests when TEST DB not configured
+        # This allows CI and local runs without PostgreSQL to still run unit tests.
+        test_db_url = env_vals.get("TEST_DATABASE_URL")
 
-        if not (host and name and user):
-            pytest.skip("Polygon news DB tests require TEST_DB_HOST/PORT/NAME/USER in .env or TEST_DATABASE_URL set.")
-
-        test_db_url = f"postgresql://{user}:{password}@{host}:{port}/{name}"
+    if not test_db_url:
+        # Use SQLite in-memory
+        test_db_url = "sqlite:///:memory:"
 
     engine = create_engine(test_db_url)
     # Ensure a clean schema for tests: drop existing news tables then recreate

@@ -40,7 +40,6 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if sma_col in features_enhanced.columns:
             ratio_col = f"{sma_col}_Ratio"
             features_enhanced[ratio_col] = current_price / features_enhanced[sma_col]
-            logger.info(f"   Added {ratio_col}: close/SMA ratio")
     
     # 2. Bollinger Bands Ratios
     if 'BB_Lower' in features_enhanced.columns:
@@ -55,13 +54,11 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
                 # Price position within bands (0 = at lower band, 1 = at upper band)
                 features_enhanced['BB_Position'] = ((current_price - features_enhanced['BB_Lower']) / 
                                                     (features_enhanced['BB_Upper'] - features_enhanced['BB_Lower']))
-                logger.info("   Added BB_Position: price position within Bollinger Bands")
     
     # 3. ATR-normalized features
     if 'ATR' in features_enhanced.columns:
         # Price volatility relative to ATR
         features_enhanced['Price_ATR_Ratio'] = current_price / features_enhanced['ATR']
-        logger.info("   Added Price_ATR_Ratio: price relative to volatility")
     
     # 4. Volume-Price Efficiency
     if 'volume' in features_enhanced.columns:
@@ -69,7 +66,6 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if 'Return_1D' in features_enhanced.columns:
             features_enhanced['Return_Volume_Efficiency'] = (features_enhanced['Return_1D'].abs() / 
                                                             (features_enhanced['volume'] + 1e-8))
-            logger.info("   Added Return_Volume_Efficiency: price change per volume unit")
     
     # 5. Ichimoku Ratios
     ichimoku_cols = [col for col in features_enhanced.columns if col.startswith('Ichimoku_') and 
@@ -78,16 +74,14 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if ich_col in features_enhanced.columns:
             ratio_col = f"{ich_col}_Ratio"
             features_enhanced[ratio_col] = current_price / features_enhanced[ich_col]
-            logger.info(f"   Added {ratio_col}: close/Ichimoku ratio")
     
     # 6. Price momentum ratios
     if 'open' in features_enhanced.columns:
         features_enhanced['Close_Open_Ratio'] = current_price / features_enhanced['open']
-        logger.info("   Added Close_Open_Ratio: intraday price change")
     
-    new_features_count = len(features_enhanced.columns) - len(features_df.columns)
-    logger.info(f"✅ Added {new_features_count} price-normalized features")
-    logger.info(f"   Total features: {len(features_enhanced.columns)}")
+    # new_features_count = len(features_enhanced.columns) - len(features_df.columns)
+    # logger.info(f"✅ Added {new_features_count} price-normalized features")
+    # logger.info(f"   Total features: {len(features_enhanced.columns)}")
     
     return features_enhanced
 
@@ -111,10 +105,7 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
     # 1. Historical volatility context
     if 'ATR_Percent' in features_enhanced.columns:
         features_enhanced['Expected_Daily_Move'] = features_enhanced['ATR_Percent']
-        
-        # 10-day expected move (assuming random walk)
         features_enhanced['Expected_10D_Move'] = features_enhanced['ATR_Percent'] * np.sqrt(10)
-        logger.info("   Added expected move features based on ATR")
     
     # 2. Price momentum context
     if 'Return_5D' in features_enhanced.columns:
@@ -125,29 +116,25 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
         if 'Return_1D' in features_enhanced.columns:
             features_enhanced['Momentum_Acceleration'] = (features_enhanced['Return_1D'] - 
                                                         features_enhanced['Return_5D'] / 5)
-            logger.info("   Added momentum acceleration feature")
     
     # 3. Volatility regime context
     if 'Vol_Regime_High' in features_enhanced.columns and 'Vol_Regime_Low' in features_enhanced.columns:
         # Current volatility regime helps set expectation bounds
         features_enhanced['Vol_Regime_Context'] = (features_enhanced['Vol_Regime_High'] * 2 + 
                                                  features_enhanced['Vol_Regime_Low'] * 0.5)
-        logger.info("   Added volatility regime context")
     
     # 4. RSI mean reversion context
     if 'RSI_14' in features_enhanced.columns:
         # RSI distance from 50 (neutral) indicates mean reversion pressure
         features_enhanced['RSI_Mean_Reversion_Pressure'] = abs(features_enhanced['RSI_14'] - 50) / 50
-        logger.info("   Added RSI mean reversion pressure")
     
     # 5. Bollinger Band context
     if 'BB_Percent' in features_enhanced.columns:
         # Position within BB bands indicates typical range
         features_enhanced['BB_Range_Context'] = features_enhanced['BB_Percent']
-        logger.info("   Added Bollinger Band range context")
     
-    new_features_count = len(features_enhanced.columns) - len(features_df.columns)
-    logger.info(f"✅ Added {new_features_count} prediction bounds features")
+    # new_features_count = len(features_enhanced.columns) - len(features_df.columns)
+    # logger.info(f"✅ Added {new_features_count} prediction bounds features")
     
     return features_enhanced
 
@@ -407,7 +394,5 @@ def add_temporal_features(features_df: pd.DataFrame,
     features_enhanced['day_of_week'] = date_col.dt.dayofweek
     features_enhanced['is_month_end'] = date_col.dt.is_month_end.astype(int)
     features_enhanced['is_quarter_end'] = date_col.dt.is_quarter_end.astype(int)
-    
-    logger.info("✅ Added temporal features: date_int, year, month, day_of_year, quarter, day_of_week, is_month_end, is_quarter_end")
     
     return features_enhanced

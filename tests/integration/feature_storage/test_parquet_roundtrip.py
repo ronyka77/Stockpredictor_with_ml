@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from src.feature_engineering.technical_indicators.feature_storage import FeatureStorage, StorageConfig
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
 
 
 @pytest.mark.integration

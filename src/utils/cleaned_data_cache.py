@@ -122,7 +122,7 @@ class CleanedDataCache:
             data_result['y_test'].to_frame().to_parquet(paths['y_test'])
             
             # Save metadata
-            metadata = {
+            metadata_raw = {
                 'target_column': data_result.get('target_column', ''),
                 'feature_count': data_result.get('feature_count', 0),
                 'prediction_horizon': data_result.get('prediction_horizon', 10),
@@ -134,23 +134,11 @@ class CleanedDataCache:
                 'removed_features': data_result.get('removed_features', {}),
                 'diversity_analysis': data_result.get('diversity_analysis', {})
             }
-            
-            # Fix Parquet serialization issues with empty structures
-            # Convert empty dictionaries to strings to avoid Parquet struct type issues
-            if isinstance(metadata['removed_features'], dict):
-                if not metadata['removed_features'] or all(not v for v in metadata['removed_features'].values()):
-                    metadata['removed_features'] = '{}'
-                else:
-                    # Convert to JSON string to preserve structure
-                    metadata['removed_features'] = json.dumps(metadata['removed_features'])
-            
-            if isinstance(metadata['diversity_analysis'], dict):
-                if not metadata['diversity_analysis']:
-                    metadata['diversity_analysis'] = '{}'
-                else:
-                    # Convert to JSON string to preserve structure
-                    metadata['diversity_analysis'] = json.dumps(metadata['diversity_analysis'])
-            
+
+            # Prepare metadata for parquet-safe storage using centralized helper
+            from src.utils.serialization import prepare_metadata_for_parquet, json_fallback_serializer
+
+            metadata = prepare_metadata_for_parquet(metadata_raw)
             metadata_df = pd.DataFrame([metadata])
             metadata_df.to_parquet(paths['metadata'])
             
@@ -163,7 +151,7 @@ class CleanedDataCache:
             }
             
             with open(paths['info'], 'w') as f:
-                json.dump(info, f, indent=2)
+                json.dump(info, f, indent=2, default=json_fallback_serializer)
             
             logger.info(f"✅ Cached cleaned {data_type} data with key: {cache_key}")
             
@@ -235,7 +223,6 @@ class CleanedDataCache:
             
             logger.info(f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}")
             logger.info(f"   Test data: {len(result['X_test'])} samples, {len(result['X_test'].columns)} features")
-            # logger.info(f"   Test data features: {result['X_test'].columns.to_list()}")
             return result
             
         except Exception as e:

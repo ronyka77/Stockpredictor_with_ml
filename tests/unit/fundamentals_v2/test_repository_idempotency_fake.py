@@ -59,10 +59,10 @@ class FakePool:
 
 
 @pytest.mark.unit
-def test_upsert_raw_payload_idempotent(monkeypatch):
+def test_upsert_raw_payload_idempotent(mocker):
     repo = FundamentalsRepository()
-    # monkeypatch connection pool
-    monkeypatch.setattr(repo, "pool", FakePool())
+    # mocker connection pool
+    mocker.patch.object(repo, "pool", FakePool())
 
     payload = {"results": [{"x": 1}], "status": "OK"}
     repo.upsert_raw_payload(

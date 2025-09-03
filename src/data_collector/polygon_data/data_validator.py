@@ -199,11 +199,14 @@ class OHLCVRecord(BaseModel):
             try:
                 # Try to parse ISO format
                 if 'T' in v:
-                    return datetime.fromisoformat(v.replace('Z', '+00:00'))
+                    parsed = datetime.fromisoformat(v.replace('Z', '+00:00'))
                 else:
-                    return datetime.strptime(v, '%Y-%m-%d').date()
+                    parsed = datetime.strptime(v, '%Y-%m-%d').date()
             except ValueError:
                 raise ValueError(f'Invalid timestamp format: {v}')
+
+            # assign parsed value back to v so subsequent future-date checks run
+            v = parsed
         
         # Check if timestamp is not in the future (with some tolerance)
         if isinstance(v, datetime):

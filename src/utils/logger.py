@@ -1,18 +1,7 @@
 """
 Centralized Logging System for StockPredictor V1
-
 This module provides a unified logging configuration that can be imported
 and used across all modules in the project.
-
-Usage:
-    from src.utils.logger import get_logger
-    
-    logger = get_logger(__name__)
-    logger.info("This is an info message")
-    
-    # For specific utilities
-    logger = get_logger(__name__, utility="polygon")
-    logger = get_logger(__name__, utility="predictor")
 """
 
 import logging

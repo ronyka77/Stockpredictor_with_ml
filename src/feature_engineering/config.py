@@ -9,7 +9,6 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Tuple
 import dotenv
-from sqlalchemy import true
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,8 +21,7 @@ class DataQualityConfig:
     
     # Data Requirements
     MIN_DATA_POINTS: int = int(os.getenv('MIN_DATA_POINTS', '100'))
-
-    # Data Quality Thresholds
+    OUTLIER_THRESHOLD: float = 3.0  # Z-score threshold for outliers
     MAX_MISSING_PCT: float = 0.05  # 5% max missing data allowed
 
 @dataclass
@@ -110,12 +108,12 @@ class DateRangeConfig:
     DEFAULT_LOOKBACK_YEARS: int = int(os.getenv('FE_DEFAULT_LOOKBACK_YEARS', '3'))
     
     # Date Formats
-    DATE_FORMAT: str = os.getenv('FE_DATE_FORMAT', '%Y-%m-%d')
-    DATETIME_FORMAT: str = os.getenv('FE_DATETIME_FORMAT', '%Y-%m-%d %H:%M:%S')
+    DATE_FORMAT: str =  '%Y-%m-%d'
+    DATETIME_FORMAT: str =  '%Y-%m-%d %H:%M:%S'
     
     # Time Zones
-    DEFAULT_TIMEZONE: str = os.getenv('FE_DEFAULT_TIMEZONE', 'UTC')
-    MARKET_TIMEZONE: str = os.getenv('FE_MARKET_TIMEZONE', 'America/New_York')
+    DEFAULT_TIMEZONE: str = 'UTC'
+    MARKET_TIMEZONE: str = 'America/New_York'
 
 @dataclass
 class FeatureCategoryConfig:
@@ -130,7 +128,7 @@ class FeatureCategoryConfig:
     DEFAULT_MARKET: str = os.getenv('FE_DEFAULT_MARKET', 'stocks')
     
     # Ticker Filters
-    DEFAULT_ACTIVE_ONLY: bool = os.getenv('FE_DEFAULT_ACTIVE_ONLY', 'true').lower() == 'true'
+    DEFAULT_ACTIVE_ONLY: bool = True
 
 @dataclass
 class StorageConfig:
@@ -146,21 +144,21 @@ class StorageConfig:
     PARQUET_ROW_GROUP_SIZE: int = int(os.getenv('FE_PARQUET_ROW_GROUP_SIZE', '50000'))
     
     # Storage Behavior
-    SAVE_TO_DATABASE: bool = true
-    SAVE_TO_PARQUET: bool = true
-    USE_CONSOLIDATED_STORAGE: bool = true
+    SAVE_TO_DATABASE: bool = True
+    SAVE_TO_PARQUET: bool = True
+    USE_CONSOLIDATED_STORAGE: bool = True
     OVERWRITE_EXISTING: bool = os.getenv('FE_OVERWRITE_EXISTING', 'false').lower() == 'true'
     
     # Partitioning
     PARTITIONING_STRATEGY: str = 'by_date' # Only year-based supported
     
     # File Management
-    CLEANUP_OLD_VERSIONS: bool = true
+    CLEANUP_OLD_VERSIONS: bool = True
     MAX_VERSIONS_TO_KEEP: int = int(os.getenv('FE_MAX_VERSIONS_TO_KEEP', '3'))
     
     # Consolidated Storage
     MAX_ROWS_PER_FILE: int = int(os.getenv('FE_MAX_ROWS_PER_FILE', '5000000'))  # 5M rows
-    INCLUDE_METADATA_COLUMNS: bool = true
+    INCLUDE_METADATA_COLUMNS: bool = True
 
 @dataclass
 class MLConfig:

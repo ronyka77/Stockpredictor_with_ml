@@ -23,7 +23,7 @@ def test_validate_ticker_list_filters_invalid():
 
 
 @pytest.mark.unit
-def test_get_ticker_info_from_manager(monkeypatch):
+def test_get_ticker_info_from_manager(mocker):
     # Provide a fake ticker manager
     class FakeManager:
         def get_active_tickers(self):

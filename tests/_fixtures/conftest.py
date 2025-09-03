@@ -30,16 +30,16 @@ def mock_http_client():
 
 @pytest.fixture
 def permission_error_simulator():
-    """Return a helper that monkeypatches filesystem calls to raise PermissionError."""
-    def _apply(monkeypatch):
+    """Return a helper that mocks filesystem calls to raise PermissionError."""
+    def _apply(mocker):
         import os
         import builtins
 
         def _raise(*a, **k):
             raise PermissionError("Permission denied (simulated)")
 
-        monkeypatch.setattr(os, "makedirs", _raise)
-        monkeypatch.setattr(builtins, "open", _raise)
+        mocker.patch.object(os, "makedirs", _raise)
+        mocker.patch.object(builtins, "open", _raise)
 
     return _apply
 

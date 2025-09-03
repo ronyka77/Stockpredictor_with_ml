@@ -17,14 +17,14 @@ class FrozenClock:
 
 
 @contextmanager
-def freeze_time(monkeypatch, start: float = 0.0):
+def freeze_time(mocker, start: float = 0.0):
     clock = FrozenClock(start=start)
-    monkeypatch.setattr(time, "time", clock.time)
-    monkeypatch.setattr(time, "sleep", clock.sleep)
+    mocker.patch.object(time, "time", clock.time)
+    mocker.patch.object(time, "sleep", clock.sleep)
     try:
         yield clock
     finally:
-        # monkeypatch will restore automatically after test scope
+        # mocker will restore automatically after test scope
         pass
 
 

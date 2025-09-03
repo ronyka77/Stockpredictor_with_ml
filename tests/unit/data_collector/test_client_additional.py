@@ -15,7 +15,7 @@ class DummyResponse:
         raise ValueError("Malformed JSON")
 
 
-def test_make_request_500_retries_and_raises(monkeypatch):
+def test_make_request_500_retries_and_raises(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
     calls = {"n": 0}
@@ -24,25 +24,25 @@ def test_make_request_500_retries_and_raises(monkeypatch):
         calls["n"] += 1
         return DummyResponse(500, text="Server error")
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     with pytest.raises(PolygonAPIError):
         client._make_request("/server/error")
 
 
-def test_make_request_malformed_json(monkeypatch):
+def test_make_request_malformed_json(mocker):
     client = PolygonDataClient(api_key="TEST", requests_per_minute=100)
 
     def fake_get(url, params=None, timeout=None):
         return DummyResponse(200, text="not json", json_data=None)
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     with pytest.raises(PolygonAPIError):
         client._make_request("/malformed")
 
 
-def test_api_key_present_in_headers(monkeypatch):
+def test_api_key_present_in_headers(mocker):
     client = PolygonDataClient(api_key="MYKEY", requests_per_minute=100)
 
     seen = {}
@@ -52,7 +52,7 @@ def test_api_key_present_in_headers(monkeypatch):
         seen['headers'] = dict(client.session.headers)
         return DummyResponse(200, json_data={"status": "OK"})
 
-    monkeypatch.setattr(client.session, "get", fake_get)
+    mocker.patch.object(client.session, "get", fake_get)
 
     res = client._make_request("/ok")
     assert res.get("status") == "OK"
