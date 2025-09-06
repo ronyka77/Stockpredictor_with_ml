@@ -119,7 +119,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
 
 if __name__ == "__main__":
     try:
-        model_dir = "AutogluonModels/ag-20250826_173422"
+        model_dir = "AutogluonModels/ag-20250906_015907"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

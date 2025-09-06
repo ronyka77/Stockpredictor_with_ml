@@ -69,29 +69,28 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df = X_val.copy()
             valid_df[label] = y_val.values
 
-        # train_df = train_df.sort_values('date_int', ascending=False).head(100000).reset_index(drop=True)
         combined_df = pd.concat([train_df, valid_df], axis=0)
         combined_df = combined_df.reset_index(drop=True)
         logger.info(f"combined_df: {len(combined_df)}")
 
         hyperparams = {
-            "FASTAI": {},
-            "GBM": {},        
+            # "FASTAI": {},
+            "GBM": {'verbosity': -1},        
             # "TABM": {}, 
-            "RF": {},       
-            # "CAT": {}
-            "REALMLP": {},
+            "RF": {'verbose': 0},       
+            # "CAT": {'task_type': 'GPU'}
+            # "REALMLP": {},
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(label=label, 
                                 eval_metric='mae', 
                                 problem_type='regression',
-                                verbosity=3)
+                                verbosity=2)
         
         self.predictor.fit(
             time_limit=39600,
-            train_data=combined_df,
+            train_data=train_df,
             tuning_data=valid_df,
             presets='best_quality',
             hyperparameters=hyperparams,
@@ -101,7 +100,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             auto_stack=True,
             num_bag_folds=10,
             use_bag_holdout=True,
-            ag_args={'fold_fitting_strategy': 'sequential_local'},
+            # ag_args={'fold_fitting_strategy': 'sequential_local'},
             ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'}
         )
         summary = self.predictor.fit_summary(show_plot=True)
@@ -238,7 +237,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         except Exception as e:
             logger.error(f"Threshold evaluation failed: {e}")
             return {'status': 'failed', 'message': str(e)}
-
 
     def load_from_dir(self, model_dir: str) -> "AutoGluonModel":
         logger.info(f"Loading AutoGluon predictor from {model_dir}")

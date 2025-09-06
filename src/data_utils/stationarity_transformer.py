@@ -50,10 +50,15 @@ def transform_dataframe_to_stationary(df: pd.DataFrame, n_jobs: int = None, verb
     """
     if n_jobs is None:
         n_jobs = min(4, os.cpu_count() or 2)
-    if verbose:
-        logger.setLevel('INFO')
-    else:
-        logger.setLevel('WARNING')
+    try:
+        if verbose:
+            logger.setLevel('INFO')
+        else:
+            logger.setLevel('WARNING')
+    except Exception:
+        # Some logger implementations (e.g., Loguru BoundLogger) do not
+        # provide setLevel; silently continue without altering level.
+        pass
     logger.info(f"🚀 [START] Parallel stationarity transformation for {len(df.columns)} columns using {n_jobs} cores (KPSS)...")
     logger.info("Step 1: Running initial KPSS tests in parallel...")
     initial_results = Parallel(n_jobs=n_jobs)(
@@ -141,10 +146,14 @@ def transform_to_stationary(series: pd.Series, verbose: bool = True) -> Tuple[pd
         - The name of the transformation applied, or 'none' if the series is already stationary.
         If no transformation makes it stationary, it returns the original series and None.
     """
-    if verbose:
-        logger.setLevel('INFO')
-    else:
-        logger.setLevel('WARNING')
+    try:
+        if verbose:
+            logger.setLevel('INFO')
+        else:
+            logger.setLevel('WARNING')
+    except Exception:
+        # Some logger implementations do not support setLevel; ignore.
+        pass
     series_clean = series.dropna()
     if series_clean.empty or len(series_clean) < 10:
         logger.warning(f"Series '{series.name}' is empty or too short after dropping NaNs (len={len(series_clean)}). Skipping KPSS.")

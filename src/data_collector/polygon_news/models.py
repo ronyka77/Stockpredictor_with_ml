@@ -6,6 +6,7 @@ Optimized for Polygon.io News API response structure with 2-year data retention
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
 from src.data_collector.config import config
 from sqlalchemy import JSON
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.sql import func
@@ -43,8 +44,8 @@ class PolygonNewsArticle(Base):
     publisher_favicon_url = Column(String(500))
     
     # Content metadata
-    # Store keywords as JSON so SQLite in-memory tests and Postgres both work
-    keywords = Column(JSON)
+    # Store keywords as Postgres text[] (ARRAY of text). Production DB is Postgres so use ARRAY.
+    keywords = Column(postgresql.ARRAY(String))
     
     # Processing metadata
     created_at = Column(DateTime(timezone=True), default=func.now())

@@ -5,6 +5,7 @@ Handles incremental updates, historical backfill, and comprehensive news collect
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+import json
 from sqlalchemy.orm import Session
 
 from src.data_collector.polygon_news.news_client import PolygonNewsClient
@@ -257,7 +258,25 @@ class PolygonNewsCollector:
                     
                     # Process content
                     processed_article = self.processor.process_article(article_metadata)
-                    
+
+                    # Normalize keywords to list for DB (text[] column expects list)
+                    keywords = processed_article.get('keywords')
+                    if isinstance(keywords, str):
+                        try:
+                            parsed = json.loads(keywords)
+                            if isinstance(parsed, list):
+                                processed_article['keywords'] = parsed
+                            else:
+                                processed_article['keywords'] = [str(parsed)]
+                        except Exception:
+                            processed_article['keywords'] = [
+                                k.strip()
+                                for k in keywords.strip('[]').split(',')
+                                if k.strip()
+                            ]
+                    elif keywords is None:
+                        processed_article['keywords'] = []
+
                     # Validate quality
                     is_valid, quality_score, issues = self.validator.validate_article(processed_article)
                     

@@ -139,7 +139,7 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
     return features_enhanced
 
 
-def clean_data_for_xgboost(df: pd.DataFrame) -> pd.DataFrame:
+def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean data specifically for XGBoost training/prediction
     
@@ -189,7 +189,7 @@ def clean_data_for_xgboost(df: pd.DataFrame) -> pd.DataFrame:
     for col in numeric_cols:
         df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').astype(np.float64)
     
-    logger.info(f"✅ XGBoost data cleaning completed: {len(df_clean)} samples ready")
+    logger.info(f"✅ Training data cleaning completed: {len(df_clean)} samples ready")
     
     return df_clean
 

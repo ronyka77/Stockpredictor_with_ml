@@ -15,7 +15,7 @@ from src.data_utils.target_engineering import convert_absolute_to_percentage_ret
 from src.data_utils.feature_engineering import (
     add_price_normalized_features,
     add_prediction_bounds_features,
-    clean_data_for_xgboost,
+    clean_data_for_training,
     analyze_feature_diversity,
     clean_features_for_training,
     add_temporal_features
@@ -33,10 +33,10 @@ _cleaned_data_cache = CleanedDataCache()
 def prepare_ml_data_for_training(prediction_horizon: int = 10, 
                                 split_date: str = '2025-03-15',
                                 ticker: Optional[str] = None,
-                                apply_stationarity_transform: bool = False) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
+                                apply_stationarity_transform: bool = False,
+                                filter_train_set: bool = True) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
     Comprehensive data preparation function for ML training
-    
     This function loads all available data, prepares features and targets,
     creates temporal train/test splits, and performs data cleaning.
     """
@@ -51,6 +51,10 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         
         if combined_data.empty:
             raise ValueError("No data loaded. Check data availability.")
+
+        # Early validation: ensure required date column exists before further processing
+        if 'date' not in combined_data.columns:
+            raise ValueError("'date' column not found in data. Cannot perform date-based split.")
         
         logger.info(f"✅ Data loaded: {combined_data.shape[0]:,} records, {combined_data.shape[1]} features")
         
@@ -166,39 +170,51 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         
         # Get test dates for modification and logging
         test_dates = dates_clean[test_mask]
-        
+        train_dates = dates_clean[train_mask]
+
         # Filter test set to include only Mondays and Fridays
-        # if not test_dates.empty:
-        #     logger.info("📅 Filtering test set to include only Mondays and Fridays.")
-        #     is_monday_or_friday = (test_dates.dt.dayofweek == 0) | (test_dates.dt.dayofweek == 4)
+        if not test_dates.empty:
+            logger.info("📅 Filtering test set to include only Mondays and Fridays.")
+            is_monday_or_friday = (test_dates.dt.dayofweek == 0) | (test_dates.dt.dayofweek == 4)
             
-        #     X_test = X_test[is_monday_or_friday]
-        #     y_test = y_test[is_monday_or_friday]
+            X_test = X_test[is_monday_or_friday]
+            y_test = y_test[is_monday_or_friday]
             
-        #     # Update test_dates to reflect the change for logging and further processing
-        #     test_dates = test_dates[is_monday_or_friday]
+            # Update test_dates to reflect the change for logging and further processing
+            test_dates = test_dates[is_monday_or_friday]
+        
+        if not train_dates.empty and filter_train_set:
+            logger.info("📅 Filtering train set to include only Mondays and Fridays.")
+            is_monday_or_friday = (train_dates.dt.dayofweek == 0) | (train_dates.dt.dayofweek == 4)
+            
+            X_train = X_train[is_monday_or_friday]
+            y_train = y_train[is_monday_or_friday]
+            
+            # Update train_dates to reflect the change for logging and further processing
+            train_dates = train_dates[is_monday_or_friday]
 
         # Reserve last 3 days of test data for unseen prediction
-        if not test_dates.empty:
-            original_test_size = len(X_test)
-            max_test_date = test_dates.max()
-            holdout_cutoff_date = max_test_date - pd.Timedelta(days=3)
+        # if not test_dates.empty:
+        #     original_test_size = len(X_test)
+        #     max_test_date = test_dates.max()
+        #     holdout_cutoff_date = max_test_date
             
-            # Create a mask to select rows for the new, smaller test set
-            final_test_selection_mask = test_dates <= holdout_cutoff_date
+        #     # Create a mask to select rows for the new, smaller test set
+        #     final_test_selection_mask = test_dates <= holdout_cutoff_date
             
-            X_test = X_test[final_test_selection_mask]
-            y_test = y_test[final_test_selection_mask]
+        #     X_test = X_test[final_test_selection_mask]
+        #     y_test = y_test[final_test_selection_mask]
             
-            # Update test_dates to reflect the change for logging
-            test_dates = test_dates[final_test_selection_mask]
+        #     # Update test_dates to reflect the change for logging
+        #     test_dates = test_dates[final_test_selection_mask]
             
-            logger.info("🔪 Reserving last 3 days of test data for unseen prediction.")
-            logger.info(f"   (Removed {original_test_size - len(X_test)} samples)")
+        #     logger.info("🔪 Reserving last 3 days of test data for unseen prediction.")
+        #     logger.info(f"   (Removed {original_test_size - len(X_test)} samples)")
         
         # Get date ranges for logging
         train_date_range = f"{dates_clean[train_mask].min().strftime('%Y-%m-%d')} to {dates_clean[train_mask].max().strftime('%Y-%m-%d')}" if train_mask.any() else "No training data"
         test_date_range = f"{test_dates.min().strftime('%Y-%m-%d')} to {test_dates.max().strftime('%Y-%m-%d')}" if not test_dates.empty else "No test data"
+        train_date_range = f"{train_dates.min().strftime('%Y-%m-%d')} to {train_dates.max().strftime('%Y-%m-%d')}" if not train_dates.empty else "No training data"
         
         logger.info(f"✅ Train set: {len(X_train)} samples ({train_date_range})")
         logger.info(f"✅ Test set: {len(X_test)} samples ({test_date_range})")
@@ -248,10 +264,8 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
 def prepare_ml_data_for_prediction(prediction_horizon: int = 10) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
     Comprehensive data preparation function for ML prediction
-    
     This function loads all available data, prepares features and targets,
     creates temporal train/test splits, and performs data cleaning.
-    
     Args:
         prediction_horizon: Days ahead for target prediction (default: 10)
         
@@ -363,7 +377,8 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
                                                 split_date: str = '2025-03-15',
                                                 ticker: str = None,
                                                 clean_features: bool = True,
-                                                apply_stationarity_transform: bool = False) -> dict:
+                                                apply_stationarity_transform: bool = False,
+                                                filter_train_set: bool = True) -> dict:
     """
     Enhanced version of prepare_ml_data_for_training with integrated data cleaning and caching
     """
@@ -398,14 +413,15 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
         prediction_horizon=prediction_horizon,
         split_date=split_date,
         ticker=ticker,
-        apply_stationarity_transform=apply_stationarity_transform
+        apply_stationarity_transform=apply_stationarity_transform,
+        filter_train_set=filter_train_set
     )
     logger.info(f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features")
     # 2. Apply data cleaning (always performed)
     logger.info("Step 2: Applying XGBoost data cleaning to combined train/test set...")
     combined_X = pd.concat([data_result['X_train'], data_result['X_test']], ignore_index=True)
     combined_y = pd.concat([data_result['y_train'], data_result['y_test']], ignore_index=True)
-    combined_X_clean = clean_data_for_xgboost(combined_X)
+    combined_X_clean = clean_data_for_training(combined_X)
     logger.info(f"   After cleaning: {len(combined_X_clean)} samples, {combined_X_clean.shape[1]} features")
     # Split back into train/test
     train_size = len(data_result['X_train'])
@@ -452,7 +468,6 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
                                                 days_back: int = 30) -> dict:
     """
     Enhanced version of prepare_ml_data_for_prediction with integrated data cleaning and caching
-    
     Args:
         prediction_horizon: Prediction horizon in days
         days_back: Number of days back to load data from
@@ -496,7 +511,7 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
         data_result['X_test'] = data_result['X_test'][recent_mask]
         data_result['y_test'] = data_result['y_test'][recent_mask]
     
-    data_result['X_test'] = clean_data_for_xgboost(data_result['X_test'])
+    data_result['X_test'] = clean_data_for_training(data_result['X_test'])
     
     # Analyze feature diversity for prediction data
     diversity_analysis = analyze_feature_diversity(data_result['X_test'])
@@ -517,14 +532,3 @@ def prepare_ml_data_for_prediction_with_cleaning(prediction_horizon: int = 10,
     logger.info(f"   Prediction data: {len(data_result['X_test'])} samples, {len(data_result['X_test'].columns)} features")
     
     return data_result
-
-# Context manager for optional memory tracking
-class nullcontext:
-    """Context manager that does nothing - used when memory tracking is disabled"""
-    def __enter__(self):
-        return None
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return False
-
-
-
