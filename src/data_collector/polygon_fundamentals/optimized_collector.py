@@ -19,7 +19,7 @@ from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
 from src.utils.logger import get_logger
-from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
+from src.database.connection import get_global_pool, fetch_all, fetch_one, execute
 
 logger = get_logger(__name__)
 
@@ -56,10 +56,12 @@ class OptimizedFundamentalCollector:
 
     def __init__(self, config: Optional[PolygonFundamentalsConfig] = None):
         self.config = config or PolygonFundamentalsConfig()
-        self.db_pool = get_connection_pool()
+        self.db_pool = get_global_pool()
 
         # Create SQLAlchemy engine from connection parameters
-        database_url = f"postgresql://{self.db_pool.config['user']}:{self.db_pool.config['password']}@{self.db_pool.config['host']}:{self.db_pool.config['port']}/{self.db_pool.config['database']}"
+        # prefer using connection pool config if available
+        cfg = getattr(self.db_pool, "config", {})
+        database_url = f"postgresql://{cfg.get('user','') }:{cfg.get('password','') }@{cfg.get('host','localhost')}:{cfg.get('port',5432)}/{cfg.get('database','') }"
         self.engine = create_engine(database_url)
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
@@ -121,19 +123,10 @@ class OptimizedFundamentalCollector:
         try:
             logger.info("Loading existing data cache...")
 
-            with self.db_pool.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT ticker_id, date 
-                        FROM raw_fundamental_data
-                    """)
-
-                    existing_data = set()
-                    for row in cursor.fetchall():
-                        existing_data.add((row["ticker_id"], row["date"]))
-
-                    self.existing_data_cache = existing_data
-                    logger.info(f"Loaded {len(existing_data)} existing data points")
+            rows = fetch_all("SELECT ticker_id, date FROM raw_fundamental_data")
+            existing_data = set((r["ticker_id"], r["date"]) for r in (rows or []))
+            self.existing_data_cache = existing_data
+            logger.info(f"Loaded {len(existing_data)} existing data points")
 
         except Exception as e:
             logger.error(f"Failed to load existing data cache: {e}")
@@ -142,23 +135,20 @@ class OptimizedFundamentalCollector:
     def _has_recent_data(self, ticker_id: int) -> bool:
         """Check if ticker has recent data (within 6 months)"""
         try:
-            with self.db_pool.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT EXISTS (
-                            SELECT 1
-                            FROM raw_fundamental_data
-                            WHERE ticker_id = %s
-                            AND date >= %s::date
-                        ) AS has_recent
-                    """,
-                        (ticker_id, (datetime.now() - timedelta(days=180)).date()),
-                    )
-                    result = cursor.fetchone()
-                    has_recent = result and result["has_recent"]
-                    logger.info(f"Ticker ID {ticker_id} recent data: {has_recent}")
-                    return has_recent
+            result = fetch_one(
+                """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM raw_fundamental_data
+                        WHERE ticker_id = %s
+                        AND date >= %s::date
+                    ) AS has_recent
+                """,
+                (ticker_id, (datetime.now() - timedelta(days=180)).date()),
+            )
+            has_recent = result and result.get("has_recent")
+            logger.info(f"Ticker ID {ticker_id} recent data: {has_recent}")
+            return has_recent
 
         except Exception as e:
             logger.error(f"Error checking recent data for ticker_id {ticker_id}: {e}")
@@ -319,57 +309,54 @@ class OptimizedFundamentalCollector:
             )
 
             # Store to database using connection pool
-            with self.db_pool.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    # Insert with conflict resolution
-                    cursor.execute(
-                        """
-                        INSERT INTO raw_fundamental_data (
-                            ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
-                            revenues, cost_of_revenue, gross_profit, operating_expenses, net_income_loss,
-                            assets, current_assets, liabilities, equity, long_term_debt,
-                            net_cash_flow_from_operating_activities, net_cash_flow_from_investing_activities,
-                            comprehensive_income_loss, other_comprehensive_income_loss,
-                            data_quality_score, missing_data_count, source_filing_url, source_filing_file_url,
-                            data_source_confidence
-                        ) VALUES (
-                            %(ticker_id)s, %(date)s, %(filing_date)s, %(fiscal_period)s, %(fiscal_year)s, %(timeframe)s,
-                            %(revenues)s, %(cost_of_revenue)s, %(gross_profit)s, %(operating_expenses)s, %(net_income_loss)s,
-                            %(assets)s, %(current_assets)s, %(liabilities)s, %(equity)s, %(long_term_debt)s,
-                            %(net_cash_flow_from_operating_activities)s, %(net_cash_flow_from_investing_activities)s,
-                            %(comprehensive_income_loss)s, %(other_comprehensive_income_loss)s,
-                            %(data_quality_score)s, %(missing_data_count)s, %(source_filing_url)s, %(source_filing_file_url)s,
-                            %(data_source_confidence)s
-                        ) ON CONFLICT (ticker_id, date) DO UPDATE SET
-                            filing_date = EXCLUDED.filing_date,
-                            fiscal_period = EXCLUDED.fiscal_period,
-                            fiscal_year = EXCLUDED.fiscal_year,
-                            timeframe = EXCLUDED.timeframe,
-                            revenues = EXCLUDED.revenues,
-                            cost_of_revenue = EXCLUDED.cost_of_revenue,
-                            gross_profit = EXCLUDED.gross_profit,
-                            operating_expenses = EXCLUDED.operating_expenses,
-                            net_income_loss = EXCLUDED.net_income_loss,
-                            assets = EXCLUDED.assets,
-                            current_assets = EXCLUDED.current_assets,
-                            liabilities = EXCLUDED.liabilities,
-                            equity = EXCLUDED.equity,
-                            long_term_debt = EXCLUDED.long_term_debt,
-                            net_cash_flow_from_operating_activities = EXCLUDED.net_cash_flow_from_operating_activities,
-                            net_cash_flow_from_investing_activities = EXCLUDED.net_cash_flow_from_investing_activities,
-                            comprehensive_income_loss = EXCLUDED.comprehensive_income_loss,
-                            other_comprehensive_income_loss = EXCLUDED.other_comprehensive_income_loss,
-                            data_quality_score = EXCLUDED.data_quality_score,
-                            missing_data_count = EXCLUDED.missing_data_count,
-                            source_filing_url = EXCLUDED.source_filing_url,
-                            source_filing_file_url = EXCLUDED.source_filing_file_url,
-                            data_source_confidence = EXCLUDED.data_source_confidence
-                    """,
-                        raw_data,
-                    )
+            # Use centralized execute helper for single-statement upsert
+            execute(
+                """
+                INSERT INTO raw_fundamental_data (
+                    ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
+                    revenues, cost_of_revenue, gross_profit, operating_expenses, net_income_loss,
+                    assets, current_assets, liabilities, equity, long_term_debt,
+                    net_cash_flow_from_operating_activities, net_cash_flow_from_investing_activities,
+                    comprehensive_income_loss, other_comprehensive_income_loss,
+                    data_quality_score, missing_data_count, source_filing_url, source_filing_file_url,
+                    data_source_confidence
+                ) VALUES (
+                    %(ticker_id)s, %(date)s, %(filing_date)s, %(fiscal_period)s, %(fiscal_year)s, %(timeframe)s,
+                    %(revenues)s, %(cost_of_revenue)s, %(gross_profit)s, %(operating_expenses)s, %(net_income_loss)s,
+                    %(assets)s, %(current_assets)s, %(liabilities)s, %(equity)s, %(long_term_debt)s,
+                    %(net_cash_flow_from_operating_activities)s, %(net_cash_flow_from_investing_activities)s,
+                    %(comprehensive_income_loss)s, %(other_comprehensive_income_loss)s,
+                    %(data_quality_score)s, %(missing_data_count)s, %(source_filing_url)s, %(source_filing_file_url)s,
+                    %(data_source_confidence)s
+                ) ON CONFLICT (ticker_id, date) DO UPDATE SET
+                    filing_date = EXCLUDED.filing_date,
+                    fiscal_period = EXCLUDED.fiscal_period,
+                    fiscal_year = EXCLUDED.fiscal_year,
+                    timeframe = EXCLUDED.timeframe,
+                    revenues = EXCLUDED.revenues,
+                    cost_of_revenue = EXCLUDED.cost_of_revenue,
+                    gross_profit = EXCLUDED.gross_profit,
+                    operating_expenses = EXCLUDED.operating_expenses,
+                    net_income_loss = EXCLUDED.net_income_loss,
+                    assets = EXCLUDED.assets,
+                    current_assets = EXCLUDED.current_assets,
+                    liabilities = EXCLUDED.liabilities,
+                    equity = EXCLUDED.equity,
+                    long_term_debt = EXCLUDED.long_term_debt,
+                    net_cash_flow_from_operating_activities = EXCLUDED.net_cash_flow_from_operating_activities,
+                    net_cash_flow_from_investing_activities = EXCLUDED.net_cash_flow_from_investing_activities,
+                    comprehensive_income_loss = EXCLUDED.comprehensive_income_loss,
+                    other_comprehensive_income_loss = EXCLUDED.other_comprehensive_income_loss,
+                    data_quality_score = EXCLUDED.data_quality_score,
+                    missing_data_count = EXCLUDED.missing_data_count,
+                    source_filing_url = EXCLUDED.source_filing_url,
+                    source_filing_file_url = EXCLUDED.source_filing_file_url,
+                    data_source_confidence = EXCLUDED.data_source_confidence
+                """,
+                raw_data,
+            )
 
-                    conn.commit()
-                    return True
+            return True
 
         except Exception as e:
             logger.error(f"Failed to store statement period: {e}")

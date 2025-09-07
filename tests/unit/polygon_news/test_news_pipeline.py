@@ -18,7 +18,9 @@ def test__collect_ticker_news_no_raw_articles(db_session, mocker):
     if stats.get("api_calls") != 1:
         raise AssertionError("API calls count unexpected for empty result")
     if stats.get("articles_fetched") != 0:
-        raise AssertionError("Articles fetched should be 0 when client returns no articles")
+        raise AssertionError(
+            "Articles fetched should be 0 when client returns no articles"
+        )
 
 
 @pytest.mark.unit
@@ -156,11 +158,17 @@ def test__collect_ticker_news_processing_exception_per_article(db_session, mocke
     )
 
     if stats.get("articles_fetched") != 2:
-        raise AssertionError("Articles fetched count mismatch for exception handling test")
+        raise AssertionError(
+            "Articles fetched count mismatch for exception handling test"
+        )
     if stats.get("articles_stored") != 1:
-        raise AssertionError("Articles stored count mismatch for exception handling test")
+        raise AssertionError(
+            "Articles stored count mismatch for exception handling test"
+        )
     if stats.get("articles_skipped", 0) < 1:
-        raise AssertionError("Expected at least one skipped article when processing errors occur")
+        raise AssertionError(
+            "Expected at least one skipped article when processing errors occur"
+        )
 
 
 @pytest.mark.unit
@@ -238,4 +246,6 @@ def test_get_collection_status_handles_healthy_and_error(db_session, mocker):
 def test_context_manager_enter_exit(db_session):
     with PolygonNewsCollector(db_session=db_session) as c:
         if not isinstance(c, PolygonNewsCollector):
-            raise AssertionError("Context manager did not return PolygonNewsCollector instance")
+            raise AssertionError(
+                "Context manager did not return PolygonNewsCollector instance"
+            )

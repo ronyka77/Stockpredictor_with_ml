@@ -28,7 +28,9 @@ def test_store_article_create_and_update_flow(db_session, sample_raw_article_ful
     # Insert same article should trigger update path and return same id
     article_id2 = storage.store_article(sample_raw_article_full)
     if article_id2 != article_id:
-        raise AssertionError("Second store did not return same article_id on update path")
+        raise AssertionError(
+            "Second store did not return same article_id on update path"
+        )
 
 
 @pytest.mark.unit
@@ -45,7 +47,9 @@ def test_store_articles_batch_mixed(
         raise AssertionError("Expected at least one new article in batch stats")
     # Depending on implementation, invalid article may count as failed_articles or skipped_articles
     if (stats.get("skipped_articles", 0) + stats.get("failed_articles", 0)) < 1:
-        raise AssertionError("Expected at least one skipped or failed article in batch stats")
+        raise AssertionError(
+            "Expected at least one skipped or failed article in batch stats"
+        )
 
 
 @pytest.mark.unit
@@ -59,7 +63,9 @@ def test_store_article_keywords_normalization(db_session, sample_raw_article_ful
     article["keywords"] = ["one", "two"]
     aid = storage.store_article(article)
     if aid is None:
-        raise AssertionError("Expected aid to be returned when storing article with keywords list")
+        raise AssertionError(
+            "Expected aid to be returned when storing article with keywords list"
+        )
 
     stored = db_session.query(models.PolygonNewsArticle).filter_by(id=aid).first()
     if not isinstance(stored.keywords, list):
@@ -73,7 +79,9 @@ def test_store_article_keywords_normalization(db_session, sample_raw_article_ful
     article2["keywords"] = json.dumps(["alpha", "beta"])
     aid2 = storage.store_article(article2)
     if aid2 is None:
-        raise AssertionError("Expected aid to be returned when storing article with JSON keywords")
+        raise AssertionError(
+            "Expected aid to be returned when storing article with JSON keywords"
+        )
 
     stored2 = db_session.query(models.PolygonNewsArticle).filter_by(id=aid2).first()
     if not isinstance(stored2.keywords, list):

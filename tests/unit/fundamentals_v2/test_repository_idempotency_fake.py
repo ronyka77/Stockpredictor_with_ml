@@ -1,7 +1,7 @@
 import pytest
 
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
-
+from tests._fixtures.helpers import FakeDBPool
 
 class FakeCursor:
     def __init__(self):
@@ -50,12 +50,10 @@ class FakeConn:
         return False
 
 
-class FakePool:
-    def __init__(self):
-        self.conn = FakeConn()
 
-    def get_connection(self):
-        return self.conn
+# Reuse shared FakeDBPool from centralized test helpers to reduce duplication
+class FakePool(FakeDBPool):
+    pass
 
 
 @pytest.mark.unit
@@ -63,6 +61,8 @@ def test_upsert_raw_payload_idempotent(mocker):
     repo = FundamentalsRepository()
     # mocker connection pool
     mocker.patch.object(repo, "pool", FakePool())
+    # Also ensure module-level helpers use the same fake pool
+    mocker.patch("src.database.connection.get_global_pool", return_value=repo.pool)
 
     payload = {"results": [{"x": 1}], "status": "OK"}
     repo.upsert_raw_payload(

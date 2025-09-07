@@ -66,7 +66,9 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
     if not ("a" in numeric_cols and "b" in numeric_cols):
         raise AssertionError(f"Missing numeric columns: {numeric_cols}")
     if out[numeric_cols].isnull().any().any():
-        raise AssertionError(f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}")
+        raise AssertionError(
+            f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
+        )
     if out["a"].dtype != np.float64:
         raise AssertionError("Numeric dtype not converted to float64")
 

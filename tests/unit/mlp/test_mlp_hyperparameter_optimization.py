@@ -84,6 +84,8 @@ def test_mlp_hyperparameter_optimization_integration():
     if not isinstance(info, dict):
         raise AssertionError("Best trial info should be a dict")
     if "best_investment_success_rate" not in info:
-        raise AssertionError("Expected 'best_investment_success_rate' key in best trial info")
+        raise AssertionError(
+            "Expected 'best_investment_success_rate' key in best trial info"
+        )
     if "model_updated" not in info:
         raise AssertionError("Expected 'model_updated' key in best trial info")

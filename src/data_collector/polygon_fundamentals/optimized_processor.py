@@ -12,7 +12,7 @@ from src.data_collector.polygon_fundamentals.optimized_collector import (
 )
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.utils.logger import get_logger
-from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
+from src.database.connection import fetch_all, get_global_pool
 
 logger = get_logger(__name__)
 
@@ -22,7 +22,7 @@ class OptimizedFundamentalProcessor:
 
     def __init__(self):
         # Get connection pool instead of creating new connections
-        self.db_pool = get_connection_pool()
+        self.db_pool = get_global_pool()
         self.collector = OptimizedFundamentalCollector()
         self.data_storage = DataStorage()
 
@@ -30,15 +30,11 @@ class OptimizedFundamentalProcessor:
         """Get tickers from database cache"""
         tickers = []
         try:
-            with self.db_pool.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    query = "SELECT ticker FROM tickers"
-                    if filter_active:
-                        query += " WHERE active = true"
-
-                    cursor.execute(query)
-                    for row in cursor.fetchall():
-                        tickers.append(row["ticker"])
+            rows = fetch_all(
+                "SELECT ticker FROM tickers" + (" WHERE active = true" if filter_active else "")
+            )
+            for row in (rows or []):
+                tickers.append(row["ticker"])
 
             logger.info(f"Loaded {len(tickers)} tickers from database")
             return tickers

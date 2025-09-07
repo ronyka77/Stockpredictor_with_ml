@@ -30,9 +30,13 @@ def test_add_price_normalized_features_schema_and_values():
         )
 
     if out["SMA_5_Ratio"].dtype != np.float64:
-        raise AssertionError(f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}")
+        raise AssertionError(
+            f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}"
+        )
     if out["Close_Open_Ratio"].dtype != np.float64:
-        raise AssertionError(f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}")
+        raise AssertionError(
+            f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}"
+        )
 
     pdt.assert_series_equal(
         out["SMA_5_Ratio"].reset_index(drop=True),
@@ -64,7 +68,9 @@ def test_add_prediction_bounds_features_expected_columns_and_values():
     ]
     for col in expected_new:
         if col not in out.columns:
-            raise AssertionError(f"Expected column {col} to be added by add_prediction_bounds_features")
+            raise AssertionError(
+                f"Expected column {col} to be added by add_prediction_bounds_features"
+            )
 
     if out["Expected_10D_Move"].iloc[0] != pytest.approx(0.02 * np.sqrt(10)):
         raise AssertionError("Expected_10D_Move computation incorrect")
@@ -89,9 +95,13 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
         raise AssertionError(f"Missing numeric columns after cleaning: {numeric_cols}")
 
     if out[numeric_cols].isnull().any().any():
-        raise AssertionError(f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}")
+        raise AssertionError(
+            f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
+        )
     if out["a"].dtype != np.float64:
-        raise AssertionError(f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}")
+        raise AssertionError(
+            f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"
+        )
 
 
 def test_add_date_features_creates_expected_columns():

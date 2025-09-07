@@ -60,7 +60,9 @@ def test_get_news_for_ticker_passes_date_params_and_returns_articles(mocker):
     if not isinstance(res, list):
         raise AssertionError("Expected list of articles from get_news_for_ticker")
     if len(res) != 2:
-        raise AssertionError("Unexpected number of articles returned by get_news_for_ticker")
+        raise AssertionError(
+            "Unexpected number of articles returned by get_news_for_ticker"
+        )
     if "published_utc.gte" not in captured.get("params", {}):
         raise AssertionError("Date parameter not passed to API client")
     if not captured.get("endpoint", "").startswith("/v2/reference/news"):

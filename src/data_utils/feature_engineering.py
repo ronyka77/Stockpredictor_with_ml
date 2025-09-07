@@ -135,9 +135,7 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
         # Use a short window (5 days) to approximate recent directionality
         # Ensure the feature exists even if simple assignment fails
         if "Return_5D" in features_enhanced.columns:
-            features_enhanced["Recent_Momentum_5D"] = features_enhanced[
-                "Return_5D"
-            ]
+            features_enhanced["Recent_Momentum_5D"] = features_enhanced["Return_5D"]
         else:
             features_enhanced["Recent_Momentum_5D"] = 0.0
 

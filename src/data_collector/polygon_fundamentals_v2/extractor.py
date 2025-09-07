@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional, List
 
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
+from src.database.connection import execute
 from src.utils.logger import get_logger
 
 
@@ -191,10 +192,8 @@ class FundamentalsExtractor:
                 updated_at = CURRENT_TIMESTAMP
         """
 
-        with self.repo.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
-                conn.commit()
+        # Use centralized helper to execute and commit
+        execute(sql, params)
 
     def extract_from_payload(self, ticker: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         ticker_id = self.repo.get_ticker_id(ticker)

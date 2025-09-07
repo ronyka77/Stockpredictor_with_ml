@@ -9,9 +9,13 @@ def test_validate_article_returns_true_for_complete_article(processed_article_ex
     v = NewsValidator()
     is_valid, score, issues = v.validate_article(processed_article_expected)
     if is_valid is not True:
-        raise AssertionError("Validator unexpectedly marked complete article as invalid")
+        raise AssertionError(
+            "Validator unexpectedly marked complete article as invalid"
+        )
     if not (score > 0.5):
-        raise AssertionError("Validator returned unexpectedly low score for complete article")
+        raise AssertionError(
+            "Validator returned unexpectedly low score for complete article"
+        )
     if issues != []:
         raise AssertionError("Validator reported issues for a complete article")
 

@@ -5,59 +5,57 @@ from pathlib import Path
 
 # Ensure the project `src` package is importable during pytest collection.
 # This mirrors editable installs by adding the repository `src/` to sys.path.
-root = Path(__file__).resolve().parent.parent
+root = Path(__file__).resolve().parent
 src_path = str(root / "src")
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
-
-@pytest.fixture
-def mock_http_client():
-    """Simple mock HTTP client fixture with configurable return values."""
-
-    class MockClient:
-        def __init__(self):
-            self._aggregates = None
-            self._grouped = None
-
-        def set_aggregates(self, data):
-            self._aggregates = data
-
-        def set_grouped(self, data):
-            self._grouped = data
-
-        def get_aggregates(self, **kwargs):
-            if isinstance(self._aggregates, Exception):
-                raise self._aggregates
-            return self._aggregates
-
-        def get_grouped_daily(self, date_str):
-            if isinstance(self._grouped, Exception):
-                raise self._grouped
-            return self._grouped
-
-    return MockClient()
+from tests._fixtures.helpers import make_sample_df, make_fake_http_response, FakePool
 
 
 @pytest.fixture
-def permission_error_simulator():
-    """Return a helper that mocks filesystem calls to raise PermissionError."""
+def sample_df():
+    return make_sample_df()
 
-    def _apply(mocker):
-        import os
-        import builtins
 
-        def _raise(*a, **k):
-            raise PermissionError("Permission denied (simulated)")
+@pytest.fixture
+def fake_response_factory():
+    return make_fake_http_response
 
-        # Patch os.makedirs and builtins.open to raise PermissionError
-        mocker.patch.object(os, "makedirs", _raise)
-        mocker.patch.object(builtins, "open", _raise)
 
-    return _apply
+@pytest.fixture
+def fake_pool():
+    return FakePool()
+
+
+@pytest.fixture(autouse=True)
+def _patch_threaded_connection_pool(mocker):
+    """Autouse safety: prevent tests from creating real ThreadedConnectionPool.
+
+    Patches `src.database.connection.ThreadedConnectionPool` to use the fake threaded
+    pool implementation from test helpers.
+    """
+    from tests._fixtures.helpers import FakeThreadedPool
+
+    mocker.patch("src.database.connection.ThreadedConnectionPool", FakeThreadedPool)
+    yield
 
 
 @pytest.fixture(autouse=True)
 def no_sleep(mocker):
     """Prevent actual sleeping in tests to speed up retry/backoff paths."""
     mocker.patch.object(time, "sleep", lambda s: None)
+
+
+@pytest.fixture
+def patch_execute_values_to_fake_pool(mocker, fake_pool):
+    """Expose wrapper fixture at top-level tests for delegating execute_values to fake pool."""
+
+    def _execute_values_wrapper(insert_sql, rows, template=None, page_size=1000, commit=True):
+        fake_pool.execute_values(insert_sql, rows, template=template, page_size=page_size)
+
+    mocker.patch(
+        "src.data_collector.polygon_data.data_storage.execute_values",
+        new=_execute_values_wrapper,
+    )
+    return None

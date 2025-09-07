@@ -7,7 +7,7 @@ from src.data_collector.polygon_data.data_validator import (
     OHLCVRecord,
     DataQualityMetrics,
 )
-
+from tests._fixtures.conftest import mock_http_client
 
 def _make_polygon_record(day_index=0):
     # Create a simple valid polygon-style record with millisecond timestamp
@@ -113,7 +113,9 @@ def test_get_bulk_historical_data_batches(mock_http_client):
     )
 
     if set(results.keys()) != set(tickers):
-        raise AssertionError("Bulk historical data did not return results for all requested tickers")
+        raise AssertionError(
+            "Bulk historical data did not return results for all requested tickers"
+        )
     for k, (recs, metrics) in results.items():
         # Each returned list may contain OHLCVRecord objects after validation, or be empty depending on validator
         if not isinstance(metrics, DataQualityMetrics):
@@ -144,9 +146,13 @@ def test_get_historical_data_transforms_and_validates(mock_http_client):
         "BBB", date(2020, 1, 1), date(2020, 1, 2)
     )
     if metrics.total_records != 2:
-        raise AssertionError("Metrics total_records mismatch for transformed/validated path")
+        raise AssertionError(
+            "Metrics total_records mismatch for transformed/validated path"
+        )
     if metrics.valid_records != len(records):
-        raise AssertionError("Metrics valid_records mismatch for transformed/validated path")
+        raise AssertionError(
+            "Metrics valid_records mismatch for transformed/validated path"
+        )
     if not all(r.ticker == "BBB" for r in records):
         raise AssertionError("Not all transformed records have expected ticker 'BBB'")
 

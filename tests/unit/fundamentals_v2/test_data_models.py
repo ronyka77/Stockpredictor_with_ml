@@ -17,7 +17,9 @@ def test_extract_financial_value_dict_and_numeric_and_missing():
     if dm.extract_financial_value(data, "net") != 50.0:
         raise AssertionError("extract_financial_value failed for net")
     if dm.extract_financial_value(data, "missing") is not None:
-        raise AssertionError("extract_financial_value failed to return None for missing")
+        raise AssertionError(
+            "extract_financial_value failed to return None for missing"
+        )
 
 
 def test_safe_divide_and_growth_and_cagr():
@@ -35,7 +37,9 @@ def test_safe_divide_and_growth_and_cagr():
     if dm.calculate_growth_rate(None, 100) is not None:
         raise AssertionError("calculate_growth_rate did not return None for None input")
     if dm.calculate_growth_rate(100, 0) is not None:
-        raise AssertionError("calculate_growth_rate did not return None when denominator is zero")
+        raise AssertionError(
+            "calculate_growth_rate did not return None when denominator is zero"
+        )
 
     # cagr
     if dm.calculate_cagr(200, 100, 2) != pytest.approx((200 / 100) ** (1 / 2) - 1):

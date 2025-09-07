@@ -25,7 +25,9 @@ def test_validate_ticker_list_filters_invalid():
     if "GOOGL" not in valid:
         raise AssertionError("Valid tickers missing expected 'GOOGL'")
     if not ("" in invalid or None in invalid):
-        raise AssertionError("Invalid ticker list did not include expected empty/None entries")
+        raise AssertionError(
+            "Invalid ticker list did not include expected empty/None entries"
+        )
 
 
 @pytest.mark.unit

@@ -57,7 +57,9 @@ def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
     out = mfl.load_all_data(ticker=None)
     # Expect combined DataFrame with ticker_id mapped
     if out.empty:
-        raise AssertionError("load_all_data returned empty when it should have combined data")
+        raise AssertionError(
+            "load_all_data returned empty when it should have combined data"
+        )
     if "ticker_id" not in out.columns:
         raise AssertionError("ticker_id column missing after metadata mapping")
     # date converted to datetime in loader
