@@ -33,5 +33,7 @@ def test_store_article_on_exception_rolls_back_and_returns_none(
     db_session.rollback = fake_rollback
 
     res = storage.store_article(sample_raw_article_full)
-    assert res is None
-    assert getattr(db_session, "_rolled_back", False) is True
+    if res is not None:
+        raise AssertionError("Expected None result when storage creation raised an exception")
+    if getattr(db_session, "_rolled_back", False) is not True:
+        raise AssertionError("Database session rollback was not called as expected")

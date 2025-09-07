@@ -49,7 +49,8 @@ class TestMLPOptimizationScalerIntegration:
         cleaned = MLPDataUtils.validate_and_clean_data(self.X_train)
         X_clean, scaler = MLPDataUtils.scale_data(cleaned, None, True)
         self.optimization_mixin.current_trial_scaler = scaler
-        assert isinstance(self.optimization_mixin.current_trial_scaler, StandardScaler)
+        if not isinstance(self.optimization_mixin.current_trial_scaler, StandardScaler):
+            raise AssertionError("current_trial_scaler should be a StandardScaler")
 
     def test_create_model_for_tuning_with_scaler(self):
         trial_predictor = MLPPredictor(
@@ -57,7 +58,8 @@ class TestMLPOptimizationScalerIntegration:
         )
         scaler = StandardScaler()
         trial_predictor.set_scaler(scaler)
-        assert trial_predictor.scaler is scaler
+        if trial_predictor.scaler is not scaler:
+            raise AssertionError("Trial predictor scaler not set correctly")
 
     def test_objective_function_scaler_integration(self):
         cleaned_train = MLPDataUtils.validate_and_clean_data(self.X_train)
@@ -73,4 +75,5 @@ class TestMLPOptimizationScalerIntegration:
             y_test=self.y_test,
             fitted_scaler=scaler,
         )
-        assert callable(objective_func)
+        if not callable(objective_func):
+            raise AssertionError("Objective function should be callable")

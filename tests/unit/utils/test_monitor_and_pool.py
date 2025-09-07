@@ -19,9 +19,8 @@ def test_get_connection_pool_singleton(mocker):
 
     p1 = monitor_mod.get_connection_pool(2, 5)
     p2 = monitor_mod.get_connection_pool(2, 5)
-    assert p1 is p2, (
-        "get_connection_pool should return a singleton instance for same params"
-    )
+    if p1 is not p2:
+        raise AssertionError("get_connection_pool should return a singleton instance for same params")
 
 
 def test_get_connection_pool_reinitializes_on_param_change(mocker):
@@ -41,7 +40,8 @@ def test_get_connection_pool_reinitializes_on_param_change(mocker):
 
     p1 = monitor_mod.get_connection_pool(2, 5)
     p2 = monitor_mod.get_connection_pool(3, 6)
-    assert p1 is not p2, "Connection pool should reinitialize when parameters change"
+    if p1 is p2:
+        raise AssertionError("Connection pool should reinitialize when parameters change")
 
 
 def test_fundamental_data_monitor_methods(mocker):
@@ -88,10 +88,11 @@ def test_fundamental_data_monitor_methods(mocker):
     )
     mon = monitor_mod.FundamentalDataMonitor()
     prog = mon.get_collection_progress()
-    assert "total_tickers" in prog and "tickers_with_data" in prog, (
-        "Progress result should include counts"
-    )
+    if not ("total_tickers" in prog and "tickers_with_data" in prog):
+        raise AssertionError("Progress result should include counts")
     summary = mon.get_data_quality_summary()
-    assert isinstance(summary, dict), "Data quality summary should return a dict"
+    if not isinstance(summary, dict):
+        raise AssertionError("Data quality summary should return a dict")
     recent = mon.get_recent_activity(days=7)
-    assert isinstance(recent, list), "Recent activity should return a list"
+    if not isinstance(recent, list):
+        raise AssertionError("Recent activity should return a list")

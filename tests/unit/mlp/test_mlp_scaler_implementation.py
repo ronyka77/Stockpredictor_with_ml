@@ -33,9 +33,12 @@ class TestMLPScalerImplementation:
     def test_validate_and_clean_data_method(self):
         cleaned = MLPDataUtils.validate_and_clean_data(self.X_test)
         X_clean, scaler = MLPDataUtils.scale_data(cleaned, None, True)
-        assert not X_clean.isnull().any().any()
-        assert not np.isinf(X_clean.values).any()
-        assert scaler is not None
+        if X_clean.isnull().any().any():
+            raise AssertionError("Cleaned data contains NaNs")
+        if np.isinf(X_clean.values).any():
+            raise AssertionError("Cleaned data contains infinities")
+        if scaler is None:
+            raise AssertionError("Scaler should be created during scale_data")
 
     def test_predictor_with_scaler(self):
         cleaned = MLPDataUtils.validate_and_clean_data(self.X_test)
@@ -44,5 +47,7 @@ class TestMLPScalerImplementation:
         scaler.fit(X_clean)
         self.predictor.set_scaler(scaler)
         predictions = self.predictor.predict(self.X_test)
-        assert predictions is not None
-        assert len(predictions) == len(self.X_test)
+        if predictions is None:
+            raise AssertionError("Predictions should not be None")
+        if len(predictions) != len(self.X_test):
+            raise AssertionError("Predictions length mismatch with input data")

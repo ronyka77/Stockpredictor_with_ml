@@ -9,11 +9,15 @@ def test_process_article_full(sample_raw_article_full, processed_article_expecte
     processed = proc.process_article(sample_raw_article_full)
 
     # Title should have artifacts removed and trailing whitespace trimmed
-    assert processed["title"].strip() == processed_article_expected["title"].strip()
-    assert processed["description"] == processed_article_expected["description"]
-    assert processed["publisher_name"] == processed_article_expected["publisher_name"]
+    if processed["title"].strip() != processed_article_expected["title"].strip():
+        raise AssertionError("Processed title does not match expected after cleanup")
+    if processed["description"] != processed_article_expected["description"]:
+        raise AssertionError("Processed description mismatch")
+    if processed["publisher_name"] != processed_article_expected["publisher_name"]:
+        raise AssertionError("Processed publisher_name mismatch")
     # Insights normalized
-    assert processed["insights"][0]["insight_type"] == "sentiment"
+    if processed["insights"][0]["insight_type"] != "sentiment":
+        raise AssertionError("Insight type normalization failed")
 
 
 @pytest.mark.unit
@@ -22,10 +26,13 @@ def test_process_article_missing_fields(sample_raw_article_missing):
     processed = proc.process_article(sample_raw_article_missing)
 
     # Missing title/description should become empty strings
-    assert processed["title"] == ""
-    assert processed["description"] == ""
+    if processed["title"] != "":
+        raise AssertionError("Missing title should be converted to empty string")
+    if processed["description"] != "":
+        raise AssertionError("Missing description should be converted to empty string")
     # tickers empty list
-    assert processed["tickers"] == []
+    if processed["tickers"] != []:
+        raise AssertionError("Missing tickers should become an empty list")
 
 
 @pytest.mark.unit

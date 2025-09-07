@@ -35,8 +35,10 @@ def test_sma_ema_column_naming_and_determinism():
     sma = calculate_sma(df, periods=[5, 10, 20])
     ema = calculate_ema(df, periods=[5, 10, 20])
 
-    assert set(["SMA_5", "SMA_10", "SMA_20"]).issubset(sma.data.columns)
-    assert set(["EMA_5", "EMA_10", "EMA_20"]).issubset(ema.data.columns)
+    if not set(["SMA_5", "SMA_10", "SMA_20"]).issubset(sma.data.columns):
+        raise AssertionError("SMA columns missing from output")
+    if not set(["EMA_5", "EMA_10", "EMA_20"]).issubset(ema.data.columns):
+        raise AssertionError("EMA columns missing from output")
 
     # Deterministic: same input yields same outputs
     sma2 = calculate_sma(df, periods=[5, 10, 20])
@@ -50,13 +52,16 @@ def test_rsi_bounds_and_signals():
     df = make_ohlcv(n=100)
     rsi = calculate_rsi(df, periods=[14])
     cols = [c for c in rsi.data.columns if c.startswith("RSI_14")]
-    assert {
+    required = {
         "RSI_14",
         "RSI_14_Overbought",
         "RSI_14_Oversold",
         "RSI_14_Neutral",
-    }.issubset(set(cols))
+    }
+    if not required.issubset(set(cols)):
+        raise AssertionError("RSI output missing expected columns")
 
     # RSI bounded in [0, 100]
     series = rsi.data["RSI_14"].dropna()
-    assert (series >= 0).all() and (series <= 100).all()
+    if not ((series >= 0).all() and (series <= 100).all()):
+        raise AssertionError("RSI values out of expected [0,100] range")

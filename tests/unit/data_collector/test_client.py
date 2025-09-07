@@ -23,7 +23,8 @@ def test_make_request_success(mocker):
     mocker.patch.object(client.session, "get", fake_get)
 
     data = client._make_request("/test/endpoint")
-    assert "results" in data
+    if "results" not in data:
+        raise AssertionError("Expected 'results' key in API response data")
 
 
 def test_make_request_401_raises(mocker):
@@ -53,7 +54,8 @@ def test_make_request_rate_limit_retries(mocker):
     mocker.patch.object(client.session, "get", fake_get)
 
     data = client._make_request("/test/rate")
-    assert data.get("status") == "OK"
+    if data.get("status") != "OK":
+        raise AssertionError("Rate-limited request did not eventually return OK status")
 
 
 def test_make_request_timeout_then_fail(mocker):

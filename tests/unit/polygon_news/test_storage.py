@@ -12,7 +12,8 @@ def test_store_article_invalid_data_returns_none(
     storage = PolygonNewsStorage(db_session)
     # missing required fields -> validate_article_data should reject
     result = storage.store_article(sample_raw_article_missing)
-    assert result is None
+    if result is not None:
+        raise AssertionError("Expected None result for invalid article data")
 
 
 @pytest.mark.unit
@@ -21,11 +22,13 @@ def test_store_article_create_and_update_flow(db_session, sample_raw_article_ful
 
     # First insert
     article_id = storage.store_article(sample_raw_article_full)
-    assert article_id is not None
+    if article_id is None:
+        raise AssertionError("Expected article_id to be returned on successful store")
 
     # Insert same article should trigger update path and return same id
     article_id2 = storage.store_article(sample_raw_article_full)
-    assert article_id2 == article_id
+    if article_id2 != article_id:
+        raise AssertionError("Second store did not return same article_id on update path")
 
 
 @pytest.mark.unit
@@ -36,10 +39,13 @@ def test_store_articles_batch_mixed(
     # Batch: first valid, second invalid -> expect 1 new, 1 failed/skipped
     batch = [sample_raw_article_full, sample_raw_article_missing]
     stats = storage.store_articles_batch(batch)
-    assert isinstance(stats, dict)
-    assert stats.get("new_articles", 0) >= 1
+    if not isinstance(stats, dict):
+        raise AssertionError("Expected stats to be a dict")
+    if stats.get("new_articles", 0) < 1:
+        raise AssertionError("Expected at least one new article in batch stats")
     # Depending on implementation, invalid article may count as failed_articles or skipped_articles
-    assert (stats.get("skipped_articles", 0) + stats.get("failed_articles", 0)) >= 1
+    if (stats.get("skipped_articles", 0) + stats.get("failed_articles", 0)) < 1:
+        raise AssertionError("Expected at least one skipped or failed article in batch stats")
 
 
 @pytest.mark.unit
@@ -52,19 +58,25 @@ def test_store_article_keywords_normalization(db_session, sample_raw_article_ful
     article["polygon_id"] = "art-keywords-list"
     article["keywords"] = ["one", "two"]
     aid = storage.store_article(article)
-    assert aid is not None
+    if aid is None:
+        raise AssertionError("Expected aid to be returned when storing article with keywords list")
 
     stored = db_session.query(models.PolygonNewsArticle).filter_by(id=aid).first()
-    assert isinstance(stored.keywords, list)
-    assert stored.keywords == ["one", "two"]
+    if not isinstance(stored.keywords, list):
+        raise AssertionError("Stored keywords should be a list")
+    if stored.keywords != ["one", "two"]:
+        raise AssertionError("Stored keywords did not match expected list")
 
     # Case: keywords provided as JSON string
     article2 = sample_raw_article_full.copy()
     article2["polygon_id"] = "art-keywords-json"
     article2["keywords"] = json.dumps(["alpha", "beta"])
     aid2 = storage.store_article(article2)
-    assert aid2 is not None
+    if aid2 is None:
+        raise AssertionError("Expected aid to be returned when storing article with JSON keywords")
 
     stored2 = db_session.query(models.PolygonNewsArticle).filter_by(id=aid2).first()
-    assert isinstance(stored2.keywords, list)
-    assert stored2.keywords == ["alpha", "beta"]
+    if not isinstance(stored2.keywords, list):
+        raise AssertionError("Stored2 keywords should be a list")
+    if stored2.keywords != ["alpha", "beta"]:
+        raise AssertionError("Stored2 keywords did not match expected list")

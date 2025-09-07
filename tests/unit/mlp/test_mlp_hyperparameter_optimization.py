@@ -49,7 +49,8 @@ def test_mlp_hyperparameter_objective_callable():
     objective = opt_mixin.objective(
         X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler
     )
-    assert callable(objective)
+    if not callable(objective):
+        raise AssertionError("Objective should be callable")
 
 
 @pytest.mark.slow
@@ -80,6 +81,9 @@ def test_mlp_hyperparameter_optimization_integration():
     study.optimize(objective, n_trials=1)
 
     info = opt_mixin.get_best_trial_info()
-    assert isinstance(info, dict)
-    assert "best_investment_success_rate" in info
-    assert "model_updated" in info
+    if not isinstance(info, dict):
+        raise AssertionError("Best trial info should be a dict")
+    if "best_investment_success_rate" not in info:
+        raise AssertionError("Expected 'best_investment_success_rate' key in best trial info")
+    if "model_updated" not in info:
+        raise AssertionError("Expected 'model_updated' key in best trial info")

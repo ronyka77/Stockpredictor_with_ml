@@ -90,8 +90,11 @@ def test_upsert_raw_payload_idempotent(mocker):
 
     cur = repo.pool.conn.cur
     # Ensure we executed twice and committed twice
-    assert repo.pool.conn.commits == 2
-    assert len(cur.executed) == 2
+    if repo.pool.conn.commits != 2:
+        raise AssertionError("Expected two commits after two upserts")
+    if len(cur.executed) != 2:
+        raise AssertionError("Expected two executed statements in cursor")
     # Ensure parameters include JSON string for payload
     _, params = cur.executed[-1]
-    assert isinstance(params["payload"], str)
+    if not isinstance(params["payload"], str):
+        raise AssertionError("Payload parameter should be a JSON string")

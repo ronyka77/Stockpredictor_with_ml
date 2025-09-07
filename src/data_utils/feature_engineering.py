@@ -131,6 +131,15 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
             features_enhanced["Momentum_Acceleration"] = (
                 features_enhanced["Return_1D"] - features_enhanced["Return_5D"] / 5
             )
+        # Recent momentum (sum of recent returns) - add as a separate feature
+        # Use a short window (5 days) to approximate recent directionality
+        # Ensure the feature exists even if simple assignment fails
+        if "Return_5D" in features_enhanced.columns:
+            features_enhanced["Recent_Momentum_5D"] = features_enhanced[
+                "Return_5D"
+            ]
+        else:
+            features_enhanced["Recent_Momentum_5D"] = 0.0
 
     # 3. Current volatility regime helps set expectation bounds
     if (
@@ -141,6 +150,11 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
             features_enhanced["Vol_Regime_High"] * 2
             + features_enhanced["Vol_Regime_Low"] * 0.5
         )
+
+    # 4. Bollinger Band range context (from BB_Percent if provided)
+    if "BB_Percent" in features_enhanced.columns:
+        # BB_Percent expresses the band width relative to price; expose as context
+        features_enhanced["BB_Range_Context"] = features_enhanced["BB_Percent"]
 
     # 4. RSI mean reversion context
     if "RSI_14" in features_enhanced.columns:

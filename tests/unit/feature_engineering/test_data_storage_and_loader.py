@@ -34,9 +34,8 @@ def test_data_storage_store_historical_data_empty_records(mocker):
     )
     ds = DataStorage(connection_string="sqlite:///:memory:")
     res = ds.store_historical_data([], batch_size=10)
-    assert res["stored_count"] == 0 and res["error_count"] == 0, (
-        f"Expected no records stored, got {res}"
-    )
+    if not (res["stored_count"] == 0 and res["error_count"] == 0):
+        raise AssertionError(f"Expected no records stored, got {res}")
 
 
 def test_stock_data_loader_load_returns_empty_dataframe_when_no_data(mocker):
@@ -53,7 +52,8 @@ def test_stock_data_loader_load_returns_empty_dataframe_when_no_data(mocker):
     mocker.patch("pandas.read_sql_query", return_value=pd.DataFrame())
     loader = StockDataLoader(db_config=cfg)
     df = loader.load_stock_data("TEST", "2020-01-01", "2020-01-03")
-    assert df.empty, "Expected empty DataFrame when no data returned from database"
+    if not df.empty:
+        raise AssertionError("Expected empty DataFrame when no data returned from database")
 
 
 def test_validate_and_clean_data_missing_columns_raises(mocker):

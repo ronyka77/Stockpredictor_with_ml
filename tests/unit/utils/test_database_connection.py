@@ -26,9 +26,8 @@ def test_get_connection_string_excludes_password():
     }
     db = DatabaseConnection(config=cfg)
     s = db.get_connection_string()
-    assert "secret" not in s and s == "dbhost:5432/stock", (
-        f"Unexpected connection string: {s}"
-    )
+    if "secret" in s or s != "dbhost:5432/stock":
+        raise AssertionError(f"Unexpected connection string: {s}")
 
 
 def test_test_connection_returns_false_on_exception(mocker):
@@ -37,9 +36,8 @@ def test_test_connection_returns_false_on_exception(mocker):
         "src.database.connection.psycopg2.connect", side_effect=Exception("conn failed")
     )
     db = DatabaseConnection(config=cfg)
-    assert db.test_connection() is False, (
-        "test_connection should return False on connection exception"
-    )
+    if db.test_connection() is not False:
+        raise AssertionError("test_connection should return False on connection exception")
 
 
 def test_test_connection_returns_true_on_success(mocker):
@@ -67,9 +65,8 @@ def test_test_connection_returns_true_on_success(mocker):
 
     mocker.patch("src.database.connection.psycopg2.connect", return_value=DummyConn())
     db = DatabaseConnection(config=cfg)
-    assert db.test_connection() is True, (
-        "test_connection should return True when SELECT 1 succeeds"
-    )
+    if db.test_connection() is not True:
+        raise AssertionError("test_connection should return True when SELECT 1 succeeds")
 
 
 def test_pool_init_requires_password():

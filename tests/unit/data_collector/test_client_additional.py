@@ -55,9 +55,10 @@ def test_api_key_present_in_headers(mocker):
     mocker.patch.object(client.session, "get", fake_get)
 
     res = client._make_request("/ok")
-    assert res.get("status") == "OK"
-    assert (
-        "Authorization" not in seen["headers"]
-    )  # API uses apiKey param, not Authorization header
+    if res.get("status") != "OK":
+        raise AssertionError("Expected OK status from API call")
+    if "Authorization" in seen["headers"]:
+        raise AssertionError("Authorization header should not be used; apiKey param preferred")
     # API key must be provided (client stores it); ensure attribute exists
-    assert client.api_key == "MYKEY"
+    if client.api_key != "MYKEY":
+        raise AssertionError("Client api_key attribute not set correctly")

@@ -29,8 +29,10 @@ def test_store_historical_no_records(mock_create_engine):
     ds = DataStorage(connection_string="sqlite:///:memory:")
 
     res = ds.store_historical_data([])
-    assert res["stored_count"] == 0
-    assert res["error_count"] == 0
+    if res["stored_count"] != 0:
+        raise AssertionError("Expected stored_count == 0 for empty input")
+    if res["error_count"] != 0:
+        raise AssertionError("Expected error_count == 0 for empty input")
 
 
 @patch("src.data_collector.polygon_data.data_storage.create_engine")
@@ -47,8 +49,10 @@ def test_store_historical_batches_and_upsert(mock_create_engine):
     recs = [make_record("AAA", date(2020, 1, 1)), make_record("AAA", date(2020, 1, 2))]
     res = ds.store_historical_data(recs, batch_size=10, on_conflict="update")
 
-    assert res["stored_count"] == 2
-    assert res["error_count"] == 0
+    if res["stored_count"] != 2:
+        raise AssertionError("Stored count mismatch after upsert")
+    if res["error_count"] != 0:
+        raise AssertionError("Expected no errors during upsert batch")
 
 
 @patch("src.data_collector.polygon_data.data_storage.create_engine")
@@ -67,5 +71,7 @@ def test_get_historical_query_and_params(mock_create_engine):
         "aaa", start_date=date(2020, 1, 1), end_date=date(2020, 1, 2), limit=1
     )
 
-    assert isinstance(out, list)
-    assert out[0]["ticker"] == "AAA"
+    if not isinstance(out, list):
+        raise AssertionError("Expected historical query to return a list")
+    if out[0]["ticker"] != "AAA":
+        raise AssertionError("Historical query ticker normalization mismatch")

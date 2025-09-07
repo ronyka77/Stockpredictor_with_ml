@@ -24,7 +24,8 @@ def test_activation_output_shape(activation):
     )
     x = torch.randn(batch_size, input_size)
     out = model(x)
-    assert out.shape == (batch_size, 1)
+    if out.shape != (batch_size, 1):
+        raise AssertionError("MLP output shape mismatch for activation test")
 
 
 def test_residual_and_architecture_info():
@@ -39,12 +40,16 @@ def test_residual_and_architecture_info():
 
     x = torch.randn(4, input_size)
     out = model(x)
-    assert out.shape == (4, 1)
+    if out.shape != (4, 1):
+        raise AssertionError("MLP output shape mismatch for residual architecture")
 
     info = model.get_architecture_info()
-    assert info["input_size"] == input_size
-    assert info["layer_sizes"] == layer_sizes
-    assert "total_parameters" in info
+    if info.get("input_size") != input_size:
+        raise AssertionError("Architecture info input_size mismatch")
+    if info.get("layer_sizes") != layer_sizes:
+        raise AssertionError("Architecture info layer_sizes mismatch")
+    if "total_parameters" not in info:
+        raise AssertionError("Architecture info missing total_parameters")
 
 
 def test_invalid_configurations_raise():
@@ -59,7 +64,8 @@ def test_predictor_create_model_and_predict_raises_for_untrained():
     cfg = {"input_size": 10, "layer_sizes": [32, 16], "epochs": 1}
     predictor = MLPPredictor(model_name="t", config=cfg)
     model = predictor._create_model()
-    assert isinstance(model, MLPModule)
+    if not isinstance(model, MLPModule):
+        raise AssertionError("Created model is not an instance of MLPModule")
 
     X = pd.DataFrame(np.random.randn(5, 10))
     with pytest.raises(ValueError):

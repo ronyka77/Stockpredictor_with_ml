@@ -11,15 +11,15 @@ def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio():
     )
 
     out = fe.add_price_normalized_features(df)
-    assert "SMA_5_Ratio" in out.columns, f"SMA ratio missing: {out.columns}"
-    assert "Close_Open_Ratio" in out.columns, f"Close/Open ratio missing: {out.columns}"
+    if "SMA_5_Ratio" not in out.columns:
+        raise AssertionError(f"SMA ratio missing: {out.columns}")
+    if "Close_Open_Ratio" not in out.columns:
+        raise AssertionError(f"Close/Open ratio missing: {out.columns}")
     # numeric equality
-    assert out["SMA_5_Ratio"].iloc[0] == pytest.approx(100.0 / 95.0), (
-        "SMA ratio incorrect"
-    )
-    assert out["Close_Open_Ratio"].iloc[1] == pytest.approx(110.0 / 109.0), (
-        "Close/Open ratio incorrect"
-    )
+    if out["SMA_5_Ratio"].iloc[0] != pytest.approx(100.0 / 95.0):
+        raise AssertionError("SMA ratio incorrect")
+    if out["Close_Open_Ratio"].iloc[1] != pytest.approx(110.0 / 109.0):
+        raise AssertionError("Close/Open ratio incorrect")
 
 
 def test_add_prediction_bounds_features_populates_expected_context_columns():
@@ -34,13 +34,15 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
     )
 
     out = fe.add_prediction_bounds_features(df)
-    assert "Expected_10D_Move" in out.columns, "Expected_10D_Move not added"
-    assert "Momentum_Acceleration" in out.columns, "Momentum_Acceleration not added"
-    assert "RSI_Mean_Reversion_Pressure" in out.columns, "RSI feature missing"
+    if "Expected_10D_Move" not in out.columns:
+        raise AssertionError("Expected_10D_Move not added")
+    if "Momentum_Acceleration" not in out.columns:
+        raise AssertionError("Momentum_Acceleration not added")
+    if "RSI_Mean_Reversion_Pressure" not in out.columns:
+        raise AssertionError("RSI feature missing")
     # Basic numeric checks
-    assert out["Expected_10D_Move"].iloc[0] == pytest.approx(0.02 * np.sqrt(10)), (
-        "Expected_10D_Move incorrect"
-    )
+    if out["Expected_10D_Move"].iloc[0] != pytest.approx(0.02 * np.sqrt(10)):
+        raise AssertionError("Expected_10D_Move incorrect")
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan():
@@ -61,13 +63,12 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
     out = fe.clean_data_for_training(df)
     # numeric columns become float64 and have no NaN left
     numeric_cols = out.select_dtypes(include=[np.number]).columns.tolist()
-    assert "a" in numeric_cols and "b" in numeric_cols, (
-        f"Missing numeric columns: {numeric_cols}"
-    )
-    assert not out[numeric_cols].isnull().any().any(), (
-        f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
-    )
-    assert out["a"].dtype == np.float64, "Numeric dtype not converted to float64"
+    if not ("a" in numeric_cols and "b" in numeric_cols):
+        raise AssertionError(f"Missing numeric columns: {numeric_cols}")
+    if out[numeric_cols].isnull().any().any():
+        raise AssertionError(f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}")
+    if out["a"].dtype != np.float64:
+        raise AssertionError("Numeric dtype not converted to float64")
 
 
 def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
@@ -79,9 +80,12 @@ def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
         }
     )
     res = fe.analyze_feature_diversity(df, min_variance_threshold=1e-6)
-    assert res["constant_feature_count"] >= 1, f"Expected constant features, got {res}"
-    assert res["zero_variance_count"] >= 1, f"Expected zero variance, got {res}"
-    assert "varied" in res["high_variance_features"], "High variance feature missing"
+    if res["constant_feature_count"] < 1:
+        raise AssertionError(f"Expected constant features, got {res}")
+    if res["zero_variance_count"] < 1:
+        raise AssertionError(f"Expected zero variance, got {res}")
+    if "varied" not in res["high_variance_features"]:
+        raise AssertionError("High variance feature missing")
 
 
 def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves_essential():
@@ -101,10 +105,12 @@ def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves
     X_clean, y_clean, removed = fe.clean_features_for_training(
         df, y, correlation_threshold=0.9
     )
-    assert "cat" not in X_clean.columns, "Non-numeric column not removed"
-    assert "const" not in X_clean.columns or "const" in removed["constant"], (
-        "Constant column removal mismatch"
-    )
+    if "cat" in X_clean.columns:
+        raise AssertionError("Non-numeric column not removed")
+    if not ("const" not in X_clean.columns or "const" in removed["constant"]):
+        raise AssertionError("Constant column removal mismatch")
     # keep1 or keep2 should remain but one of them likely removed due to high correlation (preserve essentials)
-    assert "close" in X_clean.columns, "Essential 'close' was removed unexpectedly"
-    assert len(X_clean) == len(y_clean), "X and y lengths differ after cleaning"
+    if "close" not in X_clean.columns:
+        raise AssertionError("Essential 'close' was removed unexpectedly")
+    if len(X_clean) != len(y_clean):
+        raise AssertionError("X and y lengths differ after cleaning")
