@@ -14,9 +14,9 @@ from src.models.automl.autogluon_model import AutoGluonModel
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-# for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-#     logging.getLogger(lg).setLevel(logging.WARNING)
-# warnings.filterwarnings("ignore")
+for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+    logging.getLogger(lg).setLevel(logging.WARNING)
+warnings.filterwarnings("ignore")
 
 
 class AutoGluonPredictor(BasePredictor):
@@ -102,5 +102,5 @@ def predict_all_model(model_dir: str):
 
 
 if __name__ == "__main__":
-    model_dir = "AutogluonModels/ag-20250906_015907"
+    model_dir = "AutogluonModels/ag-20250907_125628"
     predict_all_model(model_dir)

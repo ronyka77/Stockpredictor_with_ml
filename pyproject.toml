@@ -73,6 +73,9 @@ torch = [{ index = "pytorch" }]
 torchvision = [{ index = "pytorch" }]
 torchaudio = [{ index = "pytorch" }]
 
+[tool.ruff]
+line-length = 88
+
 [tool.pytest.ini_options]
 addopts = "--strict-markers --verbose --cov=src --cov-report json:coverage.json --cov-fail-under=70 --durations=10"
 markers = [

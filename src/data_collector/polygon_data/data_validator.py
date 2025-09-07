@@ -39,7 +39,7 @@ class OHLCVRecord(BaseModel):
     close: float = Field(..., gt=0, description="Closing price")
     volume: int = Field(..., ge=0, description="Trading volume")
     vwap: Optional[float] = Field(
-        None, gt=0, description="Volume weighted average price"
+        None, ge=0, description="Volume weighted average price"
     )
     adjusted_close: Optional[float] = Field(
         None, gt=0, description="Adjusted closing price"
@@ -122,7 +122,7 @@ class OHLCVRecord(BaseModel):
 
         return v
 
-    @field_validator("vwap", mode="after")
+    @field_validator("vwap", mode="before")
     @classmethod
     def validate_vwap(cls, v, info):
         values = info.data or {}

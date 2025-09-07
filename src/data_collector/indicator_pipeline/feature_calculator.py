@@ -241,14 +241,14 @@ class FeatureCalculator:
         """
 
         # Future high prices (targets for prediction)
-        features_df["Future_High_10D"] = price_data["high"].shift(-9)
-        features_df["Future_High_20D"] = price_data["high"].shift(-19)
-        features_df["Future_High_30D"] = price_data["high"].shift(-29)
+        features_df["Future_High_10D"] = price_data["high"].shift(-10)
+        features_df["Future_High_20D"] = price_data["high"].shift(-20)
+        features_df["Future_High_30D"] = price_data["high"].shift(-30)
 
         # Future close prices (alternative targets)
-        features_df["Future_Close_10D"] = price_data["close"].shift(-9)
-        features_df["Future_Close_20D"] = price_data["close"].shift(-19)
-        features_df["Future_Close_30D"] = price_data["close"].shift(-29)
+        features_df["Future_Close_10D"] = price_data["close"].shift(-10)
+        features_df["Future_Close_20D"] = price_data["close"].shift(-20)
+        features_df["Future_Close_30D"] = price_data["close"].shift(-30)
         logger.info(
             f"Added {len([col for col in features_df.columns if 'Future_' in col])} future price target features"
         )

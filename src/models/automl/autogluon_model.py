@@ -73,15 +73,10 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         valid_df = None
         if X_val is not None and y_val is not None:
             valid_df = X_val.copy()
-            valid_df.drop(columns=[groups], inplace=True)
             valid_df[label] = y_val.values
 
-        combined_df = pd.concat([train_df, valid_df], axis=0)
-        combined_df = combined_df.reset_index(drop=True)
-        logger.info(f"combined_df: {len(combined_df)}")
-
         hyperparams = {
-            # "FASTAI": {},
+            "FASTAI": {},
             "GBM": {"verbosity": -1},
             "XGB": {"verbosity": 0},
             # "TABM": {},
@@ -95,7 +90,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             label=label,
             eval_metric="rmse",
             problem_type="regression",
-            groups=groups,
             verbosity=2,
         )
 
