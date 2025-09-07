@@ -92,7 +92,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             time_limit=39600,
             train_data=train_df,
             tuning_data=valid_df,
-            presets='extreme_quality',
+            presets='best_quality',
             hyperparameters=hyperparams,
             dynamic_stacking=False,
             # num_cpus=14,

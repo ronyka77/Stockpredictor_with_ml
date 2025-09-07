@@ -6,7 +6,7 @@ financial data retrieved from the Polygon API.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import List, Optional
 from dataclasses import dataclass
 
 from src.data_collector.polygon_fundamentals.data_models import (

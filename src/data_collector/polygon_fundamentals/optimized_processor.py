@@ -5,7 +5,7 @@ This script processes fundamental data collection with per-ticker processing and
 real-time progress tracking.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from src.data_collector.polygon_fundamentals.optimized_collector import OptimizedFundamentalCollector
 from src.data_collector.polygon_data.data_storage import DataStorage

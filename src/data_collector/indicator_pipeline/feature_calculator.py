@@ -9,7 +9,7 @@ feature generation.
 import pandas as pd
 import numpy as np
 import time
-from typing import Dict, List, Optional, Any
+from typing import List, Optional, Any
 
 from src.data_collector.indicator_pipeline.trend_indicators import TrendIndicatorCalculator
 from src.data_collector.indicator_pipeline.momentum_indicators import MomentumIndicatorCalculator
