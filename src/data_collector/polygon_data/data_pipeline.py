@@ -2,7 +2,7 @@
 Main data pipeline orchestrator for Polygon.io data acquisition
 """
 
-from typing import List, Dict, Optional, Any, Union
+from typing import Dict, Optional, Any, Union
 from datetime import datetime, date, timedelta
 import time
 import json
@@ -237,75 +237,6 @@ class DataPipeline:
         self.storage.create_tables()
         
         logger.info("All health checks passed")
-    
-    def _get_tickers(self, source: str, max_tickers: Optional[int]) -> List[str]:
-        """Get list of tickers based on source"""
-        logger.info(f"Getting tickers from source: {source}")
-        
-        if source == "all":
-            all_tickers = self.ticker_manager.get_all_active_tickers()
-            tickers = self.ticker_manager.filter_tickers_by_criteria(
-                all_tickers, 
-                exclude_otc=True,
-                max_tickers=max_tickers
-            )
-        else:
-            raise ValueError(f"Unknown ticker source: {source}")
-        
-        if max_tickers and len(tickers) > max_tickers:
-            tickers = tickers[:max_tickers]
-        
-        logger.info(f"Selected {len(tickers)} tickers")
-        return tickers
-    
-    def _process_tickers_batch(self, tickers: List[str], start_date: Union[str, date],
-                                end_date: Union[str, date], timespan: str,
-                                validate_data: bool, batch_size: int) -> None:
-        """Process tickers in batches"""
-        total_batches = (len(tickers) + batch_size - 1) // batch_size
-        
-        for batch_num in range(total_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(tickers))
-            batch_tickers = tickers[start_idx:end_idx]
-            
-            logger.info(f"Processing batch {batch_num + 1}/{total_batches}: "
-                        f"tickers {start_idx + 1}-{end_idx}")
-            
-            # Process batch
-            batch_results = self.data_fetcher.get_bulk_historical_data(
-                tickers=batch_tickers,
-                start_date=start_date,
-                end_date=end_date,
-                timespan=timespan,
-                batch_size=len(batch_tickers),  # Process all in this batch together
-                validate_data=validate_data
-            )
-            
-            # Store results and update stats
-            for ticker, (records, metrics) in batch_results.items():
-                try:
-                    if records:
-                        storage_result = self.storage.store_historical_data(records)
-                        self.stats.total_records_stored += storage_result['stored_count']
-                        self.stats.add_ticker_result(ticker, True, len(records))
-                        
-                        logger.info(f"Stored {len(records)} records for {ticker}")
-                    else:
-                        self.stats.add_ticker_result(ticker, False, 0, "No data returned")
-                        
-                except Exception as e:
-                    logger.error(f"Failed to store data for {ticker}: {e}")
-                    self.stats.add_ticker_result(ticker, False, 0, str(e))
-            
-            # Log batch progress
-            logger.info(f"Batch {batch_num + 1} complete: "
-                        f"{self.stats.tickers_successful}/{self.stats.tickers_processed} successful")
-            
-            # Inter-batch pause – skip when rate limiting disabled
-            if batch_num < total_batches - 1:
-                if not getattr(config, 'DISABLE_RATE_LIMITING', False):
-                    time.sleep(1.0)
     
     def _save_pipeline_stats(self) -> None:
         """Save pipeline statistics to file"""

@@ -116,21 +116,6 @@ class MLPWrapper(nn.Module):
             Dictionary with predictions and filtering info
         """
         return self.predictor.predict_with_threshold(X, return_confidence, threshold, confidence_method)
-    
-    def get_prediction_with_confidence(self, features_df, confidence_method='variance'):
-        """
-        Get predictions with confidence scores.
-        
-        Args:
-            features_df: Input features DataFrame
-            confidence_method: Confidence calculation method
-            
-        Returns:
-            Tuple of (predictions, confidence_scores)
-        """
-        predictions = self.predict(features_df)
-        confidence_scores = self.get_prediction_confidence(features_df, confidence_method)
-        return predictions, confidence_scores
 
 
 class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMixin):
@@ -351,30 +336,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
         except Exception as e:
             logger.error(f"❌ Error loading model: {str(e)}")
             return False
-
-    def _load_scaler_from_run(self, client, run_id: str) -> bool:
-        """
-        Load scaler from run artifacts
-        
-        Args:
-            client: MLflow client
-            run_id: Run ID to load scaler from
-            
-        Returns:
-            bool: True if scaler loaded successfully, False otherwise
-        """
-        try:
-            scaler_local_path = mlflow.artifacts.download_artifacts(
-                artifact_uri=f"runs:/{run_id}/preprocessor/scaler.pkl"
-            )
-            with open(scaler_local_path, 'rb') as f:
-                self.scaler = pickle.load(f)
-            logger.info("✅ Feature scaler loaded from MLflow artifacts (preprocessor/scaler.pkl)")
-            return True
-        except Exception as e:
-            logger.info(f"ℹ️ No scaler artifact found - model will use raw features for prediction ({e})")
-            return False
-
+    
     def _extract_feature_names_from_model(self, model_uri: str, source: str):
         """
         Extract feature names from model signature

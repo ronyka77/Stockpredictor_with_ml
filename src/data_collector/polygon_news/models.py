@@ -5,7 +5,6 @@ Optimized for Polygon.io News API response structure with 2-year data retention
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
 from src.data_collector.config import config
-from sqlalchemy import JSON
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, Session

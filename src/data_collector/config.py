@@ -28,9 +28,9 @@ class PolygonConfig:
     MAX_RECORDS_PER_REQUEST: int = 50000
     
     # News Collection Configuration
-    NEWS_MAX_TICKERS: int = int(os.getenv('NEWS_MAX_TICKERS', '100'))
-    NEWS_DAYS_LOOKBACK: int = int(os.getenv('NEWS_DAYS_LOOKBACK', '7'))
-    NEWS_RETENTION_YEARS: int = int(os.getenv('NEWS_RETENTION_YEARS', '2'))
+    NEWS_MAX_TICKERS: int = int(os.getenv('NEWS_MAX_TICKERS', '1000'))
+    NEWS_DAYS_LOOKBACK: int = int(os.getenv('NEWS_DAYS_LOOKBACK', '30'))
+    NEWS_RETENTION_YEARS: int = int(os.getenv('NEWS_RETENTION_YEARS', '3'))
     NEWS_BATCH_SIZE: int = int(os.getenv('NEWS_BATCH_SIZE', '100'))
     
     # Database Configuration
@@ -96,7 +96,7 @@ class FeatureEngineeringConfig:
     # Performance Settings
     PARQUET_ROW_GROUP_SIZE: int = int(os.getenv('FE_PARQUET_ROW_GROUP_SIZE', '50000'))
     ENABLE_PARALLEL_PROCESSING: bool = True
-    MAX_WORKERS: int = int(os.getenv('FE_MAX_WORKERS', '4'))
+    MAX_WORKERS: int = int(os.getenv('MAX_WORKERS', '4'))
     
     # Database Configuration
     DB_HOST: str = os.getenv("DB_HOST", "localhost")

@@ -70,20 +70,6 @@ class LightGBMModel(BaseModel):
         # Initialize central evaluators
         self.custom_metrics = CustomMetrics()
     
-    def set_cpu_usage_limit(self, percentage: float = 0.75) -> None:
-        """
-        Set the CPU usage limit for LightGBM training and prediction
-        
-        Args:
-            percentage: CPU usage percentage (0.0 to 1.0, default 0.75 for 75%)
-        """
-        if not 0.0 <= percentage <= 1.0:
-            raise ValueError("CPU usage percentage must be between 0.0 and 1.0")
-        
-        total_cores = os.cpu_count() or 4
-        self.max_cpu_cores = max(1, int(total_cores * percentage))
-        logger.info(f"🔧 CPU Usage Limit Updated: {self.max_cpu_cores}/{total_cores} cores ({percentage:.1%})")
-    
     def _create_model(self, params: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None, **kwargs) -> 'LightGBMModel':
         """
         Create a new LightGBM model instance with specified parameters

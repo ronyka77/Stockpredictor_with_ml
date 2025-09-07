@@ -70,27 +70,6 @@ class MLPPredictorWrapper(BasePredictor):
             raise ValueError(f"Missing required feature columns for inference: {missing}")
         # Strict order and dtype
         return features_df.loc[:, self.model.feature_names].astype('float32')
-    
-    def get_prediction_with_confidence(self, features_df, confidence_method='variance'):
-        """
-        Get predictions with confidence scores using the single instance architecture
-        
-        Args:
-            features_df: DataFrame with features for prediction
-            confidence_method: Method for confidence calculation ('variance', 'simple', 'margin')
-            
-        Returns:
-            Tuple of (predictions, confidence_scores)
-        """
-        if not hasattr(self, 'model') or self.model is None:
-            raise RuntimeError("Model not loaded. Call load_model_from_mlflow() first.")
-        
-        # Ensure strict feature ordering before prediction
-        ordered_df = self._reorder_features_for_inference(features_df)
-        predictions = self.model.predict(ordered_df)
-        confidence_scores = self.model.get_prediction_confidence(ordered_df, method=confidence_method)
-        
-        return predictions, confidence_scores
 
 
 def main():

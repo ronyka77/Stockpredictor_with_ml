@@ -541,13 +541,6 @@ class OptimizedFundamentalCollector:
         
         self.stats['end_time'] = datetime.now()
     
-    async def collect_batch(self, tickers: List[str]) -> Dict[str, bool]:
-        """Legacy batch collection method"""
-        results = {}
-        async for progress in self.collect_with_progress(tickers):
-            results[progress['ticker']] = progress['success']
-        return results
-    
     def close(self):
         """Close the collector and cleanup resources"""
         try:

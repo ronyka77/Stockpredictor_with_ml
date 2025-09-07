@@ -46,6 +46,7 @@ dependencies = [
     "torchvision>=0.22.0",
     "xgboost>=3.0.2",
     "intentgraph>=0.2.2",
+    "vulture>=2.14",
 ]
 
 [build-system]

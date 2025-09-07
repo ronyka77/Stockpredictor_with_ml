@@ -79,10 +79,6 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
     if 'open' in features_enhanced.columns:
         features_enhanced['Close_Open_Ratio'] = current_price / features_enhanced['open']
     
-    # new_features_count = len(features_enhanced.columns) - len(features_df.columns)
-    # logger.info(f"✅ Added {new_features_count} price-normalized features")
-    # logger.info(f"   Total features: {len(features_enhanced.columns)}")
-    
     return features_enhanced
 
 
@@ -108,18 +104,14 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
         features_enhanced['Expected_10D_Move'] = features_enhanced['ATR_Percent'] * np.sqrt(10)
     
     # 2. Price momentum context
-    if 'Return_5D' in features_enhanced.columns:
-        # Recent momentum as context for future moves
-        features_enhanced['Recent_Momentum_5D'] = features_enhanced['Return_5D']
-        
+    if 'Return_5D' in features_enhanced.columns:        
         # Momentum acceleration
         if 'Return_1D' in features_enhanced.columns:
             features_enhanced['Momentum_Acceleration'] = (features_enhanced['Return_1D'] - 
                                                         features_enhanced['Return_5D'] / 5)
     
-    # 3. Volatility regime context
+    # 3. Current volatility regime helps set expectation bounds
     if 'Vol_Regime_High' in features_enhanced.columns and 'Vol_Regime_Low' in features_enhanced.columns:
-        # Current volatility regime helps set expectation bounds
         features_enhanced['Vol_Regime_Context'] = (features_enhanced['Vol_Regime_High'] * 2 + 
                                                  features_enhanced['Vol_Regime_Low'] * 0.5)
     
@@ -127,14 +119,6 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
     if 'RSI_14' in features_enhanced.columns:
         # RSI distance from 50 (neutral) indicates mean reversion pressure
         features_enhanced['RSI_Mean_Reversion_Pressure'] = abs(features_enhanced['RSI_14'] - 50) / 50
-    
-    # 5. Bollinger Band context
-    if 'BB_Percent' in features_enhanced.columns:
-        # Position within BB bands indicates typical range
-        features_enhanced['BB_Range_Context'] = features_enhanced['BB_Percent']
-    
-    # new_features_count = len(features_enhanced.columns) - len(features_df.columns)
-    # logger.info(f"✅ Added {new_features_count} prediction bounds features")
     
     return features_enhanced
 
@@ -361,7 +345,7 @@ def clean_features_for_training(X: pd.DataFrame, y: pd.Series,
     return X_clean, y_clean, removed_features
 
 
-def add_temporal_features(features_df: pd.DataFrame, 
+def add_date_features(features_df: pd.DataFrame, 
                         date_column: str = 'date') -> pd.DataFrame:
     """
     Add temporal features based on date information

@@ -68,35 +68,6 @@ class OptimizedFundamentalProcessor:
         
         return results
     
-    async def process_all_fundamentals(self) -> Dict[str, bool]:
-        """Process fundamental data for all active stocks - one ticker at a time"""
-        tickers = self._get_tickers_from_cache(filter_active=True)
-        
-        if not tickers:
-            logger.error("No active tickers found")
-            return {}
-        
-        logger.info(f"Starting fundamental data collection for {len(tickers)} active tickers - one ticker at a time")
-        return await self.process_with_progress(tickers)
-    
-    def get_collection_stats(self, results: Dict[str, bool]) -> Dict[str, Any]:
-        """Get statistics from collection results"""
-        total = len(results)
-        successful = sum(1 for success in results.values() if success)
-        failed = total - successful
-        
-        # Get failed tickers
-        failed_tickers = [ticker for ticker, success in results.items() if not success]
-        
-        return {
-            'total': total,
-            'successful': successful,
-            'failed': failed,
-            'success_rate': successful / total if total > 0 else 0,
-            'failed_tickers': failed_tickers,
-            'collector_stats': self.collector.stats
-        }
-    
     def close(self):
         """Close the processor and cleanup resources"""
         try:

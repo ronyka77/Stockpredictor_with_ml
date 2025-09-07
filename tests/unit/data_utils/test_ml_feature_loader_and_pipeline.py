@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-import numpy as np
 
 from src.data_utils import ml_feature_loader as mfl
 from src.data_utils import ml_data_pipeline as mp
@@ -10,7 +9,7 @@ def make_features_with_future(pred_horizon=10):
     df = pd.DataFrame({
         "ticker": ["A","B","C"],
         "close": [10.0, 12.0, 11.0],
-        f"Future_High_{pred_horizon}D": [11.0, None, 12.0],
+        f"Future_Close_{pred_horizon}D": [11.0, None, 12.0],
         "extra": [1,2,3]
     })
     return df
@@ -24,7 +23,7 @@ def test__load_from_consolidated_uses_target_and_drops_future_cols(mocker):
     features, targets = loader._load_from_consolidated(prediction_horizon=10)
     # targets should be Series with no NaNs (rows with NaN removed)
     assert isinstance(targets, pd.Series), "Targets not returned as Series"
-    assert "Future_High_10D" not in features.columns, "Future_* columns were not removed from features"
+    assert "Future_Close_10D" not in features.columns, "Future_* columns were not removed from features"
     assert len(features) == len(targets) and len(features) > 0, "Feature/target mismatch after cleaning"
 
 

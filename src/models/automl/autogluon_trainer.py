@@ -9,7 +9,7 @@ Run:
 uv run python -m src.models.automl.autogluon_trainer --preset high_quality
 """
 
-from __future__ import annotations
+
 
 import pandas as pd
 from typing import Any, Dict
@@ -38,7 +38,7 @@ def train_autogluon(*,
     X_test: pd.DataFrame = data['X_test']
     y_test: pd.Series = data['y_test']
     valid_df: pd.DataFrame = pd.concat([X_test, y_test], axis=1)
-    valid_df = valid_df.sample(frac=1).reset_index(drop=True)
+    valid_df.reset_index(drop=True, inplace=True)
 
     # Build model
     config = {

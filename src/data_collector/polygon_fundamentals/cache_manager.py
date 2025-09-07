@@ -8,7 +8,7 @@ to reduce API calls and improve performance.
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from src.utils.logger import get_logger
 
@@ -80,66 +80,6 @@ class FundamentalCacheManager:
         except Exception as e:
             logger.error(f"Error reading cache for {ticker}: {e}")
             return None
-    
-    def list_available_caches(self) -> Dict[str, List[str]]:
-        """
-        List all available cache files grouped by ticker
-        
-        Returns:
-            Dict mapping ticker to list of available cache dates
-        """
-        try:
-            cache_files = list(self.cache_dir.glob("*_financials_*.json"))
-            ticker_caches = {}
-            
-            for cache_file in cache_files:
-                ticker = cache_file.name.split('_')[0]
-                file_date = self._parse_date_from_filename(cache_file.name)
-                
-                if ticker not in ticker_caches:
-                    ticker_caches[ticker] = []
-                
-                if file_date:
-                    ticker_caches[ticker].append(file_date.strftime('%Y-%m-%d'))
-            
-            return ticker_caches
-            
-        except Exception as e:
-            logger.error(f"Error listing cache files: {e}")
-            return {}
-    
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about cache usage
-        
-        Returns:
-            Dict with cache statistics
-        """
-        try:
-            cache_files = list(self.cache_dir.glob("*_financials_*.json"))
-            total_files = len(cache_files)
-            
-            valid_caches = 0
-            expired_caches = 0
-            
-            for cache_file in cache_files:
-                file_date = self._parse_date_from_filename(cache_file.name)
-                if file_date:
-                    if self._is_cache_valid(file_date):
-                        valid_caches += 1
-                    else:
-                        expired_caches += 1
-            
-            return {
-                'total_cache_files': total_files,
-                'valid_caches': valid_caches,
-                'expired_caches': expired_caches,
-                'cache_hit_rate': valid_caches / total_files if total_files > 0 else 0
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting cache stats: {e}")
-            return {}
     
     def clear_expired_caches(self) -> int:
         """
@@ -223,15 +163,6 @@ class FundamentalCacheManager:
             logger.error(f"Error saving cache for {ticker}: {e}")
             return None
 
-    def _json_fallback_serializer(self, obj: Any) -> str:
-        """Fallback serializer for objects not natively JSON serializable."""
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        # Final fallback to string representation
-        try:
-            return str(obj)
-        except Exception:  # pragma: no cover - extremely rare
-            return repr(obj)
 
 if __name__ == "__main__":
     cache_manager = FundamentalCacheManager()

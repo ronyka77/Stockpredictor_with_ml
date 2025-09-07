@@ -74,7 +74,6 @@ class FeatureCalculator:
                     combined_data = pd.concat([combined_data, trend_result.data], axis=1)
                     calculated_components.append('trend')
                     all_warnings.extend(trend_result.warnings)
-                    # logger.info(f"Added {len(trend_result.data.columns)} trend features")
                 else:
                     logger.warning("Trend indicators failed validation")
             
@@ -157,33 +156,6 @@ class FeatureCalculator:
         except Exception as e:
             logger.error(f"Error calculating features: {str(e)}")
             raise
-    
-    def calculate_category_features(self, data: pd.DataFrame, 
-                                    category: str) -> IndicatorResult:
-        """
-        Calculate features for a specific category
-        
-        Args:
-            data: OHLCV DataFrame
-            category: Feature category ('trend', 'momentum', 'volatility', 'volume')
-        
-        Returns:
-            IndicatorResult for the specified category
-        """
-        # logger.info(f"Calculating {category} features")
-        
-        if category == 'trend':
-            calc = TrendIndicatorCalculator(data)
-        elif category == 'momentum':
-            calc = MomentumIndicatorCalculator(data)
-        elif category == 'volatility':
-            calc = VolatilityIndicatorCalculator(data)
-        elif category == 'volume':
-            calc = VolumeIndicatorCalculator(data)
-        else:
-            raise ValueError(f"Unknown category: {category}")
-        
-        return calc.calculate()
     
     def _add_future_price_targets(self, features_df: pd.DataFrame, 
                                     price_data: pd.DataFrame) -> pd.DataFrame:
@@ -311,48 +283,3 @@ class FeatureCalculator:
         logger.info(f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}")
         
         return max(0.0, min(100.0, quality_score))
-    
-    def get_feature_summary(self, features_df: pd.DataFrame) -> Dict[str, Any]:
-        """
-        Get summary statistics for the calculated features
-        
-        Args:
-            features_df: Features DataFrame
-        
-        Returns:
-            Dictionary with feature summary
-        """
-        summary = {
-            'total_features': len(features_df.columns),
-            'total_rows': len(features_df),
-            'missing_values': features_df.isna().sum().sum(),
-            'missing_percentage': (features_df.isna().sum().sum() / features_df.size) * 100,
-            'feature_types': {
-                'numeric': len(features_df.select_dtypes(include=[np.number]).columns),
-                'categorical': len(features_df.select_dtypes(include=['object', 'category']).columns)
-            },
-            'date_range': {
-                'start': features_df.index.min(),
-                'end': features_df.index.max()
-            }
-        }
-        
-        # Feature category breakdown
-        categories = {
-            'trend': ['sma', 'ema', 'macd', 'ichimoku'],
-            'momentum': ['rsi', 'stoch', 'roc', 'williams'],
-            'volatility': ['bb_', 'atr', 'volatility'],
-            'volume': ['obv', 'vpt', 'ad_'],
-            'basic': ['price_', 'return_', 'body_', 'gap_'],
-            'future_targets': ['future_']
-        }
-        
-        category_counts = {}
-        for category, keywords in categories.items():
-            count = len([col for col in features_df.columns 
-                        if any(keyword in col.lower() for keyword in keywords)])
-            category_counts[category] = count
-        
-        summary['feature_categories'] = category_counts
-        
-        return summary 

@@ -5,7 +5,7 @@ Loads an AutoGluonModel from MLflow (via run_id) and runs the standard
 prediction pipeline, exporting to predictions/autogluon/ as Excel.
 """
 
-from __future__ import annotations
+
 
 import os
 import json
@@ -78,7 +78,7 @@ def predict_all_model(model_dir: str):
         predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
 
 if __name__ == "__main__":
-    model_dir = "AutogluonModels/ag-20250901_200612"    
+    model_dir = "AutogluonModels/ag-20250906_015907"    
     predict_all_model(model_dir)
 
 

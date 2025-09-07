@@ -2,7 +2,7 @@
 Historical data fetching functionality for Polygon.io API
 """
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from typing import List, Dict, Optional, Any, Union
 import time
 
@@ -167,31 +167,6 @@ class HistoricalDataFetcher:
         
         return results
     
-    def get_recent_data(self, ticker: str, days: int = 30, 
-                        timespan: str = "day", validate_data: bool = True) -> tuple[List[OHLCVRecord], DataQualityMetrics]:
-        """
-        Get recent historical data for a ticker
-        
-        Args:
-            ticker: Stock ticker symbol
-            days: Number of days of recent data to fetch
-            timespan: Time window
-            validate_data: Whether to validate the data
-            
-        Returns:
-            Tuple of (validated_records, quality_metrics)
-        """
-        end_date = date.today()
-        start_date = end_date - timedelta(days=days)
-        
-        return self.get_historical_data(
-            ticker=ticker,
-            start_date=start_date,
-            end_date=end_date,
-            timespan=timespan,
-            validate_data=validate_data
-        )
-    
     def get_grouped_daily_data(self, target_date: Union[str, date],
                                 validate_data: bool = True) -> Dict[str, OHLCVRecord]:
         """
@@ -304,80 +279,3 @@ class HistoricalDataFetcher:
         except (ValueError, TypeError, KeyError) as e:
             logger.info(f"Failed to transform record: {e}")
             return None
-    
-    def get_data_summary(self, ticker: str, start_date: Union[str, date],
-                        end_date: Union[str, date]) -> Dict[str, Any]:
-        """
-        Get a summary of available data for a ticker and date range
-        
-        Args:
-            ticker: Stock ticker symbol
-            start_date: Start date
-            end_date: End date
-            
-        Returns:
-            Dictionary with data summary information
-        """
-        try:
-            records, metrics = self.get_historical_data(
-                ticker=ticker,
-                start_date=start_date,
-                end_date=end_date,
-                validate_data=True
-            )
-            
-            if not records:
-                return {
-                    'ticker': ticker,
-                    'start_date': start_date,
-                    'end_date': end_date,
-                    'record_count': 0,
-                    'data_available': False
-                }
-            
-            # Calculate summary statistics
-            prices = [r.close for r in records]
-            volumes = [r.volume for r in records]
-            
-            summary = {
-                'ticker': ticker,
-                'start_date': start_date,
-                'end_date': end_date,
-                'record_count': len(records),
-                'data_available': True,
-                'date_range': {
-                    'first_date': min(r.timestamp for r in records),
-                    'last_date': max(r.timestamp for r in records)
-                },
-                'price_stats': {
-                    'min_price': min(prices),
-                    'max_price': max(prices),
-                    'avg_price': sum(prices) / len(prices),
-                    'first_price': records[0].close,
-                    'last_price': records[-1].close
-                },
-                'volume_stats': {
-                    'min_volume': min(volumes),
-                    'max_volume': max(volumes),
-                    'avg_volume': sum(volumes) / len(volumes),
-                    'total_volume': sum(volumes)
-                },
-                'quality_metrics': {
-                    'success_rate': metrics.success_rate,
-                    'validation_errors': len(metrics.validation_errors),
-                    'data_gaps': len(metrics.data_gaps),
-                    'outliers': len(metrics.outliers)
-                }
-            }
-            
-            return summary
-            
-        except Exception as e:
-            logger.error(f"Error generating data summary for {ticker}: {e}")
-            return {
-                'ticker': ticker,
-                'start_date': start_date,
-                'end_date': end_date,
-                'error': str(e),
-                'data_available': False
-            } 

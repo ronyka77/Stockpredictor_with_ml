@@ -215,17 +215,6 @@ class NewsTickerIntegration:
             else:
                 score += 5
         
-        # Sector bonus (0-20 points)
-        high_news_sectors = ['Technology', 'Healthcare', 'Financial', 'Energy', 'Consumer']
-        if any(sector_name in sector for sector_name in high_news_sectors):
-            score += 20
-        else:
-            score += 10
-        
-        # Major ticker bonus (0-10 points)
-        if ticker in self.fallback_major_tickers:
-            score += 10
-        
         return score
     
     def _categorize_ticker(self, ticker: str, sector: str, market_cap: Optional[float]) -> str:
@@ -249,95 +238,6 @@ class NewsTickerIntegration:
         """Check if ticker is likely an ETF"""
         etf_indicators = ['SPY', 'QQQ', 'IWM', 'DIA', 'VTI', 'VOO', 'VEA', 'VWO', 'XLF', 'XLK', 'XLE']
         return ticker in etf_indicators or len(ticker) <= 3
-    
-    def get_tickers_by_category(self, category: str, max_tickers: int = 50) -> List[str]:
-        """
-        Get tickers by specific category
-        
-        Args:
-            category: Category name ('major', 'growth', 'value', 'etf')
-            max_tickers: Maximum number of tickers to return
-            
-        Returns:
-            List of ticker symbols
-        """
-        all_tickers = self.get_prioritized_tickers(max_tickers * 2)
-        
-        category_tickers = [
-            ticker_info['ticker'] 
-            for ticker_info in all_tickers 
-            if ticker_info['category'] == category
-        ]
-        
-        return category_tickers[:max_tickers]
-    
-    def get_growth_tickers(self, max_tickers: int = 30) -> List[str]:
-        """Get list of growth tickers for news collection"""
-        return self.get_tickers_by_category('growth', max_tickers)
-    
-    def get_sector_tickers(self, sector: str, max_tickers: int = 20) -> List[str]:
-        """
-        Get tickers from specific sector
-        
-        Args:
-            sector: Sector name to filter by
-            max_tickers: Maximum number of tickers to return
-            
-        Returns:
-            List of ticker symbols from the sector
-        """
-        all_tickers = self.get_prioritized_tickers(200)
-        
-        sector_tickers = [
-            ticker_info['ticker']
-            for ticker_info in all_tickers
-            if sector.lower() in ticker_info.get('sector', '').lower()
-        ]
-        
-        return sector_tickers[:max_tickers]
-    
-    def get_collection_strategy(self, total_budget: int = 1000) -> Dict[str, List[str]]:
-        """
-        Get optimized collection strategy based on available request budget
-        
-        Args:
-            total_budget: Total number of API requests available
-            
-        Returns:
-            Dictionary with ticker allocation by priority
-        """
-        strategy = {
-            'high_priority': [],
-            'medium_priority': [],
-            'low_priority': []
-        }
-        
-        # Allocate budget: 50% high, 30% medium, 20% low priority
-        high_budget = int(total_budget * 0.5)
-        medium_budget = int(total_budget * 0.3)
-        
-        all_tickers = self.get_prioritized_tickers(total_budget)
-        
-        # High priority: top scoring tickers
-        strategy['high_priority'] = [
-            ticker['ticker'] for ticker in all_tickers[:high_budget]
-        ]
-        
-        # Medium priority: next tier
-        strategy['medium_priority'] = [
-            ticker['ticker'] for ticker in all_tickers[high_budget:high_budget + medium_budget]
-        ]
-        
-        # Low priority: remaining
-        strategy['low_priority'] = [
-            ticker['ticker'] for ticker in all_tickers[high_budget + medium_budget:total_budget]
-        ]
-        
-        self.logger.info(f"Collection strategy: {len(strategy['high_priority'])} high, "
-                        f"{len(strategy['medium_priority'])} medium, "
-                        f"{len(strategy['low_priority'])} low priority tickers")
-        
-        return strategy
     
     def validate_ticker_list(self, tickers: List[str]) -> Tuple[List[str], List[str]]:
         """

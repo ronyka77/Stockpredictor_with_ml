@@ -61,12 +61,12 @@ class MLFeatureLoader:
             logger.info(f"Loaded {len(features)} records with {len(features.columns)} features from consolidated storage")
             
             # Extract pre-calculated future price targets
-            target_column = f"Future_High_{prediction_horizon}D"
+            target_column = f"Future_Close_{prediction_horizon}D"
             
             if target_column in features.columns:
                 # Use pre-calculated future high prices as targets
                 targets = features[target_column].copy()
-                targets.name = f'future_high_{prediction_horizon}d'
+                targets.name = f'Future_Close_{prediction_horizon}d'
                 
                 # Remove target column from features to avoid data leakage
                 features_clean = features.drop(columns=[col for col in features.columns 
@@ -108,76 +108,6 @@ class MLFeatureLoader:
                 
         except Exception as e:
             logger.error(f"Error loading from consolidated storage: {str(e)}")
-            raise
-    
-    def _load_from_individual_files(self, ticker: Optional[str], 
-                                    start_date: Optional[date],
-                                    end_date: Optional[date],
-                                    categories: Optional[List[str]],
-                                    prediction_horizon: int) -> Tuple[pd.DataFrame, pd.Series]:
-        """Load data from individual ticker files with pre-calculated targets - single ticker only"""
-        if ticker is None:
-            raise ValueError("Individual file loading requires a specific ticker. Use consolidated storage for loading all tickers.")
-        
-        try:
-            # Load features for the single ticker
-            features, metadata = self.storage.load_features(
-                ticker, start_date, end_date, categories
-            )
-            
-            if features.empty:
-                raise ValueError(f"No features found for {ticker}")
-            
-            # Add ticker column
-            features['ticker'] = ticker
-            
-            # Extract pre-calculated future price targets
-            target_column = f"Future_High_{prediction_horizon}D"
-            
-            if target_column in features.columns:
-                # Use pre-calculated future high prices as targets
-                targets = features[target_column].copy()
-                targets.name = f'future_high_{prediction_horizon}d'
-                
-                # Remove target columns from features to avoid data leakage
-                features_clean = features.drop(columns=[col for col in features.columns 
-                                                        if col.startswith('Future_')])
-                
-                # Remove rows with NaN targets
-                valid_mask = targets.notna()
-                features_final = features_clean[valid_mask].copy()
-                targets_final = targets[valid_mask].copy()
-                
-                logger.info(f"Created ML dataset for {ticker}: {len(features_final)} samples, {len(features_final.columns)} features")
-                logger.info(f"Using pre-calculated target '{target_column}': {len(targets_final)} valid samples")
-                
-                return features_final, targets_final
-            else:
-                # Fallback to any available Future_High_XD column
-                future_cols = [col for col in features.columns if col.startswith('Future_High_')]
-                if future_cols:
-                    fallback_col = future_cols[0]
-                    logger.warning(f"Target column '{target_column}' not found for {ticker}. Using '{fallback_col}' instead.")
-                    
-                    targets = features[fallback_col].copy()
-                    targets.name = fallback_col.lower()
-                    
-                    # Remove target columns from features
-                    features_clean = features.drop(columns=[col for col in features.columns 
-                                                            if col.startswith('Future_')])
-                    
-                    # Remove rows with NaN targets
-                    valid_mask = targets.notna()
-                    features_final = features_clean[valid_mask].copy()
-                    targets_final = targets[valid_mask].copy()
-                    
-                    logger.info(f"Created ML dataset for {ticker}: {len(features_final)} samples, {len(features_final.columns)} features")
-                    return features_final, targets_final
-                else:
-                    raise ValueError(f"No future price target columns found for {ticker}. Expected '{target_column}' or similar Future_High_XD columns.")
-
-        except Exception as e:
-            logger.error(f"Error loading features for {ticker}: {str(e)}")
             raise
 
 def load_yearly_data(year: int, 

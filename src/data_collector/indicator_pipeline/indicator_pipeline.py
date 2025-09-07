@@ -27,8 +27,8 @@ logger = get_logger(__name__, utility='feature_engineering')
 
 @dataclass
 class BatchJobConfig:
-    """Configuration for batch processing jobs
-
+    """
+    Configuration for batch processing jobs
     start_date and end_date accept either an ISO date string (`YYYY-MM-DD`) or a
     `datetime.date` object. They are normalized to `date` objects in
     `__post_init__` for consistent internal usage.
@@ -120,13 +120,12 @@ class BatchFeatureProcessor:
         logger.info("Initialized BatchFeatureProcessor")
     
     def get_available_tickers(self, min_data_points: int = None, 
-                                active_only: bool = None, market: str = None) -> List[str]:
+                                market: str = None) -> List[str]:
         """
         Get list of tickers with sufficient data for processing
         
         Args:
             min_data_points: Minimum number of data points required
-            active_only: Only include active tickers
             market: Market type filter ('stocks', 'crypto', 'forex', 'all')
             
         Returns:
@@ -134,16 +133,14 @@ class BatchFeatureProcessor:
         """
         # Apply config defaults
         min_data_points = min_data_points or config.data_quality.MIN_DATA_POINTS
-        active_only = active_only if active_only is not None else config.feature_categories.DEFAULT_ACTIVE_ONLY
         market = market or config.feature_categories.DEFAULT_MARKET
         
         logger.info(f"Getting tickers with at least {min_data_points} data points")
-        logger.info(f"Filters: active_only={active_only}, market={market}")
+        logger.info(f"Filters: market={market}")
         
         try:
             tickers = self.data_loader.get_available_tickers(
                 min_data_points=min_data_points,
-                active_only=active_only,
                 market=market,
             )
             
@@ -254,9 +251,6 @@ class BatchFeatureProcessor:
         job_id = str(uuid.uuid4())
         logger.info(f"Starting batch processing job {job_id} for {len(tickers)} tickers")
         
-        # Initialize job tracking
-        self._create_job_record(job_id, tickers, config)
-        
         # Initialize stats
         self.stats = ProcessingStats(
             total_tickers=len(tickers),
@@ -302,9 +296,6 @@ class BatchFeatureProcessor:
             
             self.stats.end_time = datetime.now()
             
-            # Update job record
-            self._update_job_record(job_id, self.stats, failed_tickers)
-            
             # Prepare summary
             summary = {
                 'job_id': job_id,
@@ -327,7 +318,6 @@ class BatchFeatureProcessor:
             
         except Exception as e:
             logger.error(f"Error in batch processing: {str(e)}")
-            self._update_job_record(job_id, self.stats, failed_tickers, error=str(e))
             raise
     
     def process_all_tickers(self, config: BatchJobConfig) -> Dict[str, Any]:
@@ -479,75 +469,6 @@ class BatchFeatureProcessor:
             logger.error(f"Error saving features for {ticker}: {str(e)}")
             raise
     
-    def _create_job_record(self, job_id: str, tickers: List[str], config: BatchJobConfig):
-        """Create a job tracking record in the database"""
-        try:
-            from sqlalchemy import text
-            
-            with self.data_loader.engine.connect() as conn:
-                query = text("""
-                    INSERT INTO feature_calculation_jobs 
-                    (job_id, ticker, start_date, end_date, feature_categories, status)
-                    VALUES (:job_id, :ticker, :start_date, :end_date, :categories, 'running')
-                """)
-                
-                conn.execute(query, {
-                    'job_id': job_id,
-                    'ticker': f"{len(tickers)} tickers",
-                    'start_date': config.start_date,
-                    'end_date': config.end_date,
-                    'categories': config.feature_categories
-                })
-                
-                conn.commit()
-                
-        except Exception as e:
-            logger.warning(f"Could not create job record: {str(e)}")
-    
-    def _update_job_record(self, job_id: str, stats: ProcessingStats, 
-                            failed_tickers: List[str], error: str = None):
-        """Update job tracking record with results"""
-        try:
-            from sqlalchemy import text
-            
-            status = 'failed' if error else ('completed' if stats.failed_tickers == 0 else 'partial_success')
-            
-            with self.data_loader.engine.connect() as conn:
-                query = text("""
-                    UPDATE feature_calculation_jobs 
-                    SET status = :status,
-                        total_features_calculated = :features,
-                        total_warnings = :warnings,
-                        error_message = :error,
-                        completed_at = CURRENT_TIMESTAMP
-                    WHERE job_id = :job_id
-                """)
-                
-                conn.execute(query, {
-                    'job_id': job_id,
-                    'status': status,
-                    'features': stats.total_features,
-                    'warnings': stats.total_warnings,
-                    'error': error
-                })
-                
-                conn.commit()
-                
-        except Exception as e:
-            logger.warning(f"Could not update job record: {str(e)}")
-    
-    def get_processing_status(self) -> Dict[str, Any]:
-        """Get current processing statistics"""
-        return {
-            'total_tickers': self.stats.total_tickers,
-            'processed': self.stats.processed_tickers,
-            'failed': self.stats.failed_tickers,
-            'success_rate': self.stats.success_rate,
-            'total_features': self.stats.total_features,
-            'processing_time': self.stats.processing_time,
-            'is_running': self.stats.end_time is None
-        }
-    
     def close(self):
         """Close database connections"""
         if hasattr(self.data_loader, 'close'):
@@ -559,9 +480,9 @@ def run_production_batch():
     
     # Production configuration
     job_config = BatchJobConfig(
-        batch_size=config.batch_processing.DEFAULT_BATCH_SIZE,  # Conservative batch size
-        max_workers=config.batch_processing.MAX_WORKERS,  # Conservative parallel processing
-        start_date='2023-01-01',  # 2 years of data
+        batch_size=config.batch_processing.DEFAULT_BATCH_SIZE,
+        max_workers=config.batch_processing.MAX_WORKERS,
+        start_date='2023-01-01',
         end_date=datetime.now().strftime('%Y-%m-%d'),
         min_data_points=config.data_quality.MIN_DATA_POINTS // 2,
         save_to_parquet=config.storage.SAVE_TO_PARQUET,
@@ -575,19 +496,16 @@ def run_production_batch():
         logger.info("📊 Getting all available tickers...")
         all_tickers = processor.get_available_tickers(
             min_data_points=job_config.min_data_points,
-            active_only=True,  
             market='stocks'
         )
         
-        selected_tickers = all_tickers
-        
-        logger.info(f"📈 Processing {len(selected_tickers)} tickers:")
-        if selected_tickers:
-            logger.info(f"   Sample tickers: {', '.join(selected_tickers[:10])}{'...' if len(selected_tickers) > 10 else ''}")
+        logger.info(f"📈 Processing {len(all_tickers)} tickers:")
+        if all_tickers:
+            logger.info(f"   Sample tickers: {', '.join(all_tickers[:10])}{'...' if len(all_tickers) > 10 else ''}")
         
         # Run batch processing
         start_time = time.time()
-        results = processor.process_batch(selected_tickers, job_config)
+        results = processor.process_batch(all_tickers, job_config)
         processing_time = time.time() - start_time
         
         # log results

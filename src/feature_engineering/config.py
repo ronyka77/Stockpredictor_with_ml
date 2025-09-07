@@ -30,7 +30,7 @@ class BatchProcessingConfig:
     
     # Batch Processing
     DEFAULT_BATCH_SIZE: int = int(os.getenv('FE_BATCH_SIZE', '50'))
-    MAX_WORKERS: int = int(os.getenv('FE_MAX_WORKERS', '4'))
+    MAX_WORKERS: int = int(os.getenv('MAX_WORKERS', '8'))
 
 @dataclass
 class TechnicalIndicatorConfig:
@@ -126,9 +126,6 @@ class FeatureCategoryConfig:
     # Market Filters
     AVAILABLE_MARKETS: List[str] = field(default_factory=lambda: ['stocks', 'crypto', 'forex', 'all'])
     DEFAULT_MARKET: str = os.getenv('FE_DEFAULT_MARKET', 'stocks')
-    
-    # Ticker Filters
-    DEFAULT_ACTIVE_ONLY: bool = True
 
 @dataclass
 class StorageConfig:
@@ -161,26 +158,6 @@ class StorageConfig:
     INCLUDE_METADATA_COLUMNS: bool = True
 
 @dataclass
-class MLConfig:
-    """Configuration for ML-related operations"""
-    
-    # Data Splitting
-    DEFAULT_TEST_SIZE: float = float(os.getenv('FE_ML_TEST_SIZE', '0.2'))
-    DEFAULT_VALIDATION_SIZE: float = float(os.getenv('FE_ML_VALIDATION_SIZE', '0.1'))
-    
-    # Scaling Methods
-    DEFAULT_SCALING_METHOD: str = os.getenv('FE_ML_SCALING_METHOD', 'standard')  # standard, minmax, robust, none
-    AVAILABLE_SCALING_METHODS: List[str] = field(default_factory=lambda: ['standard', 'minmax', 'robust', 'none'])
-    
-    # Missing Value Handling
-    DEFAULT_MISSING_STRATEGY: str = os.getenv('FE_ML_MISSING_STRATEGY', 'drop')  # drop, fill_mean, fill_median, fill_zero
-    AVAILABLE_MISSING_STRATEGIES: List[str] = field(default_factory=lambda: ['drop', 'fill_mean', 'fill_median', 'fill_zero'])
-    
-    # Target Variable
-    DEFAULT_TARGET_COLUMN: str = os.getenv('FE_ML_TARGET_COLUMN', 'close')
-    DEFAULT_PREDICTION_HORIZON: int = int(os.getenv('FE_ML_PREDICTION_HORIZON', '10'))  # days ahead
-
-@dataclass
 class DatabaseConfig:
     """Configuration for database operations"""
     
@@ -200,25 +177,6 @@ class DatabaseConfig:
     def database_url(self) -> str:
         """Generate PostgreSQL connection URL"""
         return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-
-@dataclass
-class CommandLineConfig:
-    """Default values for command line arguments"""
-    
-    # Batch Processing Defaults
-    CLI_BATCH_SIZE: int = 50
-    CLI_MAX_WORKERS: int = 4
-    CLI_MIN_DATA_POINTS: int = 100
-    
-    # Filter Defaults
-    CLI_DEFAULT_MARKET: str = 'stocks'
-    CLI_DEFAULT_ACTIVE_ONLY: bool = True
-    CLI_DEFAULT_CATEGORIES: List[str] = field(default_factory=lambda: ['trend', 'momentum', 'volatility', 'volume'])
-    
-    # Behavior Defaults
-    CLI_DEFAULT_DRY_RUN: bool = False
-    CLI_DEFAULT_VERBOSE: bool = False
-    CLI_DEFAULT_OVERWRITE: bool = False
 
 def _parse_tuple_float(env_var: str, default: Tuple[float, float]) -> Tuple[float, float]:
     """Parse comma-separated float tuple from environment variable"""
@@ -323,14 +281,11 @@ class FeatureEngineeringConfig:
     date_range: DateRangeConfig = field(default_factory=DateRangeConfig)
     feature_categories: FeatureCategoryConfig = field(default_factory=FeatureCategoryConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
-    ml: MLConfig = field(default_factory=MLConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
-    cli: CommandLineConfig = field(default_factory=CommandLineConfig)
     fundamental: FundamentalConfig = field(default_factory=FundamentalConfig)
     
     # Global Settings
     ENABLE_PARALLEL_PROCESSING: bool = os.getenv('FE_ENABLE_PARALLEL', 'true').lower() == 'true'
-    DEBUG_MODE: bool = os.getenv('FE_DEBUG_MODE', 'false').lower() == 'true'
     ENVIRONMENT: str = os.getenv('FE_ENVIRONMENT', 'production')  
     
     def validate_config(self) -> List[str]:
@@ -364,16 +319,6 @@ class FeatureEngineeringConfig:
         if not self.storage.FEATURES_STORAGE_PATH:
             errors.append("Features storage path cannot be empty")
         
-        # Validate ML config
-        if not 0 < self.ml.DEFAULT_TEST_SIZE < 1:
-            errors.append("Test size must be between 0 and 1")
-        
-        if not 0 < self.ml.DEFAULT_VALIDATION_SIZE < 1:
-            errors.append("Validation size must be between 0 and 1")
-        
-        if (self.ml.DEFAULT_TEST_SIZE + self.ml.DEFAULT_VALIDATION_SIZE) >= 1:
-            errors.append("Test size + validation size must be less than 1")
-        
         return errors
     
     def get_config_summary(self) -> Dict[str, Any]:
@@ -385,7 +330,6 @@ class FeatureEngineeringConfig:
         """
         return {
             'environment': self.ENVIRONMENT,
-            'debug_mode': self.DEBUG_MODE,
             'parallel_processing': self.ENABLE_PARALLEL_PROCESSING,
             'batch_size': self.batch_processing.DEFAULT_BATCH_SIZE,
             'max_workers': self.batch_processing.MAX_WORKERS,

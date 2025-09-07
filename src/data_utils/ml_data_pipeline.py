@@ -18,10 +18,7 @@ from src.data_utils.feature_engineering import (
     clean_data_for_training,
     analyze_feature_diversity,
     clean_features_for_training,
-    add_temporal_features
-)
-from src.data_utils.stationarity_transformer import (
-    transform_dataframe_to_stationary
+    add_date_features
 )
 from src.utils.cleaned_data_cache import CleanedDataCache
 
@@ -33,7 +30,6 @@ _cleaned_data_cache = CleanedDataCache()
 def prepare_ml_data_for_training(prediction_horizon: int = 10, 
                                 split_date: str = '2025-03-15',
                                 ticker: Optional[str] = None,
-                                apply_stationarity_transform: bool = False,
                                 filter_train_set: bool = True) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
     Comprehensive data preparation function for ML training
@@ -86,24 +82,6 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         # Keep original X for inverse transformations later
         X_original = X.copy()
         transformation_manifest = {}
-
-        # 3. Apply Stationarity Transformations
-        if apply_stationarity_transform:
-            logger.info("3. Applying stationarity transformations...")
-
-            # Separate target and features for transformation
-            y_df = y.to_frame()
-            
-            # Transform features and target in parallel
-            X_stationary, feature_manifest, _ = transform_dataframe_to_stationary(X)
-            y_stationary_df, target_manifest, _ = transform_dataframe_to_stationary(y_df)
-            
-            # Combine manifests and update data
-            transformation_manifest = {**feature_manifest, **target_manifest}
-            X = X_stationary
-            y = y_stationary_df[y.name]
-            
-            logger.info(f"✅ Applied {len(transformation_manifest)} stationarity transformations in parallel.")
         
         # PHASE 2 FIX: Add price-normalized features
         X = add_price_normalized_features(X)
@@ -115,7 +93,7 @@ def prepare_ml_data_for_training(prediction_horizon: int = 10,
         
         # Add the date column to features temporarily for temporal feature creation
         X['date'] = combined_data['date'].copy()
-        X = add_temporal_features(X, 'date')
+        X = add_date_features(X, 'date')
         
         # Remove the date column after temporal features are created
         X = X.drop(columns=['date'])
@@ -311,7 +289,7 @@ def prepare_ml_data_for_prediction(prediction_horizon: int = 10) -> Dict[str, Un
         X = add_prediction_bounds_features(X)
         
         X['date'] = combined_data['date'].copy()
-        X = add_temporal_features(X, 'date')
+        X = add_date_features(X, 'date')
         
         # Remove the date column after temporal features are created
         X = X.drop(columns=['date'])
@@ -377,7 +355,6 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
                                                 split_date: str = '2025-03-15',
                                                 ticker: str = None,
                                                 clean_features: bool = True,
-                                                apply_stationarity_transform: bool = False,
                                                 filter_train_set: bool = True) -> dict:
     """
     Enhanced version of prepare_ml_data_for_training with integrated data cleaning and caching
@@ -389,8 +366,7 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
         'split_date': split_date,
         'ticker': ticker,
         'clean_features': clean_features,
-        'function': 'prepare_ml_data_for_training_with_cleaning',
-        'apply_stationarity_transform': apply_stationarity_transform
+        'function': 'prepare_ml_data_for_training_with_cleaning'
     }
     cache_key = _cleaned_data_cache._generate_cache_key(**cache_params)
     # Check if cached data exists and is newer than 24 hours
@@ -413,7 +389,6 @@ def prepare_ml_data_for_training_with_cleaning(prediction_horizon: int = 10,
         prediction_horizon=prediction_horizon,
         split_date=split_date,
         ticker=ticker,
-        apply_stationarity_transform=apply_stationarity_transform,
         filter_train_set=filter_train_set
     )
     logger.info(f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features")

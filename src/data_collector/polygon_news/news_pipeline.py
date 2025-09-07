@@ -4,7 +4,7 @@ Handles incremental updates, historical backfill, and comprehensive news collect
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from sqlalchemy.orm import Session
 
@@ -82,7 +82,6 @@ class PolygonNewsCollector:
         """
         self.logger.info(f"Starting historical news collection ({years_back} years)")
         self._reset_stats()
-        from datetime import timezone
         self.stats['start_time'] = datetime.now(timezone.utc)
         
         try:
@@ -93,7 +92,6 @@ class PolygonNewsCollector:
             self.logger.info(f"Processing {len(major_tickers)} major tickers for historical backfill")
             
             # Calculate date range (ensure timezone consistency)
-            from datetime import timezone
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=years_back * 365)
             
@@ -115,7 +113,6 @@ class PolygonNewsCollector:
                         )
                         
                         if existing_articles:
-                            self.logger.info(f"Ticker {ticker}: data exists for {current_date.date()}-{batch_end.date()}")
                             continue
                         
                         # Collect news for this ticker and date range
@@ -162,7 +159,6 @@ class PolygonNewsCollector:
         """
         self.logger.info(f"Starting targeted collection for {len(tickers)} tickers")
         self._reset_stats()
-        from datetime import timezone
         self.stats['start_time'] = datetime.now(timezone.utc)
         
         try:
@@ -348,7 +344,6 @@ class PolygonNewsCollector:
             latest_date = self.storage.get_latest_date_overall()
             
             # Get recent statistics
-            from datetime import timezone
             recent_stats = self.storage.get_article_statistics(
                 start_date=datetime.now(timezone.utc) - timedelta(days=30)
             )

@@ -7,7 +7,7 @@ from src.data_utils.feature_engineering import (
     add_price_normalized_features,
     add_prediction_bounds_features,
     clean_data_for_training,
-    add_temporal_features,
+    add_date_features,
 )
 
 
@@ -65,11 +65,11 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
     assert out['a'].dtype == np.float64, f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"
 
 
-def test_add_temporal_features_creates_expected_columns():
+def test_add_date_features_creates_expected_columns():
     dates = pd.to_datetime(pd.Series(['2025-03-01', '2025-03-02']))
     df = pd.DataFrame({'date': dates, 'close': [1.0, 2.0]})
 
-    out = add_temporal_features(df.copy(), 'date')
+    out = add_date_features(df.copy(), 'date')
 
     expected = ['date_int', 'year', 'month', 'day_of_year', 'quarter', 'day_of_week', 'is_month_end', 'is_quarter_end']
     for col in expected:

@@ -10,7 +10,7 @@ Also exposes fit with (X, y, X_val, y_val) by reconstructing label columns
 for AutoGluon training.
 """
 
-from __future__ import annotations
+
 
 from typing import Any, Dict, Optional
 
@@ -92,14 +92,16 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             time_limit=39600,
             train_data=train_df,
             tuning_data=valid_df,
-            presets='best_quality',
+            presets='extreme_quality',
             hyperparameters=hyperparams,
             dynamic_stacking=False,
             # num_cpus=14,
             num_gpus=1,
-            auto_stack=True,
-            num_bag_folds=10,
+            # auto_stack=True,
+            num_stack_levels=2,
+            num_bag_folds=6,
             use_bag_holdout=True,
+            fit_strategy='sequential',
             # ag_args={'fold_fitting_strategy': 'sequential_local'},
             ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'}
         )

@@ -23,13 +23,13 @@ def convert_absolute_to_percentage_returns(combined_data: pd.DataFrame,
     Instead of predicting absolute prices ($254.75), we predict percentage returns (+5.2%).
     
     Args:
-        combined_data: DataFrame with Future_High_XD columns and close prices
+        combined_data: DataFrame with Future_Close_XD columns and close prices
         prediction_horizon: Days ahead for prediction
         
     Returns:
         Tuple of (updated_data, new_target_column_name)
     """
-    target_column = f"Future_High_{prediction_horizon}D"
+    target_column = f"Future_Close_{prediction_horizon}D"
     new_target_column = f"Future_Return_{prediction_horizon}D"
     
     logger.info(f"🎯 Converting absolute targets to percentage returns (horizon: {prediction_horizon}d)")
@@ -46,7 +46,7 @@ def convert_absolute_to_percentage_returns(combined_data: pd.DataFrame,
         raise ValueError("'close' column not found. Required for percentage return calculation.")
     
     # Create percentage return target
-    # Formula: (Future_High - Current_Close) / Current_Close * 100
+    # Formula: (Future_Close - Current_Close) / Current_Close * 100
     future_prices = combined_data[target_column]
     current_prices = combined_data['close']
     percentage_returns = (future_prices - current_prices) / current_prices
@@ -115,64 +115,3 @@ def convert_percentage_predictions_to_prices(predictions: np.ndarray,
         return bounded_predictions
     else:
         return predicted_prices
-
-
-def create_target_features(data: pd.DataFrame, 
-                            target_column: str,
-                            lookback_periods: list = [5, 10, 20]) -> pd.DataFrame:
-    """
-    Create additional features based on target patterns
-    
-    This can help the model understand target behavior patterns
-    and improve prediction accuracy.
-    
-    Args:
-        data: DataFrame with target column
-        target_column: Name of the target column
-        lookback_periods: List of periods to look back for patterns
-        
-    Returns:
-        DataFrame with additional target-based features
-    """
-    logger.info(f"🎯 Creating target-based features from '{target_column}'...")
-    
-    if target_column not in data.columns:
-        logger.warning(f"Target column '{target_column}' not found. Skipping target feature creation.")
-        return data
-    
-    enhanced_data = data.copy()
-    target_series = enhanced_data[target_column]
-    
-    # 1. Target volatility features
-    for period in lookback_periods:
-        if len(target_series) >= period:
-            # Rolling standard deviation of target
-            vol_col = f"Target_Vol_{period}D"
-            enhanced_data[vol_col] = target_series.rolling(window=period, min_periods=1).std()
-            
-            # Rolling mean of target
-            mean_col = f"Target_Mean_{period}D"
-            enhanced_data[mean_col] = target_series.rolling(window=period, min_periods=1).mean()
-            
-            # Target momentum (current vs rolling mean)
-            momentum_col = f"Target_Momentum_{period}D"
-            enhanced_data[momentum_col] = target_series - enhanced_data[mean_col]
-    
-    # 2. Target regime features
-    if len(target_series) >= 20:
-        # High/low target regime
-        rolling_median = target_series.rolling(window=20, min_periods=1).median()
-        enhanced_data['Target_Above_Median'] = (target_series > rolling_median).astype(int)
-        
-        # Target percentile rank
-        enhanced_data['Target_Percentile'] = target_series.rolling(window=50, min_periods=1).rank(pct=True)
-    
-    # 3. Target trend features
-    if len(target_series) >= 10:
-        enhanced_data['Target_Trend_5D'] = (target_series > target_series.shift(5)).astype(int)
-        enhanced_data['Target_Trend_10D'] = (target_series > target_series.shift(10)).astype(int)
-    
-    new_features_count = len(enhanced_data.columns) - len(data.columns)
-    logger.info(f"✅ Created {new_features_count} target-based features")
-    
-    return enhanced_data 

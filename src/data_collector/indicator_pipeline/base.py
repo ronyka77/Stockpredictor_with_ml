@@ -10,7 +10,6 @@ import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Any
-from datetime import datetime
 
 from src.utils.logger import get_logger
 from src.data_collector.config import feature_config
@@ -101,52 +100,6 @@ class BaseIndicator(ABC):
         if column_mapping:
             self.data = self.data.rename(columns=column_mapping)
     
-    def check_minimum_periods(self, required_periods: int) -> bool:
-        """
-        Check if we have enough data for the calculation
-        
-        Args:
-            required_periods: Minimum periods required
-            
-        Returns:
-            True if sufficient data, False otherwise
-        """
-        return len(self.data) >= required_periods
-    
-    def calculate_quality_score(self, result: pd.DataFrame) -> float:
-        """
-        Calculate quality score for the indicator result
-        
-        Args:
-            result: Calculated indicator DataFrame
-            
-        Returns:
-            Quality score between 0-100
-        """
-        if result.empty:
-            return 0.0
-        
-        # Calculate missing data percentage
-        missing_pct = result.isna().sum().sum() / (len(result) * len(result.columns))
-        
-        # Calculate outlier percentage
-        outlier_count = 0
-        total_values = 0
-        
-        for col in result.select_dtypes(include=[np.number]).columns:
-            values = result[col].dropna()
-            if len(values) > 0:
-                z_scores = np.abs((values - values.mean()) / values.std())
-                outlier_count += (z_scores > self.config.OUTLIER_THRESHOLD).sum()
-                total_values += len(values)
-        
-        outlier_pct = outlier_count / total_values if total_values > 0 else 0
-        
-        # Calculate quality score (higher is better)
-        quality_score = 100 * (1 - missing_pct) * (1 - outlier_pct)
-        
-        return max(0.0, min(100.0, quality_score))
-    
     @abstractmethod
     def calculate(self) -> IndicatorResult:
         """
@@ -156,24 +109,6 @@ class BaseIndicator(ABC):
             IndicatorResult containing the calculated values and metadata
         """
         pass
-    
-    def get_metadata(self) -> Dict[str, Any]:
-        """
-        Get metadata about the indicator calculation
-        
-        Returns:
-            Dictionary containing metadata
-        """
-        return {
-            'indicator_name': self.__class__.__name__,
-            'parameters': self.params,
-            'data_points': len(self.data),
-            'date_range': {
-                'start': self.data.index.min().isoformat() if not self.data.empty else None,
-                'end': self.data.index.max().isoformat() if not self.data.empty else None
-            },
-            'calculation_timestamp': datetime.now().isoformat()
-        }
 
 class IndicatorValidator:
     """
@@ -207,7 +142,6 @@ class IndicatorValidator:
                 logger.warning(f"Validation failed: Infinite values found in column {col}")
                 return False
         
-        # logger.info("Indicator result validation passed")
         return True
 
 def create_indicator_result(data: pd.DataFrame, metadata: Dict[str, Any], 

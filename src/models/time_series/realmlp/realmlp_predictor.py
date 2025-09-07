@@ -316,21 +316,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         z = self._compute_penultimate_activations(X_ref)
         self._fit_latent_stats_from_activations(z, eps=eps)
 
-    def set_conformal_calibration(self, X_cal: pd.DataFrame, y_cal: pd.Series, alpha: float = 0.1, k_neighbors: int = 50) -> None:
-        """
-        Prepare residual-based conformal calibration by storing latent features and absolute residuals.
-        """
-        if self.model is None or not self.is_trained:
-            raise RuntimeError("Model must be trained before conformal calibration")
-        self._conformal_alpha = float(alpha)
-        self._conformal_k = int(max(1, k_neighbors))
-        z = self._compute_penultimate_activations(X_cal)
-        yhat = self.predict(X_cal)
-        resid = np.abs(np.asarray(y_cal).reshape(-1) - np.asarray(yhat).reshape(-1))
-        self._cal_latent = z
-        self._cal_residuals = resid
-
-    # ------------------------- Threshold optimization & evaluation -------------------------
     def optimize_and_evaluate_threshold(
         self,
         *,
@@ -391,7 +376,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
 
         return results
 
-    # ------------------------- Optuna hypertuning (no data loading/saving) -------------------------
     def optuna_hypertune(
         self,
         *,
@@ -581,7 +565,6 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             "best_value": self.best_score,
         }
 
-    # ------------------------- MLflow save/load -------------------------
     def save_model(
         self,
         *,

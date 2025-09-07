@@ -8,7 +8,7 @@ Usage (Windows with uv):
     uv run python -m src.models.time_series.realmlp.realmlp_main
 """
 
-from __future__ import annotations
+
 
 from typing import List
 

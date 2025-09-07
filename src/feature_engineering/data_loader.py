@@ -115,8 +115,8 @@ class StockDataLoader:
             # Validate and clean the data
             df = self._validate_and_clean_data(df, ticker)
             
-            logger.info(f"Loaded {len(df)} records for {ticker}")
-            logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
+            # logger.info(f"Loaded {len(df)} records for {ticker}")
+            # logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
             
             return df
             
@@ -125,14 +125,13 @@ class StockDataLoader:
             raise
     
     def get_available_tickers(self, min_data_points: Optional[int] = None, 
-                                active_only: bool = True, market: str = 'stocks',
+                                market: str = 'stocks',
                                 ) -> List[str]:
         """
         Get list of available tickers with sufficient data
         
         Args:
             min_data_points: Minimum number of data points required
-            active_only: Only include active tickers
             market: Market type filter (default: 'stocks')
             
         Returns:
@@ -149,7 +148,7 @@ class StockDataLoader:
             SELECT t.ticker, COUNT(hp.*) as data_points, t.name, t.market
             FROM tickers t
             INNER JOIN historical_prices hp ON t.ticker = hp.ticker
-            WHERE (:active_only = false OR t.active = true)
+            WHERE  t.active = true
                 AND (:market = 'all' OR t.market = :market)
                 AND t."type" ='CS'
             GROUP BY t.ticker, t.name, t.market
@@ -159,7 +158,6 @@ class StockDataLoader:
             
             params = {
                 'min_data_points': min_data_points,
-                'active_only': active_only,
                 'market': market if market != 'all' else 'all',
             }
             
@@ -221,70 +219,6 @@ class StockDataLoader:
             logger.error(f"Error getting metadata for {'all tickers' if ticker is None else ticker}: {str(e)}")
             return pd.DataFrame() if ticker is None else {}
 
-    def get_data_summary(self, ticker: str) -> Dict[str, Any]:
-        """
-        Get data summary for a ticker including metadata and price data statistics
-        
-        Args:
-            ticker: Stock ticker symbol
-            
-        Returns:
-            Dictionary with data summary
-        """
-        logger.info(f"Getting data summary for {ticker}")
-        
-        try:
-            # Get ticker metadata
-            metadata = self.get_ticker_metadata(ticker)
-            
-            # Get price data statistics
-            query = text("""
-            SELECT 
-                COUNT(*) as total_records,
-                MIN(date) as earliest_date,
-                MAX(date) as latest_date,
-                AVG("close") as avg_close,
-                MIN("close") as min_close,
-                MAX("close") as max_close,
-                AVG(volume) as avg_volume,
-                MIN(volume) as min_volume,
-                MAX(volume) as max_volume,
-                COUNT(CASE WHEN adjusted_close IS NULL THEN 1 END) as missing_adj_close,
-                COUNT(CASE WHEN vwap IS NULL THEN 1 END) as missing_vwap
-            FROM historical_prices 
-            WHERE ticker = :ticker
-            """)
-            
-            df = pd.read_sql_query(query, self.engine, params={'ticker': ticker.upper()})
-            
-            if df.empty:
-                logger.warning(f"No price data found for {ticker}")
-                return metadata
-            
-            price_stats = df.iloc[0].to_dict()
-            
-            # Combine metadata and price statistics
-            summary = {
-                'ticker': ticker.upper(),
-                'metadata': metadata,
-                'price_data': price_stats,
-                'data_quality': {
-                    'has_metadata': bool(metadata),
-                    'total_records': price_stats.get('total_records', 0),
-                    'missing_adj_close': price_stats.get('missing_adj_close', 0),
-                    'missing_vwap': price_stats.get('missing_vwap', 0),
-                    'data_completeness': 1.0 - (price_stats.get('missing_adj_close', 0) + price_stats.get('missing_vwap', 0)) / (2 * price_stats.get('total_records', 1))
-                }
-            }
-            
-            logger.info(f"Data summary for {ticker}: {price_stats.get('total_records', 0)} records")
-            
-            return summary
-            
-        except Exception as e:
-            logger.error(f"Error getting data summary for {ticker}: {str(e)}")
-            return {'ticker': ticker, 'error': str(e)}
-    
     def _validate_and_clean_data(self, df: pd.DataFrame, ticker: str) -> pd.DataFrame:
         """
         Validate and clean the loaded data

@@ -179,6 +179,9 @@ class NoOpRateLimiter(RateLimiter):
     def get_time_until_reset(self) -> float:
         return 0.0
 
+    def handle_successful_request(self) -> None:
+        return
+
     def reset(self) -> None:
         return
 

@@ -347,20 +347,6 @@ class PolygonDataClient:
             logger.error(f"Health check failed: {e}")
             return False
     
-    def get_rate_limit_status(self) -> Dict[str, Any]:
-        """
-        Get current rate limit status
-        
-        Returns:
-            Dictionary with rate limit information
-        """
-        return {
-            'requests_per_minute': self.rate_limiter.requests_per_minute,
-            'remaining_requests': self.rate_limiter.get_remaining_requests(),
-            'time_until_reset': self.rate_limiter.get_time_until_reset(),
-            'consecutive_errors': getattr(self.rate_limiter, 'consecutive_errors', 0)
-        }
-    
     def __enter__(self):
         """Context manager entry"""
         return self
