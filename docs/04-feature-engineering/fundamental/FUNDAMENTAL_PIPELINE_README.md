@@ -83,9 +83,6 @@ python src/feature_engineering/fundamental_monitor.py --report report.json
 The pipeline uses `FundamentalConfig` from `config.py` with these key settings:
 
 - **HISTORICAL_YEARS**: Years of historical data (default: 2)
-- **OUTLIER_CAPPING**: Enable outlier capping (default: True)
-- **MIN_FUNDAMENTAL_DATA_POINTS**: Minimum quarters needed (default: 8)
-- **SECTOR_CLASSIFICATION**: Classification system (default: GICS)
 
 ## Database Schema
 

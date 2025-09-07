@@ -4,12 +4,14 @@ import pytest
 from pathlib import Path
 from src.utils.cleaned_data_cache import CleanedDataCache
 
+
 def test_cleaned_data_cache_basic(tmp_path):
     cache = CleanedDataCache(cache_dir=tmp_path)
     df = pd.DataFrame({"a": [1, 2, 3]})
     cache.set("test_key", df)
     loaded = cache.get("test_key")
     assert loaded.equals(df)
+
 
 @pytest.mark.unit
 def test_cache_key_and_roundtrip(tmp_path):
@@ -53,10 +55,8 @@ def test_clear_cache(tmp_path):
     c = CleanedDataCache(cache_dir=str(tmp_path))
     key = c._generate_cache_key(a=1)
     # create dummy info file to simulate existence
-    info_path = (Path(str(tmp_path)) / f"training_{key}").with_suffix('.info.json')
+    info_path = (Path(str(tmp_path)) / f"training_{key}").with_suffix(".info.json")
     info_path.write_text(json.dumps({"cache_key": key}))
     assert c.cache_exists(key, data_type="training") is False  # partial
     c.clear_cache()  # should not raise
     assert not any(tmp_path.iterdir())
-
-

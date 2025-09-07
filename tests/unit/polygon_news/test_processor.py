@@ -33,5 +33,3 @@ def test_process_article_malformed_types_raises(sample_raw_article_malformed):
     proc = NewsProcessor()
     with pytest.raises(Exception):
         proc.process_article(sample_raw_article_malformed)
-
-

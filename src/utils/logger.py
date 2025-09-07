@@ -1,215 +1,210 @@
 """
 Centralized Logging System for StockPredictor V1
-
 This module provides a unified logging configuration that can be imported
 and used across all modules in the project.
-
-Usage:
-    from src.utils.logger import get_logger
-    
-    logger = get_logger(__name__)
-    logger.info("This is an info message")
-    
-    # For specific utilities
-    logger = get_logger(__name__, utility="polygon")
-    logger = get_logger(__name__, utility="predictor")
 """
 
 import logging
-import logging.config
+import atexit
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
+
+from loguru import logger as _loguru_logger
 
 # Base logs directory - point to central logs folder at project root
 LOGS_BASE_DIR = Path(__file__).parent.parent.parent / "logs"
 
 
-def setup_logging_config(utility: str = "general") -> dict:
-    """
-    Setup logging configuration for a specific utility
-    
-    Args:
-        utility: Name of the utility (e.g., 'polygon', 'predictor', 'general')
-        
-    Returns:
-        Logging configuration dictionary
-    """
-    # Create utility-specific log directory
-    log_dir = LOGS_BASE_DIR / utility
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate log file names with current date
-    today = datetime.now().strftime('%Y%m%d')
-    info_log_file = log_dir / f"{utility}_{today}.log"
-    debug_log_file = log_dir / f"{utility}_debug_{today}.log"
-    error_log_file = log_dir / f"{utility}_error_{today}.log"
-    
-    config = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'standard': {
-                'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-            },
-            'detailed': {
-                'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
-            },
-            'console': {
-                'format': '%(asctime)s [%(levelname)s] %(message)s'
-            },
-        },
-        'handlers': {
-            'console': {
-                'level': 'INFO',
-                'formatter': 'console',
-                'class': 'logging.StreamHandler',
-            },
-            'info_file': {
-                'level': 'INFO',
-                'formatter': 'standard',
-                'class': 'logging.FileHandler',
-                'filename': str(info_log_file),
-                'mode': 'a',
-                'encoding': 'utf-8',
-            },
-            'debug_file': {
-                'level': 'DEBUG',
-                'formatter': 'detailed',
-                'class': 'logging.FileHandler',
-                'filename': str(debug_log_file),
-                'mode': 'a',
-                'encoding': 'utf-8',
-            },
-            'error_file': {
-                'level': 'ERROR',
-                'formatter': 'detailed',
-                'class': 'logging.FileHandler',
-                'filename': str(error_log_file),
-                'mode': 'a',
-                'encoding': 'utf-8',
-            },
-        },
-        'loggers': {
-            '': {  # Root logger
-                'handlers': ['console', 'info_file', 'debug_file', 'error_file'],
-                'level': 'DEBUG',
-                'propagate': False
-            },
-            # Silence very chatty third-party libraries that log DEBUG by default
-            'matplotlib': {
-                'handlers': ['console'],
-                'level': 'WARNING',
-                'propagate': False
-            },
-            'graphviz': {
-                'handlers': ['console'],
-                'level': 'WARNING',
-                'propagate': False
-            }
-        }
-    }
-    
-    return config
+class InterceptHandler(logging.Handler):
+    """Intercepts stdlib logging and routes it to Loguru."""
 
-def get_logger(name: str, utility: Optional[str] = None) -> logging.Logger:
-    """
-    Get a logger instance for a specific module
-    
-    Args:
-        name: Logger name (typically __name__)
-        utility: Utility name for organizing logs (auto-detected if None)
-        
-    Returns:
-        Configured logger instance
+    def emit(self, record: logging.LogRecord) -> None:
+        # Retrieve corresponding Loguru level if it exists
+        try:
+            level = _loguru_logger.level(record.levelname).name
+        except (ValueError, AttributeError):
+            level = record.levelno
+
+        # Find caller from where logging was called
+        frame, depth = logging.currentframe(), 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        _loguru_logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+
+def _ensure_utility_dir(utility: str) -> Path:
+    path = LOGS_BASE_DIR / utility
+    path.mkdir(parents=True, exist_ok=True)
+    gitkeep = path / ".gitkeep"
+    if not gitkeep.exists():
+        gitkeep.touch()
+    return path
+
+
+def get_logger(name: str, utility: Optional[str] = None):
+    """Return a Loguru-bound logger compatible with previous get_logger API.
+    The returned object exposes `.info`, `.warning`, `.error`, `.debug`, and
+    other Loguru methods via the bound logger.
     """
     # Auto-detect utility from module name if not provided
     if utility is None:
-        if 'polygon' in name:
-            utility = 'polygon'
-        elif 'predictor' in name:
-            utility = 'predictor'
-        elif 'data_collector' in name:
-            utility = 'data_collector'
-        elif 'feature_engineering' in name:
-            utility = 'feature_engineering'
-        elif 'mlp' in name:
-            utility = 'mlp'
-        elif 'lstm' in name:
-            utility = 'lstm'
-        elif 'lightgbm' in name:
-            utility = 'lightgbm'
-        elif 'xgboost' in name:
-            utility = 'xgboost'
-        elif 'catboost' in name:
-            utility = 'catboost'
-        elif 'random_forest' in name:
-            utility = 'random_forest'
+        lower_name = name.lower()
+        if "polygon" in lower_name:
+            utility = "polygon"
+        elif "predictor" in lower_name:
+            utility = "predictor"
+        elif "data_collector" in lower_name or "data_collector" in lower_name:
+            utility = "data_collector"
+        elif "feature_engineering" in lower_name:
+            utility = "feature_engineering"
+        elif "mlp" in lower_name:
+            utility = "mlp"
+        elif "lstm" in lower_name:
+            utility = "lstm"
+        elif "lightgbm" in lower_name:
+            utility = "lightgbm"
+        elif "xgboost" in lower_name:
+            utility = "xgboost"
+        elif "random_forest" in lower_name:
+            utility = "random_forest"
         else:
-            utility = 'general'
-    
-    # Setup logging configuration for this utility
-    config = setup_logging_config(utility)
-    
-    # Configure logging (this is safe to call multiple times)
-    logging.config.dictConfig(config)
-    
-    # Return logger
-    return logging.getLogger(name)
+            utility = "general"
 
-def get_polygon_logger(name: str) -> logging.Logger:
-    """Convenience function for polygon-specific logging"""
-    return get_logger(name, utility='polygon')
+    # Ensure utility directory exists
+    util_dir = _ensure_utility_dir(utility)
 
-def cleanup_old_logs(days_to_keep: int = 30, min_size_kb: int = 2) -> None:
-    """
-    Clean up old log files and small log files
+    # Lazily initialize global sinks on first get_logger call
+    _initialize_sinks_once()
 
-    Args:
-        days_to_keep: Number of days of logs to keep
-        min_size_kb: Minimum file size in KB to keep
-    """
-    logger = get_logger(__name__)
-    log_dir = LOGS_BASE_DIR 
-    if not log_dir.exists():
-        return
+    # Ensure a file sink exists for this utility (one per process run)
+    _ensure_file_sink_for_utility(utility, util_dir)
 
-    cutoff_time = datetime.now().timestamp() - (days_to_keep * 24 * 60 * 60)
-    min_size_bytes = min_size_kb * 1024
+    # Return a bound logger with metadata similar to previous behavior
+    return _loguru_logger.bind(name=name, utility=utility)
 
-    # Recursively check all subdirectories
-    for log_file in log_dir.rglob("*.log"):
-        try:
-            file_stat = log_file.stat()
-            # Delete old files or very small files
-            if file_stat.st_mtime < cutoff_time or file_stat.st_size < min_size_bytes:
-                log_file.unlink()
-                logger.info(f"Deleted log file: {log_file} (size: {file_stat.st_size} bytes)")
-        except OSError as e:
-            logger.error(f"Failed to delete {log_file}: {e}")# Initialize logs directory structure
+
 def init_logging_structure():
     """Initialize the logging directory structure"""
-    utilities = ['polygon', 'predictor', 'data_collector', 'feature_engineering', 'general']
-    
-    for utility in utilities:
-        log_dir = LOGS_BASE_DIR / utility
-        log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create a .gitkeep file to ensure directories are tracked
-        gitkeep = log_dir / '.gitkeep'
-        if not gitkeep.exists():
-            gitkeep.touch()
+    utilities = [
+        "polygon",
+        "predictor",
+        "data_collector",
+        "feature_engineering",
+        "general",
+    ]
+    for u in utilities:
+        _ensure_utility_dir(u)
+
 
 # Initialize on import
 init_logging_structure()
 
-# Example usage and testing
+# --- New: sink management for enqueue and shutdown ---
+_sinks_initialized = False
+_console_sink_id: Optional[int] = None
+_file_sink_ids: Dict[str, int] = {}
+
+
+def _initialize_sinks_once() -> None:
+    """Initialize console sink and stdlib intercept once per process."""
+    global _sinks_initialized, _console_sink_id
+    if _sinks_initialized:
+        return
+
+    # Remove default handlers
+    _loguru_logger.remove()
+
+    # Console sink: write to stdout, non-blocking queue enabled
+    console_format = (
+        "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
+    )
+    _console_sink_id = _loguru_logger.add(
+        sys.stdout, level="INFO", enqueue=True, format=console_format
+    )
+
+    # Intercept stdlib logging
+    logging.basicConfig(handlers=[InterceptHandler()], level=0)
+
+    _sinks_initialized = True
+
+
+def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
+    """Add a file sink for the given utility if not already added for this process run.
+    File name includes timestamp to avoid cross-process collisions.
+    """
+    global _file_sink_ids
+    if utility in _file_sink_ids:
+        return
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = util_dir / f"{utility}_{timestamp}.log"
+
+    file_format = (
+        "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
+    )
+    sink_id = _loguru_logger.add(
+        str(log_file),
+        level="INFO",
+        rotation="10 MB",
+        retention="30 days",
+        compression="zip",
+        encoding="utf-8",
+        enqueue=True,
+        format=file_format,
+    )
+
+    _file_sink_ids[utility] = sink_id
+
+
+def shutdown_logging() -> None:
+    """Remove all Loguru sinks to flush queued messages. Safe to call multiple times."""
+    global _sinks_initialized, _console_sink_id, _file_sink_ids
+    # Attempt to remove file sinks; log failures at debug level with exception info
+    for sid in list(_file_sink_ids.values()):
+        try:
+            _loguru_logger.remove(sid)
+        except Exception as e:
+            try:
+                logger.debug(f"Error removing file sink id={sid}", exc_info=True)
+            except Exception:
+                # If logger is not available or logging fails, fallback to stderr
+                sys.stderr.write(f"Error removing file sink id={sid}: {e}\n")
+    # Clear file sink registry regardless of removal success
+    _file_sink_ids.clear()
+
+    # Attempt to remove console sink; ensure console sink id is reset regardless
+    try:
+        if _console_sink_id is not None:
+            _loguru_logger.remove(_console_sink_id)
+    except Exception as e:
+        try:
+            logger.debug(
+                f"Error removing console sink id={_console_sink_id}", exc_info=True
+            )
+        except Exception:
+            sys.stderr.write(
+                f"Error removing console sink id={_console_sink_id}: {e}\n"
+            )
+    finally:
+        _console_sink_id = None
+
+    # Ensure initialized flag is reset so state is consistent
+    _sinks_initialized = False
+
+
+# Register shutdown to flush sinks on graceful exit
+atexit.register(shutdown_logging)
+
+
 if __name__ == "__main__":
-    # Test the logging system
     logger = get_logger(__name__)
-    logger.info("Testing centralized logging system")
-    logger.info("This is a debug message")
-    logger.warning("This is a warning message")
-    logger.error("This is an error message")
-    
-    cleanup_old_logs()
+    logger.info("Testing Loguru-based logging system")
+    logger.debug("Debug message")
+    logger.warning("Warning message")
+    logger.error("Error message")

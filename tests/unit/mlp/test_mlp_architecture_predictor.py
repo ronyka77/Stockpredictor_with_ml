@@ -13,7 +13,12 @@ def test_mlp_forward_and_architecture_info():
     layer_sizes = [4, 3]
     output_size = 2
 
-    model = MLPModule(input_size=input_size, layer_sizes=layer_sizes, output_size=output_size, dropout=0.0)
+    model = MLPModule(
+        input_size=input_size,
+        layer_sizes=layer_sizes,
+        output_size=output_size,
+        dropout=0.0,
+    )
 
     # Batch input
     x = torch.randn(7, input_size)
@@ -36,12 +41,16 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
     n_samples = 10
     n_features = 3
     rng = np.random.RandomState(0)
-    X = pd.DataFrame(rng.randn(n_samples, n_features), columns=[f"f{i}" for i in range(n_features)])
+    X = pd.DataFrame(
+        rng.randn(n_samples, n_features), columns=[f"f{i}" for i in range(n_features)]
+    )
     y = pd.Series(rng.randn(n_samples))
 
     # Scale training data and create dataloader
     X_scaled, scaler = MLPDataUtils.scale_data(X, scaler=None, fit_scaler=True)
-    train_loader = MLPDataUtils.create_dataloader_from_dataframe(X_scaled, y, batch_size=4, shuffle=False, num_workers=0)
+    train_loader = MLPDataUtils.create_dataloader_from_dataframe(
+        X_scaled, y, batch_size=4, shuffle=False, num_workers=0
+    )
 
     config = {
         "input_size": n_features,
@@ -55,7 +64,9 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
     predictor = MLPPredictor(config=config)
 
     # Fit should complete quickly for 1 epoch
-    predictor.fit(train_loader, val_loader=None, scaler=scaler, feature_names=list(X.columns))
+    predictor.fit(
+        train_loader, val_loader=None, scaler=scaler, feature_names=list(X.columns)
+    )
 
     assert predictor.is_trained is True
 
@@ -72,7 +83,7 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
     assert conf_margin.shape[0] == n_samples
 
     # Check that checkpoint file was created
-    checkpoint_path = os.path.join(config["checkpoint_dir"], f"{predictor.model_name}_checkpoint.pth")
+    checkpoint_path = os.path.join(
+        config["checkpoint_dir"], f"{predictor.model_name}_checkpoint.pth"
+    )
     assert os.path.exists(checkpoint_path)
-
-

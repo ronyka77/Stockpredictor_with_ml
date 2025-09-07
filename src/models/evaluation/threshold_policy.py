@@ -23,7 +23,9 @@ logger = get_logger(__name__, utility="evaluation")
 
 @dataclass
 class ThresholdConfig:
-    method: str = "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
+    method: str = (
+        "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
+    )
     value: Optional[float] = None
     quantile: Optional[float] = None
     top_k: Optional[int] = None
@@ -44,14 +46,16 @@ class ThresholdResult:
 class ThresholdPolicy:
     """
     Compute boolean masks for confidence-based filtering given a configuration.
-    
+
     Notes
     - Sanitizes non-finite confidence values (NaN/Inf): they are excluded from kept set
     - Supports vectorized operations
     - Extensible via `method` dispatch
     """
 
-    def compute_mask(self, confidence: np.ndarray, X: Optional[pd.DataFrame], cfg: ThresholdConfig) -> ThresholdResult:
+    def compute_mask(
+        self, confidence: np.ndarray, X: Optional[pd.DataFrame], cfg: ThresholdConfig
+    ) -> ThresholdResult:
         if confidence is None:
             raise ValueError("confidence must not be None")
 
@@ -63,6 +67,7 @@ class ThresholdPolicy:
         # Ensure 1D numpy array
         conf = np.asarray(confidence).reshape(-1)
         total_samples = conf.shape[0]
+        avg_confidence = float(conf.mean())
 
         # Sanitize non-finite
         finite_mask = np.isfinite(conf)
@@ -82,9 +87,6 @@ class ThresholdPolicy:
             if cfg.value is None:
                 raise ValueError("ThresholdConfig.value is required for method 'gt'")
             raw_mask = conf > float(cfg.value)
-        elif method in {"quantile", "topk", "per_group", "adaptive"}:
-            # Reserved for future slices
-            raise NotImplementedError(f"Method '{method}' not implemented yet")
         else:
             raise ValueError(
                 f"Unknown threshold method '{cfg.method}'. Supported: 'ge', 'gt'"
@@ -95,8 +97,9 @@ class ThresholdPolicy:
         indices = np.where(final_mask)[0]
 
         samples_kept = int(final_mask.sum())
-        samples_kept_ratio = float(samples_kept / total_samples) if total_samples else 0.0
-        avg_confidence = float(conf[final_mask].mean()) if samples_kept > 0 else float("nan")
+        samples_kept_ratio = (
+            float(samples_kept / total_samples) if total_samples else 0.0
+        )
 
         stats = {
             "samples_kept": samples_kept,
@@ -108,13 +111,11 @@ class ThresholdPolicy:
             "policy_value": float(cfg.value) if cfg.value is not None else None,
         }
 
-        logger.info(
-            f"threshold_policy_filter policy_method={method} policy_params={{'value': {cfg.value}}} "
-            f"stats={{'samples_kept': {samples_kept}, 'total_samples': {total_samples}, "
-            f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence if samples_kept>0 else 'nan'}, "
-            f"'non_finite_confidence_count': {non_finite_count}}}"
-        )
+        # logger.info(
+        #     f"threshold_policy_filter policy_method={method} policy_params={{'value': {cfg.value}}} "
+        #     f"stats={{'samples_kept': {samples_kept}, 'total_samples': {total_samples}, "
+        #     f"'samples_kept_ratio': {samples_kept_ratio:.4f}, 'avg_confidence': {avg_confidence}, 'max_confidence': {max_confidence}, "
+        #     f"'non_finite_confidence_count': {non_finite_count}}}"
+        # )
 
         return ThresholdResult(mask=final_mask, indices=indices, stats=stats)
-
-

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 from datetime import datetime
 from typing import Any, Dict
@@ -20,7 +18,7 @@ async def main() -> Dict[str, Any]:
     total = len(results)
     ok = sum(1 for v in results.values() if v)
     logger.info(
-        f"Fundamentals V2 complete: {ok}/{total} success in {elapsed_s/60:.1f} minutes"
+        f"Fundamentals V2 complete: {ok}/{total} success in {elapsed_s / 60:.1f} minutes"
     )
     return {"results": results, "success": ok, "total": total, "elapsed_s": elapsed_s}
 
@@ -28,5 +26,3 @@ async def main() -> Dict[str, Any]:
 if __name__ == "__main__":
     out = asyncio.run(main())
     logger.info(out)
-
-

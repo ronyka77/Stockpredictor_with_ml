@@ -10,12 +10,23 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 class TestMLPScalerImplementation:
     def setup_method(self):
         np.random.seed(42)
-        self.X_test = pd.DataFrame({"feature1": np.random.randn(100), "feature2": np.random.randn(100), "feature3": np.random.randn(100)})
+        self.X_test = pd.DataFrame(
+            {
+                "feature1": np.random.randn(100),
+                "feature2": np.random.randn(100),
+                "feature3": np.random.randn(100),
+            }
+        )
         self.X_test.loc[0, "feature1"] = np.nan
         self.X_test.loc[1, "feature2"] = np.inf
         self.X_test.loc[2, "feature3"] = -np.inf
-        self.predictor = MLPPredictor(model_name="test_mlp", config={"layer_sizes": [10, 5], "input_size": 3, "batch_size": 16})
-        self.predictor.model = MLPModule(input_size=3, layer_sizes=[10, 5], output_size=1)
+        self.predictor = MLPPredictor(
+            model_name="test_mlp",
+            config={"layer_sizes": [10, 5], "input_size": 3, "batch_size": 16},
+        )
+        self.predictor.model = MLPModule(
+            input_size=3, layer_sizes=[10, 5], output_size=1
+        )
         self.predictor.device = torch.device("cpu")
         self.predictor.model = self.predictor.model.to("cpu")
 
@@ -35,5 +46,3 @@ class TestMLPScalerImplementation:
         predictions = self.predictor.predict(self.X_test)
         assert predictions is not None
         assert len(predictions) == len(self.X_test)
-
-

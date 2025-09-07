@@ -11,23 +11,32 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 class TestMLPOptimizationScalerIntegration:
     def setup_method(self):
         np.random.seed(42)
-        self.X_train = pd.DataFrame({
-            "feature1": np.random.randn(200),
-            "feature2": np.random.randn(200),
-            "feature3": np.random.randn(200),
-            "close": np.random.uniform(50, 150, 200),
-        })
+        self.X_train = pd.DataFrame(
+            {
+                "feature1": np.random.randn(200),
+                "feature2": np.random.randn(200),
+                "feature3": np.random.randn(200),
+                "close": np.random.uniform(50, 150, 200),
+            }
+        )
         self.y_train = pd.Series(np.random.randn(200))
-        self.X_test = pd.DataFrame({
-            "feature1": np.random.randn(50),
-            "feature2": np.random.randn(50),
-            "feature3": np.random.randn(50),
-            "close": np.random.uniform(50, 150, 50),
-        })
+        self.X_test = pd.DataFrame(
+            {
+                "feature1": np.random.randn(50),
+                "feature2": np.random.randn(50),
+                "feature3": np.random.randn(50),
+                "close": np.random.uniform(50, 150, 50),
+            }
+        )
         self.y_test = pd.Series(np.random.randn(50))
 
-        self.predictor = MLPPredictor(model_name="test_mlp_optimization", config={"layer_sizes": [10, 5], "input_size": 4, "batch_size": 16})
-        self.predictor.model = MLPModule(input_size=4, layer_sizes=[10, 5], output_size=1)
+        self.predictor = MLPPredictor(
+            model_name="test_mlp_optimization",
+            config={"layer_sizes": [10, 5], "input_size": 4, "batch_size": 16},
+        )
+        self.predictor.model = MLPModule(
+            input_size=4, layer_sizes=[10, 5], output_size=1
+        )
         self.predictor.device = torch.device("cpu")
         self.predictor.model = self.predictor.model.to("cpu")
 
@@ -43,7 +52,9 @@ class TestMLPOptimizationScalerIntegration:
         assert isinstance(self.optimization_mixin.current_trial_scaler, StandardScaler)
 
     def test_create_model_for_tuning_with_scaler(self):
-        trial_predictor = MLPPredictor(model_name="test_trial", config={"input_size": 4, "layer_sizes": [10, 5]})
+        trial_predictor = MLPPredictor(
+            model_name="test_trial", config={"input_size": 4, "layer_sizes": [10, 5]}
+        )
         scaler = StandardScaler()
         trial_predictor.set_scaler(scaler)
         assert trial_predictor.scaler is scaler
@@ -63,5 +74,3 @@ class TestMLPOptimizationScalerIntegration:
             fitted_scaler=scaler,
         )
         assert callable(objective_func)
-
-

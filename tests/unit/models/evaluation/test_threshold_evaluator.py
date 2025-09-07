@@ -47,7 +47,9 @@ class MockModel:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         return self._preds
 
-    def get_prediction_confidence(self, X: pd.DataFrame, method: str = 'simple') -> np.ndarray:
+    def get_prediction_confidence(
+        self, X: pd.DataFrame, method: str = "simple"
+    ) -> np.ndarray:
         return self._conf
 
 
@@ -71,13 +73,11 @@ def test_optimize_prediction_threshold_success():
         X_test,
         y_test,
         current_prices,
-        confidence_method='simple',
+        confidence_method="simple",
         threshold_range=(0.1, 0.99),
         n_thresholds=10,
     )
 
-    assert res['status'] == 'success'
-    assert 'optimal_threshold' in res
-    assert res['n_thresholds_tested'] >= 1
-
-
+    assert res["status"] == "success"
+    assert "optimal_threshold" in res
+    assert res["n_thresholds_tested"] >= 1

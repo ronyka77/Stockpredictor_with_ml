@@ -64,5 +64,3 @@ def test_predictor_create_model_and_predict_raises_for_untrained():
     X = pd.DataFrame(np.random.randn(5, 10))
     with pytest.raises(ValueError):
         predictor.predict(X)
-
-

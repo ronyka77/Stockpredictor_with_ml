@@ -12,19 +12,12 @@ class FrozenClock:
     def sleep(self, seconds: float) -> None:
         self._now += float(seconds)
 
-    def elapse(self, seconds: float) -> None:
-        self._now += float(seconds)
-
 
 @contextmanager
-def freeze_time(monkeypatch, start: float = 0.0):
+def freeze_time(mocker, start: float = 0.0):
     clock = FrozenClock(start=start)
-    monkeypatch.setattr(time, "time", clock.time)
-    monkeypatch.setattr(time, "sleep", clock.sleep)
-    try:
+    with (
+        mocker.patch.object(time, "time", new=clock.time),
+        mocker.patch.object(time, "sleep", new=clock.sleep),
+    ):
         yield clock
-    finally:
-        # monkeypatch will restore automatically after test scope
-        pass
-
-

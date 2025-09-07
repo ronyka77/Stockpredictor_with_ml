@@ -35,3 +35,7 @@ docs/07-implementation-guides/test_driven_development_guide.md
 reports/
 .backup/
 .hypothesis/
+AutogluonModels/
+docs/external/
+src/intentgraph.py
+cluster_analysis/

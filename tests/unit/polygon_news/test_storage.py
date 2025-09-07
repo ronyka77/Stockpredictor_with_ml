@@ -6,7 +6,9 @@ import json
 
 
 @pytest.mark.unit
-def test_store_article_invalid_data_returns_none(db_session, sample_raw_article_missing):
+def test_store_article_invalid_data_returns_none(
+    db_session, sample_raw_article_missing
+):
     storage = PolygonNewsStorage(db_session)
     # missing required fields -> validate_article_data should reject
     result = storage.store_article(sample_raw_article_missing)
@@ -27,7 +29,9 @@ def test_store_article_create_and_update_flow(db_session, sample_raw_article_ful
 
 
 @pytest.mark.unit
-def test_store_articles_batch_mixed(db_session, sample_raw_article_full, sample_raw_article_missing):
+def test_store_articles_batch_mixed(
+    db_session, sample_raw_article_full, sample_raw_article_missing
+):
     storage = PolygonNewsStorage(db_session)
     # Batch: first valid, second invalid -> expect 1 new, 1 failed/skipped
     batch = [sample_raw_article_full, sample_raw_article_missing]
@@ -45,24 +49,22 @@ def test_store_article_keywords_normalization(db_session, sample_raw_article_ful
 
     # Case: keywords already a list
     article = sample_raw_article_full.copy()
-    article['polygon_id'] = 'art-keywords-list'
-    article['keywords'] = ['one', 'two']
+    article["polygon_id"] = "art-keywords-list"
+    article["keywords"] = ["one", "two"]
     aid = storage.store_article(article)
     assert aid is not None
 
     stored = db_session.query(models.PolygonNewsArticle).filter_by(id=aid).first()
     assert isinstance(stored.keywords, list)
-    assert stored.keywords == ['one', 'two']
+    assert stored.keywords == ["one", "two"]
 
     # Case: keywords provided as JSON string
     article2 = sample_raw_article_full.copy()
-    article2['polygon_id'] = 'art-keywords-json'
-    article2['keywords'] = json.dumps(['alpha', 'beta'])
+    article2["polygon_id"] = "art-keywords-json"
+    article2["keywords"] = json.dumps(["alpha", "beta"])
     aid2 = storage.store_article(article2)
     assert aid2 is not None
 
     stored2 = db_session.query(models.PolygonNewsArticle).filter_by(id=aid2).first()
     assert isinstance(stored2.keywords, list)
-    assert stored2.keywords == ['alpha', 'beta']
-
-
+    assert stored2.keywords == ["alpha", "beta"]

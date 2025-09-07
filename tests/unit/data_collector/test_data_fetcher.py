@@ -3,13 +3,23 @@ from types import SimpleNamespace
 from datetime import datetime, date
 
 from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
-from src.data_collector.polygon_data.data_validator import OHLCVRecord, DataQualityMetrics
+from src.data_collector.polygon_data.data_validator import (
+    OHLCVRecord,
+    DataQualityMetrics,
+)
 
 
 def _make_polygon_record(day_index=0):
     # Create a simple valid polygon-style record with millisecond timestamp
     ts = int(datetime(2020, 1, 1 + day_index).timestamp() * 1000)
-    return {"t": ts, "o": 10.0 + day_index, "h": 11.0 + day_index, "l": 9.0 + day_index, "c": 10.5 + day_index, "v": 1000 + day_index}
+    return {
+        "t": ts,
+        "o": 10.0 + day_index,
+        "h": 11.0 + day_index,
+        "l": 9.0 + day_index,
+        "c": 10.5 + day_index,
+        "v": 1000 + day_index,
+    }
 
 
 def test_get_historical_data_returns_empty_when_no_data(mock_http_client):
@@ -27,9 +37,13 @@ def test_get_historical_data_validation_path(mock_http_client):
     mock_http_client.set_aggregates([{"dummy": True}])
 
     fake_validated = ["vrec1", "vrec2"]
-    fake_metrics = SimpleNamespace(success_rate=99.9, validation_errors=[], data_gaps=[], outliers=[])
+    fake_metrics = SimpleNamespace(
+        success_rate=99.9, validation_errors=[], data_gaps=[], outliers=[]
+    )
 
-    validator = SimpleNamespace(validate_ohlcv_batch=lambda raw, ticker: (fake_validated, fake_metrics))
+    validator = SimpleNamespace(
+        validate_ohlcv_batch=lambda raw, ticker: (fake_validated, fake_metrics)
+    )
 
     fetcher = HistoricalDataFetcher(client=mock_http_client, validator=validator)
     records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
@@ -44,7 +58,9 @@ def test_get_historical_data_transform_without_validation(mock_http_client):
     mock_http_client.set_aggregates([rec])
 
     fetcher = HistoricalDataFetcher(client=mock_http_client)
-    records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-01", validate_data=False)
+    records, metrics = fetcher.get_historical_data(
+        "TICK", "2020-01-01", "2020-01-01", validate_data=False
+    )
 
     assert len(records) == 1
     assert isinstance(records[0], OHLCVRecord)
@@ -81,14 +97,14 @@ def test_get_bulk_historical_data_batches(mock_http_client):
     tickers = ["A", "B", "C"]
     fetcher = HistoricalDataFetcher(client=mock_http_client)
 
-    results = fetcher.get_bulk_historical_data(tickers, "2020-01-01", "2020-01-02", batch_size=2, delay_between_batches=0)
+    results = fetcher.get_bulk_historical_data(
+        tickers, "2020-01-01", "2020-01-02", batch_size=2, delay_between_batches=0
+    )
 
     assert set(results.keys()) == set(tickers)
     for k, (recs, metrics) in results.items():
         # Each returned list may contain OHLCVRecord objects after validation, or be empty depending on validator
         assert isinstance(metrics, DataQualityMetrics)
-
-
 
 
 def test_get_historical_data_no_data(mock_http_client):
@@ -109,7 +125,9 @@ def test_get_historical_data_transforms_and_validates(mock_http_client):
     mock_http_client.set_aggregates(raw)
     fetcher = HistoricalDataFetcher(client=mock_http_client)
 
-    records, metrics = fetcher.get_historical_data("BBB", date(2020, 1, 1), date(2020, 1, 2))
+    records, metrics = fetcher.get_historical_data(
+        "BBB", date(2020, 1, 1), date(2020, 1, 2)
+    )
     assert metrics.total_records == 2
     assert metrics.valid_records == len(records)
     assert all(r.ticker == "BBB" for r in records)
@@ -125,5 +143,3 @@ def test_get_grouped_daily_data(mock_http_client):
     res = fetcher.get_grouped_daily_data("2020-01-01")
     assert "CCC" in res
     assert res["CCC"].ticker == "CCC"
-
-

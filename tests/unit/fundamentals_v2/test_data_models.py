@@ -5,7 +5,9 @@ from src.data_collector.polygon_fundamentals import data_models as dm
 
 
 def make_financial_value(v=100.0):
-    return dm.FinancialValue(value=float(v), unit="USD", label="test", order=1, source="polygon")
+    return dm.FinancialValue(
+        value=float(v), unit="USD", label="test", order=1, source="polygon"
+    )
 
 
 def test_extract_financial_value_dict_and_numeric_and_missing():
@@ -35,7 +37,9 @@ def test_safe_divide_and_growth_and_cagr():
 
 def test_financial_statement_date_parsing_and_company_details():
     # Create statements with string dates to ensure field_validator parses them
-    inc = dm.IncomeStatement(start_date="2020-01-01", filing_date="2021-03-01", fiscal_period="Q1")
+    inc = dm.IncomeStatement(
+        start_date="2020-01-01", filing_date="2021-03-01", fiscal_period="Q1"
+    )
     dm.BalanceSheet(filing_date="2020-12-31", fiscal_period="FY")
     dm.CashFlowStatement(filing_date="2021-06-30", fiscal_period="Q2")
 
@@ -78,7 +82,7 @@ def test_fundamental_data_response_latest_and_by_period_and_quality():
         status="OK",
         income_statements=[s1, s2],
         balance_sheets=[b1],
-        cash_flow_statements=[cf1]
+        cash_flow_statements=[cf1],
     )
 
     # Latest income statement should be s2 (2021)
@@ -99,5 +103,3 @@ def test_fundamental_data_response_latest_and_by_period_and_quality():
     assert isinstance(score, float)
     # Since some essential fields are provided, score should be > 0
     assert score > 0
-
-

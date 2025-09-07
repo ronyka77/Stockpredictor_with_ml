@@ -2,8 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.feature_engineering.technical_indicators.trend_indicators import calculate_sma, calculate_ema
-from src.feature_engineering.technical_indicators.momentum_indicators import calculate_rsi
+from src.data_collector.indicator_pipeline.trend_indicators import (
+    calculate_sma,
+    calculate_ema,
+)
+from src.data_collector.indicator_pipeline.momentum_indicators import calculate_rsi
 
 
 def make_ohlcv(n=60, seed=42):
@@ -14,13 +17,16 @@ def make_ohlcv(n=60, seed=42):
     lows = np.minimum(opens, prices) - rng.random(n)
     volume = rng.integers(1000, 5000, n)
     idx = pd.date_range("2024-01-01", periods=n, freq="D")
-    return pd.DataFrame({
-        "open": opens,
-        "high": highs,
-        "low": lows,
-        "close": prices,
-        "volume": volume,
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": prices,
+            "volume": volume,
+        },
+        index=idx,
+    )
 
 
 @pytest.mark.unit
@@ -44,10 +50,13 @@ def test_rsi_bounds_and_signals():
     df = make_ohlcv(n=100)
     rsi = calculate_rsi(df, periods=[14])
     cols = [c for c in rsi.data.columns if c.startswith("RSI_14")]
-    assert {"RSI_14", "RSI_14_Overbought", "RSI_14_Oversold", "RSI_14_Neutral"}.issubset(set(cols))
+    assert {
+        "RSI_14",
+        "RSI_14_Overbought",
+        "RSI_14_Oversold",
+        "RSI_14_Neutral",
+    }.issubset(set(cols))
 
     # RSI bounded in [0, 100]
     series = rsi.data["RSI_14"].dropna()
     assert (series >= 0).all() and (series <= 100).all()
-
-

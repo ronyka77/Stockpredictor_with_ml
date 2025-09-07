@@ -15,21 +15,7 @@ def db_session():
     # Load .env and read values; prefer TEST_DATABASE_URL from .env, otherwise build from TEST_DB_* vars
     load_dotenv()
     env_vals = dotenv_values()
-    test_db_url = env_vals.get("TEST_DATABASE_URL")
-
-    if not test_db_url:
-        # Build from individual TEST_DB_* variables
-        host = env_vals.get("TEST_DB_HOST")
-        port = env_vals.get("TEST_DB_PORT")
-        name = env_vals.get("TEST_DB_NAME")
-        user = env_vals.get("TEST_DB_USER")
-        password = env_vals.get("TEST_DB_PASSWORD", "")
-
-        if not (host and name and user):
-            pytest.skip("Polygon news DB tests require TEST_DB_HOST/PORT/NAME/USER in .env or TEST_DATABASE_URL set.")
-
-        test_db_url = f"postgresql://{user}:{password}@{host}:{port}/{name}"
-
+    test_db_url = f"postgresql://{env_vals.get('TEST_DB_USER', 'postgres')}:{env_vals.get('TEST_DB_PASSWORD')}@{env_vals.get('TEST_DB_HOST', 'localhost')}:{env_vals.get('TEST_DB_PORT', '5332')}/{env_vals.get('TEST_DB_NAME', 'stock_data')}"
     engine = create_engine(test_db_url)
     # Ensure a clean schema for tests: drop existing news tables then recreate
     try:
@@ -97,5 +83,3 @@ def processed_article_expected():
             }
         ],
     }
-
-

@@ -8,4 +8,4 @@ for financial data, threshold-based evaluation, and model performance assessment
 from .metrics import CustomMetrics
 from .threshold_evaluator import ThresholdEvaluator, ModelProtocol
 
-__all__ = ['CustomMetrics', 'ThresholdEvaluator', 'ModelProtocol'] 
+__all__ = ["CustomMetrics", "ThresholdEvaluator", "ModelProtocol"]

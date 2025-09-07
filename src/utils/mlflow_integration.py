@@ -24,6 +24,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 project_root = Path(__file__).parent.parent.parent
 
+
 class MLflowIntegration:
     """MLflow integration for experiment tracking and model management."""
 
@@ -101,7 +102,10 @@ class MLflowIntegration:
 
             logger.info(
                 "Started MLflow run",
-                extra={"run_id": run.info.run_id, "experiment_id": run.info.experiment_id},
+                extra={
+                    "run_id": run.info.run_id,
+                    "experiment_id": run.info.experiment_id,
+                },
             )
             return run
 
@@ -126,7 +130,10 @@ class MLflowIntegration:
             raise
 
     def log_metrics(
-        self, metrics: dict[str, float], step: Optional[int] = None, run_id: Optional[str] = None
+        self,
+        metrics: dict[str, float],
+        step: Optional[int] = None,
+        run_id: Optional[str] = None,
     ) -> None:
         """Log metrics to MLflow.
 
@@ -169,8 +176,6 @@ class MLflowIntegration:
                 log_func = mlflow.sklearn.log_model
             elif flavor == "xgboost":
                 log_func = mlflow.xgboost.log_model
-            elif flavor == "catboost":
-                log_func = mlflow.catboost.log_model
             else:
                 raise ValueError(f"Unsupported model flavor: {flavor}")
 
@@ -189,7 +194,10 @@ class MLflowIntegration:
 
             logger.info(
                 f"Logged {flavor} model to MLflow",
-                extra={"artifact_path": artifact_path, "has_signature": signature is not None},
+                extra={
+                    "artifact_path": artifact_path,
+                    "has_signature": signature is not None,
+                },
             )
 
         except Exception as e:
@@ -237,13 +245,15 @@ class MLflowIntegration:
             model = mlflow.pyfunc.load_model(model_uri)
 
             logger.info(
-                "Loaded model from MLflow", extra={"run_id": run_id, "model_path": model_path}
+                "Loaded model from MLflow",
+                extra={"run_id": run_id, "model_path": model_path},
             )
             return model
 
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise
+
 
 def cleanup_deleted_runs(mlruns_dir="mlruns"):
     client = MlflowClient()
@@ -255,46 +265,54 @@ def cleanup_deleted_runs(mlruns_dir="mlruns"):
             runs = client.search_runs(
                 [exp.experiment_id], run_view_type=mlflow.entities.ViewType.DELETED_ONLY
             )
-            logger.info(f"Found {len(runs)} runs in experiment {exp.name} (ID: {exp.experiment_id})")
+            logger.info(
+                f"Found {len(runs)} runs in experiment {exp.name} (ID: {exp.experiment_id})"
+            )
             for run in runs:
                 run_id = run.info.run_id
                 run_path = os.path.join(mlruns_dir, exp.experiment_id, run_id)
                 try:
                     if os.path.exists(run_path):
-                        logger.info(f"Deleting run folder for run_id {run_id} at {run_path}")
+                        logger.info(
+                            f"Deleting run folder for run_id {run_id} at {run_path}"
+                        )
                         shutil.rmtree(run_path)
                 except Exception as e:
-                    logger.error(f"Error deleting run folder for run_id {run_id} at {run_path}: {str(e)}")
+                    logger.error(
+                        f"Error deleting run folder for run_id {run_id} at {run_path}: {str(e)}"
+                    )
                     continue
         except Exception as e:
-            logger.error(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
+            logger.error(
+                f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}"
+            )
             continue
+
 
 def cleanup_empty_experiments(mlruns_dir="mlruns"):
     """Clean up experiments that have no runs.
-    
+
     Args:
         mlruns_dir: Path to mlruns directory. Defaults to 'mlruns'.
     """
     client = MlflowClient()
     experiments = client.search_experiments()
-    
+
     for exp in experiments:
         logger.info(f"Checking Experiment: {exp.name} (ID: {exp.experiment_id})")
         try:
             # Search for all runs (active and deleted)
             runs = client.search_runs(
-                [exp.experiment_id],
-                run_view_type=mlflow.entities.ViewType.ALL
+                [exp.experiment_id], run_view_type=mlflow.entities.ViewType.ALL
             )
-            
+
             if len(runs) == 0 and exp.experiment_id != "0":
                 logger.info(f"Experiment {exp.name} has no runs - deleting...")
                 exp_path = os.path.join(mlruns_dir, exp.experiment_id)
-                
+
                 # Delete from tracking server
                 client.delete_experiment(exp.experiment_id)
-                
+
                 # Remove experiment directory if it exists
                 if os.path.exists(exp_path):
                     logger.info(f"Removing experiment directory at {exp_path}")
@@ -302,7 +320,9 @@ def cleanup_empty_experiments(mlruns_dir="mlruns"):
             else:
                 logger.info(f"Experiment {exp.name} has {len(runs)} runs")
         except Exception as e:
-            logger.error(f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}")
+            logger.error(
+                f"Error processing experiment {exp.name} (ID: {exp.experiment_id}): {str(e)}"
+            )
             continue
 
 

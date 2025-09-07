@@ -34,5 +34,3 @@ def test_validate_and_clean_data_property(n_rows, n_cols, nan_probability):
     # Cleaned should contain no NaN or infinite values
     assert not cleaned.isnull().any().any()
     assert not np.isinf(cleaned.values).any()
-
-

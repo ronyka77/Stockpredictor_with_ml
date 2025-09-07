@@ -13,7 +13,9 @@ class DummyModel:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         return self._pred[: len(X)]
 
-    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "simple") -> np.ndarray:
+    def get_prediction_confidence(
+        self, X: pd.DataFrame, method: str = "simple"
+    ) -> np.ndarray:
         return self._conf[: len(X)]
 
 
@@ -71,8 +73,8 @@ def test_predict_with_threshold_filters_and_returns_confidence():
     model = DummyModel(predictions=preds, confidence=conf)
     te = ThresholdEvaluator(investment_amount=100.0)
 
-    out = te.predict_with_threshold(model, X, threshold=0.5, confidence_method="simple", return_confidence=True)
+    out = te.predict_with_threshold(
+        model, X, threshold=0.5, confidence_method="simple", return_confidence=True
+    )
     assert out["filtered_samples"] <= n
     assert "all_confidence" in out and "filtered_confidence" in out
-
-
