@@ -88,7 +88,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(
             label=label,
-            eval_metric="rmse",
+            eval_metric="mae",
             problem_type="regression",
             verbosity=2,
         )
@@ -98,7 +98,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             train_data=train_df,
             tuning_data=valid_df,
             presets="best_quality",
-            hyperparameters=hyperparams,
+            hyperparameters='zeroshot_2025_tabfm',
             dynamic_stacking=False,
             # num_cpus=14,
             num_gpus=1,

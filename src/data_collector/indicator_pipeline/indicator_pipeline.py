@@ -12,9 +12,9 @@ from datetime import datetime, date
 from src.feature_engineering.config import config
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from src.feature_engineering.data_loader import StockDataLoader
 from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
@@ -28,6 +28,131 @@ from src.utils.feature_categories import classify_feature_name
 logger = get_logger(__name__, utility="feature_engineering")
 
 
+def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str, db_config: Optional[Dict[str, Any]]):
+    """Module-level worker used by ProcessPoolExecutor (must be top-level for Windows).
+
+    Recreates required components inside the worker process to avoid sharing non-picklable
+    objects (DB connections, class instances) across processes.
+    """
+    start_time = time.time()
+    result = {
+        "ticker": ticker,
+        "success": False,
+        "features_calculated": 0,
+        "warnings": 0,
+        "error": None,
+        "processing_time": 0.0,
+        "quality_score": 0.0,
+    }
+
+    try:
+        # Local imports to keep worker lightweight and avoid top-level state
+        from src.feature_engineering.data_loader import StockDataLoader
+        from src.data_collector.indicator_pipeline.feature_calculator import (
+            FeatureCalculator,
+        )
+        from src.data_collector.indicator_pipeline.feature_storage import (
+            FeatureStorage,
+        )
+        from src.data_collector.indicator_pipeline.consolidated_storage import (
+            ConsolidatedFeatureStorage,
+        )
+
+        loader = StockDataLoader(db_config)
+        calculator = FeatureCalculator()
+        storage = FeatureStorage()
+        consolidated = ConsolidatedFeatureStorage(
+            db_engine=loader.engine if hasattr(loader, "engine") else None
+        )
+
+        # Normalize date strings
+        start_date = config_dict.get("start_date") or "2022-01-01"
+        end_date = config_dict.get("end_date") or datetime.now().strftime("%Y-%m-%d")
+
+        # If dates are date objects, convert to ISO strings
+        if isinstance(start_date, (datetime, date)):
+            start_date = start_date.isoformat()
+        if isinstance(end_date, (datetime, date)):
+            end_date = end_date.isoformat()
+
+        stock_data = loader.load_stock_data(ticker, start_date, end_date)
+
+        if stock_data.empty:
+            result["error"] = "No data available"
+            return result
+
+        if len(stock_data) < config_dict.get("min_data_points", 0):
+            result["error"] = (
+                f"Insufficient data: {len(stock_data)} < {config_dict.get('min_data_points')}"
+            )
+            return result
+
+        feature_result = calculator.calculate_all_features(
+            stock_data, include_categories=config_dict.get("feature_categories")
+        )
+
+        result["features_calculated"] = len(feature_result.data.columns)
+        result["warnings"] = len(feature_result.warnings)
+        result["quality_score"] = feature_result.quality_score
+        result["processing_time"] = time.time() - start_time
+
+        if config_dict.get("save_to_parquet"):
+            storage_metadata = {
+                "categories": config_dict.get("feature_categories"),
+                "quality_score": feature_result.quality_score,
+                "warnings": feature_result.warnings,
+                "job_id": job_id,
+            }
+            storage.save_features(ticker, feature_result.data, storage_metadata)
+
+        if config_dict.get("save_to_database"):
+            # Prepare rows for bulk upsert to avoid per-row DB inserts
+            try:
+                from src.database.db_utils import bulk_upsert_technical_features
+
+                rows = []
+                quality_score_val = (
+                    float(feature_result.quality_score.item())
+                    if hasattr(feature_result.quality_score, "item")
+                    else float(feature_result.quality_score)
+                )
+
+                for date_idx, row in feature_result.data.iterrows():
+                    for feature_name, feature_value in row.items():
+                        if pd.isna(feature_value) or np.isinf(feature_value):
+                            continue
+
+                        feature_value = float(feature_value)
+                        if abs(feature_value) >= 1e9:
+                            continue
+
+                        rows.append(
+                            {
+                                "ticker": ticker,
+                                "date": date_idx.date(),
+                                "feature_category": classify_feature_name(feature_name),
+                                "feature_name": feature_name,
+                                "feature_value": feature_value,
+                                "quality_score": quality_score_val,
+                            }
+                        )
+
+                saved_count = bulk_upsert_technical_features(
+                    rows, page_size=1000, overwrite=config_dict.get("overwrite_existing", True)
+                )
+            except Exception as e:
+                logger.error(f"Bulk upsert failed for {ticker}: {e}")
+                saved_count = 0
+
+        result["success"] = True
+        return result
+
+    except Exception as e:
+        result["error"] = str(e)
+        return result
+
+
+
 @dataclass
 class BatchJobConfig:
     """
@@ -39,6 +164,7 @@ class BatchJobConfig:
 
     batch_size: int = config.batch_processing.DEFAULT_BATCH_SIZE
     max_workers: int = config.batch_processing.MAX_WORKERS
+    use_processes: bool = False
     start_date: Optional[Union[str, date]] = None
     end_date: Optional[Union[str, date]] = None
     feature_categories: List[str] = None
@@ -120,6 +246,8 @@ class BatchFeatureProcessor:
             db_config: Database configuration dictionary
         """
         self.data_loader = StockDataLoader(db_config)
+        # persist db_config so worker processes can recreate their own loaders
+        self.db_config = db_config
         self.feature_calculator = FeatureCalculator()
         self.feature_storage = FeatureStorage()
         self.consolidated_storage = ConsolidatedFeatureStorage(
@@ -234,12 +362,43 @@ class BatchFeatureProcessor:
                 # logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
 
             if config.save_to_database:
-                saved_count = self._save_features_to_database(
-                    ticker, feature_result, job_id, config.overwrite_existing
-                )
-                logger.info(
-                    f"Saved {saved_count} feature records to database for {ticker}"
-                )
+                try:
+                    from src.database.db_utils import bulk_upsert_technical_features
+
+                    rows = []
+                    quality_score_val = (
+                        float(feature_result.quality_score.item())
+                        if hasattr(feature_result.quality_score, "item")
+                        else float(feature_result.quality_score)
+                    )
+
+                    for date_idx, row in feature_result.data.iterrows():
+                        for feature_name, feature_value in row.items():
+                            if pd.isna(feature_value) or np.isinf(feature_value):
+                                continue
+                            feature_value = float(feature_value)
+                            if abs(feature_value) >= 1e9:
+                                continue
+
+                            rows.append(
+                                {
+                                    "ticker": ticker,
+                                    "date": date_idx.date(),
+                                    "feature_category": classify_feature_name(feature_name),
+                                    "feature_name": feature_name,
+                                    "feature_value": feature_value,
+                                    "quality_score": quality_score_val,
+                                }
+                            )
+
+                    saved_count = bulk_upsert_technical_features(
+                        rows, page_size=1000, overwrite=config.overwrite_existing
+                    )
+                    logger.info(
+                        f"Saved {saved_count} feature records to database for {ticker}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error saving features for {ticker}: {e}")
 
             result["success"] = True
             logger.info(
@@ -279,15 +438,32 @@ class BatchFeatureProcessor:
         failed_tickers = []
 
         try:
-            # Process tickers in parallel
-            with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
-                # Submit all tasks
-                future_to_ticker = {
-                    executor.submit(
-                        self.process_single_ticker, ticker, config, job_id
-                    ): ticker
-                    for ticker in tickers
-                }
+            # Choose executor based on config flag. For process-based parallelism on
+            # Windows, ProcessPoolExecutor requires module-level callables and
+            # picklable arguments.
+            if config.use_processes:
+                executor_cls = ProcessPoolExecutor
+            else:
+                executor_cls = ThreadPoolExecutor
+
+            with executor_cls(max_workers=config.max_workers) as executor:
+                if config.use_processes:
+                    # Convert config to serializable dict
+                    config_dict = asdict(config)
+                    # Submit module-level worker that recreates resources per process
+                    future_to_ticker = {
+                        executor.submit(
+                            _process_ticker_worker, ticker, config_dict, job_id, self.db_config
+                        ): ticker
+                        for ticker in tickers
+                    }
+                else:
+                    future_to_ticker = {
+                        executor.submit(
+                            self.process_single_ticker, ticker, config, job_id
+                        ): ticker
+                        for ticker in tickers
+                    }
 
                 for future in as_completed(future_to_ticker):
                     ticker = future_to_ticker[future]
@@ -440,88 +616,44 @@ class BatchFeatureProcessor:
         Returns:
             Number of records saved
         """
+        # New implementation uses bulk upsert helper to improve throughput
         try:
-            from sqlalchemy import text
+            from src.database.db_utils import bulk_upsert_technical_features
 
-            saved_count = 0
+            rows = []
+            quality_score_val = (
+                float(feature_result.quality_score.item())
+                if hasattr(feature_result.quality_score, "item")
+                else float(feature_result.quality_score)
+            )
 
-            with self.data_loader.engine.connect() as conn:
-                for date_idx, row in feature_result.data.iterrows():
-                    for feature_name, feature_value in row.items():
-                        if pd.isna(feature_value) or np.isinf(feature_value):
-                            continue
+            for date_idx, row in feature_result.data.iterrows():
+                for feature_name, feature_value in row.items():
+                    if pd.isna(feature_value) or np.isinf(feature_value):
+                        continue
 
-                        # Convert to native Python types and check range
-                        feature_value = float(feature_value)
-
-                        # Skip values that are too large for database precision (15,6)
-                        # Database can handle values up to 999,999,999.999999
-                        if abs(feature_value) >= 1e9:
-                            logger.info(
-                                f"Skipping {feature_name} value {feature_value} - too large for database precision"
-                            )
-                            continue
-
-                        # Determine feature category
-                        category = classify_feature_name(feature_name)
-
-                        # Check if feature already exists
-                        if not overwrite:
-                            check_query = text("""
-                                SELECT COUNT(*) as count FROM technical_features 
-                                WHERE ticker = :ticker AND date = :date 
-                                AND feature_category = :category AND feature_name = :name
-                            """)
-
-                            result = conn.execute(
-                                check_query,
-                                {
-                                    "ticker": ticker,
-                                    "date": date_idx.date(),
-                                    "category": category,
-                                    "name": feature_name,
-                                },
-                            ).fetchone()
-
-                            if result and result[0] > 0:
-                                continue
-
-                        # Insert or update feature
-                        insert_query = text("""
-                            INSERT INTO technical_features 
-                            (ticker, date, feature_category, feature_name, feature_value, quality_score)
-                            VALUES (:ticker, :date, :category, :name, :value, :quality)
-                            ON CONFLICT (ticker, date, feature_category, feature_name) 
-                            DO UPDATE SET 
-                                feature_value = EXCLUDED.feature_value,
-                                quality_score = EXCLUDED.quality_score,
-                                calculation_timestamp = CURRENT_TIMESTAMP
-                        """)
-
-                        conn.execute(
-                            insert_query,
-                            {
-                                "ticker": ticker,
-                                "date": date_idx.date(),
-                                "category": category,
-                                "name": feature_name,
-                                "value": feature_value,
-                                "quality": float(
-                                    feature_result.quality_score.item()
-                                    if hasattr(feature_result.quality_score, "item")
-                                    else feature_result.quality_score
-                                ),
-                            },
+                    feature_value = float(feature_value)
+                    if abs(feature_value) >= 1e9:
+                        logger.info(
+                            f"Skipping {feature_name} value {feature_value} - too large for database precision"
                         )
+                        continue
 
-                        saved_count += 1
+                    rows.append(
+                        {
+                            "ticker": ticker,
+                            "date": date_idx.date(),
+                            "feature_category": classify_feature_name(feature_name),
+                            "feature_name": feature_name,
+                            "feature_value": feature_value,
+                            "quality_score": quality_score_val,
+                        }
+                    )
 
-                conn.commit()
-
+            saved_count = bulk_upsert_technical_features(rows, page_size=1000, overwrite=overwrite)
             return saved_count
-
         except Exception as e:
-            logger.error(f"Error saving features for {ticker}: {str(e)}")
+            logger.error(f"Error saving features for {ticker}: {e}")
             raise
 
     def close(self):
