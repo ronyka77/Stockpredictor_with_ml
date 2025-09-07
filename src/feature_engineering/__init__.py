@@ -13,7 +13,7 @@ Main Components:
 
 Usage:
     from src.data_collector.indicator_pipeline import FeatureCalculator
-    
+
     calculator = FeatureCalculator()
     features = calculator.calculate_features('AAPL', '2024-01-01', '2024-12-31')
 """

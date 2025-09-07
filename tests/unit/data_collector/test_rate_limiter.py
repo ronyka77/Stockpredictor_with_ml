@@ -1,7 +1,10 @@
 import pytest
 
 from tests._fixtures.frozen_time import freeze_time
-from src.data_collector.polygon_data.rate_limiter import RateLimiter, AdaptiveRateLimiter
+from src.data_collector.polygon_data.rate_limiter import (
+    RateLimiter,
+    AdaptiveRateLimiter,
+)
 
 
 @pytest.mark.unit
@@ -56,5 +59,3 @@ def test_adaptive_rate_limiter_backoff_and_restore(mocker):
         arl.handle_successful_request()
         # After clearing consecutive_errors, restore toward original limit
         assert arl.requests_per_minute <= arl.original_limit
-
-

@@ -66,5 +66,3 @@ def test_make_request_timeout_then_fail(mocker):
 
     with pytest.raises(PolygonAPIError):
         client._make_request("/timeout")
-
-

@@ -43,5 +43,3 @@ class StubModel:
 @pytest.fixture
 def stub_model():
     return StubModel()
-
-

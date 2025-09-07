@@ -14,6 +14,7 @@ if src_path not in sys.path:
 @pytest.fixture
 def mock_http_client():
     """Simple mock HTTP client fixture with configurable return values."""
+
     class MockClient:
         def __init__(self):
             self._aggregates = None
@@ -41,6 +42,7 @@ def mock_http_client():
 @pytest.fixture
 def permission_error_simulator():
     """Return a helper that mocks filesystem calls to raise PermissionError."""
+
     def _apply(mocker):
         import os
         import builtins
@@ -59,5 +61,3 @@ def permission_error_simulator():
 def no_sleep(mocker):
     """Prevent actual sleeping in tests to speed up retry/backoff paths."""
     mocker.patch.object(time, "sleep", lambda s: None)
-
-

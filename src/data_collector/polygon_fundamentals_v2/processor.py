@@ -1,5 +1,3 @@
-
-
 from typing import Dict, List
 
 from src.data_collector.polygon_fundamentals_v2.collector_service import (
@@ -23,7 +21,9 @@ class FundamentalsProcessor:
         try:
             with self.pool.get_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT ticker FROM tickers WHERE active = true and has_financials = true")
+                    cur.execute(
+                        "SELECT ticker FROM tickers WHERE active = true and has_financials = true"
+                    )
                     return [r["ticker"] for r in cur.fetchall()]
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to load active tickers: {e}")
@@ -41,5 +41,3 @@ class FundamentalsProcessor:
                 logger.error(f"Exception while processing {t}: {e}")
                 results[t] = False
         return results
-
-

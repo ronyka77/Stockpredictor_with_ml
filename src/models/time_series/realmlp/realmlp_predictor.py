@@ -26,11 +26,22 @@ logger = get_logger(__name__)
 
 
 class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
-    def __init__(self, model_name: str = "RealMLP", config: Optional[Dict[str, Any]] = None, threshold_evaluator=None):
-        super().__init__(model_name=model_name, config=config or {}, threshold_evaluator=threshold_evaluator)
+    def __init__(
+        self,
+        model_name: str = "RealMLP",
+        config: Optional[Dict[str, Any]] = None,
+        threshold_evaluator=None,
+    ):
+        super().__init__(
+            model_name=model_name,
+            config=config or {},
+            threshold_evaluator=threshold_evaluator,
+        )
         self.preprocessor: Optional[RealMLPPreprocessor] = None
         self.feature_names: List[str] = []
-        self.threshold_evaluator: ThresholdEvaluator = threshold_evaluator or ThresholdEvaluator()
+        self.threshold_evaluator: ThresholdEvaluator = (
+            threshold_evaluator or ThresholdEvaluator()
+        )
         self.optimal_threshold: Optional[float] = None
         self.confidence_method: str = "variance"
         self.best_threshold_info: Optional[Dict[str, Any]] = None
@@ -75,7 +86,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             use_diagonal=use_diagonal,
             use_numeric_embedding=use_numeric_embedding,
             numeric_embedding_dim=numeric_embedding_dim,
-            numeric_embedding_out_dim=hidden_sizes[0] if use_numeric_embedding else input_size,
+            numeric_embedding_out_dim=hidden_sizes[0]
+            if use_numeric_embedding
+            else input_size,
             num_categories=num_categories,
             cat_embed_dim=cat_embed_dim,
             embedding_dropout=embedding_dropout,
@@ -85,12 +98,16 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         if not self.is_trained or self.model is None:
             raise RuntimeError("Model must be trained/loaded before prediction")
         if getattr(self, "preprocessor", None) is None:
-            raise RuntimeError("Preprocessor not available on predictor; cannot transform features for inference")
+            raise RuntimeError(
+                "Preprocessor not available on predictor; cannot transform features for inference"
+            )
 
         numeric_cols = list(self.preprocessor.feature_names)
         missing = [c for c in numeric_cols if c not in X.columns]
         if missing:
-            raise ValueError(f"Missing required numeric feature columns for inference: {missing}")
+            raise ValueError(
+                f"Missing required numeric feature columns for inference: {missing}"
+            )
 
         X_num, cat_idx = self.preprocessor.transform(X, numeric_cols=numeric_cols)
 
@@ -107,14 +124,20 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             preds = outputs.detach().cpu().numpy().squeeze()
         return preds
 
-    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "variance") -> np.ndarray:
+    def get_prediction_confidence(
+        self, X: pd.DataFrame, method: str = "variance"
+    ) -> np.ndarray:
         if method == "variance":
             if getattr(self, "preprocessor", None) is None:
-                raise RuntimeError("Preprocessor not available; cannot compute confidence")
+                raise RuntimeError(
+                    "Preprocessor not available; cannot compute confidence"
+                )
             numeric_cols = list(self.preprocessor.feature_names)
             missing = [c for c in numeric_cols if c not in X.columns]
             if missing:
-                raise ValueError(f"Missing required numeric feature columns for confidence: {missing}")
+                raise ValueError(
+                    f"Missing required numeric feature columns for confidence: {missing}"
+                )
             X_num, cat_idx = self.preprocessor.transform(X, numeric_cols=numeric_cols)
 
             device = self.device
@@ -141,9 +164,15 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                         pass_preds: List[np.ndarray] = []
                         for start in range(0, n_samples, batch_size):
                             end = min(start + batch_size, n_samples)
-                            x_batch = torch.as_tensor(X_num[start:end], dtype=torch.float32, device=device)
+                            x_batch = torch.as_tensor(
+                                X_num[start:end], dtype=torch.float32, device=device
+                            )
                             if cat_idx is not None:
-                                c_batch = torch.as_tensor(cat_idx[start:end], dtype=torch.bfloat16, device=device)
+                                c_batch = torch.as_tensor(
+                                    cat_idx[start:end],
+                                    dtype=torch.bfloat16,
+                                    device=device,
+                                )
                             else:
                                 c_batch = None
                             outputs = self.model(x_batch, c_batch)
@@ -176,7 +205,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             return conf_norm
         elif method == "ensemble":
             if not self.ensemble_models or len(self.ensemble_models) == 0:
-                logger.warning("No ensemble_models set; falling back to variance confidence")
+                logger.warning(
+                    "No ensemble_models set; falling back to variance confidence"
+                )
                 return self.get_prediction_confidence(X, method="variance")
             preds_list: List[np.ndarray] = []
             for m in self.ensemble_models:
@@ -185,13 +216,21 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                         preds_list.append(m.predict(X))
                     else:
                         if getattr(self, "preprocessor", None) is None:
-                            raise RuntimeError("Preprocessor not available to run raw ensemble module")
+                            raise RuntimeError(
+                                "Preprocessor not available to run raw ensemble module"
+                            )
                         numeric_cols = list(self.preprocessor.feature_names)
-                        X_num, cat_idx = self.preprocessor.transform(X, numeric_cols=numeric_cols)
-                        x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
+                        X_num, cat_idx = self.preprocessor.transform(
+                            X, numeric_cols=numeric_cols
+                        )
+                        x_tensor = torch.as_tensor(
+                            X_num, dtype=torch.float32, device=self.device
+                        )
                         cat_tensor = None
                         if cat_idx is not None:
-                            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.bfloat16, device=self.device)
+                            cat_tensor = torch.as_tensor(
+                                cat_idx, dtype=torch.bfloat16, device=self.device
+                            )
                         with torch.no_grad():
                             outputs = m.to(self.device)(x_tensor, cat_tensor)
                             preds_list.append(outputs.detach().cpu().numpy().squeeze())
@@ -208,14 +247,16 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             z = self._compute_penultimate_activations(X)
             # Ensure latent stats
             if self._latent_mean is None or self._latent_cov_inv is None:
-                logger.warning("Latent stats not set; computing from provided X as reference")
+                logger.warning(
+                    "Latent stats not set; computing from provided X as reference"
+                )
                 self._fit_latent_stats_from_activations(z)
             mu = self._latent_mean
             cov_inv = self._latent_cov_inv
             if mu is None or cov_inv is None:
                 return np.full(z.shape[0], 0.5, dtype=float)
             diff = z - mu
-            d2 = np.einsum('ij,jk,ik->i', diff, cov_inv, diff)
+            d2 = np.einsum("ij,jk,ik->i", diff, cov_inv, diff)
             # Map distance to confidence
             med = float(np.median(d2)) + 1e-8
             conf = np.exp(-d2 / med)
@@ -223,7 +264,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             return (conf - mn) / (mx - mn) if mx > mn else np.full_like(conf, 0.5)
         elif method == "conformal_residual":
             if self._cal_latent is None or self._cal_residuals is None:
-                logger.warning("Conformal calibration not set; falling back to variance confidence")
+                logger.warning(
+                    "Conformal calibration not set; falling back to variance confidence"
+                )
                 return self.get_prediction_confidence(X, method="variance")
             z = self._compute_penultimate_activations(X)
             # Compute kNN in latent space (brute-force, vectorized)
@@ -236,7 +279,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             cal2 = (cal**2).sum(axis=1)
             d2 = z2 + cal2[None, :] - 2.0 * (z @ cal.T)
             # Get k nearest residual quantile for each row
-            idxs = np.argpartition(d2, kth=k-1, axis=1)[:, :k]
+            idxs = np.argpartition(d2, kth=k - 1, axis=1)[:, :k]
             local_q = np.quantile(res[idxs], 1.0 - self._conformal_alpha, axis=1)
             conf = 1.0 / (1.0 + local_q)
             mn, mx = float(np.min(conf)), float(np.max(conf))
@@ -253,41 +296,49 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
     # ------------------------- Confidence utilities -------------------------
     def _compute_penultimate_activations(self, X: pd.DataFrame) -> np.ndarray:
         if getattr(self, "preprocessor", None) is None:
-            raise RuntimeError("Preprocessor not available to compute latent activations")
+            raise RuntimeError(
+                "Preprocessor not available to compute latent activations"
+            )
         numeric_cols = list(self.preprocessor.feature_names)
         missing = [c for c in numeric_cols if c not in X.columns]
         if missing:
-            raise ValueError(f"Missing required numeric feature columns for latent activations: {missing}")
+            raise ValueError(
+                f"Missing required numeric feature columns for latent activations: {missing}"
+            )
         X_num, cat_idx = self.preprocessor.transform(X, numeric_cols=numeric_cols)
 
         self.model.to(self.device)
         x_tensor = torch.as_tensor(X_num, dtype=torch.float32, device=self.device)
         cat_tensor = None
         if cat_idx is not None:
-            cat_tensor = torch.as_tensor(cat_idx, dtype=torch.bfloat16, device=self.device)
+            cat_tensor = torch.as_tensor(
+                cat_idx, dtype=torch.bfloat16, device=self.device
+            )
 
         m: RealMLPModule = self.model  # type: ignore[assignment]
         with torch.no_grad():
             # Replicate forward up to penultimate
             z = x_tensor
-            if getattr(m, 'num_embed', None) is not None:
+            if getattr(m, "num_embed", None) is not None:
                 z = m.num_embed(z)
-            if getattr(m, 'diag', None) is not None:
+            if getattr(m, "diag", None) is not None:
                 z = m.diag(z)
-            if getattr(m, 'cat_embedding', None) is not None:
+            if getattr(m, "cat_embedding", None) is not None:
                 if cat_tensor is None:
-                    cat_tensor = torch.zeros(z.size(0), dtype=torch.bfloat16, device=self.device)
+                    cat_tensor = torch.zeros(
+                        z.size(0), dtype=torch.bfloat16, device=self.device
+                    )
                 if cat_tensor.dim() > 1:
                     cat_idx_flat = cat_tensor.view(cat_tensor.size(0))
                 else:
                     cat_idx_flat = cat_tensor
                 e = m.cat_embedding(cat_idx_flat)
-                if getattr(m, 'cat_embed_dropout', None) is not None:
+                if getattr(m, "cat_embed_dropout", None) is not None:
                     e = m.cat_embed_dropout(e)
                 z = torch.cat([z, e], dim=1)
             for i, lin in enumerate(m.linear_blocks):
                 z = lin(z)
-                if m.batch_norm and getattr(m, 'bn_blocks', None) is not None:
+                if m.batch_norm and getattr(m, "bn_blocks", None) is not None:
                     z = m.bn_blocks[i](z)
                 z = m.activation(z)
                 z = m.dropouts[i](z)
@@ -295,7 +346,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             z_np = z.detach().cpu().numpy()
         return z_np
 
-    def _fit_latent_stats_from_activations(self, z: np.ndarray, eps: float = 1e-5) -> None:
+    def _fit_latent_stats_from_activations(
+        self, z: np.ndarray, eps: float = 1e-5
+    ) -> None:
         mu = z.mean(axis=0)
         cov = np.cov(z, rowvar=False)
         # Regularize covariance for stability
@@ -324,17 +377,24 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         current_prices_col: str = "close",
         confidence_method: str = "variance",
         threshold_range: tuple = (0.01, 0.99),
-        n_thresholds: int = 99) -> Dict[str, Any]:
+        n_thresholds: int = 99,
+    ) -> Dict[str, Any]:
         """
         Run confidence-threshold optimization on test data, then evaluate performance at the best threshold.
         Returns a dict containing optimization and evaluation results.
         """
         if self.model is None or not self.is_trained:
-            raise RuntimeError("Model must be trained/loaded before threshold evaluation")
+            raise RuntimeError(
+                "Model must be trained/loaded before threshold evaluation"
+            )
         if getattr(self, "preprocessor", None) is None:
-            raise RuntimeError("Preprocessor not available; cannot align feature columns for evaluation")
+            raise RuntimeError(
+                "Preprocessor not available; cannot align feature columns for evaluation"
+            )
         if current_prices_col not in X_test.columns:
-            raise ValueError(f"'{current_prices_col}' column is required in X_test to compute profits")
+            raise ValueError(
+                f"'{current_prices_col}' column is required in X_test to compute profits"
+            )
 
         current_prices_test = X_test[current_prices_col].to_numpy()
 
@@ -396,7 +456,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         - Does not save models
         """
 
-        study = optuna.create_study(direction="maximize", sampler=optuna.samplers.RandomSampler(seed=42))
+        study = optuna.create_study(
+            direction="maximize", sampler=optuna.samplers.RandomSampler(seed=42)
+        )
         base_config = dict(self.config) if isinstance(self.config, dict) else {}
 
         def objective(trial: optuna.Trial) -> float:
@@ -423,12 +485,20 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             use_batch_norm = trial.suggest_categorical("use_batch_norm", [True, False])
             use_diagonal = trial.suggest_categorical("use_diagonal", [True, False])
             huber_delta = trial.suggest_float("huber_delta", 0.03, 0.12)
-            cat_embedding_dim = trial.suggest_categorical("cat_embedding_dim", [16, 24, 32, 48 ,64])
-            numeric_embedding_dim = trial.suggest_categorical("numeric_embedding_dim", [16, 24, 32, 48 ,64])
+            cat_embedding_dim = trial.suggest_categorical(
+                "cat_embedding_dim", [16, 24, 32, 48, 64]
+            )
+            numeric_embedding_dim = trial.suggest_categorical(
+                "numeric_embedding_dim", [16, 24, 32, 48, 64]
+            )
             embedding_dropout = trial.suggest_float("embedding_dropout", 0.05, 0.2)
             epochs = trial.suggest_int("epochs", 5, 25)
-            early_stopping_patience = trial.suggest_int("early_stopping_patience", 5, 15)
-            early_stopping_min_delta = trial.suggest_float("early_stopping_min_delta", 1e-4, 1e-2, log=True)
+            early_stopping_patience = trial.suggest_int(
+                "early_stopping_patience", 5, 15
+            )
+            early_stopping_min_delta = trial.suggest_float(
+                "early_stopping_min_delta", 1e-4, 1e-2, log=True
+            )
             early_stopping_warmup = trial.suggest_int("early_stopping_warmup", 3, 10)
 
             trial_config = {
@@ -468,38 +538,52 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     y_test=y_val,
                     confidence_method=confidence_method,
                 )
-                metrics = eval_pack.get("evaluation", {}) if isinstance(eval_pack, dict) else {}
+                metrics = (
+                    eval_pack.get("evaluation", {})
+                    if isinstance(eval_pack, dict)
+                    else {}
+                )
                 optimized_profit_score = None
 
                 # Extract optimization dict, whether nested (wrapper) or direct
                 opt_dict = None
                 if isinstance(eval_pack, dict):
-                    if "optimization" in eval_pack and isinstance(eval_pack["optimization"], dict):
+                    if "optimization" in eval_pack and isinstance(
+                        eval_pack["optimization"], dict
+                    ):
                         opt_dict = eval_pack["optimization"]
                     elif "status" in eval_pack and "best_result" in eval_pack:
                         opt_dict = eval_pack
 
-                best_res = opt_dict.get("best_result", {}) if isinstance(opt_dict, dict) else {}
+                best_res = (
+                    opt_dict.get("best_result", {})
+                    if isinstance(opt_dict, dict)
+                    else {}
+                )
                 if not isinstance(best_res, dict):
                     best_res = {}
 
                 # Primary score from evaluation metrics if available
                 if isinstance(metrics, dict) and "profit_per_investment" in metrics:
                     try:
-                        optimized_profit_score = float(metrics["profit_per_investment"]) 
+                        optimized_profit_score = float(metrics["profit_per_investment"])
                     except Exception:
                         optimized_profit_score = None
                 # Fallback score from best_result (optimizer) when no evaluation present
                 if optimized_profit_score is None:
                     try:
-                        optimized_profit_score = float(best_res.get("test_profit_per_investment", 0.0))
+                        optimized_profit_score = float(
+                            best_res.get("test_profit_per_investment", 0.0)
+                        )
                     except Exception:
                         optimized_profit_score = 0.0
 
                 # Build threshold_info from optimization results for logging/selection
                 optimal_threshold = None
                 if isinstance(opt_dict, dict):
-                    optimal_threshold = opt_dict.get("optimal_threshold") or best_res.get("threshold")
+                    optimal_threshold = opt_dict.get(
+                        "optimal_threshold"
+                    ) or best_res.get("threshold")
                 threshold_info = {
                     "optimal_threshold": optimal_threshold,
                     "samples_kept_ratio": best_res.get("test_samples_ratio"),
@@ -522,16 +606,20 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
 
                     # Store the optimal threshold and confidence method
                     if threshold_info.get("optimal_threshold") is not None:
-                        self.optimal_threshold = float(threshold_info["optimal_threshold"])  # type: ignore[index]
+                        self.optimal_threshold = float(
+                            threshold_info["optimal_threshold"]
+                        )  # type: ignore[index]
                         self.confidence_method = confidence_method
 
-                    logger.info(f"\U0001F3AF NEW BEST TRIAL {trial.number}: Profit Per Investment = {float(optimized_profit_score):.3f}")
+                    logger.info(
+                        f"\U0001f3af NEW BEST TRIAL {trial.number}: Profit Per Investment = {float(optimized_profit_score):.3f}"
+                    )
                     if threshold_info.get("optimal_threshold") is not None:
                         logger.info(
                             f"   Optimal threshold: {float(threshold_info['optimal_threshold']):.3f}"
                         )
                         logger.info(
-                            f"   Samples kept: {float(threshold_info['samples_kept_ratio'])*100:.1f}%"
+                            f"   Samples kept: {float(threshold_info['samples_kept_ratio']) * 100:.1f}%"
                         )
                         logger.info(
                             f"   Investment success rate: {float(threshold_info['investment_success_rate']):.3f}"
@@ -571,7 +659,8 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         metrics: Dict[str, float],
         params: Dict[str, Any],
         X_eval: pd.DataFrame,
-        preprocessor: Optional[RealMLPPreprocessor] = None) -> Optional[str]:
+        preprocessor: Optional[RealMLPPreprocessor] = None,
+    ) -> Optional[str]:
         """
         Save the trained RealMLP model and preprocessor artifacts to MLflow.
         Logs:
@@ -587,7 +676,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
 
         try:
             numeric_feature_names = (
-                list(preprocessor.feature_names) if (preprocessor and preprocessor.feature_names) else list(X_eval.columns)
+                list(preprocessor.feature_names)
+                if (preprocessor and preprocessor.feature_names)
+                else list(X_eval.columns)
             )
         except Exception:
             logger.warning("Could not get feature names")
@@ -600,7 +691,7 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     combined_feature_names.append(c)
 
         try:
-            joined = "\u241F".join([str(c) for c in numeric_feature_names])
+            joined = "\u241f".join([str(c) for c in numeric_feature_names])
             feature_schema_hash = hashlib.sha256(joined.encode("utf-8")).hexdigest()
         except Exception:
             feature_schema_hash = ""
@@ -608,7 +699,10 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         # Prepare input example and signature (use numeric_feature_names for model signature)
         input_example = X_eval.loc[:, numeric_feature_names].iloc[:5].copy()
         for col in input_example.columns:
-            if getattr(input_example[col], "dtype", None) is not None and input_example[col].dtype.kind == "i":
+            if (
+                getattr(input_example[col], "dtype", None) is not None
+                and input_example[col].dtype.kind == "i"
+            ):
                 input_example[col] = input_example[col].astype("float64")
 
         self.model.eval()
@@ -619,14 +713,29 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         self.model.to(self.device)
         try:
             with torch.no_grad():
-                input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32, device=self.device)
-                has_cat = hasattr(self.model, "cat_embedding") and getattr(self.model, "cat_embedding") is not None
+                input_tensor = torch.as_tensor(
+                    input_example.values, dtype=torch.float32, device=self.device
+                )
+                has_cat = (
+                    hasattr(self.model, "cat_embedding")
+                    and getattr(self.model, "cat_embedding") is not None
+                )
                 if has_cat:
-                    dummy_cat = torch.zeros((input_tensor.shape[0],), dtype=torch.bfloat16, device=self.device)
-                    predictions_example = self.model(input_tensor, dummy_cat).detach().cpu().numpy()
+                    dummy_cat = torch.zeros(
+                        (input_tensor.shape[0],),
+                        dtype=torch.bfloat16,
+                        device=self.device,
+                    )
+                    predictions_example = (
+                        self.model(input_tensor, dummy_cat).detach().cpu().numpy()
+                    )
                 else:
-                    predictions_example = self.model(input_tensor).detach().cpu().numpy()
-            signature = mlflow.models.infer_signature(input_example, predictions_example)
+                    predictions_example = (
+                        self.model(input_tensor).detach().cpu().numpy()
+                    )
+            signature = mlflow.models.infer_signature(
+                input_example, predictions_example
+            )
         finally:
             try:
                 self.model.to(self.device)
@@ -642,7 +751,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         with mlflow.start_run(run_name="realmlp_final") as run:
             # Optionally silence MLflow env var info message
             try:
-                os.environ.setdefault("MLFLOW_RECORD_ENV_VARS_IN_MODEL_LOGGING", "false")
+                os.environ.setdefault(
+                    "MLFLOW_RECORD_ENV_VARS_IN_MODEL_LOGGING", "false"
+                )
             except Exception:
                 pass
             # Log params/metrics
@@ -651,7 +762,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 params_to_log["feature_schema_hash"] = feature_schema_hash
                 if self.optimal_threshold is not None:
                     params_to_log["optimal_threshold"] = float(self.optimal_threshold)
-                    params_to_log["confidence_method"] = str(getattr(self, "confidence_method", "variance"))
+                    params_to_log["confidence_method"] = str(
+                        getattr(self, "confidence_method", "variance")
+                    )
                 mlflow.log_params(params_to_log)
             except Exception as e:
                 logger.warning(f"Could not log params: {e}")
@@ -659,13 +772,25 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 mlflow.log_metrics(metrics)
                 if isinstance(self.threshold_eval_metrics, dict):
                     metric_keys = [
-                        "mse","mae","r2_score","total_profit","profit_per_investment",
-                        "custom_accuracy","investment_success_rate","samples_evaluated","samples_kept_ratio",
-                        "average_confidence","avg_confidence_all","avg_confidence_filtered"
+                        "mse",
+                        "mae",
+                        "r2_score",
+                        "total_profit",
+                        "profit_per_investment",
+                        "custom_accuracy",
+                        "investment_success_rate",
+                        "samples_evaluated",
+                        "samples_kept_ratio",
+                        "average_confidence",
+                        "avg_confidence_all",
+                        "avg_confidence_filtered",
                     ]
                     loggable = {}
                     for k in metric_keys:
-                        if k in self.threshold_eval_metrics and self.threshold_eval_metrics[k] is not None:
+                        if (
+                            k in self.threshold_eval_metrics
+                            and self.threshold_eval_metrics[k] is not None
+                        ):
                             val = self.threshold_eval_metrics[k]
                             try:
                                 loggable[k] = float(val)
@@ -673,19 +798,27 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                                 pass
                     if loggable:
                         mlflow.log_metrics(loggable)
-                
+
                 # Persist JSON artifacts for completeness
                 if self.best_threshold_info is not None:
-                    mlflow.log_dict(self.best_threshold_info, "evaluation/best_threshold_info.json")
+                    mlflow.log_dict(
+                        self.best_threshold_info, "evaluation/best_threshold_info.json"
+                    )
                 if isinstance(self.threshold_eval_metrics, dict):
-                    mlflow.log_dict(self.threshold_eval_metrics, "evaluation/threshold_evaluation_metrics.json")
+                    mlflow.log_dict(
+                        self.threshold_eval_metrics,
+                        "evaluation/threshold_evaluation_metrics.json",
+                    )
             except Exception as e:
                 logger.warning(f"Could not log metrics/artifacts: {e}")
 
             # Log feature names explicitly (alongside preprocessor copy)
             try:
                 mlflow.log_dict(
-                    {"feature_names": numeric_feature_names, "export_feature_names": combined_feature_names},
+                    {
+                        "feature_names": numeric_feature_names,
+                        "export_feature_names": combined_feature_names,
+                    },
                     "preprocessor/feature_names.json",
                 )
             except Exception as e:
@@ -712,7 +845,10 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             # Log the PyTorch model
             try:
                 self.model.to(self.device)
-                if hasattr(self.model, "cat_embedding") and getattr(self.model, "cat_embedding") is not None:
+                if (
+                    hasattr(self.model, "cat_embedding")
+                    and getattr(self.model, "cat_embedding") is not None
+                ):
                     mlflow.pytorch.log_model(
                         pytorch_model=self.model,
                         artifact_path="model",
@@ -727,9 +863,17 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                     )
                 # Optionally validate serving input example for clarity
                 try:
-                    from mlflow.models import validate_serving_input, convert_input_example_to_serving_input
-                    serving_example = convert_input_example_to_serving_input(input_example)
-                    validate_serving_input(f"runs:/{run.info.run_id}/model", serving_example)
+                    from mlflow.models import (
+                        validate_serving_input,
+                        convert_input_example_to_serving_input,
+                    )
+
+                    serving_example = convert_input_example_to_serving_input(
+                        input_example
+                    )
+                    validate_serving_input(
+                        f"runs:/{run.info.run_id}/model", serving_example
+                    )
                 except Exception as _val_e:
                     logger.warning(f"Serving input validation warning: {_val_e}")
             except Exception as e:
@@ -769,7 +913,9 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
             self.preprocessor = None
             self.feature_names = []
             try:
-                downloaded_dir = mlflow.artifacts.download_artifacts(artifact_uri=f"runs:/{run_id}/preprocessor")
+                downloaded_dir = mlflow.artifacts.download_artifacts(
+                    artifact_uri=f"runs:/{run_id}/preprocessor"
+                )
                 # Load from the downloaded directory
                 preproc = RealMLPPreprocessor().load_artifacts(Path(downloaded_dir))
                 self.preprocessor = preproc
@@ -779,7 +925,11 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
                 else:
                     # Fallback: look for explicit feature_names.json we logged
                     try:
-                        with open(os.path.join(downloaded_dir, "feature_names.json"), "r", encoding="utf-8") as f:
+                        with open(
+                            os.path.join(downloaded_dir, "feature_names.json"),
+                            "r",
+                            encoding="utf-8",
+                        ) as f:
                             data = json.load(f)
                         if isinstance(data, list):
                             self.feature_names = data
@@ -798,5 +948,3 @@ class RealMLPPredictor(RealMLPTrainingMixin, PyTorchBasePredictor):
         except Exception as e:
             logger.error(f"Error loading RealMLP model: {e}")
             return False
-
-

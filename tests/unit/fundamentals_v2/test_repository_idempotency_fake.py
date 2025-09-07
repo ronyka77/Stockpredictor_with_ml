@@ -95,5 +95,3 @@ def test_upsert_raw_payload_idempotent(mocker):
     # Ensure parameters include JSON string for payload
     _, params = cur.executed[-1]
     assert isinstance(params["payload"], str)
-
-

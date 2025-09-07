@@ -1,5 +1,3 @@
-
-
 import hashlib
 import json
 from typing import Any, Dict, Optional, List
@@ -199,7 +197,9 @@ class FundamentalsRepository:
             with conn.cursor() as cur:
                 cur.execute(sql)
                 rows = cur.fetchall() or []
-                logger.info(f"📊 Found {len(rows)} pending raw fundamental records to process")
+                logger.info(
+                    f"📊 Found {len(rows)} pending raw fundamental records to process"
+                )
                 return rows
 
     def upsert_raw_payload(
@@ -246,5 +246,3 @@ class FundamentalsRepository:
     def _hash_payload(payload: Dict[str, Any]) -> str:
         data = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
         return hashlib.sha256(data).hexdigest()
-
-

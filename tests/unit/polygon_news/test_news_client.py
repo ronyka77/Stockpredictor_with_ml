@@ -42,34 +42,40 @@ def test_get_news_for_ticker_passes_date_params_and_returns_articles(mocker):
     captured = {}
 
     def fake_fetch(self, endpoint, params):
-        captured['endpoint'] = endpoint
-        captured['params'] = params
+        captured["endpoint"] = endpoint
+        captured["params"] = params
         return [{"id": "a1"}, {"id": "a2"}]
 
     mocker.patch.object(PolygonNewsClient, "_fetch_paginated_data", fake_fetch)
 
     start = datetime(2025, 8, 1)
     end = datetime(2025, 8, 31)
-    res = client.get_news_for_ticker("ACME", published_utc_gte=start, published_utc_lte=end, limit=2)
+    res = client.get_news_for_ticker(
+        "ACME", published_utc_gte=start, published_utc_lte=end, limit=2
+    )
 
     assert isinstance(res, list)
     assert len(res) == 2
-    assert "published_utc.gte" in captured['params']
-    assert captured['endpoint'].startswith("/v2/reference/news")
+    assert "published_utc.gte" in captured["params"]
+    assert captured["endpoint"].startswith("/v2/reference/news")
 
 
 @pytest.mark.unit
 def test_get_news_for_ticker_handles_empty_api_response(mocker):
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
-    mocker.patch.object(PolygonNewsClient, "_fetch_paginated_data", lambda self, e, p: [])
+    mocker.patch.object(
+        PolygonNewsClient, "_fetch_paginated_data", lambda self, e, p: []
+    )
 
     res = client.get_news_for_ticker("ACME")
     assert res == []
 
 
 @pytest.mark.unit
-def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(mocker, caplog, capsys):
+def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
+    mocker, caplog, capsys
+):
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     def fake_get(ticker, **kwargs):
@@ -77,7 +83,11 @@ def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(mocke
             raise PolygonAPIError("simulated")
         return [{"id": f"ok-{ticker}"}]
 
-    mocker.patch.object(PolygonNewsClient, "get_news_for_ticker", lambda self, **kw: fake_get(kw.get('ticker')))
+    mocker.patch.object(
+        PolygonNewsClient,
+        "get_news_for_ticker",
+        lambda self, **kw: fake_get(kw.get("ticker")),
+    )
 
     caplog.clear()
     res = client.get_news_for_multiple_tickers(["GOOD", "BAD"])
@@ -97,7 +107,9 @@ def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, 
         {"id": "3", "published_utc": "2025-09-01T00:00:00Z"},
     ]
 
-    mocker.patch.object(PolygonNewsClient, "get_recent_market_news", lambda self, **kw: articles)
+    mocker.patch.object(
+        PolygonNewsClient, "get_recent_market_news", lambda self, **kw: articles
+    )
 
     start = datetime(2025, 8, 1, tzinfo=timezone.utc)
     end = datetime(2025, 8, 31, tzinfo=timezone.utc)
@@ -105,18 +117,21 @@ def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, 
     res = client.get_news_by_date_range(start, end)
 
     # should include only id 1
-    assert any(a.get('id') == '1' for a in res)
-    assert all(a.get('id') != '3' for a in res)
+    assert any(a.get("id") == "1" for a in res)
+    assert all(a.get("id") != "3" for a in res)
     assert True
 
 
 @pytest.mark.unit
 def test_validate_news_response():
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
-    good = {"id": "x", "title": "t", "article_url": "u", "published_utc": "2025-08-14T13:45:00Z"}
+    good = {
+        "id": "x",
+        "title": "t",
+        "article_url": "u",
+        "published_utc": "2025-08-14T13:45:00Z",
+    }
     bad = {"id": None, "title": "t", "article_url": "u", "published_utc": None}
 
     assert client.validate_news_response(good) is True
     assert client.validate_news_response(bad) is False
-
-

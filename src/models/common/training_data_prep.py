@@ -16,7 +16,8 @@ def prepare_common_training_data(
     *,
     prediction_horizon: int,
     outlier_quantiles: Tuple[float, float] = (0.05, 0.95),
-    recent_date_int_cut: int = 15) -> Dict[str, Any]:
+    recent_date_int_cut: int = 15,
+) -> Dict[str, Any]:
     """
     Centralized data preparation for time-series model training (MLP, RealMLP).
     Steps:
@@ -34,6 +35,7 @@ def prepare_common_training_data(
         prediction_horizon=prediction_horizon,
         ticker=None,
         clean_features=True,
+        filter_train_set=False,
     )
 
     X_train: pd.DataFrame = data_result["X_train"]
@@ -52,11 +54,15 @@ def prepare_common_training_data(
         y_train = y_train[keep_mask]
         logger.info(
             "Target outlier removal: %d \u2192 %d samples (%d removed)",
-            int(len(keep_mask)), int(keep_mask.sum()), int(len(keep_mask) - int(keep_mask.sum())),
+            int(len(keep_mask)),
+            int(keep_mask.sum()),
+            int(len(keep_mask) - int(keep_mask.sum())),
         )
         logger.info(
             "   Training target range: %.6f to %.6f (avg: %.6f)",
-            float(y_train.min()), float(y_train.max()), float(y_train.mean()),
+            float(y_train.min()),
+            float(y_train.max()),
+            float(y_train.mean()),
         )
     except Exception as e:
         logger.warning(f"Outlier removal skipped due to error: {e}")
@@ -67,7 +73,11 @@ def prepare_common_training_data(
 
     # 4) Optional date_int trimming on test set
     try:
-        if "date_int" in X_test_clean.columns and recent_date_int_cut and recent_date_int_cut > 0:
+        if (
+            "date_int" in X_test_clean.columns
+            and recent_date_int_cut
+            and recent_date_int_cut > 0
+        ):
             uniq = X_test_clean["date_int"].drop_duplicates().sort_values()
             if len(uniq) > recent_date_int_cut:
                 threshold = uniq.iloc[-recent_date_int_cut - 1]
@@ -75,7 +85,9 @@ def prepare_common_training_data(
                 mask = X_test_clean["date_int"] < threshold
                 X_test_clean = X_test_clean[mask]
                 y_test = y_test[mask]
-                logger.info(f"Removed rows with date_int >= {threshold} (kept {len(X_test_clean)} samples)")
+                logger.info(
+                    f"Removed rows with date_int >= {threshold} (kept {len(X_test_clean)} samples)"
+                )
         elif "date_int" not in X_test_clean.columns:
             logger.warning("'date_int' column not found - skipping date filtering")
     except Exception as e:
@@ -99,5 +111,3 @@ def prepare_common_training_data(
     }
 
     return result
-
-

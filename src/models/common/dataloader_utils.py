@@ -1,5 +1,3 @@
-
-
 from typing import Optional
 
 import numpy as np
@@ -14,7 +12,9 @@ class _NumpyOptionalCatDataset(Dataset):
     Yields (x_num, y, cat_idx) where cat_idx can be None per sample batch consumer expectations.
     """
 
-    def __init__(self, *, X_num: np.ndarray, y: np.ndarray, cat_idx: Optional[np.ndarray] = None) -> None:
+    def __init__(
+        self, *, X_num: np.ndarray, y: np.ndarray, cat_idx: Optional[np.ndarray] = None
+    ) -> None:
         """Support both in-memory numpy arrays and memmapped numpy arrays.
 
         For very large datasets, users can pass `np.memmap` instances for
@@ -69,5 +69,3 @@ def create_dataloader_from_numpy(
         pin_memory=pin,
         persistent_workers=(num_workers > 0),
     )
-
-

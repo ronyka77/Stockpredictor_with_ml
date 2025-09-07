@@ -21,8 +21,8 @@ class RealMLPModule(nn.Module):
         num_categories: Optional[int] = None,
         cat_embed_dim: int = 32,
         embedding_dropout: float = 0.1,
-        output_size: int = 1) -> None:
-        
+        output_size: int = 1,
+    ) -> None:
         super().__init__()
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
@@ -74,7 +74,9 @@ class RealMLPModule(nn.Module):
 
         dims = [trunk_input_dim] + hidden_sizes
         self.linear_blocks = nn.ModuleList()
-        self.bn_blocks: Optional[nn.ModuleList] = nn.ModuleList() if batch_norm else None
+        self.bn_blocks: Optional[nn.ModuleList] = (
+            nn.ModuleList() if batch_norm else None
+        )
         self.dropouts = nn.ModuleList()
         for i in range(len(hidden_sizes)):
             self.linear_blocks.append(nn.Linear(dims[i], dims[i + 1]))
@@ -95,7 +97,9 @@ class RealMLPModule(nn.Module):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
 
-    def forward(self, x_num: torch.Tensor, cat_idx: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, x_num: torch.Tensor, cat_idx: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         # Numeric path
         z = x_num
         if self.num_embed is not None:
@@ -128,5 +132,3 @@ class RealMLPModule(nn.Module):
             z = self.activation(z)
             z = self.dropouts[i](z)
         return self.out(z)
-
-

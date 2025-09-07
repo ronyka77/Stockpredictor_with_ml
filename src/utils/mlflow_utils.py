@@ -68,7 +68,9 @@ class MLFlowManager:
             if experiment is None:
                 experiment_id = mlflow.create_experiment(name)
                 mlflow.set_experiment(name)
-                self.logger.info(f"Created new experiment: {name} experiment_id: {experiment_id}")
+                self.logger.info(
+                    f"Created new experiment: {name} experiment_id: {experiment_id}"
+                )
             else:
                 experiment_id = experiment.experiment_id
                 mlflow.set_experiment(name)
@@ -86,10 +88,16 @@ class MLFlowManager:
             if not meta_path.exists():
                 logger.info(f"Meta.yaml not found at {meta_path}, creating a new one.")
                 path_parts = str(meta_path).split("\\")
-                if len(path_parts) >= 3 and path_parts[-3].isdigit() and path_parts[-2].isdigit():
+                if (
+                    len(path_parts) >= 3
+                    and path_parts[-3].isdigit()
+                    and path_parts[-2].isdigit()
+                ):
                     experiment_id = path_parts[-3]
                     run_id = path_parts[-2]
-                    self.create_missing_meta_yaml(meta_path.parent, experiment_id, run_id)
+                    self.create_missing_meta_yaml(
+                        meta_path.parent, experiment_id, run_id
+                    )
                     logger.info("Meta.yaml has experiment and run id")
                 elif len(path_parts) >= 2 and path_parts[-2].isdigit():
                     experiment_id = path_parts[-2]
@@ -139,7 +147,8 @@ class MLFlowManager:
             return
 
     def create_missing_meta_yaml(
-        self, run_path: Path, experiment_id: str, run_id: Optional[str] = None) -> None:
+        self, run_path: Path, experiment_id: str, run_id: Optional[str] = None
+    ) -> None:
         """Create meta.yaml file if it doesn't exist"""
         try:
             if isinstance(run_path, str):
@@ -206,16 +215,22 @@ class MLFlowManager:
                                 self.create_missing_meta_yaml(
                                     meta_path.parent, experiment_id, run_id
                                 )
-                                self.logger.info(f"Created missing run meta.yaml at {meta_path}")
+                                self.logger.info(
+                                    f"Created missing run meta.yaml at {meta_path}"
+                                )
                             else:
                                 # This is an experiment directory
                                 experiment_id = path_parts[-1]
-                                self.create_missing_meta_yaml(meta_path.parent, experiment_id)
+                                self.create_missing_meta_yaml(
+                                    meta_path.parent, experiment_id
+                                )
                                 self.logger.info(
                                     f"Created missing experiment meta.yaml at {meta_path}"
                                 )
                         except Exception as e:
-                            self.logger.error(f"Error creating meta.yaml at {meta_path}: {e}")
+                            self.logger.error(
+                                f"Error creating meta.yaml at {meta_path}: {e}"
+                            )
                             continue
 
                     # Normalize the paths in the meta.yaml
@@ -230,6 +245,7 @@ class MLFlowManager:
         except Exception as e:
             self.logger.error(f"Error in normalize_all_meta_yaml_paths: {e}")
             raise
+
 
 # Usage example:
 if __name__ == "__main__":

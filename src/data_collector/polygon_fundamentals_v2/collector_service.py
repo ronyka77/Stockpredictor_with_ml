@@ -1,11 +1,15 @@
-
-
 from typing import Any, Dict, Optional
 
-from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCacheManager
-from src.data_collector.polygon_fundamentals_v2.raw_client import RawPolygonFundamentalsClient
+from src.data_collector.polygon_fundamentals.cache_manager import (
+    FundamentalCacheManager,
+)
+from src.data_collector.polygon_fundamentals_v2.raw_client import (
+    RawPolygonFundamentalsClient,
+)
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
-from src.data_collector.polygon_fundamentals_v2.validator_v2 import FundamentalDataValidatorV2
+from src.data_collector.polygon_fundamentals_v2.validator_v2 import (
+    FundamentalDataValidatorV2,
+)
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
 from src.data_collector.polygon_fundamentals_v2.extractor import FundamentalsExtractor
 from src.utils.logger import get_logger
@@ -45,7 +49,9 @@ class FundamentalsCollectorService:
 
         if not raw or not raw.get("results"):
             if ticker_id is not None:
-                self.repo.set_ticker_financials(ticker_id=ticker_id, has_financials=False)
+                self.repo.set_ticker_financials(
+                    ticker_id=ticker_id, has_financials=False
+                )
             return {"ticker": ticker, "success": False, "error": "no_results"}
 
         # persist raw payload (first result metadata anchors the period)
@@ -83,5 +89,3 @@ class FundamentalsCollectorService:
                 "cash": len(dto.cash_flow_statements),
             },
         }
-
-

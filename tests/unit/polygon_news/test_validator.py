@@ -39,13 +39,15 @@ def test_validate_article_handles_old_and_future_dates(processed_article_expecte
     v = NewsValidator()
     article = processed_article_expected.copy()
     # Old date
-    article["published_utc"] = (datetime.now(timezone.utc) - timedelta(days=800)).isoformat()
+    article["published_utc"] = (
+        datetime.now(timezone.utc) - timedelta(days=800)
+    ).isoformat()
     is_valid_old, score_old, issues_old = v.validate_article(article)
     assert "Article too old" in issues_old or score_old < 1.0
 
     # Future date
-    article["published_utc"] = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+    article["published_utc"] = (
+        datetime.now(timezone.utc) + timedelta(days=10)
+    ).isoformat()
     is_valid_future, score_future, issues_future = v.validate_article(article)
     assert "Future publication date" in issues_future or score_future < 1.0
-
-

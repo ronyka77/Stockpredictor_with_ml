@@ -83,5 +83,3 @@ def processed_article_expected():
             }
         ],
     }
-
-

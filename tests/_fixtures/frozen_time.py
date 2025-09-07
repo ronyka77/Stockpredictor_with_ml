@@ -12,6 +12,7 @@ class FrozenClock:
     def sleep(self, seconds: float) -> None:
         self._now += float(seconds)
 
+
 @contextmanager
 def freeze_time(mocker, start: float = 0.0):
     clock = FrozenClock(start=start)
@@ -22,5 +23,3 @@ def freeze_time(mocker, start: float = 0.0):
     finally:
         # mocker will restore automatically after test scope
         pass
-
-

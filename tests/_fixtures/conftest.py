@@ -4,6 +4,7 @@ import pytest
 @pytest.fixture
 def mock_http_client():
     """Simple mock HTTP client fixture with configurable return values."""
+
     class MockClient:
         def __init__(self):
             self._aggregates = None
@@ -31,6 +32,7 @@ def mock_http_client():
 @pytest.fixture
 def permission_error_simulator():
     """Return a helper that mocks filesystem calls to raise PermissionError."""
+
     def _apply(mocker):
         import os
         import builtins
@@ -42,5 +44,3 @@ def permission_error_simulator():
         mocker.patch.object(builtins, "open", _raise)
 
     return _apply
-
-

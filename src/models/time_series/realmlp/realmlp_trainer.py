@@ -1,5 +1,3 @@
-
-
 from dataclasses import dataclass
 from typing import Optional, Tuple, List, Dict, Any
 
@@ -49,16 +47,22 @@ class RealMLPTrainingMixin:
             if p.grad is not None:
                 param_norm = float(p.grad.data.norm(2).item())
                 total_norm_sq += param_norm * param_norm
-        return float(total_norm_sq ** 0.5)
+        return float(total_norm_sq**0.5)
 
     def _create_optimizer(self, model: nn.Module) -> torch.optim.Optimizer:
         learning_rate = float(self.config.get("learning_rate", 1e-3))
         weight_decay = float(self.config.get("weight_decay", 1e-5))
-        return torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        return torch.optim.AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
 
-    def _create_scheduler(self, optimizer: torch.optim.Optimizer) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+    def _create_scheduler(
+        self, optimizer: torch.optim.Optimizer
+    ) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
         epochs = int(self.config.get("epochs", 30))
-        return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=max(1, epochs)
+        )
 
     def _build_loaders(
         self,
@@ -68,7 +72,8 @@ class RealMLPTrainingMixin:
         train_cat_idx: Optional[np.ndarray],
         X_val_num: Optional[np.ndarray],
         y_val: Optional[np.ndarray],
-        val_cat_idx: Optional[np.ndarray]) -> Tuple[DataLoader, Optional[DataLoader]]:
+        val_cat_idx: Optional[np.ndarray],
+    ) -> Tuple[DataLoader, Optional[DataLoader]]:
         batch_size = int(self.config.get("batch_size", 1024))
         num_workers = int(self.config.get("num_workers", 1))
         train_loader = create_dataloader_from_numpy(
@@ -103,7 +108,8 @@ class RealMLPTrainingMixin:
         device: torch.device,
         use_amp: bool,
         grad_clip: float,
-        fallback_consecutive_nonfinite: int) -> Tuple[float, int, int, int, float, bool, Optional[Dict[str, Any]]]:
+        fallback_consecutive_nonfinite: int,
+    ) -> Tuple[float, int, int, int, float, bool, Optional[Dict[str, Any]]]:
         model.train()
         running = 0.0
         steps = 0
@@ -204,13 +210,20 @@ class RealMLPTrainingMixin:
             steps += 1
         avg = running / max(1, steps)
         avg_grad_norm = grad_norm_sum / max(1, steps)
-        return avg, steps, skipped_batches, total_batches, avg_grad_norm, fallback_triggered, last_nonfinite_stats
+        return (
+            avg,
+            steps,
+            skipped_batches,
+            total_batches,
+            avg_grad_norm,
+            fallback_triggered,
+            last_nonfinite_stats,
+        )
 
     @torch.no_grad()
-    def _evaluate_metrics(self, 
-        model: RealMLPModule, 
-        loader: Optional[DataLoader], 
-        device: torch.device) -> Dict[str, float]:
+    def _evaluate_metrics(
+        self, model: RealMLPModule, loader: Optional[DataLoader], device: torch.device
+    ) -> Dict[str, float]:
         if loader is None:
             return {"mse": float("nan"), "mae": float("nan"), "r2": float("nan")}
         model.eval()
@@ -246,7 +259,8 @@ class RealMLPTrainingMixin:
         y_train: pd.Series,
         X_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
-        preprocessor: RealMLPPreprocessor) -> "RealMLPTrainingMixin":
+        preprocessor: RealMLPPreprocessor,
+    ) -> "RealMLPTrainingMixin":
         """
         Fit the RealMLP model using the provided training data and preprocessor.
         """
@@ -259,10 +273,14 @@ class RealMLPTrainingMixin:
 
         # Numeric columns order from preprocessor
         numeric_cols = list(preprocessor.feature_names)
-        X_train_num, train_cat_idx = preprocessor.transform(X_train, numeric_cols=numeric_cols)
+        X_train_num, train_cat_idx = preprocessor.transform(
+            X_train, numeric_cols=numeric_cols
+        )
         X_val_num = y_val_array = val_cat_idx = None
         if X_val is not None and y_val is not None:
-            X_val_num, val_cat_idx = preprocessor.transform(X_val, numeric_cols=numeric_cols)
+            X_val_num, val_cat_idx = preprocessor.transform(
+                X_val, numeric_cols=numeric_cols
+            )
             y_val_array = np.asarray(y_val.values, dtype=np.float32)
 
         y_train_array = np.asarray(y_train.values, dtype=np.float32)
@@ -301,9 +319,13 @@ class RealMLPTrainingMixin:
         optimizer = self._create_optimizer(self.model)
         use_huber = bool(self.config.get("use_huber", False))
         huber_delta = float(self.config.get("huber_delta", 0.1))
-        criterion: nn.Module = nn.HuberLoss(delta=huber_delta) if use_huber else nn.MSELoss()
+        criterion: nn.Module = (
+            nn.HuberLoss(delta=huber_delta) if use_huber else nn.MSELoss()
+        )
         scheduler = self._create_scheduler(optimizer)
-        use_amp_base = bool(self.config.get("use_amp", True)) and torch.cuda.is_available()
+        use_amp_base = (
+            bool(self.config.get("use_amp", True)) and torch.cuda.is_available()
+        )
         epochs = int(self.config.get("epochs", 30))
         grad_clip = float(self.config.get("grad_clip", 1.0))
 
@@ -325,9 +347,19 @@ class RealMLPTrainingMixin:
                 f"AMP epoch config: use_amp={use_amp} dtype=bf16 loss_scaler_active=False"
             )
 
-            fallback_consecutive_nonfinite = int(self.config.get("amp_fallback_consecutive_nonfinite", 3))
+            fallback_consecutive_nonfinite = int(
+                self.config.get("amp_fallback_consecutive_nonfinite", 3)
+            )
 
-            train_loss, steps, skipped_batches, total_batches, avg_grad_norm, fallback_triggered, last_nonfinite = self._train_one_epoch(
+            (
+                train_loss,
+                steps,
+                skipped_batches,
+                total_batches,
+                avg_grad_norm,
+                fallback_triggered,
+                last_nonfinite,
+            ) = self._train_one_epoch(
                 model=self.model,
                 loader=train_loader,
                 optimizer=optimizer,
@@ -340,7 +372,9 @@ class RealMLPTrainingMixin:
 
             # Fallback: if FP16 scaler path triggered too many non-finite, switch to BF16 or disable AMP
             if fallback_triggered and use_amp:
-                logger.warning("AMP fallback triggered under BF16: disabling AMP for subsequent epochs")
+                logger.warning(
+                    "AMP fallback triggered under BF16: disabling AMP for subsequent epochs"
+                )
                 use_amp_base = False
 
             # Validation metrics
@@ -355,7 +389,7 @@ class RealMLPTrainingMixin:
                 pass
             skipped_pct = (skipped_batches / max(1, total_batches)) * 100.0
             logger.info(
-                f"Epoch {epoch+1}/{epochs} train_loss={train_loss:.6f} val_mse={val_metrics['mse']:.6f} val_mae={val_metrics['mae']:.6f} val_r2={val_metrics['r2']:.4f} "
+                f"Epoch {epoch + 1}/{epochs} train_loss={train_loss:.6f} val_mse={val_metrics['mse']:.6f} val_mae={val_metrics['mae']:.6f} val_r2={val_metrics['r2']:.4f} "
                 f"lr={lr_now} grad_norm={avg_grad_norm:.4f} skipped_batches={skipped_batches}/{total_batches} ({skipped_pct:.2f}%)"
             )
             if skipped_batches > 0 and last_nonfinite is not None:
@@ -371,31 +405,47 @@ class RealMLPTrainingMixin:
                     # Save checkpoint
                     try:
                         import os
+
                         os.makedirs(checkpoint_dir, exist_ok=True)
                         best_ckpt_path = os.path.join(checkpoint_dir, "realmlp_best.pt")
-                        torch.save({
-                            "model_state": self.model.state_dict(),
-                            "optimizer_state": optimizer.state_dict(),
-                            "epoch": epoch + 1,
-                            "val_mse": best_val,
-                        }, best_ckpt_path)
-                        logger.info(f"🧩 Saved best checkpoint at epoch {epoch+1} to {best_ckpt_path} (val_mse={best_val:.6f})")
+                        torch.save(
+                            {
+                                "model_state": self.model.state_dict(),
+                                "optimizer_state": optimizer.state_dict(),
+                                "epoch": epoch + 1,
+                                "val_mse": best_val,
+                            },
+                            best_ckpt_path,
+                        )
+                        logger.info(
+                            f"🧩 Saved best checkpoint at epoch {epoch + 1} to {best_ckpt_path} (val_mse={best_val:.6f})"
+                        )
                     except Exception as e:
                         logger.warning(f"Could not save checkpoint: {e}")
                 else:
                     epochs_no_improve += 1
                     logger.info(f"⏳ No improvement ({epochs_no_improve}/{patience})")
                     if epochs_no_improve >= patience:
-                        logger.info(f"⛔ Early stopping at epoch {epoch+1}; best epoch was {best_epoch+1} (val_mse={best_val:.6f})")
+                        logger.info(
+                            f"⛔ Early stopping at epoch {epoch + 1}; best epoch was {best_epoch + 1} (val_mse={best_val:.6f})"
+                        )
                         # Restore the best checkpoint if available
                         if best_ckpt_path is not None:
                             try:
                                 # Prefer weights_only when available to avoid arbitrary object unpickling
-                                state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
+                                state = torch.load(
+                                    best_ckpt_path,
+                                    map_location=device,
+                                    weights_only=True,
+                                )
                                 self.model.load_state_dict(state.get("model_state", {}))
-                                logger.info("✅ Restored best model weights from checkpoint")
+                                logger.info(
+                                    "✅ Restored best model weights from checkpoint"
+                                )
                             except Exception as e:
-                                logger.warning(f"Could not restore best checkpoint: {e}")
+                                logger.warning(
+                                    f"Could not restore best checkpoint: {e}"
+                                )
                         break
             if steps > 0 and scheduler is not None:
                 scheduler.step()
@@ -406,9 +456,13 @@ class RealMLPTrainingMixin:
         if best_ckpt_path is not None:
             try:
                 # Prefer weights_only when available to avoid arbitrary object unpickling
-                state = torch.load(best_ckpt_path, map_location=device, weights_only=True)
+                state = torch.load(
+                    best_ckpt_path, map_location=device, weights_only=True
+                )
                 self.model.load_state_dict(state.get("model_state", {}))
-                logger.info(f"✅ Finalized with best checkpoint weights (val_mse={best_val:.6f})")
+                logger.info(
+                    f"✅ Finalized with best checkpoint weights (val_mse={best_val:.6f})"
+                )
             except Exception as e:
                 logger.warning(f"Could not finalize restore of best checkpoint: {e}")
 
@@ -418,9 +472,9 @@ class RealMLPTrainingMixin:
             if hasattr(self, "set_latent_stats") and X_train is not None:
                 # Use the same numeric feature alignment as during training
                 self.set_latent_stats(X_ref=X_train)
-                logger.info("✅ Precomputed latent stats for latent_mahalanobis confidence")
+                logger.info(
+                    "✅ Precomputed latent stats for latent_mahalanobis confidence"
+                )
         except Exception as e:
             logger.warning(f"Could not precompute latent stats: {e}")
         return self
-
-

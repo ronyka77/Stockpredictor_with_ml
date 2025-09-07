@@ -23,7 +23,9 @@ logger = get_logger(__name__, utility="evaluation")
 
 @dataclass
 class ThresholdConfig:
-    method: str = "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
+    method: str = (
+        "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
+    )
     value: Optional[float] = None
     quantile: Optional[float] = None
     top_k: Optional[int] = None
@@ -44,14 +46,16 @@ class ThresholdResult:
 class ThresholdPolicy:
     """
     Compute boolean masks for confidence-based filtering given a configuration.
-    
+
     Notes
     - Sanitizes non-finite confidence values (NaN/Inf): they are excluded from kept set
     - Supports vectorized operations
     - Extensible via `method` dispatch
     """
 
-    def compute_mask(self, confidence: np.ndarray, X: Optional[pd.DataFrame], cfg: ThresholdConfig) -> ThresholdResult:
+    def compute_mask(
+        self, confidence: np.ndarray, X: Optional[pd.DataFrame], cfg: ThresholdConfig
+    ) -> ThresholdResult:
         if confidence is None:
             raise ValueError("confidence must not be None")
 
@@ -93,8 +97,9 @@ class ThresholdPolicy:
         indices = np.where(final_mask)[0]
 
         samples_kept = int(final_mask.sum())
-        samples_kept_ratio = float(samples_kept / total_samples) if total_samples else 0.0
-        
+        samples_kept_ratio = (
+            float(samples_kept / total_samples) if total_samples else 0.0
+        )
 
         stats = {
             "samples_kept": samples_kept,
@@ -114,5 +119,3 @@ class ThresholdPolicy:
         # )
 
         return ThresholdResult(mask=final_mask, indices=indices, stats=stats)
-
-

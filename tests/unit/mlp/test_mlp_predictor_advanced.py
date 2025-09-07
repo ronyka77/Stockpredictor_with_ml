@@ -17,7 +17,15 @@ def create_dataloader(X, y, batch_size=16):
 
 
 def test_basic_training():
-    config = {"input_size": 10, "layer_sizes": [64, 32], "activation": "relu", "dropout": 0.2, "epochs": 3, "batch_size": 16, "learning_rate": 1e-3}
+    config = {
+        "input_size": 10,
+        "layer_sizes": [64, 32],
+        "activation": "relu",
+        "dropout": 0.2,
+        "epochs": 3,
+        "batch_size": 16,
+        "learning_rate": 1e-3,
+    }
     predictor = MLPPredictor(model_name="test_mlp", config=config)
     X_train, y_train = create_dummy_data(100, 10)
     X_val, y_val = create_dummy_data(50, 10)
@@ -26,6 +34,6 @@ def test_basic_training():
     predictor.fit(train_loader, val_loader)
     X_test = pd.DataFrame(X_train.numpy())
     predictions = predictor.predict(X_test)
-    assert predictions.ndim == 1 or (predictions.ndim == 2 and predictions.shape[1] == 1)
-
-
+    assert predictions.ndim == 1 or (
+        predictions.ndim == 2 and predictions.shape[1] == 1
+    )

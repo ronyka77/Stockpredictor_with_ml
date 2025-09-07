@@ -1,5 +1,3 @@
-
-
 from typing import Any, Dict, Optional, List
 
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
@@ -26,7 +24,9 @@ class FundamentalsExtractor:
             return float(obj)
         return None
 
-    def _upsert_fact_row(self, ticker_id: int, meta: Dict[str, Any], row: Dict[str, Any]) -> None:
+    def _upsert_fact_row(
+        self, ticker_id: int, meta: Dict[str, Any], row: Dict[str, Any]
+    ) -> None:
         # Metadata fields
         params: Dict[str, Any] = {
             "ticker_id": ticker_id,
@@ -211,22 +211,50 @@ class FundamentalsExtractor:
                 "revenues": self._flatten_value(meta.get("revenues")),
                 "cost_of_revenue": self._flatten_value(meta.get("cost_of_revenue")),
                 "gross_profit": self._flatten_value(meta.get("gross_profit")),
-                "operating_expenses": self._flatten_value(meta.get("operating_expenses")),
-                "selling_general_and_administrative_expenses": self._flatten_value(meta.get("selling_general_and_administrative_expenses")),
-                "research_and_development": self._flatten_value(meta.get("research_and_development")),
-                "operating_income_loss": self._flatten_value(meta.get("operating_income_loss")),
-                "nonoperating_income_loss": self._flatten_value(meta.get("other_income_expense")),
-                "income_loss_from_continuing_operations_before_tax": self._flatten_value(meta.get("income_loss_before_income_tax_expense_benefit")),
-                "income_tax_expense_benefit": self._flatten_value(meta.get("income_tax_expense_benefit")),
+                "operating_expenses": self._flatten_value(
+                    meta.get("operating_expenses")
+                ),
+                "selling_general_and_administrative_expenses": self._flatten_value(
+                    meta.get("selling_general_and_administrative_expenses")
+                ),
+                "research_and_development": self._flatten_value(
+                    meta.get("research_and_development")
+                ),
+                "operating_income_loss": self._flatten_value(
+                    meta.get("operating_income_loss")
+                ),
+                "nonoperating_income_loss": self._flatten_value(
+                    meta.get("other_income_expense")
+                ),
+                "income_loss_from_continuing_operations_before_tax": self._flatten_value(
+                    meta.get("income_loss_before_income_tax_expense_benefit")
+                ),
+                "income_tax_expense_benefit": self._flatten_value(
+                    meta.get("income_tax_expense_benefit")
+                ),
                 "income_loss_from_continuing_operations_after_tax": None,
                 "net_income_loss": self._flatten_value(meta.get("net_income_loss")),
-                "net_income_loss_attributable_to_parent": self._flatten_value(meta.get("net_income_loss_attributable_to_parent")),
-                "basic_earnings_per_share": self._flatten_value(meta.get("earnings_per_share_basic")),
-                "diluted_earnings_per_share": self._flatten_value(meta.get("earnings_per_share_diluted")),
-                "basic_average_shares": self._flatten_value(meta.get("weighted_average_shares_outstanding")),
-                "diluted_average_shares": self._flatten_value(meta.get("weighted_average_shares_outstanding_diluted")),
-                "comprehensive_income_loss": self._flatten_value(meta.get("comprehensive_income_loss")),
-                "comprehensive_income_loss_attributable_to_parent": self._flatten_value(meta.get("comprehensive_income_loss_attributable_to_parent")),
+                "net_income_loss_attributable_to_parent": self._flatten_value(
+                    meta.get("net_income_loss_attributable_to_parent")
+                ),
+                "basic_earnings_per_share": self._flatten_value(
+                    meta.get("earnings_per_share_basic")
+                ),
+                "diluted_earnings_per_share": self._flatten_value(
+                    meta.get("earnings_per_share_diluted")
+                ),
+                "basic_average_shares": self._flatten_value(
+                    meta.get("weighted_average_shares_outstanding")
+                ),
+                "diluted_average_shares": self._flatten_value(
+                    meta.get("weighted_average_shares_outstanding_diluted")
+                ),
+                "comprehensive_income_loss": self._flatten_value(
+                    meta.get("comprehensive_income_loss")
+                ),
+                "comprehensive_income_loss_attributable_to_parent": self._flatten_value(
+                    meta.get("comprehensive_income_loss_attributable_to_parent")
+                ),
             }
             self._upsert_fact_row(ticker_id, meta, row)
             count += 1
@@ -238,18 +266,38 @@ class FundamentalsExtractor:
                 "current_assets": self._flatten_value(meta.get("current_assets")),
                 "noncurrent_assets": self._flatten_value(meta.get("noncurrent_assets")),
                 "inventory": self._flatten_value(meta.get("inventory_net")),
-                "other_current_assets": self._flatten_value(meta.get("other_assets_current")),
-                "fixed_assets": self._flatten_value(meta.get("property_plant_equipment_net")),
-                "other_noncurrent_assets": self._flatten_value(meta.get("other_assets_noncurrent")),
+                "other_current_assets": self._flatten_value(
+                    meta.get("other_assets_current")
+                ),
+                "fixed_assets": self._flatten_value(
+                    meta.get("property_plant_equipment_net")
+                ),
+                "other_noncurrent_assets": self._flatten_value(
+                    meta.get("other_assets_noncurrent")
+                ),
                 "liabilities": self._flatten_value(meta.get("liabilities")),
-                "current_liabilities": self._flatten_value(meta.get("current_liabilities")),
-                "noncurrent_liabilities": self._flatten_value(meta.get("noncurrent_liabilities")),
-                "accounts_payable": self._flatten_value(meta.get("accounts_payable_current")),
-                "other_current_liabilities": self._flatten_value(meta.get("other_liabilities_current")),
-                "long_term_debt": self._flatten_value(meta.get("long_term_debt_noncurrent")),
-                "other_noncurrent_liabilities": self._flatten_value(meta.get("other_liabilities_noncurrent")),
+                "current_liabilities": self._flatten_value(
+                    meta.get("current_liabilities")
+                ),
+                "noncurrent_liabilities": self._flatten_value(
+                    meta.get("noncurrent_liabilities")
+                ),
+                "accounts_payable": self._flatten_value(
+                    meta.get("accounts_payable_current")
+                ),
+                "other_current_liabilities": self._flatten_value(
+                    meta.get("other_liabilities_current")
+                ),
+                "long_term_debt": self._flatten_value(
+                    meta.get("long_term_debt_noncurrent")
+                ),
+                "other_noncurrent_liabilities": self._flatten_value(
+                    meta.get("other_liabilities_noncurrent")
+                ),
                 "equity": self._flatten_value(meta.get("equity")),
-                "equity_attributable_to_parent": self._flatten_value(meta.get("equity_attributable_to_parent")),
+                "equity_attributable_to_parent": self._flatten_value(
+                    meta.get("equity_attributable_to_parent")
+                ),
             }
             self._upsert_fact_row(ticker_id, meta, row)
             count += 1
@@ -257,9 +305,15 @@ class FundamentalsExtractor:
         for stmt in dto.cash_flow_statements:
             meta = stmt.model_dump()
             row = {
-                "net_cash_flow_from_operating_activities": self._flatten_value(meta.get("net_cash_flow_from_operating_activities")),
-                "net_cash_flow_from_investing_activities": self._flatten_value(meta.get("net_cash_flow_from_investing_activities")),
-                "net_cash_flow_from_financing_activities": self._flatten_value(meta.get("net_cash_flow_from_financing_activities")),
+                "net_cash_flow_from_operating_activities": self._flatten_value(
+                    meta.get("net_cash_flow_from_operating_activities")
+                ),
+                "net_cash_flow_from_investing_activities": self._flatten_value(
+                    meta.get("net_cash_flow_from_investing_activities")
+                ),
+                "net_cash_flow_from_financing_activities": self._flatten_value(
+                    meta.get("net_cash_flow_from_financing_activities")
+                ),
                 "net_cash_flow": self._flatten_value(meta.get("net_cash_flow")),
             }
             self._upsert_fact_row(ticker_id, meta, row)
@@ -307,5 +361,3 @@ if __name__ == "__main__":
             default=str,
         )
     )
-
-

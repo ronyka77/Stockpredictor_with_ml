@@ -63,9 +63,9 @@ def test_get_historical_query_and_params(mock_create_engine):
     mock_create_engine.return_value = mock_engine
 
     ds = DataStorage(connection_string="sqlite:///:memory:")
-    out = ds.get_historical_data("aaa", start_date=date(2020, 1, 1), end_date=date(2020, 1, 2), limit=1)
+    out = ds.get_historical_data(
+        "aaa", start_date=date(2020, 1, 1), end_date=date(2020, 1, 2), limit=1
+    )
 
     assert isinstance(out, list)
     assert out[0]["ticker"] == "AAA"
-
-

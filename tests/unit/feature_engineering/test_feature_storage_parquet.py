@@ -14,7 +14,7 @@ def test_parquet_roundtrip(tmp_path):
     df = pd.DataFrame({"sma": [1.0, 2.0, 3.0], "rsi": [30.0, 40.0, 50.0]}, index=idx)
     # The storage system resets index to a 'date' column and restores it as index on load,
     # so name the index to match round-trip behavior.
-    df.index.name = 'date'
+    df.index.name = "date"
 
     # Prepare storage config to use temporary directory
     config = StorageConfig(
@@ -38,7 +38,9 @@ def test_parquet_roundtrip(tmp_path):
     loaded_df, loaded_meta = fs.load_features("TICK")
 
     # Dataframe round-trip: same shape, index values and columns
-    assert np.array_equal(df.index.values, loaded_df.index.values), f"Index values differ: {df.index} vs {loaded_df.index}"
+    assert np.array_equal(df.index.values, loaded_df.index.values), (
+        f"Index values differ: {df.index} vs {loaded_df.index}"
+    )
     assert list(loaded_df.columns) == list(df.columns)
     # Numeric equality check (ignore index/column name metadata and frequency)
     assert_frame_equal(df, loaded_df, check_names=False, check_freq=False)
@@ -55,5 +57,3 @@ def test_parquet_roundtrip(tmp_path):
     stats = fs.get_storage_stats()
     assert isinstance(stats, dict)
     assert stats["version"] == config.version
-
-

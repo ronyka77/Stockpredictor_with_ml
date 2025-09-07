@@ -41,8 +41,7 @@ QUALITY_SCORE_THRESHOLD=50.0
 # =============================================================================
 # FEATURE ENGINEERING - BATCH PROCESSING
 # =============================================================================
-FE_BATCH_SIZE=50
-FE_MAX_WORKERS=4
+FE_BATCH_SIZE=32
 FE_CONTINUE_ON_ERROR=true
 
 # =============================================================================
@@ -77,17 +76,6 @@ FE_PARQUET_ROW_GROUP_SIZE=50000
 FE_OVERWRITE_EXISTING=false
 FE_MAX_VERSIONS_TO_KEEP=3
 FE_MAX_ROWS_PER_FILE=5000000
-
-# =============================================================================
-# FEATURE ENGINEERING - ML CONFIGURATION
-# =============================================================================
-FE_ML_TEST_SIZE=0.2
-FE_ML_VALIDATION_SIZE=0.1
-FE_ML_SCALING_METHOD=standard
-FE_ML_MISSING_STRATEGY=drop
-FE_ML_TARGET_COLUMN=close
-FE_ML_PREDICTION_HORIZON=10
-FE_ML_ENABLE_FEATURE_SELECTION=false
 
 # =============================================================================
 # FEATURE ENGINEERING - GENERAL SETTINGS

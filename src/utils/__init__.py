@@ -1,2 +1,4 @@
-from .serialization import json_fallback_serializer as json_fallback_serializer, prepare_metadata_for_parquet as prepare_metadata_for_parquet
-
+from .serialization import (
+    json_fallback_serializer as json_fallback_serializer,
+    prepare_metadata_for_parquet as prepare_metadata_for_parquet,
+)

@@ -28,10 +28,7 @@ class RealMLPPreprocessor:
     - Persist: scaler.pkl, clip_stats.json, cat_maps.json, feature_names.json
     """
 
-    def __init__(
-        self,
-        *,
-        oov_index: int = 0) -> None:
+    def __init__(self, *, oov_index: int = 0) -> None:
         self.categorical_cols = ["ticker_id"]
         self.oov_index = oov_index
 
@@ -48,7 +45,9 @@ class RealMLPPreprocessor:
                 self.cat_maps[col] = self._build_cat_map(df[col])
         return self
 
-    def transform(self, df: pd.DataFrame, numeric_cols: List[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def transform(
+        self, df: pd.DataFrame, numeric_cols: List[str]
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         if self.scaler is None:
             raise RuntimeError("Preprocessor not fitted")
         X_num = self.scaler.transform(df[numeric_cols].values)
@@ -68,7 +67,9 @@ class RealMLPPreprocessor:
                 unseen_count = int(unseen_mask.sum())
                 cat_idx = mapped.fillna(self.oov_index).astype(int).to_numpy()
                 if unseen_count > 0:
-                    logger.warning(f"Unseen {col} values encountered; mapped to OOV index {self.oov_index}. count={unseen_count}")
+                    logger.warning(
+                        f"Unseen {col} values encountered; mapped to OOV index {self.oov_index}. count={unseen_count}"
+                    )
         return X_num.astype(np.float32), cat_idx
 
     def _build_cat_map(self, series: pd.Series) -> Dict[str, int]:
@@ -79,7 +80,9 @@ class RealMLPPreprocessor:
         unique_vals = sorted(series.dropna().astype(str).unique())
         mapping: Dict[str, int] = {val: idx + 1 for idx, val in enumerate(unique_vals)}
         mapping["__OOV__"] = self.oov_index
-        logger.info(f"✅ Built categorical mapping for {series.name} with {len(mapping)} unique values")
+        logger.info(
+            f"✅ Built categorical mapping for {series.name} with {len(mapping)} unique values"
+        )
         return mapping
 
     def save_artifacts(self, base_dir: Path) -> None:
@@ -99,5 +102,3 @@ class RealMLPPreprocessor:
         with open(base_dir / "feature_names.json", "r") as f:
             self.feature_names = json.load(f)
         return self
-
-

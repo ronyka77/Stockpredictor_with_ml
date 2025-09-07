@@ -36,5 +36,3 @@ class NumericEmbedding(nn.Module):
         z = self.activation(z)
         z = z.reshape(b, f * self.embed_dim)
         return self.proj(z)
-
-

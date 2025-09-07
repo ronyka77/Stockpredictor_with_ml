@@ -5,6 +5,7 @@ Contains utilities to prepare metadata for Parquet and a JSON fallback
 serializer that converts datetimes and other non-serializable objects
 to strings. Extracted to avoid duplicated logic in multiple modules.
 """
+
 from datetime import datetime
 import json
 from typing import Dict, Any, List, Optional
@@ -24,7 +25,9 @@ def json_fallback_serializer(obj: Any) -> str:
         return repr(obj)
 
 
-def prepare_metadata_for_parquet(metadata: Dict[str, Any], keys: Optional[List[str]] = None) -> Dict[str, Any]:
+def prepare_metadata_for_parquet(
+    metadata: Dict[str, Any], keys: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """Prepare metadata dict to be safe for Parquet/Parquet-like storage.
 
     - Converts dictionary-valued entries listed in `keys` to JSON strings
@@ -39,10 +42,8 @@ def prepare_metadata_for_parquet(metadata: Dict[str, Any], keys: Optional[List[s
         val = out.get(key, None)
         if isinstance(val, dict):
             if not val:
-                out[key] = '{}'
+                out[key] = "{}"
             else:
                 out[key] = json.dumps(val)
 
     return out
-
-

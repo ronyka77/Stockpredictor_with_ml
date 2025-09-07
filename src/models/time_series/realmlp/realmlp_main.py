@@ -8,8 +8,6 @@ Usage (Windows with uv):
     uv run python -m src.models.time_series.realmlp.realmlp_main
 """
 
-
-
 from typing import List
 
 import numpy as np
@@ -29,6 +27,7 @@ def _get_numeric_columns(df: pd.DataFrame) -> List[str]:
     numeric_cols = [c for c in df.columns if c not in cat_cols]
     return numeric_cols
 
+
 def main() -> None:
     logger.info("=" * 80)
     logger.info("🎯 RealMLP TRAINING & EVALUATION")
@@ -47,22 +46,26 @@ def main() -> None:
     y_test: pd.Series = prep["y_test"].copy()
 
     # 2) Preprocessing (clean numeric → clip + robust scale; categorical mapping)
-    numeric_cols = _get_numeric_columns(X_train) 
+    numeric_cols = _get_numeric_columns(X_train)
     y_train_array = np.asarray(y_train.values, dtype=np.float32)
     y_test_array = np.asarray(y_test.values, dtype=np.float32)
 
     pre = RealMLPPreprocessor()
     pre.fit(X_train, numeric_cols=numeric_cols)
     X_train_num, train_cat_idx = pre.transform(X_train, numeric_cols=numeric_cols)
-    X_test_num, test_cat_idx = pre.transform(X_test, numeric_cols=numeric_cols)    
+    X_test_num, test_cat_idx = pre.transform(X_test, numeric_cols=numeric_cols)
 
-    train_finite_mask = np.isfinite(X_train_num).all(axis=1) & np.isfinite(y_train_array)
+    train_finite_mask = np.isfinite(X_train_num).all(axis=1) & np.isfinite(
+        y_train_array
+    )
     test_finite_mask = np.isfinite(X_test_num).all(axis=1) & np.isfinite(y_test_array)
 
     dropped_train = int(len(train_finite_mask) - int(train_finite_mask.sum()))
     dropped_test = int(len(test_finite_mask) - int(test_finite_mask.sum()))
     if dropped_train or dropped_test:
-        logger.warning(f"Data contained non-finite values; dropping rows — train:{dropped_train} test:{dropped_test}")
+        logger.warning(
+            f"Data contained non-finite values; dropping rows — train:{dropped_train} test:{dropped_test}"
+        )
 
     X_train_num = X_train_num[train_finite_mask]
     y_train_array = y_train_array[train_finite_mask]
@@ -73,7 +76,7 @@ def main() -> None:
     y_test_array = y_test_array[test_finite_mask]
     if test_cat_idx is not None:
         test_cat_idx = test_cat_idx[test_finite_mask]
-    
+
     predictor = RealMLPPredictor(model_name="RealMLP")
     results = predictor.optuna_hypertune(
         X_train=X_train,
@@ -82,7 +85,7 @@ def main() -> None:
         y_val=y_test,
         preprocessor=pre,
         confidence_method="latent_mahalanobis",
-        n_trials=num_trials
+        n_trials=num_trials,
     )
     metrics = results.get("best_value")
 
@@ -98,5 +101,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

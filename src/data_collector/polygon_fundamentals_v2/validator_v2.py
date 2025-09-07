@@ -1,5 +1,3 @@
-
-
 from dataclasses import dataclass
 from typing import List
 
@@ -11,6 +9,7 @@ from src.data_collector.polygon_fundamentals.data_validator import (
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
 
 @dataclass
 class ExtendedValidation:
@@ -79,11 +78,13 @@ class FundamentalDataValidatorV2:
                 net = cf.net_cash_flow.value or 0.0
                 denom = abs(total) if total else 1.0
                 if abs(net - total) > 0.05 * denom:
-                    cross_warnings.append("Cash flow components don't sum within 5% tolerance")
+                    cross_warnings.append(
+                        "Cash flow components don't sum within 5% tolerance"
+                    )
         except Exception as e:
             logger.error(f"Error in cash flow components sum: {e}")
             pass
 
-        return ExtendedValidation(base=base, cross_errors=cross_errors, cross_warnings=cross_warnings)
-
-
+        return ExtendedValidation(
+            base=base, cross_errors=cross_errors, cross_warnings=cross_warnings
+        )

@@ -28,5 +28,3 @@ def test_get_logger_creates_file(tmp_path: Path) -> None:
     finally:
         # restore module state
         logger_mod.LOGS_BASE_DIR = old_base
-
-
