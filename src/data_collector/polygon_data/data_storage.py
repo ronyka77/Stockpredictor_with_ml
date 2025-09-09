@@ -5,11 +5,17 @@ Data storage functionality for PostgreSQL database operations
 from typing import List, Dict, Optional, Any
 from datetime import datetime, date
 import pandas as pd
-from sqlalchemy import create_engine, text
 
 from src.utils.logger import get_logger
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
-from src.data_collector.config import config
+from src.database.connection import (
+    get_global_pool,
+    init_global_pool,
+    fetch_all,
+    fetch_one,
+    execute,
+    execute_values,
+)
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -21,24 +27,13 @@ class DataStorage:
     Provides efficient bulk operations, data integrity checks, and query capabilities.
     """
 
-    def __init__(self, connection_string: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the data storage handler
 
         Args:
-            connection_string: PostgreSQL connection string (defaults to config)
         """
-        self.connection_string = connection_string or config.database_url
-        self.engine = create_engine(self.connection_string, echo=False)
-
-        # Test connection
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            logger.info("Database connection established successfully")
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
+        init_global_pool()
 
     def store_historical_data(
         self,
@@ -133,29 +128,35 @@ class DataStorage:
         Returns:
             Tuple of (inserted_count, updated_count)
         """
-        with self.engine.connect() as conn:
-            # Use PostgreSQL's ON CONFLICT clause for upsert
-            upsert_query = text("""
-                INSERT INTO historical_prices 
-                (ticker, date, open, high, low, close, volume, adjusted_close, vwap)
-                VALUES (:ticker, :date, :open, :high, :low, :close, :volume, :adjusted_close, :vwap)
-                ON CONFLICT (ticker, date) 
-                DO UPDATE SET
-                    open = EXCLUDED.open,
-                    high = EXCLUDED.high,
-                    low = EXCLUDED.low,
-                    close = EXCLUDED.close,
-                    volume = EXCLUDED.volume,
-                    adjusted_close = EXCLUDED.adjusted_close,
-                    vwap = EXCLUDED.vwap
-            """)
+        # Use psycopg2.execute_values for performant batched upserts
+        cols = [
+            "ticker",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "adjusted_close",
+            "vwap",
+        ]
+        values = [tuple(row[col] for col in cols) for _, row in batch_df.iterrows()]
 
-            # Execute batch insert
-            conn.execute(upsert_query, batch_df.to_dict("records"))
-            conn.commit()
+        insert_sql = (
+            "INSERT INTO historical_prices (" + ",".join(cols) + ") VALUES %s "
+            "ON CONFLICT (ticker, date) DO UPDATE SET "
+            "open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, "
+            "close = EXCLUDED.close, volume = EXCLUDED.volume, "
+            "adjusted_close = EXCLUDED.adjusted_close, vwap = EXCLUDED.vwap"
+        )
 
-            # In a real implementation, you might want to track actual inserts vs updates
+        try:
+            # Use helper that manages connection, cursor and commit
+            execute_values(insert_sql, values, page_size=1000)
             return len(batch_df), 0
+        except Exception as e:
+            logger.error(f"_upsert_batch failed: {e}")
+            raise
 
     def _insert_ignore_batch(self, batch_df: pd.DataFrame) -> int:
         """
@@ -167,18 +168,29 @@ class DataStorage:
         Returns:
             Number of records inserted
         """
-        with self.engine.connect() as conn:
-            insert_query = text("""
-                INSERT INTO historical_prices 
-                (ticker, date, open, high, low, close, volume, adjusted_close, vwap)
-                VALUES (:ticker, :date, :open, :high, :low, :close, :volume, :adjusted_close, :vwap)
-                ON CONFLICT (ticker, date) DO NOTHING
-            """)
+        cols = [
+            "ticker",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "adjusted_close",
+            "vwap",
+        ]
+        values = [tuple(row[col] for col in cols) for _, row in batch_df.iterrows()]
+        insert_sql = (
+            "INSERT INTO historical_prices (" + ",".join(cols) + ") VALUES %s "
+            "ON CONFLICT (ticker, date) DO NOTHING"
+        )
 
-            conn.execute(insert_query, batch_df.to_dict("records"))
-            conn.commit()
-
+        try:
+            execute_values(insert_sql, values, page_size=1000)
             return len(batch_df)
+        except Exception as e:
+            logger.error(f"_insert_ignore_batch failed: {e}")
+            raise
 
     def _insert_batch(self, batch_df: pd.DataFrame) -> int:
         """
@@ -190,15 +202,17 @@ class DataStorage:
         Returns:
             Number of records inserted
         """
-        batch_df.to_sql(
-            "historical_prices",
-            self.engine,
-            if_exists="append",
-            index=False,
-            method="multi",
-        )
+        # Generic insert using execute_values
+        cols = list(batch_df.columns)
+        values = [tuple(row[col] for col in cols) for _, row in batch_df.iterrows()]
+        insert_sql = "INSERT INTO historical_prices (" + ",".join(cols) + ") VALUES %s"
 
-        return len(batch_df)
+        try:
+            execute_values(insert_sql, values, page_size=1000)
+            return len(batch_df)
+        except Exception as e:
+            logger.error(f"_insert_batch failed: {e}")
+            raise
 
     def get_historical_data(
         self,
@@ -219,31 +233,29 @@ class DataStorage:
         Returns:
             List of historical data records
         """
-        query = "SELECT * FROM historical_prices WHERE ticker = :ticker"
-        params = {"ticker": ticker.upper()}
+        query = "SELECT * FROM historical_prices WHERE ticker = %s"
+        params: list[Any] = [ticker.upper()]
 
         if start_date:
-            query += " AND date >= :start_date"
-            params["start_date"] = start_date
+            query += " AND date >= %s"
+            params.append(start_date)
 
         if end_date:
-            query += " AND date <= :end_date"
-            params["end_date"] = end_date
+            query += " AND date <= %s"
+            params.append(end_date)
 
         query += " ORDER BY date ASC"
 
         if limit:
-            query += " LIMIT :limit"
-            params["limit"] = limit
+            query += " LIMIT %s"
+            params.append(limit)
 
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(query), params)
-                records = [dict(row._mapping) for row in result]
-
+            rows = fetch_all(query, tuple(params))
+            # fetch_all returns list of dict rows by default
+            records = rows or []
             logger.info(f"Retrieved {len(records)} records for {ticker}")
             return records
-
         except Exception as e:
             logger.error(f"Error retrieving data for {ticker}: {e}")
             raise
@@ -258,13 +270,10 @@ class DataStorage:
         query = "SELECT DISTINCT ticker FROM historical_prices ORDER BY ticker"
 
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(query))
-                tickers = [row[0] for row in result]
-
+            rows = fetch_all(query, None, dict_cursor=False)
+            tickers = [r[0] for r in (rows or [])]
             logger.info(f"Found {len(tickers)} unique tickers in database")
             return tickers
-
         except Exception as e:
             logger.error(f"Error retrieving available tickers: {e}")
             raise
@@ -350,9 +359,7 @@ class DataStorage:
         """
 
         try:
-            with self.engine.connect() as conn:
-                conn.execute(text(create_table_sql))
-                conn.commit()
+            execute(create_table_sql)
 
             logger.info("Database tables created/verified successfully")
 
@@ -368,38 +375,26 @@ class DataStorage:
             Dictionary with health check results
         """
         try:
-            with self.engine.connect() as conn:
-                # Test basic connectivity
-                result = conn.execute(text("SELECT 1"))
-                connectivity = result.fetchone()[0] == 1
-
-                # Test table existence
-                table_check = conn.execute(
-                    text("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'historical_prices'
-                    )
-                """)
+            connectivity = bool(fetch_one("SELECT 1") is not None)
+            table_exists = bool(
+                fetch_one(
+                    "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'historical_prices')"
                 )
-                table_exists = table_check.fetchone()[0]
+            )
+            record_count = 0
+            if table_exists:
+                rc = fetch_one("SELECT COUNT(*) as cnt FROM historical_prices")
+                record_count = (
+                    rc.get("cnt") if isinstance(rc, dict) else (rc[0] if rc else 0)
+                )
 
-                # Get basic stats
-                if table_exists:
-                    stats_result = conn.execute(
-                        text("SELECT COUNT(*) FROM historical_prices")
-                    )
-                    record_count = stats_result.fetchone()[0]
-                else:
-                    record_count = 0
-
-                return {
-                    "status": "healthy",
-                    "connectivity": connectivity,
-                    "table_exists": table_exists,
-                    "record_count": record_count,
-                    "timestamp": datetime.now().isoformat(),
-                }
+            return {
+                "status": "healthy",
+                "connectivity": connectivity,
+                "table_exists": table_exists,
+                "record_count": record_count,
+                "timestamp": datetime.now().isoformat(),
+            }
 
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
@@ -442,71 +437,60 @@ class DataStorage:
                 batch_data = tickers_data[i : i + batch_size]
 
                 try:
-                    with self.engine.connect() as conn:
-                        for ticker_data in batch_data:
-                            # Prepare ticker data with all available fields
-                            upsert_data = {
-                                "ticker": ticker_data.get("ticker", "").upper(),
-                                "name": ticker_data.get("name"),
-                                "market": ticker_data.get("market", "stocks"),
-                                "locale": ticker_data.get("locale", "us"),
-                                "primary_exchange": ticker_data.get("primary_exchange"),
-                                "currency_name": ticker_data.get("currency_name"),
-                                "active": ticker_data.get("active", True),
-                                "type": ticker_data.get("type"),
-                                "market_cap": ticker_data.get("market_cap"),
-                                "weighted_shares_outstanding": ticker_data.get(
-                                    "weighted_shares_outstanding"
-                                ),
-                                "round_lot": ticker_data.get("round_lot"),
-                                "cik": ticker_data.get("cik"),
-                                "composite_figi": ticker_data.get("composite_figi"),
-                                "share_class_figi": ticker_data.get("share_class_figi"),
-                                "sic_code": ticker_data.get("sic_code"),
-                                "sic_description": ticker_data.get("sic_description"),
-                                "ticker_root": ticker_data.get("ticker_root"),
-                                "total_employees": ticker_data.get("total_employees"),
-                                "list_date": ticker_data.get("list_date"),
-                            }
-                            # Remove None values
-                            upsert_data = {
-                                k: v for k, v in upsert_data.items() if v is not None
-                            }
+                    # Prepare rows for execute_values
+                    cols = None
+                    rows = []
+                    for ticker_data in batch_data:
+                        upsert_data = {
+                            "ticker": ticker_data.get("ticker", "").upper(),
+                            "name": ticker_data.get("name"),
+                            "market": ticker_data.get("market", "stocks"),
+                            "locale": ticker_data.get("locale", "us"),
+                            "primary_exchange": ticker_data.get("primary_exchange"),
+                            "currency_name": ticker_data.get("currency_name"),
+                            "active": ticker_data.get("active", True),
+                            "type": ticker_data.get("type"),
+                            "market_cap": ticker_data.get("market_cap"),
+                            "weighted_shares_outstanding": ticker_data.get(
+                                "weighted_shares_outstanding"
+                            ),
+                            "round_lot": ticker_data.get("round_lot"),
+                            "cik": ticker_data.get("cik"),
+                            "composite_figi": ticker_data.get("composite_figi"),
+                            "share_class_figi": ticker_data.get("share_class_figi"),
+                            "sic_code": ticker_data.get("sic_code"),
+                            "sic_description": ticker_data.get("sic_description"),
+                            "ticker_root": ticker_data.get("ticker_root"),
+                            "total_employees": ticker_data.get("total_employees"),
+                            "list_date": ticker_data.get("list_date"),
+                        }
+                        # Remove None values
+                        upsert_data = {
+                            k: v for k, v in upsert_data.items() if v is not None
+                        }
 
-                            # Build dynamic query based on available fields
-                            columns = list(upsert_data.keys())
-                            placeholders = [f":{col}" for col in columns]
+                        if cols is None:
+                            cols = list(upsert_data.keys())
+                        # maintain column order for rows
+                        rows.append(tuple(upsert_data.get(c) for c in cols))
 
-                            # Add last_updated to columns and values
-                            columns.append("last_updated")
-                            placeholders.append("CURRENT_TIMESTAMP")
+                    if not cols:
+                        continue
 
-                            # Build the INSERT part
-                            insert_columns = ", ".join(columns)
-                            insert_values = ", ".join(placeholders)
+                    # Build insert SQL
+                    insert_columns = ",".join(cols)
+                    insert_sql = (
+                        f"INSERT INTO tickers ({insert_columns}) VALUES %s "
+                        f"ON CONFLICT (ticker) DO UPDATE SET "
+                        + ", ".join(
+                            [f"{c}=EXCLUDED.{c}" for c in cols if c != "ticker"]
+                        )
+                    )
 
-                            # Build the UPDATE part (exclude ticker and timestamps)
-                            update_columns = [
-                                col
-                                for col in upsert_data.keys()
-                                if col not in ["ticker", "created_at"]
-                            ]
-                            update_set = ", ".join(
-                                [f"{col} = EXCLUDED.{col}" for col in update_columns]
-                            )
-                            update_set += ", last_updated = CURRENT_TIMESTAMP"
+                    # use centralized helper for batched upsert
+                    execute_values(insert_sql, rows, page_size=500)
 
-                            upsert_query = text(f"""
-                                INSERT INTO tickers ({insert_columns})
-                                VALUES ({insert_values})
-                                ON CONFLICT (ticker) 
-                                DO UPDATE SET {update_set}
-                            """)
-
-                            conn.execute(upsert_query, upsert_data)
-                            stored_count += 1
-
-                        conn.commit()
+                    stored_count += len(batch_data)
 
                     logger.info(
                         f"Processed ticker batch {i // batch_size + 1}: {len(batch_data)} tickers"
@@ -565,8 +549,8 @@ class DataStorage:
             query += f" LIMIT {limit}"
 
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(query), params)
+            with get_global_pool().connection() as conn:
+                result = conn.execute(query, params)
                 tickers = []
 
                 for row in result:
@@ -614,8 +598,8 @@ class DataStorage:
             query += f" LIMIT {limit}"
 
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(query), params)
+            with get_global_pool().connection() as conn:
+                result = conn.execute(query, params)
                 tickers = [row[0] for row in result]
 
                 logger.info(f"Retrieved {len(tickers)} ticker symbols from database")
@@ -627,5 +611,4 @@ class DataStorage:
 
     def __exit__(self):
         """Context manager exit"""
-        if hasattr(self, "engine"):
-            self.engine.dispose()
+        pass

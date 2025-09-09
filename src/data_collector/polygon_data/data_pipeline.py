@@ -92,7 +92,6 @@ class DataPipeline:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        db_connection: Optional[str] = None,
         requests_per_minute: int = 5,
     ):
         """
@@ -100,14 +99,13 @@ class DataPipeline:
 
         Args:
             api_key: Polygon.io API key (defaults to config)
-            db_connection: Database connection string (defaults to config)
             requests_per_minute: Rate limit for API requests
         """
         # Initialize components
         self.client = PolygonDataClient(api_key, requests_per_minute)
         self.ticker_manager = TickerManager(self.client)
         self.data_fetcher = HistoricalDataFetcher(self.client)
-        self.storage = DataStorage(db_connection)
+        self.storage = DataStorage()
         self.validator = DataValidator(strict_mode=False)
 
         # Pipeline state
@@ -249,16 +247,6 @@ class DataPipeline:
         if not self.client.health_check():
             raise RuntimeError("Polygon.io API health check failed")
 
-        # Check database connectivity
-        db_health = self.storage.health_check()
-        if db_health["status"] != "healthy":
-            raise RuntimeError(
-                f"Database health check failed: {db_health.get('error')}"
-            )
-
-        # Ensure database tables exist
-        self.storage.create_tables()
-
         logger.info("All health checks passed")
 
     def _save_pipeline_stats(self) -> None:
@@ -307,8 +295,8 @@ if __name__ == "__main__":
 
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    # start_date = datetime.now() - timedelta(days=7)
-    start_date = datetime(2022, 1, 1).date()
+    start_date = datetime.now() - timedelta(days=7)
+    # start_date = datetime(2022, 1, 1).date()
 
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

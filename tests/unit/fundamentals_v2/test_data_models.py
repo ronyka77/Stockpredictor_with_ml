@@ -12,27 +12,44 @@ def make_financial_value(v=100.0):
 
 def test_extract_financial_value_dict_and_numeric_and_missing():
     data = {"revenues": {"value": 123.0}, "net": 50}
-    assert dm.extract_financial_value(data, "revenues") == 123.0
-    assert dm.extract_financial_value(data, "net") == 50.0
-    assert dm.extract_financial_value(data, "missing") is None
+    if dm.extract_financial_value(data, "revenues") != 123.0:
+        raise AssertionError("extract_financial_value failed for revenues")
+    if dm.extract_financial_value(data, "net") != 50.0:
+        raise AssertionError("extract_financial_value failed for net")
+    if dm.extract_financial_value(data, "missing") is not None:
+        raise AssertionError(
+            "extract_financial_value failed to return None for missing"
+        )
 
 
 def test_safe_divide_and_growth_and_cagr():
     # safe_divide
-    assert dm.safe_divide(10, 2) == 5
-    assert dm.safe_divide(None, 2) is None
-    assert dm.safe_divide(1, 0) is None
+    if dm.safe_divide(10, 2) != 5:
+        raise AssertionError("safe_divide returned unexpected result")
+    if dm.safe_divide(None, 2) is not None:
+        raise AssertionError("safe_divide did not return None for None numerator")
+    if dm.safe_divide(1, 0) is not None:
+        raise AssertionError("safe_divide did not return None for division by zero")
 
     # growth rate
-    assert dm.calculate_growth_rate(120, 100) == pytest.approx(0.2)
-    assert dm.calculate_growth_rate(None, 100) is None
-    assert dm.calculate_growth_rate(100, 0) is None
+    if dm.calculate_growth_rate(120, 100) != pytest.approx(0.2):
+        raise AssertionError("calculate_growth_rate returned unexpected value")
+    if dm.calculate_growth_rate(None, 100) is not None:
+        raise AssertionError("calculate_growth_rate did not return None for None input")
+    if dm.calculate_growth_rate(100, 0) is not None:
+        raise AssertionError(
+            "calculate_growth_rate did not return None when denominator is zero"
+        )
 
     # cagr
-    assert dm.calculate_cagr(200, 100, 2) == pytest.approx((200 / 100) ** (1 / 2) - 1)
-    assert dm.calculate_cagr(None, 100, 2) is None
-    assert dm.calculate_cagr(200, 0, 2) is None
-    assert dm.calculate_cagr(200, 100, 0) is None
+    if dm.calculate_cagr(200, 100, 2) != pytest.approx((200 / 100) ** (1 / 2) - 1):
+        raise AssertionError("calculate_cagr returned unexpected value")
+    if dm.calculate_cagr(None, 100, 2) is not None:
+        raise AssertionError("calculate_cagr did not return None for None input")
+    if dm.calculate_cagr(200, 0, 2) is not None:
+        raise AssertionError("calculate_cagr did not return None for zero denominator")
+    if dm.calculate_cagr(200, 100, 0) is not None:
+        raise AssertionError("calculate_cagr did not return None for zero periods")
 
 
 def test_financial_statement_date_parsing_and_company_details():
@@ -43,13 +60,17 @@ def test_financial_statement_date_parsing_and_company_details():
     dm.BalanceSheet(filing_date="2020-12-31", fiscal_period="FY")
     dm.CashFlowStatement(filing_date="2021-06-30", fiscal_period="Q2")
 
-    assert isinstance(inc.start_date, date)
-    assert isinstance(inc.filing_date, date)
-    assert inc.fiscal_period == "Q1"
+    if not isinstance(inc.start_date, date):
+        raise AssertionError("IncomeStatement start_date not parsed to date")
+    if not isinstance(inc.filing_date, date):
+        raise AssertionError("IncomeStatement filing_date not parsed to date")
+    if inc.fiscal_period != "Q1":
+        raise AssertionError("IncomeStatement fiscal_period mismatch")
 
     # CompanyDetails parsing list_date
     comp = dm.CompanyDetails(ticker="TICK", list_date="2010-05-01")
-    assert isinstance(comp.list_date, date)
+    if not isinstance(comp.list_date, date):
+        raise AssertionError("CompanyDetails list_date not parsed to date")
 
 
 def test_fundamental_data_response_latest_and_by_period_and_quality():
@@ -87,19 +108,25 @@ def test_fundamental_data_response_latest_and_by_period_and_quality():
 
     # Latest income statement should be s2 (2021)
     latest_inc = resp.get_latest_income_statement()
-    assert latest_inc is s2
+    if latest_inc is not s2:
+        raise AssertionError("Latest income statement selection incorrect")
 
     # Latest balance sheet
     latest_bal = resp.get_latest_balance_sheet()
-    assert latest_bal is b1
+    if latest_bal is not b1:
+        raise AssertionError("Latest balance sheet selection incorrect")
 
     # get statements by period
     by_q1 = resp.get_statements_by_period("Q1")
-    assert by_q1["income_statement"] is not None
-    assert by_q1["balance_sheet"] is not None
+    if by_q1["income_statement"] is None:
+        raise AssertionError("get_statements_by_period missing income_statement")
+    if by_q1["balance_sheet"] is None:
+        raise AssertionError("get_statements_by_period missing balance_sheet")
 
     # calculate data quality
     score = resp.calculate_data_quality()
-    assert isinstance(score, float)
+    if not isinstance(score, float):
+        raise AssertionError("Data quality score type mismatch")
     # Since some essential fields are provided, score should be > 0
-    assert score > 0
+    if score <= 0:
+        raise AssertionError("Data quality score unexpectedly non-positive")

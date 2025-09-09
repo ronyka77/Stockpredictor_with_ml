@@ -30,9 +30,12 @@ def test_extract_article_metadata_maps_fields_correctly():
     }
 
     meta = client.extract_article_metadata(raw)
-    assert meta["polygon_id"] == "art-abc"
-    assert meta["publisher_name"] == "Example Pub"
-    assert meta["insights"][0]["sentiment"] == "neutral"
+    if meta.get("polygon_id") != "art-abc":
+        raise AssertionError("polygon_id not extracted correctly")
+    if meta.get("publisher_name") != "Example Pub":
+        raise AssertionError("publisher_name not extracted correctly")
+    if meta.get("insights", [])[0].get("sentiment") != "neutral":
+        raise AssertionError("insight sentiment not extracted correctly")
 
 
 @pytest.mark.unit
@@ -54,10 +57,16 @@ def test_get_news_for_ticker_passes_date_params_and_returns_articles(mocker):
         "ACME", published_utc_gte=start, published_utc_lte=end, limit=2
     )
 
-    assert isinstance(res, list)
-    assert len(res) == 2
-    assert "published_utc.gte" in captured["params"]
-    assert captured["endpoint"].startswith("/v2/reference/news")
+    if not isinstance(res, list):
+        raise AssertionError("Expected list of articles from get_news_for_ticker")
+    if len(res) != 2:
+        raise AssertionError(
+            "Unexpected number of articles returned by get_news_for_ticker"
+        )
+    if "published_utc.gte" not in captured.get("params", {}):
+        raise AssertionError("Date parameter not passed to API client")
+    if not captured.get("endpoint", "").startswith("/v2/reference/news"):
+        raise AssertionError("Unexpected endpoint used for news API")
 
 
 @pytest.mark.unit
@@ -69,7 +78,8 @@ def test_get_news_for_ticker_handles_empty_api_response(mocker):
     )
 
     res = client.get_news_for_ticker("ACME")
-    assert res == []
+    if res != []:
+        raise AssertionError("Expected empty list when API returns no data")
 
 
 @pytest.mark.unit
@@ -92,9 +102,10 @@ def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
     caplog.clear()
     res = client.get_news_for_multiple_tickers(["GOOD", "BAD"])
 
-    assert "GOOD" in res and isinstance(res["GOOD"], list)
-    assert "BAD" in res and res["BAD"] == []
-    assert True
+    if "GOOD" not in res or not isinstance(res["GOOD"], list):
+        raise AssertionError("GOOD results missing or invalid")
+    if "BAD" not in res or res["BAD"] != []:
+        raise AssertionError("BAD results did not return expected empty list")
 
 
 @pytest.mark.unit
@@ -117,9 +128,10 @@ def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, 
     res = client.get_news_by_date_range(start, end)
 
     # should include only id 1
-    assert any(a.get("id") == "1" for a in res)
-    assert all(a.get("id") != "3" for a in res)
-    assert True
+    if not any(a.get("id") == "1" for a in res):
+        raise AssertionError("Expected article id '1' in filtered results")
+    if any(a.get("id") == "3" for a in res):
+        raise AssertionError("Article id '3' should be excluded from filtered results")
 
 
 @pytest.mark.unit
@@ -133,5 +145,7 @@ def test_validate_news_response():
     }
     bad = {"id": None, "title": "t", "article_url": "u", "published_utc": None}
 
-    assert client.validate_news_response(good) is True
-    assert client.validate_news_response(bad) is False
+    if client.validate_news_response(good) is not True:
+        raise AssertionError("Good news response validation failed")
+    if client.validate_news_response(bad) is not False:
+        raise AssertionError("Bad news response validation did not fail as expected")

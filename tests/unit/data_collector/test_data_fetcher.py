@@ -7,7 +7,7 @@ from src.data_collector.polygon_data.data_validator import (
     OHLCVRecord,
     DataQualityMetrics,
 )
-
+from tests._fixtures.conftest import mock_http_client
 
 def _make_polygon_record(day_index=0):
     # Create a simple valid polygon-style record with millisecond timestamp
@@ -28,8 +28,10 @@ def test_get_historical_data_returns_empty_when_no_data(mock_http_client):
     fetcher = HistoricalDataFetcher(client=mock_http_client)
     records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
 
-    assert records == []
-    assert isinstance(metrics, DataQualityMetrics)
+    if records != []:
+        raise AssertionError("Expected no records when API returns empty aggregates")
+    if not isinstance(metrics, DataQualityMetrics):
+        raise AssertionError("Metrics should be DataQualityMetrics")
 
 
 def test_get_historical_data_validation_path(mock_http_client):
@@ -48,8 +50,10 @@ def test_get_historical_data_validation_path(mock_http_client):
     fetcher = HistoricalDataFetcher(client=mock_http_client, validator=validator)
     records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
 
-    assert records == fake_validated
-    assert metrics.success_rate == 99.9
+    if records != fake_validated:
+        raise AssertionError("Validator path did not return validated records")
+    if metrics.success_rate != 99.9:
+        raise AssertionError("Metrics success_rate mismatch in validator path")
 
 
 def test_get_historical_data_transform_without_validation(mock_http_client):
@@ -62,11 +66,16 @@ def test_get_historical_data_transform_without_validation(mock_http_client):
         "TICK", "2020-01-01", "2020-01-01", validate_data=False
     )
 
-    assert len(records) == 1
-    assert isinstance(records[0], OHLCVRecord)
-    assert records[0].ticker == "TICK"
-    assert metrics.total_records == 1
-    assert metrics.valid_records == 1
+    if len(records) != 1:
+        raise AssertionError("Expected one record in transformed results")
+    if not isinstance(records[0], OHLCVRecord):
+        raise AssertionError("Transformed record is not OHLCVRecord")
+    if records[0].ticker != "TICK":
+        raise AssertionError("Transformed record ticker mismatch")
+    if metrics.total_records != 1:
+        raise AssertionError("Metrics total_records mismatch")
+    if metrics.valid_records != 1:
+        raise AssertionError("Metrics valid_records mismatch")
 
 
 def test_get_historical_data_raises_on_client_exception(mock_http_client):
@@ -85,8 +94,10 @@ def test_get_grouped_daily_data_without_validation(mock_http_client):
     fetcher = HistoricalDataFetcher(client=mock_http_client)
     results = fetcher.get_grouped_daily_data("2020-01-01", validate_data=False)
 
-    assert "AAA" in results
-    assert isinstance(results["AAA"], OHLCVRecord)
+    if "AAA" not in results:
+        raise AssertionError("Expected grouped results to contain 'AAA'")
+    if not isinstance(results["AAA"], OHLCVRecord):
+        raise AssertionError("Grouped result value is not OHLCVRecord")
 
 
 def test_get_bulk_historical_data_batches(mock_http_client):
@@ -101,10 +112,14 @@ def test_get_bulk_historical_data_batches(mock_http_client):
         tickers, "2020-01-01", "2020-01-02", batch_size=2, delay_between_batches=0
     )
 
-    assert set(results.keys()) == set(tickers)
+    if set(results.keys()) != set(tickers):
+        raise AssertionError(
+            "Bulk historical data did not return results for all requested tickers"
+        )
     for k, (recs, metrics) in results.items():
         # Each returned list may contain OHLCVRecord objects after validation, or be empty depending on validator
-        assert isinstance(metrics, DataQualityMetrics)
+        if not isinstance(metrics, DataQualityMetrics):
+            raise AssertionError("Metrics in bulk results should be DataQualityMetrics")
 
 
 def test_get_historical_data_no_data(mock_http_client):
@@ -112,8 +127,10 @@ def test_get_historical_data_no_data(mock_http_client):
     fetcher = HistoricalDataFetcher(client=mock_http_client)
 
     records, metrics = fetcher.get_historical_data("AAA", "2020-01-01", "2020-01-02")
-    assert records == []
-    assert metrics.total_records == 0
+    if records != []:
+        raise AssertionError("Expected no records when no aggregates returned")
+    if metrics.total_records != 0:
+        raise AssertionError("Expected metrics.total_records == 0 when no records")
 
 
 def test_get_historical_data_transforms_and_validates(mock_http_client):
@@ -128,9 +145,16 @@ def test_get_historical_data_transforms_and_validates(mock_http_client):
     records, metrics = fetcher.get_historical_data(
         "BBB", date(2020, 1, 1), date(2020, 1, 2)
     )
-    assert metrics.total_records == 2
-    assert metrics.valid_records == len(records)
-    assert all(r.ticker == "BBB" for r in records)
+    if metrics.total_records != 2:
+        raise AssertionError(
+            "Metrics total_records mismatch for transformed/validated path"
+        )
+    if metrics.valid_records != len(records):
+        raise AssertionError(
+            "Metrics valid_records mismatch for transformed/validated path"
+        )
+    if not all(r.ticker == "BBB" for r in records):
+        raise AssertionError("Not all transformed records have expected ticker 'BBB'")
 
 
 def test_get_grouped_daily_data(mock_http_client):
@@ -141,5 +165,7 @@ def test_get_grouped_daily_data(mock_http_client):
     fetcher = HistoricalDataFetcher(client=mock_http_client)
 
     res = fetcher.get_grouped_daily_data("2020-01-01")
-    assert "CCC" in res
-    assert res["CCC"].ticker == "CCC"
+    if "CCC" not in res:
+        raise AssertionError("Expected 'CCC' key in grouped daily results")
+    if res["CCC"].ticker != "CCC":
+        raise AssertionError("Grouped result ticker mismatch for 'CCC'")

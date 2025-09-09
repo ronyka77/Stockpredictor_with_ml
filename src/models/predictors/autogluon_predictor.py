@@ -14,9 +14,9 @@ from src.models.automl.autogluon_model import AutoGluonModel
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-    logging.getLogger(lg).setLevel(logging.WARNING)
-warnings.filterwarnings("ignore")
+# for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+#     logging.getLogger(lg).setLevel(logging.WARNING)
+# warnings.filterwarnings("ignore")
 
 
 class AutoGluonPredictor(BasePredictor):

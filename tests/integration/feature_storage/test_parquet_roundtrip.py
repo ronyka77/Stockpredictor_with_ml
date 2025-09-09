@@ -26,8 +26,11 @@ def test_feature_storage_roundtrip(tmp_path):
 
     meta = {"categories": ["trend", "momentum"], "quality_score": 95.0, "warnings": []}
     m = fs.save_features("TEST", df, meta)
-    assert m.ticker == "TEST" and m.total_features == 2
+    if not (m.ticker == "TEST" and m.total_features == 2):
+        raise AssertionError("Saved feature metadata does not match expected values")
 
     loaded_df, loaded_meta = fs.load_features("TEST")
-    assert loaded_df.shape == df.shape
-    assert set(loaded_df.columns) == set(df.columns)
+    if loaded_df.shape != df.shape:
+        raise AssertionError("Loaded DataFrame shape does not match original")
+    if set(loaded_df.columns) != set(df.columns):
+        raise AssertionError("Loaded DataFrame columns do not match original")

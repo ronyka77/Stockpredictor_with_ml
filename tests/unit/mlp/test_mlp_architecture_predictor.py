@@ -23,17 +23,22 @@ def test_mlp_forward_and_architecture_info():
     # Batch input
     x = torch.randn(7, input_size)
     out = model(x)
-    assert out.shape == (7, output_size)
+    if out.shape != (7, output_size):
+        raise AssertionError("MLP forward output shape mismatch")
 
     # Single-dimension input should be expanded to batch dim
     x1 = torch.randn(input_size)
     out1 = model(x1)
-    assert out1.shape[0] == 1
+    if out1.shape[0] != 1:
+        raise AssertionError("Single-dim input not expanded to batch dimension")
 
     info = model.get_architecture_info()
-    assert info["input_size"] == input_size
-    assert info["output_size"] == output_size
-    assert info["num_layers"] == len(model.layers)
+    if info.get("input_size") != input_size:
+        raise AssertionError("Architecture info input_size mismatch")
+    if info.get("output_size") != output_size:
+        raise AssertionError("Architecture info output_size mismatch")
+    if info.get("num_layers") != len(model.layers):
+        raise AssertionError("Architecture info num_layers mismatch")
 
 
 def test_mlppredictor_fit_predict_and_confidence(tmp_path):
@@ -68,22 +73,28 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
         train_loader, val_loader=None, scaler=scaler, feature_names=list(X.columns)
     )
 
-    assert predictor.is_trained is True
+    if predictor.is_trained is not True:
+        raise AssertionError("Predictor should be marked trained after fit")
 
     # Predictions should return correct length
     preds = predictor.predict(X)
-    assert isinstance(preds, np.ndarray)
-    assert preds.shape[0] == n_samples
+    if not isinstance(preds, np.ndarray):
+        raise AssertionError("Predictions should be a numpy ndarray")
+    if preds.shape[0] != n_samples:
+        raise AssertionError("Predictions length mismatch")
 
     # Confidence methods
     conf_simple = predictor.get_prediction_confidence(X, method="simple")
-    assert conf_simple.shape[0] == n_samples
+    if conf_simple.shape[0] != n_samples:
+        raise AssertionError("Simple confidence length mismatch")
 
     conf_margin = predictor.get_prediction_confidence(X, method="margin")
-    assert conf_margin.shape[0] == n_samples
+    if conf_margin.shape[0] != n_samples:
+        raise AssertionError("Margin confidence length mismatch")
 
     # Check that checkpoint file was created
     checkpoint_path = os.path.join(
         config["checkpoint_dir"], f"{predictor.model_name}_checkpoint.pth"
     )
-    assert os.path.exists(checkpoint_path)
+    if not os.path.exists(checkpoint_path):
+        raise AssertionError("Checkpoint file was not created")

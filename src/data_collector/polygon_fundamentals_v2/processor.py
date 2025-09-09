@@ -3,7 +3,7 @@ from typing import Dict, List
 from src.data_collector.polygon_fundamentals_v2.collector_service import (
     FundamentalsCollectorService,
 )
-from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
+from src.database.connection import get_global_pool, fetch_all
 from src.utils.logger import get_logger
 
 
@@ -15,16 +15,12 @@ class FundamentalsProcessor:
 
     def __init__(self) -> None:
         self.service = FundamentalsCollectorService()
-        self.pool = get_connection_pool()
+        self.pool = get_global_pool()
 
     def _get_active_tickers(self) -> List[str]:
         try:
-            with self.pool.get_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT ticker FROM tickers WHERE active = true and has_financials = true"
-                    )
-                    return [r["ticker"] for r in cur.fetchall()]
+            rows = fetch_all("SELECT ticker FROM tickers WHERE active = true and type = 'CS'")
+            return [r["ticker"] for r in (rows or [])]
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to load active tickers: {e}")
             return []

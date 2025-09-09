@@ -60,8 +60,11 @@ class RateLimiter:
                     f"Sleeping for {sleep_time:.2f} seconds"
                 )
                 time.sleep(sleep_time)
+                # Update window start using current time after sleep
                 self.window_start = time.time()
                 self.request_count = 0
+                # Refresh current_time to reflect time after sleep
+                current_time = time.time()
 
         self.request_count += 1
         self.last_request_time = current_time

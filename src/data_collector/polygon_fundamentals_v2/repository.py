@@ -2,7 +2,13 @@ import hashlib
 import json
 from typing import Any, Dict, Optional, List
 
-from src.data_collector.polygon_fundamentals.db_pool import get_connection_pool
+from src.database.connection import (
+    get_global_pool,
+    fetch_all,
+    fetch_one,
+    execute,
+    run_in_transaction,
+)
 from src.utils.logger import get_logger
 
 
@@ -113,66 +119,54 @@ class FundamentalsRepository:
     """DB access layer. Only SQL and transactions live here."""
 
     def __init__(self) -> None:
-        self.pool = get_connection_pool()
+        self.pool = get_global_pool()
 
     def ensure_schema(self) -> None:
-        with self.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(RAW_STAGING_DDL)
-                cur.execute(FACTS_V2_DDL)
-                conn.commit()
+        # Use centralized execute helper which handles connection and commit
+        execute(RAW_STAGING_DDL)
+        execute(FACTS_V2_DDL)
         logger.info("Ensured fundamentals V2 staging and facts schema")
 
     def get_ticker_id(self, ticker: str) -> Optional[int]:
-        with self.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM tickers WHERE ticker=%s", (ticker,))
-                row = cur.fetchone()
-                return int(row["id"]) if row and "id" in row else None
+        row = fetch_one("SELECT id FROM tickers WHERE ticker=%s", (ticker,))
+        return int(row["id"]) if row and "id" in row else None
 
     def get_ticker_symbol(self, ticker_id: int) -> Optional[str]:
-        with self.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT ticker FROM tickers WHERE id=%s", (ticker_id,))
-                row = cur.fetchone()
-                return str(row["ticker"]) if row and "ticker" in row else None
+        row = fetch_one("SELECT ticker FROM tickers WHERE id=%s", (ticker_id,))
+        return str(row["ticker"]) if row and "ticker" in row else None
 
     def set_ticker_financials(self, *, ticker_id: int, has_financials: bool) -> bool:
         """
         Update the `has_financials` flag for a given ticker id.
         Returns True if a row was updated, False otherwise. Handles errors with rollback and logging.
         """
-        with self.pool.get_connection() as conn:
-            try:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                            UPDATE public.tickers
-                            SET has_financials = %s, last_updated = CURRENT_TIMESTAMP
-                            WHERE id = %s
-                        """,
-                        (has_financials, ticker_id),
-                    )
-                    updated: int = getattr(cur, "rowcount", 0) or 0
-                conn.commit()
-                if updated == 0:
-                    logger.warning(
-                        f"No ticker updated for id={ticker_id} when setting has_financials={has_financials}"
-                    )
-                else:
-                    logger.info(
-                        f"Updated has_financials={has_financials} for ticker_id={ticker_id}"
-                    )
-                return updated > 0
-            except Exception as e:  # noqa: BLE001
-                try:
-                    conn.rollback()
-                except Exception:  # noqa: BLE001
-                    pass
-                logger.error(
-                    f"Failed to update has_financials for ticker_id={ticker_id} to {has_financials}: {e}"
+        def _update_fn(conn, cur):
+            cur.execute(
+                """
+                    UPDATE public.tickers
+                    SET has_financials = %s, last_updated = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """,
+                (has_financials, ticker_id),
+            )
+            return getattr(cur, "rowcount", 0) or 0
+
+        try:
+            updated = run_in_transaction(_update_fn)
+            if updated == 0:
+                logger.warning(
+                    f"No ticker updated for id={ticker_id} when setting has_financials={has_financials}"
                 )
-                return False
+            else:
+                logger.info(
+                    f"Updated has_financials={has_financials} for ticker_id={ticker_id}"
+                )
+            return updated > 0
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                f"Failed to update has_financials for ticker_id={ticker_id} to {has_financials}: {e}"
+            )
+            return False
 
     def fetch_pending_raw(self) -> List[Dict[str, Any]]:
         """
@@ -193,14 +187,9 @@ class FundamentalsRepository:
                 OR (r.filing_date IS NOT NULL AND (f.filing_date IS NULL OR f.filing_date < r.filing_date))
             ORDER BY r.ingested_at DESC
         """
-        with self.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql)
-                rows = cur.fetchall() or []
-                logger.info(
-                    f"📊 Found {len(rows)} pending raw fundamental records to process"
-                )
-                return rows
+        rows = fetch_all(sql)
+        logger.info(f"📊 Found {len(rows)} pending raw fundamental records to process")
+        return rows
 
     def upsert_raw_payload(
         self,
@@ -215,32 +204,31 @@ class FundamentalsRepository:
         payload: Dict[str, Any],
     ) -> None:
         response_hash = self._hash_payload(payload)
-        with self.pool.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                        INSERT INTO raw_fundamental_json (
-                        ticker_id, period_end, timeframe, fiscal_period, fiscal_year, filing_date, source, payload_json, response_hash
-                        ) VALUES (
-                        %(ticker_id)s, %(period_end)s, %(timeframe)s, %(fiscal_period)s, %(fiscal_year)s, %(filing_date)s, %(source)s, %(payload)s, %(response_hash)s
-                        )
-                        ON CONFLICT (response_hash) DO UPDATE SET
-                        payload_json = EXCLUDED.payload_json,
-                        filing_date = EXCLUDED.filing_date;
-                    """,
-                    {
-                        "ticker_id": ticker_id,
-                        "period_end": period_end,
-                        "timeframe": timeframe,
-                        "fiscal_period": fiscal_period,
-                        "fiscal_year": fiscal_year,
-                        "filing_date": filing_date,
-                        "source": source,
-                        "payload": json.dumps(payload, default=str),
-                        "response_hash": response_hash,
-                    },
+        params = {
+            "ticker_id": ticker_id,
+            "period_end": period_end,
+            "timeframe": timeframe,
+            "fiscal_period": fiscal_period,
+            "fiscal_year": fiscal_year,
+            "filing_date": filing_date,
+            "source": source,
+            "payload": json.dumps(payload, default=str),
+            "response_hash": response_hash,
+        }
+
+        execute(
+            """
+                INSERT INTO raw_fundamental_json (
+                ticker_id, period_end, timeframe, fiscal_period, fiscal_year, filing_date, source, payload_json, response_hash
+                ) VALUES (
+                %(ticker_id)s, %(period_end)s, %(timeframe)s, %(fiscal_period)s, %(fiscal_year)s, %(filing_date)s, %(source)s, %(payload)s, %(response_hash)s
                 )
-                conn.commit()
+                ON CONFLICT (response_hash) DO UPDATE SET
+                payload_json = EXCLUDED.payload_json,
+                filing_date = EXCLUDED.filing_date;
+            """,
+            params,
+        )
 
     @staticmethod
     def _hash_payload(payload: Dict[str, Any]) -> str:

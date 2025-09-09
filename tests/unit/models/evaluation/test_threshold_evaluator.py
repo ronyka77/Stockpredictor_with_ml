@@ -17,10 +17,14 @@ def test_vectorized_profit_calculation_basic():
     # Only positions 0 and 2 have y_pred > 0
     # position 0: shares = 100/10 = 10 -> profit = 10 * 10 * 0.1 = 10
     # position 2: shares = 100/5 = 20 -> profit = 20 * 5 * 0.2 = 20
-    assert np.isclose(profits[0], 10.0)
-    assert profits[1] == 0
-    assert np.isclose(profits[2], 20.0)
-    assert profits[3] == 0
+    if not np.isclose(profits[0], 10.0):
+        raise AssertionError("Profit calculation for position 0 incorrect")
+    if profits[1] != 0:
+        raise AssertionError("Profit for non-invested position should be 0")
+    if not np.isclose(profits[2], 20.0):
+        raise AssertionError("Profit calculation for position 2 incorrect")
+    if profits[3] != 0:
+        raise AssertionError("Profit for non-invested position should be 0")
 
 
 def test_calculate_filtered_profit_edge_cases():
@@ -30,13 +34,15 @@ def test_calculate_filtered_profit_edge_cases():
     y_true = np.array([0.1, 0.2])
     y_pred = np.array([-0.01, -0.02])
     prices = np.array([10.0, 20.0])
-    assert te.calculate_filtered_profit(y_true, y_pred, prices) == 0.0
+    if te.calculate_filtered_profit(y_true, y_pred, prices) != 0.0:
+        raise AssertionError("Filtered profit should be 0 when no positive predictions")
 
     # Some positive predictions
     y_pred2 = np.array([0.05, -0.01])
     profit = te.calculate_filtered_profit(y_true, y_pred2, prices)
     # invest in first: shares = 50 / 10 =5 -> profit = 5*10*0.1 =5
-    assert np.isclose(profit, 5.0)
+    if not np.isclose(profit, 5.0):
+        raise AssertionError("Filtered profit calculation incorrect")
 
 
 class MockModel:
@@ -78,6 +84,9 @@ def test_optimize_prediction_threshold_success():
         n_thresholds=10,
     )
 
-    assert res["status"] == "success"
-    assert "optimal_threshold" in res
-    assert res["n_thresholds_tested"] >= 1
+    if res.get("status") != "success":
+        raise AssertionError("Optimization did not report success")
+    if "optimal_threshold" not in res:
+        raise AssertionError("optimal_threshold missing from optimization result")
+    if res.get("n_thresholds_tested", 0) < 1:
+        raise AssertionError("No thresholds tested during optimization")

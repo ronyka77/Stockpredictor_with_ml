@@ -1,5 +1,7 @@
 # StockPredictor V1
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ronyka77/Stockpredictor_with_ml)
+
 Advanced stock prediction system combining Polygon.io data collection, feature engineering, gradient-boosted models, and neural networks with production-oriented tooling (caching, logging, MLflow, and batch processing).
 
 ## Table of Contents

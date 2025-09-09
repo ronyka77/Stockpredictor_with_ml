@@ -26,13 +26,12 @@ def test__load_from_consolidated_uses_target_and_drops_future_cols(mocker):
     )
     features, targets = loader._load_from_consolidated(prediction_horizon=10)
     # targets should be Series with no NaNs (rows with NaN removed)
-    assert isinstance(targets, pd.Series), "Targets not returned as Series"
-    assert "Future_Close_10D" not in features.columns, (
-        "Future_* columns were not removed from features"
-    )
-    assert len(features) == len(targets) and len(features) > 0, (
-        "Feature/target mismatch after cleaning"
-    )
+    if not isinstance(targets, pd.Series):
+        raise AssertionError("Targets not returned as Series")
+    if "Future_Close_10D" in features.columns:
+        raise AssertionError("Future_* columns were not removed from features")
+    if not (len(features) == len(targets) and len(features) > 0):
+        raise AssertionError("Feature/target mismatch after cleaning")
 
 
 def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
@@ -57,14 +56,15 @@ def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
     )
     out = mfl.load_all_data(ticker=None)
     # Expect combined DataFrame with ticker_id mapped
-    assert not out.empty, (
-        "load_all_data returned empty when it should have combined data"
-    )
-    assert "ticker_id" in out.columns, "ticker_id column missing after metadata mapping"
+    if out.empty:
+        raise AssertionError(
+            "load_all_data returned empty when it should have combined data"
+        )
+    if "ticker_id" not in out.columns:
+        raise AssertionError("ticker_id column missing after metadata mapping")
     # date converted to datetime in loader
-    assert pd.api.types.is_datetime64_any_dtype(out["date"]), (
-        "Date column not converted to datetime"
-    )
+    if not pd.api.types.is_datetime64_any_dtype(out["date"]):
+        raise AssertionError("Date column not converted to datetime")
 
 
 def test_prepare_ml_data_for_training_raises_on_missing_date_column(mocker):
@@ -91,4 +91,5 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache_when_available(mo
     mp._cleaned_data_cache.get_cache_age_hours = lambda *a, **k: 1.0
     mp._cleaned_data_cache.load_cleaned_data = lambda *a, **k: fake_cached
     res = mp.prepare_ml_data_for_training_with_cleaning()
-    assert res == fake_cached, "Cached result not returned when cache present"
+    if res != fake_cached:
+        raise AssertionError("Cached result not returned when cache present")

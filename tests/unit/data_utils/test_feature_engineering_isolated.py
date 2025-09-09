@@ -24,16 +24,19 @@ def test_add_price_normalized_features_schema_and_values():
     out = add_price_normalized_features(df.copy())
 
     expected_cols = list(df.columns) + ["SMA_5_Ratio", "Close_Open_Ratio"]
-    assert list(out.columns) == expected_cols, (
-        f"Unexpected schema after add_price_normalized_features: got {list(out.columns)}, expected {expected_cols}"
-    )
+    if list(out.columns) != expected_cols:
+        raise AssertionError(
+            f"Unexpected schema after add_price_normalized_features: got {list(out.columns)}, expected {expected_cols}"
+        )
 
-    assert out["SMA_5_Ratio"].dtype == np.float64, (
-        f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}"
-    )
-    assert out["Close_Open_Ratio"].dtype == np.float64, (
-        f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}"
-    )
+    if out["SMA_5_Ratio"].dtype != np.float64:
+        raise AssertionError(
+            f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}"
+        )
+    if out["Close_Open_Ratio"].dtype != np.float64:
+        raise AssertionError(
+            f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}"
+        )
 
     pdt.assert_series_equal(
         out["SMA_5_Ratio"].reset_index(drop=True),
@@ -64,13 +67,13 @@ def test_add_prediction_bounds_features_expected_columns_and_values():
         "BB_Range_Context",
     ]
     for col in expected_new:
-        assert col in out.columns, (
-            f"Expected column {col} to be added by add_prediction_bounds_features"
-        )
+        if col not in out.columns:
+            raise AssertionError(
+                f"Expected column {col} to be added by add_prediction_bounds_features"
+            )
 
-    assert out["Expected_10D_Move"].iloc[0] == pytest.approx(0.02 * np.sqrt(10)), (
-        "Expected_10D_Move computation incorrect"
-    )
+    if out["Expected_10D_Move"].iloc[0] != pytest.approx(0.02 * np.sqrt(10)):
+        raise AssertionError("Expected_10D_Move computation incorrect")
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
@@ -88,16 +91,17 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
     out = clean_data_for_training(df.copy())
 
     numeric_cols = out.select_dtypes(include=[np.number]).columns.tolist()
-    assert "a" in numeric_cols and "b" in numeric_cols, (
-        f"Missing numeric columns after cleaning: {numeric_cols}"
-    )
+    if not ("a" in numeric_cols and "b" in numeric_cols):
+        raise AssertionError(f"Missing numeric columns after cleaning: {numeric_cols}")
 
-    assert not out[numeric_cols].isnull().any().any(), (
-        f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
-    )
-    assert out["a"].dtype == np.float64, (
-        f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"
-    )
+    if out[numeric_cols].isnull().any().any():
+        raise AssertionError(
+            f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
+        )
+    if out["a"].dtype != np.float64:
+        raise AssertionError(
+            f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"
+        )
 
 
 def test_add_date_features_creates_expected_columns():
@@ -117,9 +121,9 @@ def test_add_date_features_creates_expected_columns():
         "is_quarter_end",
     ]
     for col in expected:
-        assert col in out.columns, f"Temporal feature {col} missing from output"
+        if col not in out.columns:
+            raise AssertionError(f"Temporal feature {col} missing from output")
 
     # check deterministic values
-    assert out.loc[0, "year"] == 2025 and out.loc[1, "year"] == 2025, (
-        "Year extraction failed"
-    )
+    if not (out.loc[0, "year"] == 2025 and out.loc[1, "year"] == 2025):
+        raise AssertionError("Year extraction failed")

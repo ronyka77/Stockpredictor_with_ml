@@ -39,7 +39,8 @@ def test_collect_historical_news_respects_batching(db_session, mocker):
     )
 
     # years_back=0 will produce zero-day range; ensure function handles gracefully and returns stats
-    assert isinstance(stats, dict)
+    if not isinstance(stats, dict):
+        raise AssertionError("collect_historical_news did not return dict stats")
 
 
 @pytest.mark.unit
@@ -53,4 +54,5 @@ def test_main_handles_missing_database_url(mocker, tmp_path):
 
     # main() should return False when API key missing
     res = np_mod.main()
-    assert res is False
+    if res is not False:
+        raise AssertionError("main() should return False when API key is missing")

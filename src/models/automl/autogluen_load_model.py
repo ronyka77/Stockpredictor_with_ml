@@ -142,7 +142,7 @@ def run_model_evaluation(
 
 if __name__ == "__main__":
     try:
-        model_dir = "AutogluonModels/ag-20250907_023533"
+        model_dir = "AutogluonModels/ag-20250907_125628"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

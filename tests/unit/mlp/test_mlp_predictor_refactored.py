@@ -38,5 +38,7 @@ class TestMLPPredictorRefactored:
             )
             result = self.predictor.predict(self.X_test)
             mock_validate.assert_called_once_with(self.X_test)
-            assert isinstance(result, np.ndarray)
-            assert len(result) == 5
+            if not isinstance(result, np.ndarray):
+                raise AssertionError("Predictor result is not numpy ndarray")
+            if len(result) != 5:
+                raise AssertionError("Predictor result length mismatch")

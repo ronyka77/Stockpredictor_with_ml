@@ -46,8 +46,10 @@ def test_excel_export_schema(tmp_path, mocker):
     os.chdir(str(tmp_path))
     try:
         output_path = p.save_predictions_to_excel(features_df, metadata_df, predictions)
-        assert output_path.endswith(".xlsx")
-        assert os.path.exists(output_path)
+        if not output_path.endswith(".xlsx"):
+            raise AssertionError("Output path does not end with .xlsx")
+        if not os.path.exists(output_path):
+            raise AssertionError("Expected Excel output file to exist")
 
         df = pd.read_excel(output_path)
     finally:
@@ -63,4 +65,5 @@ def test_excel_export_schema(tmp_path, mocker):
         "current_price",
         "actual_return",
     }
-    assert expected_columns.issubset(set(df.columns))
+    if not expected_columns.issubset(set(df.columns)):
+        raise AssertionError("Exported Excel is missing expected columns")

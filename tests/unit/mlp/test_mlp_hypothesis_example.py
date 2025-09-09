@@ -32,5 +32,7 @@ def test_validate_and_clean_data_property(n_rows, n_cols, nan_probability):
     cleaned = MLPDataUtils.validate_and_clean_data(df)
 
     # Cleaned should contain no NaN or infinite values
-    assert not cleaned.isnull().any().any()
-    assert not np.isinf(cleaned.values).any()
+    if cleaned.isnull().any().any():
+        raise AssertionError("Cleaned data contains NaNs")
+    if np.isinf(cleaned.values).any():
+        raise AssertionError("Cleaned data contains infinite values")

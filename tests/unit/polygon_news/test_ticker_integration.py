@@ -7,19 +7,27 @@ from src.data_collector.polygon_news.ticker_integration import NewsTickerIntegra
 def test_get_prioritized_tickers_fallback_and_filters():
     nti = NewsTickerIntegration()
     tickers = nti.get_prioritized_tickers(max_tickers=5, include_etfs=False)
-    assert isinstance(tickers, list)
-    assert len(tickers) <= 5
+    if not isinstance(tickers, list):
+        raise AssertionError("Prioritized tickers should be returned as a list")
+    if len(tickers) > 5:
+        raise AssertionError("Returned more tickers than requested by max_tickers")
     # No ETFs should be present (ETF names like SPY should be skipped if include_etfs=False)
-    assert all(not nti._is_etf(t["ticker"]) for t in tickers)
+    if not all(not nti._is_etf(t["ticker"]) for t in tickers):
+        raise AssertionError("ETF tickers present despite include_etfs=False")
 
 
 @pytest.mark.unit
 def test_validate_ticker_list_filters_invalid():
     nti = NewsTickerIntegration()
     valid, invalid = nti.validate_ticker_list(["AAPL", "", "BAD$", None, "GOOGL"])
-    assert "AAPL" in valid
-    assert "GOOGL" in valid
-    assert "" in invalid or None in invalid
+    if "AAPL" not in valid:
+        raise AssertionError("Valid tickers missing expected 'AAPL'")
+    if "GOOGL" not in valid:
+        raise AssertionError("Valid tickers missing expected 'GOOGL'")
+    if not ("" in invalid or None in invalid):
+        raise AssertionError(
+            "Invalid ticker list did not include expected empty/None entries"
+        )
 
 
 @pytest.mark.unit
@@ -44,6 +52,8 @@ def test_get_ticker_info_from_manager(mocker):
 
     nti = NewsTickerIntegration(ticker_manager=FakeManager())
     pri = nti.get_prioritized_tickers(max_tickers=10)
-    assert any(p["ticker"] == "XYZ" for p in pri)
+    if not any(p["ticker"] == "XYZ" for p in pri):
+        raise AssertionError("Expected prioritized tickers to include 'XYZ'")
     info = nti.get_ticker_info("XYZ")
-    assert info["ticker"] == "XYZ"
+    if info["ticker"] != "XYZ":
+        raise AssertionError("Ticker info lookup returned unexpected ticker")

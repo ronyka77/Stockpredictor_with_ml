@@ -22,8 +22,10 @@ def test_ohlcv_record_valid_and_invalid():
     }
 
     rec = OHLCVRecord(**valid)
-    assert rec.ticker == "AAPL"
-    assert isinstance(rec.timestamp, date)
+    if rec.ticker != "AAPL":
+        raise AssertionError("Ticker normalization failed for valid record")
+    if not isinstance(rec.timestamp, date):
+        raise AssertionError("Timestamp not parsed to date for valid record")
 
     # invalid: high lower than low should raise
     bad = valid.copy()
@@ -49,7 +51,8 @@ def test_vwap_fallback_on_invalid_vwap(caplog):
     rec = OHLCVRecord(**data)
     # fallback uses (high + low + 2*close) / 4 when volume>0 and then rounds
     expected = round((120.0 + 90.0 + 2 * 110.0) / 4, 4)
-    assert rec.vwap == expected
+    if rec.vwap != expected:
+        raise AssertionError("VWAP fallback calculation mismatch")
 
 
 def test_validate_ohlcv_record_polygon_transform_and_ticker_addition():
@@ -58,9 +61,12 @@ def test_validate_ohlcv_record_polygon_transform_and_ticker_addition():
     # Polygon-style payload with milliseconds timestamp and no ticker in payload
     polygon_record = {"t": 1577923200000, "o": 10, "h": 12, "l": 9, "c": 11, "v": 100}
     validated = dv.validate_ohlcv_record(polygon_record, ticker="TSLA")
-    assert isinstance(validated, OHLCVRecord)
-    assert validated.ticker == "TSLA"
-    assert isinstance(validated.timestamp, datetime)
+    if not isinstance(validated, OHLCVRecord):
+        raise AssertionError("validate_ohlcv_record did not return OHLCVRecord")
+    if validated.ticker != "TSLA":
+        raise AssertionError("Ticker not preserved when provided to validator")
+    if not isinstance(validated.timestamp, datetime):
+        raise AssertionError("Timestamp not parsed to datetime in validator")
 
 
 def test_validate_ohlcv_batch_metrics_and_outliers_and_gaps():
@@ -91,12 +97,16 @@ def test_validate_ohlcv_batch_metrics_and_outliers_and_gaps():
         )
 
     validated_records, metrics = dv.validate_ohlcv_batch(records, ticker=None)
-    assert metrics.total_records == len(records)
-    assert metrics.valid_records == len(validated_records)
+    if metrics.total_records != len(records):
+        raise AssertionError("Metrics total_records mismatch")
+    if metrics.valid_records != len(validated_records):
+        raise AssertionError("Metrics valid_records mismatch")
     # We expect at least one gap (created by the artificial jump in dates)
-    assert len(metrics.data_gaps) >= 1
+    if len(metrics.data_gaps) < 1:
+        raise AssertionError("Expected at least one data gap in metrics")
     # We expect price outlier detection to have recorded at least one outlier
-    assert len(metrics.outliers) >= 1
+    if len(metrics.outliers) < 1:
+        raise AssertionError("Expected at least one outlier in metrics")
 
 
 def test_calculate_batch_vwap():
@@ -108,7 +118,8 @@ def test_calculate_batch_vwap():
 
     vwap = DataValidator.calculate_batch_vwap(recs)
     # manual calculation: typical prices = 9, 19 => weighted = (9*100 + 19*200) / 300 = (900 + 3800)/300 = 4700/300 = 15.6667
-    assert round(vwap, 4) == round(4700 / 300, 4)
+    if round(vwap, 4) != round(4700 / 300, 4):
+        raise AssertionError("Batch VWAP calculation mismatch")
 
 
 def test_validate_ticker_empty_raises():
@@ -134,7 +145,8 @@ def test_validate_ticker_clean_uppercase():
         close=1.0,
         volume=1,
     )
-    assert rec.ticker == "AAPL"
+    if rec.ticker != "AAPL":
+        raise AssertionError("Ticker cleanup/uppercase failed")
 
 
 def test_high_lower_consistency_raises():
@@ -202,8 +214,10 @@ def test_vwap_fallback_on_invalid_value():
         vwap=0,
     )
     expected = OHLCVRecord._calculate_fallback_vwap(12.0, 9.0, 11.0, 100)
-    assert isinstance(rec.vwap, float)
-    assert rec.vwap == expected
+    if not isinstance(rec.vwap, float):
+        raise AssertionError("VWAP not set to float")
+    if rec.vwap != expected:
+        raise AssertionError("VWAP fallback calculation mismatch")
 
 
 def test_adjusted_close_none_ok_and_negative_raises():
@@ -218,7 +232,8 @@ def test_adjusted_close_none_ok_and_negative_raises():
         volume=1,
         adjusted_close=None,
     )
-    assert rec.adjusted_close is None
+    if rec.adjusted_close is not None:
+        raise AssertionError("Adjusted close None expected")
 
     with pytest.raises(ValueError):
         OHLCVRecord(
@@ -244,7 +259,8 @@ def test_timestamp_parsing_and_future_date_rejected():
         close=1.5,
         volume=1,
     )
-    assert isinstance(rec.timestamp, (datetime, date))
+    if not isinstance(rec.timestamp, (datetime, date)):
+        raise AssertionError("Timestamp parsing did not produce datetime or date")
 
     # future date should raise
     future_iso = (datetime.now() + timedelta(days=1)).isoformat()

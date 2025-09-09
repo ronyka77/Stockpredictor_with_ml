@@ -16,8 +16,12 @@ class FrozenClock:
 @contextmanager
 def freeze_time(mocker, start: float = 0.0):
     clock = FrozenClock(start=start)
-    with (
-        mocker.patch.object(time, "time", new=clock.time),
-        mocker.patch.object(time, "sleep", new=clock.sleep),
-    ):
+    old_time = time.time
+    old_sleep = time.sleep
+    try:
+        time.time = clock.time
+        time.sleep = clock.sleep
         yield clock
+    finally:
+        time.time = old_time
+        time.sleep = old_sleep

@@ -1,9 +1,9 @@
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
-
+from tests._fixtures.conftest import patch_execute_values_to_fake_pool
 
 class DummyRecord(OHLCVRecord):
     pass
@@ -21,51 +21,51 @@ def make_record(ticker: str, dt: date, close: float = 10.0):
     )
 
 
-@patch("src.data_collector.polygon_data.data_storage.create_engine")
-def test_store_historical_no_records(mock_create_engine):
-    # create storage with mocked engine to avoid real DB connection
-    mock_engine = MagicMock()
-    mock_create_engine.return_value = mock_engine
-    ds = DataStorage(connection_string="sqlite:///:memory:")
+def test_store_historical_no_records(mocker):
+    # Prevent real DB pool by patching PostgresConnection to test fake
+    from tests._fixtures.helpers import PostgresPoolCompat
+
+    mocker.patch("src.database.connection.PostgresConnection", PostgresPoolCompat)
+    ds = DataStorage()
 
     res = ds.store_historical_data([])
-    assert res["stored_count"] == 0
-    assert res["error_count"] == 0
+    if res["stored_count"] != 0:
+        raise AssertionError("Expected stored_count == 0 for empty input")
+    if res["error_count"] != 0:
+        raise AssertionError("Expected error_count == 0 for empty input")
 
 
-@patch("src.data_collector.polygon_data.data_storage.create_engine")
-def test_store_historical_batches_and_upsert(mock_create_engine):
-    mock_engine = MagicMock()
-    # ensure .connect() context manager works
-    mock_conn = MagicMock()
-    mock_engine.connect.return_value.__enter__.return_value = mock_conn
-    mock_create_engine.return_value = mock_engine
+def test_store_historical_batches_and_upsert(mocker, patch_execute_values_to_fake_pool):
+    # Use fake Postgres pool and have execute_values delegate to fake pool
+    from tests._fixtures.helpers import PostgresPoolCompat
 
-    ds = DataStorage(connection_string="sqlite:///:memory:")
+    mocker.patch("src.database.connection.PostgresConnection", PostgresPoolCompat)
 
-    # prepare 3 records -> single batch
+    ds = DataStorage()
+
+    # prepare records -> single batch
     recs = [make_record("AAA", date(2020, 1, 1)), make_record("AAA", date(2020, 1, 2))]
     res = ds.store_historical_data(recs, batch_size=10, on_conflict="update")
 
-    assert res["stored_count"] == 2
-    assert res["error_count"] == 0
+    if res["stored_count"] != 2:
+        raise AssertionError("Stored count mismatch after upsert")
+    if res["error_count"] != 0:
+        raise AssertionError("Expected no errors during upsert batch")
 
 
-@patch("src.data_collector.polygon_data.data_storage.create_engine")
-def test_get_historical_query_and_params(mock_create_engine):
-    mock_engine = MagicMock()
-    mock_conn = MagicMock()
-    # simulate returned rows
-    row_mock = MagicMock()
-    row_mock._mapping = {"ticker": "AAA", "date": date(2020, 1, 1), "close": 10}
-    mock_conn.execute.return_value = [row_mock]
-    mock_engine.connect.return_value.__enter__.return_value = mock_conn
-    mock_create_engine.return_value = mock_engine
+def test_get_historical_query_and_params(mocker):
+    # Patch fetch_all to return deterministic rows via shared helpers
+    fake_rows = [{"ticker": "AAA", "date": date(2020, 1, 1), "close": 10}]
+    mocker.patch(
+        "src.data_collector.polygon_data.data_storage.fetch_all", return_value=fake_rows
+    )
 
-    ds = DataStorage(connection_string="sqlite:///:memory:")
+    ds = DataStorage()
     out = ds.get_historical_data(
         "aaa", start_date=date(2020, 1, 1), end_date=date(2020, 1, 2), limit=1
     )
 
-    assert isinstance(out, list)
-    assert out[0]["ticker"] == "AAA"
+    if not isinstance(out, list):
+        raise AssertionError("Expected historical query to return a list")
+    if out[0]["ticker"] != "AAA":
+        raise AssertionError("Historical query ticker normalization mismatch")

@@ -15,8 +15,12 @@ def test__collect_ticker_news_no_raw_articles(db_session, mocker):
         "ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50
     )
 
-    assert stats["api_calls"] == 1
-    assert stats["articles_fetched"] == 0
+    if stats.get("api_calls") != 1:
+        raise AssertionError("API calls count unexpected for empty result")
+    if stats.get("articles_fetched") != 0:
+        raise AssertionError(
+            "Articles fetched should be 0 when client returns no articles"
+        )
 
 
 @pytest.mark.unit
@@ -50,9 +54,12 @@ def test__collect_ticker_news_happy_flow(
         "ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50
     )
 
-    assert stats["api_calls"] == 1
-    assert stats["articles_fetched"] == 1
-    assert stats["articles_stored"] == 1
+    if stats.get("api_calls") != 1:
+        raise AssertionError("API calls unexpected in happy flow")
+    if stats.get("articles_fetched") != 1:
+        raise AssertionError("Articles fetched unexpected in happy flow")
+    if stats.get("articles_stored") != 1:
+        raise AssertionError("Articles stored unexpected in happy flow")
 
 
 @pytest.mark.unit
@@ -104,9 +111,12 @@ def test__collect_ticker_news_skips_invalid(
         "ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50, limit=2
     )
 
-    assert stats["articles_fetched"] == 2
-    assert stats["articles_stored"] == 1
-    assert stats["articles_skipped"] >= 1
+    if stats.get("articles_fetched") != 2:
+        raise AssertionError("Articles fetched count mismatch for skip-flow test")
+    if stats.get("articles_stored") != 1:
+        raise AssertionError("Articles stored count mismatch for skip-flow test")
+    if stats.get("articles_skipped", 0) < 1:
+        raise AssertionError("Expected at least one skipped article in skip-flow test")
 
 
 @pytest.mark.unit
@@ -147,9 +157,18 @@ def test__collect_ticker_news_processing_exception_per_article(db_session, mocke
         "ACME", datetime.now(timezone.utc), datetime.now(timezone.utc), 50, limit=2
     )
 
-    assert stats["articles_fetched"] == 2
-    assert stats["articles_stored"] == 1
-    assert stats["articles_skipped"] >= 1
+    if stats.get("articles_fetched") != 2:
+        raise AssertionError(
+            "Articles fetched count mismatch for exception handling test"
+        )
+    if stats.get("articles_stored") != 1:
+        raise AssertionError(
+            "Articles stored count mismatch for exception handling test"
+        )
+    if stats.get("articles_skipped", 0) < 1:
+        raise AssertionError(
+            "Expected at least one skipped article when processing errors occur"
+        )
 
 
 @pytest.mark.unit
@@ -183,8 +202,10 @@ def test_collect_targeted_news_happy_flow(db_session, mocker):
     end = datetime.now(timezone.utc)
     stats = collector.collect_targeted_news(["ACME"], start, end, limit_per_ticker=10)
 
-    assert stats["total_api_calls"] == 1
-    assert stats["total_articles_fetched"] == 2
+    if stats.get("total_api_calls") != 1:
+        raise AssertionError("Total API calls mismatch in collect_targeted_news")
+    if stats.get("total_articles_fetched") != 2:
+        raise AssertionError("Total articles fetched mismatch in collect_targeted_news")
 
 
 @pytest.mark.unit
@@ -204,8 +225,10 @@ def test_get_collection_status_handles_healthy_and_error(db_session, mocker):
     )
 
     status = collector.get_collection_status()
-    assert status["status"] == "healthy"
-    assert status["recent_statistics"]["total_articles"] == 5
+    if status.get("status") != "healthy":
+        raise AssertionError("Expected healthy status from storage health_check")
+    if status.get("recent_statistics", {}).get("total_articles") != 5:
+        raise AssertionError("Recent statistics total_articles mismatch")
 
     # Now simulate error
     def raise_err():
@@ -213,11 +236,16 @@ def test_get_collection_status_handles_healthy_and_error(db_session, mocker):
 
     mocker.patch.object(collector.storage, "health_check", raise_err)
     status2 = collector.get_collection_status()
-    assert status2["status"] == "error"
-    assert "error" in status2
+    if status2.get("status") != "error":
+        raise AssertionError("Expected error status when health_check raises")
+    if "error" not in status2:
+        raise AssertionError("Expected error key in status2")
 
 
 @pytest.mark.unit
 def test_context_manager_enter_exit(db_session):
     with PolygonNewsCollector(db_session=db_session) as c:
-        assert isinstance(c, PolygonNewsCollector)
+        if not isinstance(c, PolygonNewsCollector):
+            raise AssertionError(
+                "Context manager did not return PolygonNewsCollector instance"
+            )
