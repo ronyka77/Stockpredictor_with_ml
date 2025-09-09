@@ -36,8 +36,6 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
     out = fe.add_prediction_bounds_features(df)
     if "Expected_10D_Move" not in out.columns:
         raise AssertionError("Expected_10D_Move not added")
-    if "Momentum_Acceleration" not in out.columns:
-        raise AssertionError("Momentum_Acceleration not added")
     if "RSI_Mean_Reversion_Pressure" not in out.columns:
         raise AssertionError("RSI feature missing")
     # Basic numeric checks

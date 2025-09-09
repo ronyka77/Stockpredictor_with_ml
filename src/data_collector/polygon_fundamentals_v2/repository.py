@@ -140,6 +140,7 @@ class FundamentalsRepository:
         Update the `has_financials` flag for a given ticker id.
         Returns True if a row was updated, False otherwise. Handles errors with rollback and logging.
         """
+
         def _update_fn(conn, cur):
             cur.execute(
                 """

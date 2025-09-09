@@ -6,7 +6,7 @@ Handles incremental updates, historical backfill, and comprehensive news collect
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
 import json
-from sqlalchemy.orm import Session
+from src.database.connection import close_global_pool
 
 from src.data_collector.polygon_news.news_client import PolygonNewsClient
 from src.data_collector.polygon_news.storage import PolygonNewsStorage
@@ -30,7 +30,6 @@ class PolygonNewsCollector:
 
     def __init__(
         self,
-        db_session: Session,
         polygon_api_key: Optional[str] = None,
         requests_per_minute: int = 5,
     ):
@@ -42,12 +41,11 @@ class PolygonNewsCollector:
             polygon_api_key: Polygon.io API key
             requests_per_minute: Rate limit for API requests
         """
-        self.db_session = db_session
         self.logger = get_logger(self.__class__.__name__, utility="data_collector")
 
         # Initialize components
         self.news_client = PolygonNewsClient(polygon_api_key, requests_per_minute)
-        self.storage = PolygonNewsStorage(db_session)
+        self.storage = PolygonNewsStorage()
         self.ticker_integration = NewsTickerIntegration()
         self.processor = NewsProcessor()
         self.validator = NewsValidator()
@@ -414,9 +412,6 @@ def main():
     This function sets up the database connection, initializes the news collector,
     and runs incremental news collection with proper error handling and logging.
     """
-    import os
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
     from src.data_collector.polygon_news.models import create_tables
     from src.data_collector.config import config
 
@@ -430,25 +425,13 @@ def main():
             logger.error("POLYGON_API_KEY environment variable not set")
             return False
 
-        # Database connection using centralized config
-        database_url = os.getenv("DATABASE_URL", config.database_url)
-        logger.info(
-            f"Using database: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
-        )
-
         try:
-            engine = create_engine(database_url)
-
-            # Create tables if they don't exist (safe for existing tables)
+            # Ensure database tables exist using global pool
             logger.info("Ensuring database tables exist...")
-            create_tables(engine)
-
-            # Create session
-            Session = sessionmaker(bind=engine)
-            session = Session()
+            create_tables()
         except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            logger.error("Please check your DATABASE_URL environment variable")
+            logger.error(f"Failed to ensure database tables: {e}")
+            logger.error("Please check your database environment variables")
             return False
 
         # Initialize news collector
@@ -456,14 +439,11 @@ def main():
             logger.info("Initializing Polygon News Collector...")
 
             collector = PolygonNewsCollector(
-                db_session=session,
                 polygon_api_key=config.API_KEY,
                 requests_per_minute=config.REQUESTS_PER_MINUTE,
             )
         except Exception as e:
             logger.error(f"Failed to initialize news collector: {e}")
-            session.close()
-            engine.dispose()
             return False
 
         # Run incremental news collection
@@ -545,7 +525,7 @@ def main():
                     top_tickers = recent_stats.get("top_tickers", {})
                     if top_tickers:
                         logger.info(
-                            f"  - Top tickers: {dict(list(top_tickers.items())[:5])}"
+                            f"  - Top tickers count: {dict(list(top_tickers.items())[:5])}"
                         )
 
                     sentiment_dist = recent_stats.get("sentiment_distribution", {})
@@ -564,9 +544,8 @@ def main():
 
         finally:
             try:
-                session.close()
-                engine.dispose()
-                logger.info("Database connection closed")
+                close_global_pool()
+                logger.info("Database pool closed")
             except Exception as e:
                 logger.warning(f"Error during cleanup: {e}")
 

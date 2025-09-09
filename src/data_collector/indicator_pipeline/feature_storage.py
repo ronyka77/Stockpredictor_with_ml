@@ -80,8 +80,6 @@ class FeatureStorage:
         self.version_path = self.base_path / self.config.version
         self.version_path.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Initialized FeatureStorage at {self.version_path}")
-
     def save_features(
         self, ticker: str, features_data: pd.DataFrame, metadata: Dict[str, Any]
     ) -> FeatureMetadata:
@@ -131,11 +129,6 @@ class FeatureStorage:
             # Cleanup old versions if configured
             if self.config.cleanup_old_versions:
                 self._cleanup_old_versions(ticker)
-
-            logger.info(
-                f"Saved {len(features_data)} records with {len(features_data.columns)} features for {ticker}"
-            )
-            # logger.info(f"File: {file_path}, Size: {file_stats['size_mb']:.2f} MB")
 
             return feature_metadata
 
@@ -194,9 +187,9 @@ class FeatureStorage:
             # Load metadata
             metadata = self._load_metadata_from_parquet(ticker, version)
 
-            logger.info(
-                f"Loaded {len(features_data)} records with {len(features_data.columns)} features for {ticker}"
-            )
+            # logger.info(
+            #     f"Loaded {len(features_data)} records with {len(features_data.columns)} features for {ticker}"
+            # )
 
             return features_data, metadata
 
@@ -448,3 +441,44 @@ class FeatureStorage:
 
         except Exception as e:
             logger.warning(f"Could not cleanup old versions for {ticker}: {str(e)}")
+
+    def remove_all_versions_for_all_tickers(self) -> Dict[str, Dict[str, Any]]:
+        """Remove all parquet files (data + metadata) for all tickers across all versions.
+
+        Returns:
+            Mapping of version -> result dict containing removed_files_count and errors list (or None).
+        """
+        results: Dict[str, Dict[str, Any]] = {}
+
+        for version_dir in self.base_path.iterdir():
+            if not version_dir.is_dir():
+                continue
+
+            removed_count = 0
+            errors: List[str] = []
+
+            try:
+                for p in version_dir.glob("*.parquet"):
+                    try:
+                        if p.is_file():
+                            p.unlink()
+                            removed_count += 1
+                            logger.info(f"Removed file: {p}")
+                    except Exception as ex:
+                        logger.warning(f"Failed to remove file {p}: {ex}")
+                        errors.append(str(ex))
+
+            except Exception as e:
+                logger.warning(f"Failed scanning version directory {version_dir}: {e}")
+                results[version_dir.name] = {
+                    "removed_files_count": removed_count,
+                    "errors": [str(e)],
+                }
+                continue
+
+            results[version_dir.name] = {
+                "removed_files_count": removed_count,
+                "errors": errors or None,
+            }
+
+        return results

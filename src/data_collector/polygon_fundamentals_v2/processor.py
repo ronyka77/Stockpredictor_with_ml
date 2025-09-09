@@ -19,7 +19,9 @@ class FundamentalsProcessor:
 
     def _get_active_tickers(self) -> List[str]:
         try:
-            rows = fetch_all("SELECT ticker FROM tickers WHERE active = true and type = 'CS'")
+            rows = fetch_all(
+                "SELECT ticker FROM tickers WHERE active = true and type = 'CS'"
+            )
             return [r["ticker"] for r in (rows or [])]
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to load active tickers: {e}")

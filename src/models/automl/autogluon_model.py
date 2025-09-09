@@ -35,8 +35,43 @@ def default_mean_diff(y_true, y_pred, *args, **kwargs):
     return np.mean(y_p - y_t)
 
 
+def conditional_mean_absolute_error(y_true, y_pred, *args, **kwargs):
+    """Mean absolute error with conditional zeroing rules.
+
+    Rules:
+    - If y_true > 0 and y_pred > y_true then contribution = 0
+    - If y_true < 0 and y_pred < y_true then contribution = 0
+
+    Returns the mean of absolute errors after applying the rules.
+    """
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+
+    # Ensure same shape
+    if y_t.shape != y_p.shape:
+        y_p = np.reshape(y_p, y_t.shape)
+
+    abs_errors = np.abs(y_t - y_p)
+
+    # Apply conditional zeroing
+    mask_positive_over = (y_t > 0) & (y_t > y_p)
+    mask_negative_under = (y_t < 0) & (y_p < y_t)
+
+    abs_errors[mask_positive_over] = 0.0
+    abs_errors[mask_negative_under] = 0.0
+
+    return float(np.mean(abs_errors))
+
+
 scorer = make_scorer(
     name="mean_diff", score_func=default_mean_diff, greater_is_better=True, optimum=1
+)
+
+mae_scorer = make_scorer(
+    name="conditional_mean_absolute_error",
+    score_func=conditional_mean_absolute_error,
+    greater_is_better=False,
+    optimum=0,
 )
 
 
@@ -64,9 +99,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
     ) -> "AutoGluonModel":
         label = self.config.get("label", "Future_Return_10D")
         groups = self.config.get("groups", "year")
-        eval_metric = scorer
-
-        # Build train/valid DataFrames with label column
+        eval_metric = mae_scorer
         train_df = X.copy()
 
         train_df[label] = y.values
@@ -76,11 +109,11 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df[label] = y_val.values
 
         hyperparams = {
-            "FASTAI": {},
+            # "FASTAI": {},
             "GBM": {"verbosity": -1},
             "XGB": {"verbosity": 0},
             # "TABM": {},
-            # "RF": {'verbose': 0},
+            "RF": {'verbose': 0},
             # "CAT": {'task_type': 'GPU'}
             # "REALMLP": {},
         }
@@ -88,7 +121,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(
             label=label,
-            eval_metric="mae",
+            eval_metric=eval_metric,
             problem_type="regression",
             verbosity=2,
         )
@@ -98,13 +131,12 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             train_data=train_df,
             tuning_data=valid_df,
             presets="best_quality",
-            hyperparameters='zeroshot_2025_tabfm',
+            hyperparameters=hyperparams,
             dynamic_stacking=False,
-            # num_cpus=14,
             num_gpus=1,
             # auto_stack=True,
             num_stack_levels=2,
-            num_bag_folds=3,
+            num_bag_folds=4,
             use_bag_holdout=True,
             fit_strategy="sequential",
             ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
@@ -255,9 +287,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 confidence_method=confidence_method,
                 threshold_range=threshold_range,
                 n_thresholds=n_thresholds,
-            )
-            logger.info(
-                f"Threshold evaluation finished. status={results.get('status', 'unknown')}"
             )
             return results
         except Exception as e:

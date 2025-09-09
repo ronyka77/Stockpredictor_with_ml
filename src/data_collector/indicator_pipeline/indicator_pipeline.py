@@ -28,7 +28,11 @@ from src.utils.feature_categories import classify_feature_name
 logger = get_logger(__name__, utility="feature_engineering")
 
 
-def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str, db_config: Optional[Dict[str, Any]]):
+def _process_ticker_worker(
+    ticker: str,
+    config_dict: Dict[str, Any],
+    job_id: str,
+):
     """Module-level worker used by ProcessPoolExecutor (must be top-level for Windows).
 
     Recreates required components inside the worker process to avoid sharing non-picklable
@@ -54,16 +58,10 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
         from src.data_collector.indicator_pipeline.feature_storage import (
             FeatureStorage,
         )
-        from src.data_collector.indicator_pipeline.consolidated_storage import (
-            ConsolidatedFeatureStorage,
-        )
 
-        loader = StockDataLoader(db_config)
+        loader = StockDataLoader()
         calculator = FeatureCalculator()
         storage = FeatureStorage()
-        consolidated = ConsolidatedFeatureStorage(
-            db_engine=loader.engine if hasattr(loader, "engine") else None
-        )
 
         # Normalize date strings
         start_date = config_dict.get("start_date") or "2022-01-01"
@@ -137,12 +135,13 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
                             }
                         )
 
-                saved_count = bulk_upsert_technical_features(
-                    rows, page_size=1000, overwrite=config_dict.get("overwrite_existing", True)
+                bulk_upsert_technical_features(
+                    rows,
+                    page_size=1000,
+                    overwrite=config_dict.get("overwrite_existing", True),
                 )
             except Exception as e:
                 logger.error(f"Bulk upsert failed for {ticker}: {e}")
-                saved_count = 0
 
         result["success"] = True
         return result
@@ -150,7 +149,6 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
     except Exception as e:
         result["error"] = str(e)
         return result
-
 
 
 @dataclass
@@ -164,7 +162,7 @@ class BatchJobConfig:
 
     batch_size: int = config.batch_processing.DEFAULT_BATCH_SIZE
     max_workers: int = config.batch_processing.MAX_WORKERS
-    use_processes: bool = False
+    use_processes: bool = True
     start_date: Optional[Union[str, date]] = None
     end_date: Optional[Union[str, date]] = None
     feature_categories: List[str] = None
@@ -238,23 +236,14 @@ class BatchFeatureProcessor:
     Batch processor for calculating technical indicators across multiple tickers
     """
 
-    def __init__(self, db_config: Optional[Dict[str, Any]] = None):
+    def __init__(self):
         """
         Initialize the batch processor
-
-        Args:
-            db_config: Database configuration dictionary
         """
-        self.data_loader = StockDataLoader(db_config)
-        # persist db_config so worker processes can recreate their own loaders
-        self.db_config = db_config
+        self.data_loader = StockDataLoader()
         self.feature_calculator = FeatureCalculator()
         self.feature_storage = FeatureStorage()
-        self.consolidated_storage = ConsolidatedFeatureStorage(
-            db_engine=self.data_loader.engine
-            if hasattr(self.data_loader, "engine")
-            else None
-        )
+        self.consolidated_storage = ConsolidatedFeatureStorage()
         self.stats = ProcessingStats()
         self._lock = threading.Lock()
 
@@ -318,8 +307,6 @@ class BatchFeatureProcessor:
         }
 
         try:
-            logger.info(f"Processing ticker {ticker}")
-
             # Load stock data
             stock_data = self.data_loader.load_stock_data(
                 ticker,
@@ -384,7 +371,9 @@ class BatchFeatureProcessor:
                                 {
                                     "ticker": ticker,
                                     "date": date_idx.date(),
-                                    "feature_category": classify_feature_name(feature_name),
+                                    "feature_category": classify_feature_name(
+                                        feature_name
+                                    ),
                                     "feature_name": feature_name,
                                     "feature_value": feature_value,
                                     "quality_score": quality_score_val,
@@ -453,7 +442,10 @@ class BatchFeatureProcessor:
                     # Submit module-level worker that recreates resources per process
                     future_to_ticker = {
                         executor.submit(
-                            _process_ticker_worker, ticker, config_dict, job_id, self.db_config
+                            _process_ticker_worker,
+                            ticker,
+                            config_dict,
+                            job_id,
                         ): ticker
                         for ticker in tickers
                     }
@@ -467,7 +459,6 @@ class BatchFeatureProcessor:
 
                 for future in as_completed(future_to_ticker):
                     ticker = future_to_ticker[future]
-                    logger.info(f"Processing ticker {ticker}")
                     try:
                         result = future.result()
                         results.append(result)
@@ -650,7 +641,9 @@ class BatchFeatureProcessor:
                         }
                     )
 
-            saved_count = bulk_upsert_technical_features(rows, page_size=1000, overwrite=overwrite)
+            saved_count = bulk_upsert_technical_features(
+                rows, page_size=1000, overwrite=overwrite
+            )
             return saved_count
         except Exception as e:
             logger.error(f"Error saving features for {ticker}: {e}")
@@ -685,12 +678,9 @@ def run_production_batch():
         all_tickers = processor.get_available_tickers(
             min_data_points=job_config.min_data_points, market="stocks"
         )
-
         logger.info(f"📈 Processing {len(all_tickers)} tickers:")
-        if all_tickers:
-            logger.info(
-                f"   Sample tickers: {', '.join(all_tickers[:10])}{'...' if len(all_tickers) > 10 else ''}"
-            )
+        storage = FeatureStorage()
+        storage.remove_all_versions_for_all_tickers()
 
         # Run batch processing
         start_time = time.time()
@@ -707,7 +697,7 @@ def run_production_batch():
         logger.info(f"   Processing time: {processing_time:.1f} seconds")
 
         # Check storage stats
-        storage = FeatureStorage()
+
         stats = storage.get_storage_stats()
         logger.info("📁 Storage Statistics:")
         logger.info(f"   Total tickers stored: {stats['total_tickers']}")

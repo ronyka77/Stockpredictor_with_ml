@@ -8,7 +8,6 @@ for optimal ML performance and time-series analysis.
 
 from src.data_collector.indicator_pipeline.consolidated_storage import (
     consolidate_existing_features,
-    ConsolidatedFeatureStorage,
 )
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 import time
@@ -76,10 +75,6 @@ def main():
                 f"   {file_info['file']}: {file_info['rows']:,} rows, {file_info['size_mb']:.2f} MB, Year: {file_info['year']}"
             )
 
-        # Test loading performance
-        logger.info("\n🧪 Testing year-based loading performance...")
-        test_year_loading_performance()
-
         return result
 
     except Exception as e:
@@ -87,84 +82,6 @@ def main():
         import traceback
 
         traceback.print_exc()
-
-
-def test_year_loading_performance():
-    """Test loading performance of year-based consolidated storage"""
-    from src.data_collector.indicator_pipeline.consolidated_storage import (
-        ConsolidatedStorageConfig,
-    )
-    from datetime import date
-
-    consolidated_storage = ConsolidatedFeatureStorage(
-        ConsolidatedStorageConfig(partitioning_strategy="by_date")
-    )
-
-    try:
-        # Test 1: Load all data
-        start_time = time.time()
-        all_data = consolidated_storage.load_consolidated_features()
-        load_time_all = time.time() - start_time
-
-        years_available = sorted(all_data["date"].dt.year.unique())
-        logger.info(
-            f"   Load all years ({years_available}): {load_time_all:.2f}s ({len(all_data):,} rows)"
-        )
-
-        # Test 2: Load specific year (2024)
-        if 2024 in years_available:
-            start_time = time.time()
-            year_2024_data = consolidated_storage.load_consolidated_features(
-                start_date=date(2024, 1, 1), end_date=date(2024, 12, 31)
-            )
-            load_time_2024 = time.time() - start_time
-            logger.info(
-                f"   Load 2024 only: {load_time_2024:.2f}s ({len(year_2024_data):,} rows)"
-            )
-
-        # Test 3: Load specific year (2025)
-        if 2025 in years_available:
-            start_time = time.time()
-            year_2025_data = consolidated_storage.load_consolidated_features(
-                start_date=date(2025, 1, 1), end_date=date(2025, 12, 31)
-            )
-            load_time_2025 = time.time() - start_time
-            logger.info(
-                f"   Load 2025 only: {load_time_2025:.2f}s ({len(year_2025_data):,} rows)"
-            )
-
-        # Test 4: Load specific tickers for specific year
-        start_time = time.time()
-        filtered_data = consolidated_storage.load_consolidated_features(
-            tickers=["AAPL", "MSFT", "GOOGL"],
-            start_date=date(2024, 1, 1),
-            end_date=date(2024, 12, 31),
-        )
-        load_time_filtered = time.time() - start_time
-        logger.info(
-            f"   Load 3 tickers (2024): {load_time_filtered:.2f}s ({len(filtered_data):,} rows)"
-        )
-
-        # Test 5: Load specific categories
-        start_time = time.time()
-        trend_data = consolidated_storage.load_consolidated_features(
-            categories=["trend"],
-            start_date=date(2024, 1, 1),
-            end_date=date(2024, 12, 31),
-        )
-        load_time_categories = time.time() - start_time
-        logger.info(
-            f"   Load trend features (2024): {load_time_categories:.2f}s ({len(trend_data.columns)} columns)"
-        )
-
-        # Show data distribution by year
-        logger.info("\n📊 Data Distribution by Year:")
-        year_counts = all_data["date"].dt.year.value_counts().sort_index()
-        for year, count in year_counts.items():
-            logger.info(f"   {year}: {count:,} rows")
-
-    except Exception as e:
-        logger.warning(f"   ❌ Load test failed: {str(e)}")
 
 
 if __name__ == "__main__":

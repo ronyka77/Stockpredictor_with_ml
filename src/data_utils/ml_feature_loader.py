@@ -270,18 +270,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
             return combined_features
         else:
             logger.warning("No yearly data could be loaded")
-            try:
-                if data_loader is not None:
-                    data_loader.close()
-            except Exception as e:
-                logger.warning(f"Failed to close data_loader before early return: {e}")
             return pd.DataFrame()
     except Exception as e:
         logger.error(f"CRITICAL ERROR in load_all_data: {str(e)}")
         raise
-    finally:
-        try:
-            if data_loader is not None:
-                data_loader.close()
-        except Exception as e:
-            logger.warning(f"Failed to close data_loader in finally: {e}")

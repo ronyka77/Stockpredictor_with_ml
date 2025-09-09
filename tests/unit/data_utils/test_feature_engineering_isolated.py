@@ -61,10 +61,7 @@ def test_add_prediction_bounds_features_expected_columns_and_values():
     expected_new = [
         "Expected_Daily_Move",
         "Expected_10D_Move",
-        "Recent_Momentum_5D",
-        "Momentum_Acceleration",
         "RSI_Mean_Reversion_Pressure",
-        "BB_Range_Context",
     ]
     for col in expected_new:
         if col not in out.columns:

@@ -38,16 +38,14 @@ class ConsolidatedFeatureStorage:
     Consolidated storage system for multiple tickers in year-partitioned Parquet files
     """
 
-    def __init__(self, db_engine=None):
+    def __init__(self):
         """
         Initialize consolidated feature storage
 
         Args:
             config: Consolidated storage configuration
-            db_engine: Database engine for metadata storage
         """
         self.config = ConsolidatedStorageConfig()
-        self.db_engine = db_engine
 
         # Create storage directories
         self.base_path = Path(self.config.base_path)
@@ -406,8 +404,7 @@ def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
             logger.warning(f"Could not load {ticker}: {str(e)}")
 
     # Create consolidated storage
-    config = ConsolidatedStorageConfig(partitioning_strategy=strategy)
-    consolidated_storage = ConsolidatedFeatureStorage(config)
+    consolidated_storage = ConsolidatedFeatureStorage()
 
     # Save in consolidated format
     result = consolidated_storage.save_multiple_tickers(

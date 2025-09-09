@@ -61,7 +61,7 @@ class OptimizedFundamentalCollector:
         # Create SQLAlchemy engine from connection parameters
         # prefer using connection pool config if available
         cfg = getattr(self.db_pool, "config", {})
-        database_url = f"postgresql://{cfg.get('user','') }:{cfg.get('password','') }@{cfg.get('host','localhost')}:{cfg.get('port',5432)}/{cfg.get('database','') }"
+        database_url = f"postgresql://{cfg.get('user', '')}:{cfg.get('password', '')}@{cfg.get('host', 'localhost')}:{cfg.get('port', 5432)}/{cfg.get('database', '')}"
         self.engine = create_engine(database_url)
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
