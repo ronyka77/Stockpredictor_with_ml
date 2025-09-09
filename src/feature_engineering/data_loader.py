@@ -8,8 +8,7 @@ from the database for feature engineering calculations.
 import pandas as pd
 from typing import List, Optional, Dict, Any, Union
 from datetime import date
-import os
-from sqlalchemy import create_engine, text
+from src.database.connection import fetch_all
 
 from src.utils.logger import get_logger
 from src.feature_engineering.config import config
@@ -22,38 +21,11 @@ class StockDataLoader:
     Loads and validates stock data from the database for feature engineering
     """
 
-    def __init__(self, db_config: Optional[Dict[str, Any]] = None):
+    def __init__(self):
         """
         Initialize the data loader
-
-        Args:
-            db_config: Database configuration dictionary
         """
-        if db_config:
-            self.config = db_config
-        else:
-            # Default configuration from environment variables
-            self.config = {
-                "host": os.getenv("DB_HOST", "localhost"),
-                "port": int(os.getenv("DB_PORT", 5432)),
-                "database": os.getenv("DB_NAME", "stock_data"),
-                "user": os.getenv("DB_USER", "postgres"),
-                "password": os.getenv("DB_PASSWORD", ""),
-            }
-        # Fail-fast validation for required credentials
-        if not self.config.get("password"):
-            raise ValueError(
-                "DB_PASSWORD environment variable is required for feature engineering data access"
-            )
-
-        # Create SQLAlchemy engine for pandas compatibility
-        connection_string = f"postgresql://{self.config['user']}:{self.config['password']}@{self.config['host']}:{self.config['port']}/{self.config['database']}"
-        self.engine = create_engine(connection_string)
         self.feature_config = config
-
-        logger.info(
-            f"Initialized StockDataLoader with database: {self.config['host']}:{self.config['port']}/{self.config['database']}"
-        )
 
     def load_stock_data(
         self, ticker: str, start_date: Union[str, date], end_date: Union[str, date]
@@ -78,25 +50,37 @@ class StockDataLoader:
             if isinstance(end_date, date):
                 end_date = end_date.strftime("%Y-%m-%d")
 
-            # SQL query for historical_prices table
-            query = text("""
-            SELECT date, "open", high, low, "close", volume, adjusted_close, vwap
-            FROM historical_prices 
-            WHERE ticker = :ticker
-                AND date >= :start_date AND date <= :end_date 
-            ORDER BY date ASC
-            """)
-
-            params = {
-                "ticker": ticker.upper(),
-                "start_date": start_date,
-                "end_date": end_date,
-            }
-
-            # Use SQLAlchemy engine with pandas
-            df = pd.read_sql_query(
-                query, self.engine, params=params, parse_dates=["date"]
+            # SQL query for historical_prices table (use positional params)
+            query = (
+                'SELECT date, "open", high, low, "close", volume, adjusted_close, vwap '
+                "FROM historical_prices "
+                "WHERE ticker = %s AND date >= %s AND date <= %s "
+                "ORDER BY date ASC"
             )
+
+            params = (ticker.upper(), start_date, end_date)
+
+            rows = fetch_all(query, params=params, dict_cursor=False)
+            # Construct DataFrame from rows; columns match the SELECT order
+            df = (
+                pd.DataFrame(
+                    rows,
+                    columns=[
+                        "date",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "adjusted_close",
+                        "vwap",
+                    ],
+                )
+                if rows
+                else pd.DataFrame()
+            )
+            if not df.empty:
+                df["date"] = pd.to_datetime(df["date"])
 
             if df.empty:
                 logger.warning(
@@ -121,9 +105,6 @@ class StockDataLoader:
 
             # Validate and clean the data
             df = self._validate_and_clean_data(df, ticker)
-
-            # logger.info(f"Loaded {len(df)} records for {ticker}")
-            # logger.info(f"Date range: {df.index.min()} to {df.index.max()}")
 
             return df
 
@@ -155,24 +136,28 @@ class StockDataLoader:
 
         try:
             # Join tickers table with historical_prices to get active tickers with sufficient data
-            query = text("""
-            SELECT t.ticker, COUNT(hp.*) as data_points, t.name, t.market
-            FROM tickers t
-            INNER JOIN historical_prices hp ON t.ticker = hp.ticker
-            WHERE  t.active = true
-                AND (:market = 'all' OR t.market = :market)
-                AND t."type" ='CS'
-            GROUP BY t.ticker, t.name, t.market
-            HAVING COUNT(hp.*) >= :min_data_points
-            ORDER BY COUNT(hp.*) DESC, t.ticker
-            """)
+            query = (
+                "SELECT t.ticker, COUNT(hp.*) as data_points, t.name, t.market "
+                "FROM tickers t "
+                "INNER JOIN historical_prices hp ON t.ticker = hp.ticker "
+                "WHERE t.active = true AND ( %s = 'all' OR t.market = %s ) AND t.\"type\" = 'CS' "
+                "GROUP BY t.ticker, t.name, t.market "
+                "HAVING COUNT(hp.*) >= %s "
+                "ORDER BY COUNT(hp.*) DESC, t.ticker"
+            )
 
-            params = {
-                "min_data_points": min_data_points,
-                "market": market if market != "all" else "all",
-            }
+            params = (
+                market if market != "all" else "all",
+                market if market != "all" else "all",
+                min_data_points,
+            )
 
-            df = pd.read_sql_query(query, self.engine, params=params)
+            rows = fetch_all(query, params=params, dict_cursor=False)
+            df = (
+                pd.DataFrame(rows, columns=["ticker", "data_points", "name", "market"])
+                if rows
+                else pd.DataFrame()
+            )
 
             tickers = df["ticker"].tolist()
             logger.info(
@@ -198,37 +183,57 @@ class StockDataLoader:
             Dictionary with ticker metadata (if ticker specified) or DataFrame with all tickers metadata
         """
         try:
-            # Build base query
-            query = text(
-                """
-            SELECT id, ticker, "name", market, locale, primary_exchange, currency_name, 
-                active, "type", market_cap, weighted_shares_outstanding, round_lot, 
-                last_updated, created_at, cik, composite_figi, 
-                share_class_figi, sic_code, sic_description, ticker_root, total_employees, 
-                list_date
-            FROM tickers 
-            """
-                + ("WHERE ticker = :ticker" if ticker is not None else "")
-                + """
-            ORDER BY ticker
-            """
+            # Build base query for ticker metadata
+            base_query = (
+                'SELECT id, ticker, "name", market, locale, primary_exchange, currency_name, '
+                'active, "type", market_cap, weighted_shares_outstanding, round_lot, '
+                "last_updated, created_at, cik, composite_figi, share_class_figi, sic_code, sic_description, ticker_root, total_employees, list_date "
+                "FROM tickers "
             )
 
-            # Execute query with or without parameters
             if ticker is not None:
-                df = pd.read_sql_query(
-                    query, self.engine, params={"ticker": ticker.upper()}
-                )
+                query = base_query + "WHERE ticker = %s ORDER BY ticker"
+                params = (ticker.upper(),)
             else:
-                df = pd.read_sql_query(query, self.engine)
+                query = base_query + "ORDER BY ticker"
+                params = None
 
-            if df.empty:
+            rows = fetch_all(query, params=params, dict_cursor=False)
+            if not rows:
                 if ticker is None:
                     logger.warning("No ticker metadata found")
                     return pd.DataFrame()
                 else:
                     logger.warning(f"No metadata found for ticker {ticker}")
                     return {}
+
+            df = pd.DataFrame(
+                rows,
+                columns=[
+                    "id",
+                    "ticker",
+                    "name",
+                    "market",
+                    "locale",
+                    "primary_exchange",
+                    "currency_name",
+                    "active",
+                    "type",
+                    "market_cap",
+                    "weighted_shares_outstanding",
+                    "round_lot",
+                    "last_updated",
+                    "created_at",
+                    "cik",
+                    "composite_figi",
+                    "share_class_figi",
+                    "sic_code",
+                    "sic_description",
+                    "ticker_root",
+                    "total_employees",
+                    "list_date",
+                ],
+            )
 
             if ticker is None:
                 logger.info(f"Retrieved metadata for {len(df)} tickers")
@@ -329,68 +334,8 @@ class StockDataLoader:
                 f"Cleaned data for {ticker}: removed {removed_count} invalid rows"
             )
 
-        # Check if we still have enough data
-        if len(df) < self.feature_config.data_quality.MIN_DATA_POINTS:
-            logger.warning(
-                f"Insufficient data for {ticker} after cleaning: {len(df)} < {self.feature_config.data_quality.MIN_DATA_POINTS}"
-            )
-
         return df
-
-    def execute_query(
-        self, query: str, params: Optional[List[Any]] = None
-    ) -> List[tuple]:
-        """
-        Execute a raw SQL query and return results
-
-        Args:
-            query: SQL query string (with %s placeholders for parameters)
-            params: List of parameters for the query
-
-        Returns:
-            List of tuples containing query results
-        """
-        try:
-            # Convert %s placeholders to :param format for SQLAlchemy
-            param_count = query.count("%s")
-            if param_count > 0 and params:
-                # Create named parameters
-                param_dict = {
-                    f"param_{i}": params[i]
-                    for i in range(min(param_count, len(params)))
-                }
-
-                # Replace %s with :param_n
-                formatted_query = query
-                for i in range(param_count):
-                    formatted_query = formatted_query.replace("%s", f":param_{i}", 1)
-
-                # Execute with named parameters
-                with self.engine.connect() as conn:
-                    result = conn.execute(text(formatted_query), param_dict)
-                    return [tuple(row) for row in result]
-            else:
-                # Execute without parameters
-                with self.engine.connect() as conn:
-                    result = conn.execute(text(query))
-                    return [tuple(row) for row in result]
-
-        except Exception as e:
-            logger.error(f"Error executing query: {e}")
-            logger.info(f"Query: {query}")
-            logger.info(f"Params: {params}")
-            raise
-
-    def close(self) -> None:
-        """Close database connection"""
-        if hasattr(self, "engine") and self.engine:
-            self.engine.dispose()
-            logger.info("Database connection closed")
 
     def __enter__(self):
         """Context manager entry"""
         return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
-        self.close()

@@ -10,7 +10,7 @@ from psycopg2.pool import ThreadedConnectionPool
 from typing import Iterable, Optional, Any, List, Tuple, Callable
 from psycopg2.extras import execute_values as _execute_values
 from contextlib import contextmanager
-from typing import Dict, Any, Optional, Generator
+from typing import Generator
 import os
 import threading
 import atexit
@@ -36,7 +36,9 @@ class PostgresConnection:
     def __init__(self, minconn: int, maxconn: int, **conn_kwargs: Any):
         # Validate required credentials early
         if not conn_kwargs.get("password"):
-            raise ValueError("DB_PASSWORD environment variable is required for database connections")
+            raise ValueError(
+                "DB_PASSWORD environment variable is required for database connections"
+            )
 
         self._minconn = minconn
         self._maxconn = maxconn
@@ -46,11 +48,6 @@ class PostgresConnection:
         self._pool = ThreadedConnectionPool(minconn, maxconn, **conn_kwargs)
         self._sem = Semaphore(maxconn)
         self._closed = False
-
-        logger.info(
-            f"Initialized PostgresConnection ({minconn}-{maxconn}) for "
-            f"{conn_kwargs.get('host', '<dsn>')}:{conn_kwargs.get('port', '')}/{conn_kwargs.get('database', '')}"
-        )
 
     @contextmanager
     def connection(
@@ -120,7 +117,7 @@ class PostgresConnection:
         self._closed = True
         try:
             self._pool.closeall()
-            logger.info("PostgresConnection closed")
+            # logger.info("PostgresConnection closed")
         except Exception as exc:
             logger.error(f"Error closing pooled connections: {exc}")
 
@@ -184,6 +181,7 @@ def close_global_pool() -> None:
 
 
 # --- Convenience DB helpers ---
+
 
 def fetch_all(
     query: str, params: Optional[Tuple] = None, dict_cursor: bool = True

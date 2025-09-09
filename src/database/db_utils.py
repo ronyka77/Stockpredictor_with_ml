@@ -2,7 +2,8 @@
 
 Contains bulk upsert helpers used by feature engineering and other modules.
 """
-from typing import List, Dict, Any, Iterable, Tuple
+
+from typing import Dict, Any, Iterable, Tuple
 from psycopg2.extras import execute_values
 from src.database.connection import get_global_pool
 from src.utils.logger import get_logger
@@ -47,13 +48,14 @@ def bulk_upsert_technical_features(
             "quality_score = EXCLUDED.quality_score, calculation_timestamp = CURRENT_TIMESTAMP"
         )
     else:
-        conflict_clause = "ON CONFLICT (ticker, date, feature_category, feature_name) DO NOTHING"
+        conflict_clause = (
+            "ON CONFLICT (ticker, date, feature_category, feature_name) DO NOTHING"
+        )
 
     insert_sql = (
         "INSERT INTO technical_features "
         "(ticker, date, feature_category, feature_name, feature_value, quality_score) "
-        "VALUES %s "
-        + conflict_clause
+        "VALUES %s " + conflict_clause
     )
 
     tuples = [_row_tuple_from_dict(r) for r in rows]
@@ -79,5 +81,3 @@ def bulk_upsert_technical_features(
                 cur.close()
             except Exception:
                 pass
-
-

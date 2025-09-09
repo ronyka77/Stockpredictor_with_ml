@@ -8,7 +8,12 @@ Simple programmatic interface that always performs full setup and verification.
 
 from pathlib import Path
 
-from src.database.connection import get_global_pool, init_global_pool, execute, fetch_one, fetch_all
+from src.database.connection import (
+    init_global_pool,
+    execute,
+    fetch_one,
+    fetch_all,
+)
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -21,7 +26,6 @@ def setup_fundamental_database():
     try:
         # Ensure global pool is initialized (will validate credentials)
         init_global_pool()
-        db_pool = get_global_pool()
         # Read the SQL schema file
         sql_file = (
             Path(__file__).parent.parent.parent.parent
@@ -63,7 +67,7 @@ def setup_fundamental_database():
                 "SELECT indexname FROM pg_indexes WHERE tablename = 'raw_fundamental_data'"
             )
             logger.info(f"📊 Created {len(indexes)} indexes:")
-            for index in (indexes or []):
+            for index in indexes or []:
                 logger.info(f"   - {index['indexname']}")
 
             return True
@@ -95,19 +99,23 @@ def verify_database_setup():
             "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'raw_fundamental_data' ORDER BY ordinal_position"
         )
         logger.info(f"📋 Table has {len(columns)} columns:")
-        for column in (columns or []):
+        for column in columns or []:
             logger.info(f"   - {column['column_name']}: {column['data_type']}")
 
         constraints = fetch_all(
             "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_name = 'raw_fundamental_data'"
         )
         logger.info(f"🔒 Table has {len(constraints)} constraints:")
-        for constraint in (constraints or []):
-            logger.info(f"   - {constraint['constraint_name']}: {constraint['constraint_type']}")
+        for constraint in constraints or []:
+            logger.info(
+                f"   - {constraint['constraint_name']}: {constraint['constraint_type']}"
+            )
 
-        indexes = fetch_all("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'raw_fundamental_data'")
+        indexes = fetch_all(
+            "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'raw_fundamental_data'"
+        )
         logger.info(f"📊 Table has {len(indexes)} indexes:")
-        for index in (indexes or []):
+        for index in indexes or []:
             logger.info(f"   - {index['indexname']}")
 
         logger.info("✅ Database setup verification complete!")
@@ -133,10 +141,14 @@ def validate_table_structure():
             "equity",
         ]
 
-        existing = fetch_all("SELECT column_name FROM information_schema.columns WHERE table_name = 'raw_fundamental_data'")
+        existing = fetch_all(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'raw_fundamental_data'"
+        )
         existing_columns = [row["column_name"] for row in (existing or [])]
 
-        missing_columns = [col for col in required_columns if col not in existing_columns]
+        missing_columns = [
+            col for col in required_columns if col not in existing_columns
+        ]
 
         if missing_columns:
             logger.error(f"❌ Missing required columns: {missing_columns}")
@@ -147,7 +159,7 @@ def validate_table_structure():
         )
 
         logger.info("📋 Key column data types:")
-        for col in (column_types or []):
+        for col in column_types or []:
             logger.info(f"   - {col['column_name']}: {col['data_type']}")
 
         logger.info("✅ Table structure validation complete!")

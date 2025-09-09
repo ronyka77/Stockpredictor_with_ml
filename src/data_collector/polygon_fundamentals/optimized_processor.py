@@ -31,9 +31,10 @@ class OptimizedFundamentalProcessor:
         tickers = []
         try:
             rows = fetch_all(
-                "SELECT ticker FROM tickers" + (" WHERE active = true" if filter_active else "")
+                "SELECT ticker FROM tickers"
+                + (" WHERE active = true" if filter_active else "")
             )
-            for row in (rows or []):
+            for row in rows or []:
                 tickers.append(row["ticker"])
 
             logger.info(f"Loaded {len(tickers)} tickers from database")

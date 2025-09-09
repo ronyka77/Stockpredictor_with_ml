@@ -14,9 +14,6 @@ from src.models.automl.autogluon_model import AutoGluonModel
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-# for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-#     logging.getLogger(lg).setLevel(logging.WARNING)
-# warnings.filterwarnings("ignore")
 
 
 class AutoGluonPredictor(BasePredictor):
@@ -30,19 +27,16 @@ class AutoGluonPredictor(BasePredictor):
                 self.model = AutoGluonModel()
                 self.model.load_from_dir(self.model_dir)
                 logger.info(
-                    "✅ AutoGluon predictor loaded from AG_MODEL_DIR: %s",
-                    self.model_dir,
+                    f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}"
                 )
                 return
             except Exception as e:
                 logger.warning(
-                    "Failed to load AutoGluon predictor from AG_MODEL_DIR '%s': %s",
-                    self.model_dir,
-                    e,
+                    f"Failed to load AutoGluon predictor from AG_MODEL_DIR '{self.model_dir}': {e}"
                 )
         else:
             logger.warning(
-                "AG_MODEL_DIR is set but path does not exist: %s", self.model_dir
+                f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}"
             )
 
     def _load_metadata(self) -> None:
@@ -59,19 +53,15 @@ class AutoGluonPredictor(BasePredictor):
                 self.optimal_threshold = threshold
                 self.model.selected_model_name = model_name
                 logger.info(
-                    "✅ AutoGluon optimal threshold and best model name loaded: %s, %s",
-                    self.optimal_threshold,
-                    self.model.selected_model_name,
+                    f"✅ AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to load AutoGluon metadata from AG_MODEL_DIR '%s': %s",
-                    self.model_dir,
-                    e,
+                    f"Failed to load AutoGluon metadata from AG_MODEL_DIR '{self.model_dir}': {e}"
                 )
         else:
             logger.warning(
-                "AG_MODEL_DIR is set but path does not exist: %s", self.model_dir
+                f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}"
             )
 
 
@@ -91,7 +81,9 @@ def predict_all_model(model_dir: str):
     features_df_base, metadata_df_base = predictor.load_recent_data(days_back=30)
     model_names = predictor.model.predictor.model_names()
     for model_name in model_names:
-        logger.info(f"Predicting model: {model_name}")
+        logger.info(
+            f"Predicting model: {model_name} with AG_MODEL_DIR: {predictor.model_dir} and optimal threshold: {predictor.optimal_threshold}"
+        )
         features_df = features_df_base.copy()
         metadata_df = metadata_df_base.copy()
         predictor.model.selected_model_name = model_name
@@ -102,5 +94,9 @@ def predict_all_model(model_dir: str):
 
 
 if __name__ == "__main__":
-    model_dir = "AutogluonModels/ag-20250907_125628"
+    for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+        logging.getLogger(lg).setLevel(logging.WARNING)
+    warnings.filterwarnings("ignore")
+
+    model_dir = "AutogluonModels/ag-20250909_203905"
     predict_all_model(model_dir)
