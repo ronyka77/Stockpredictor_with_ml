@@ -41,7 +41,7 @@ def main():
     """
     Main function for standalone prediction
     """
-    run_id = "33fd8b3b4f8a43d49ff2644f635221c0"
+    run_id = "50b1c2b9330c416aab77bb76c2759174"
     days_back = 30
     predictor = LightGBMPredictor(run_id=run_id)
     output_file = predictor.run_prediction_pipeline(days_back=days_back)

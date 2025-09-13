@@ -28,8 +28,8 @@ def bulk_upsert_technical_features(
     """Bulk upsert technical features using execute_values for performance.
 
     Args:
-        rows: Iterable of dicts with keys: ticker, date, feature_category,
-              feature_name, feature_value, quality_score
+        rows:   Iterable of dicts with keys: ticker, date, feature_category,
+                feature_name, feature_value, quality_score
         page_size: page size passed to execute_values
         overwrite: If True, ON CONFLICT DO UPDATE; if False, ON CONFLICT DO NOTHING
 

@@ -295,8 +295,8 @@ if __name__ == "__main__":
 
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    # start_date = datetime.now() - timedelta(days=7)
-    start_date = datetime(2024, 1, 1).date()
+    start_date = datetime.now() - timedelta(days=7)
+    # start_date = datetime(2024, 1, 1).date()
 
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

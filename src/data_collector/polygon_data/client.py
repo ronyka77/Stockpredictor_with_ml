@@ -30,12 +30,7 @@ class PolygonAPIError(Exception):
 
 
 class PolygonDataClient:
-    """
-    Main client for interacting with Polygon.io API
-
-    Provides comprehensive error handling, rate limiting, and retry mechanisms
-    for reliable data acquisition from Polygon.io.
-    """
+    """Main client for interacting with Polygon.io API"""
 
     def __init__(self, api_key: Optional[str] = None, requests_per_minute: int = 5):
         """
@@ -341,15 +336,7 @@ class PolygonDataClient:
         return response.get("results", [])
 
     def get_grouped_daily(self, date: str) -> List[Dict]:
-        """
-        Get grouped daily (OHLCV) data for all stocks on a specific date
-
-        Args:
-            date: Date in YYYY-MM-DD format
-
-        Returns:
-            List of OHLCV records for all stocks
-        """
+        """Get grouped daily (OHLCV) data for all stocks on a specific date"""
         endpoint = f"/v2/aggs/grouped/locale/us/market/stocks/{date}"
 
         params = {"adjusted": "true"}
@@ -377,12 +364,7 @@ class PolygonDataClient:
         return response.get("results", {})
 
     def health_check(self) -> bool:
-        """
-        Perform a health check on the API connection
-
-        Returns:
-            True if API is accessible, False otherwise
-        """
+        """Perform a health check on the API connection"""
         try:
             # Simple request to check API connectivity
             response = self._make_request("/v3/reference/tickers", {"limit": 1})

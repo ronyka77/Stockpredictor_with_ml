@@ -21,11 +21,6 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__, utility="database")
 
 
-# --- Safe pooled manager + module-level lifecycle helpers ---
-class ConnectionAcquireTimeout(RuntimeError):
-    """Raised when acquiring a pooled connection times out."""
-
-
 class PostgresConnection:
     """
     Thread-safe pooled connection wrapper that enforces an acquire timeout
@@ -56,7 +51,7 @@ class PostgresConnection:
         """Acquire a connection from the pool with a timeout.
 
         Raises:
-            ConnectionAcquireTimeout: if the semaphore cannot be acquired in time.
+            RuntimeError: if the semaphore cannot be acquired in time.
         """
         if self._closed:
             raise RuntimeError("Connection pool is closed")
@@ -64,7 +59,7 @@ class PostgresConnection:
         acquired = self._sem.acquire(timeout=timeout)
         if not acquired:
             logger.error("Timeout acquiring pooled connection")
-            raise ConnectionAcquireTimeout("Timeout acquiring pooled connection")
+            raise RuntimeError("Timeout acquiring pooled connection")
 
         conn = None
         try:

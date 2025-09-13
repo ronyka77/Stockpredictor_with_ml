@@ -113,7 +113,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             "GBM": {"verbosity": -1},
             "XGB": {"verbosity": 0},
             # "TABM": {},
-            "RF": {'verbose': 0},
+            "RF": {"verbose": 0},
             # "CAT": {'task_type': 'GPU'}
             # "REALMLP": {},
         }
