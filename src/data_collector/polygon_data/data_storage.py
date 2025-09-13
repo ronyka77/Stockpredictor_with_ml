@@ -65,7 +65,8 @@ class DataStorage:
             data_rows.append(row_data)
 
         # Create DataFrame for efficient processing
-        df = pd.DataFrame(data_rows)
+        df = pd.DataFrame(data_rows).drop_duplicates(subset=["ticker", "date"])
+        # print(df.head())
 
         # Ensure proper data types
         df["date"] = pd.to_datetime(df["date"]).dt.date

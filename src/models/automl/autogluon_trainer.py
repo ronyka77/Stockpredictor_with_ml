@@ -12,7 +12,6 @@ uv run python -m src.models.automl.autogluon_trainer --preset high_quality
 import pandas as pd
 from typing import Any, Dict
 
-from src.feature_engineering.data_loader import StockDataLoader
 from src.utils.logger import get_logger
 from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.automl.autogluon_model import AutoGluonModel
@@ -32,16 +31,10 @@ def train_autogluon(
     )
     logger.info(f"target_column: {data.get('target_column')}")
 
-    data_loader = StockDataLoader()
-    all_metadata_df = data_loader.get_ticker_metadata()
-    ticker_map = dict(zip(all_metadata_df["id"], all_metadata_df["ticker"]))
-
     X_train: pd.DataFrame = data["X_train"]
-    # X_train['ticker_name'] = X_train['ticker_id'].map(ticker_map).fillna(X_train['ticker_id'])
     logger.info(f"X_train: {X_train.columns.tolist()}")
     y_train: pd.Series = data["y_train"]
     X_test: pd.DataFrame = data["X_test"]
-    # X_test['ticker_name'] = X_test['ticker_id'].map(ticker_map).fillna(X_test['ticker_id'])
     y_test: pd.Series = data["y_test"]
     valid_df: pd.DataFrame = pd.concat([X_test, y_test], axis=1)
     valid_df.reset_index(drop=True, inplace=True)

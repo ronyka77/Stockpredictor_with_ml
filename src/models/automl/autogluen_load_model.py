@@ -13,10 +13,6 @@ from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 
 logger = get_logger(__name__)
-# Narrowly ignore common user warnings from Autogluon modules
-# for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
-#     logging.getLogger(lg).setLevel(logging.WARNING)
-# warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
 
 
 def generate_and_log_leaderboard(
@@ -26,11 +22,11 @@ def generate_and_log_leaderboard(
     Returns the leaderboard DataFrame.
     """
     try:
-        logger.info("Generating leaderboard on valid_df (n=%d)", len(valid_df))
+        logger.info(f"Generating leaderboard on valid_df (n={len(valid_df)})")
         leaderboard = predictor.leaderboard(
             valid_df, silent=True, extra_metrics=["mape", "mse", "mae", "rmse", "r2"]
         )
-        logger.info("Autogluon leaderboard:\n%s", leaderboard.to_string())
+        logger.info(f"Autogluon leaderboard:\n{leaderboard.to_string()}")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         leaderboard.to_excel(
@@ -50,7 +46,7 @@ def generate_and_log_leaderboard(
             logger.info(f"Feature importance: {feature_importance}")
         return leaderboard
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.error("Failed to create leaderboard: %s", exc)
+        logger.error(f"Failed to create leaderboard: {exc}")
         raise
 
 
@@ -136,15 +132,19 @@ def run_model_evaluation(
             json.dump(metadata, f, indent=2)
         logger.info(f"Saved model metadata to: {metadata_path}")
     except Exception as e:
-        logger.error("Script failed: %s", e)
+        logger.error(f"Script failed: {e}")
         raise
 
 
 if __name__ == "__main__":
+    # Narrowly ignore common user warnings from Autogluon modules
+    for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
+        logging.getLogger(lg).setLevel(logging.WARNING)
+    warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
     try:
-        model_dir = "AutogluonModels/ag-20250907_125628"
+        model_dir = "AutogluonModels/ag-20250909_181529"
         prediction_horizon = 10
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:
-        logger.error("Script failed: %s", e)
+        logger.error(f"Script failed: {e}")
         raise

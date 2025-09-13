@@ -10,7 +10,7 @@ from psycopg2.pool import ThreadedConnectionPool
 from typing import Iterable, Optional, Any, List, Tuple, Callable
 from psycopg2.extras import execute_values as _execute_values
 from contextlib import contextmanager
-from typing import Dict, Any, Optional, Generator
+from typing import Generator
 import os
 import threading
 import atexit
@@ -19,11 +19,6 @@ from threading import Semaphore
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="database")
-
-
-# --- Safe pooled manager + module-level lifecycle helpers ---
-class ConnectionAcquireTimeout(RuntimeError):
-    """Raised when acquiring a pooled connection times out."""
 
 
 class PostgresConnection:
@@ -36,7 +31,9 @@ class PostgresConnection:
     def __init__(self, minconn: int, maxconn: int, **conn_kwargs: Any):
         # Validate required credentials early
         if not conn_kwargs.get("password"):
-            raise ValueError("DB_PASSWORD environment variable is required for database connections")
+            raise ValueError(
+                "DB_PASSWORD environment variable is required for database connections"
+            )
 
         self._minconn = minconn
         self._maxconn = maxconn
@@ -47,11 +44,6 @@ class PostgresConnection:
         self._sem = Semaphore(maxconn)
         self._closed = False
 
-        logger.info(
-            f"Initialized PostgresConnection ({minconn}-{maxconn}) for "
-            f"{conn_kwargs.get('host', '<dsn>')}:{conn_kwargs.get('port', '')}/{conn_kwargs.get('database', '')}"
-        )
-
     @contextmanager
     def connection(
         self, timeout: float = 5.0
@@ -59,7 +51,7 @@ class PostgresConnection:
         """Acquire a connection from the pool with a timeout.
 
         Raises:
-            ConnectionAcquireTimeout: if the semaphore cannot be acquired in time.
+            RuntimeError: if the semaphore cannot be acquired in time.
         """
         if self._closed:
             raise RuntimeError("Connection pool is closed")
@@ -67,7 +59,7 @@ class PostgresConnection:
         acquired = self._sem.acquire(timeout=timeout)
         if not acquired:
             logger.error("Timeout acquiring pooled connection")
-            raise ConnectionAcquireTimeout("Timeout acquiring pooled connection")
+            raise RuntimeError("Timeout acquiring pooled connection")
 
         conn = None
         try:
@@ -120,7 +112,7 @@ class PostgresConnection:
         self._closed = True
         try:
             self._pool.closeall()
-            logger.info("PostgresConnection closed")
+            # logger.info("PostgresConnection closed")
         except Exception as exc:
             logger.error(f"Error closing pooled connections: {exc}")
 
@@ -184,6 +176,7 @@ def close_global_pool() -> None:
 
 
 # --- Convenience DB helpers ---
+
 
 def fetch_all(
     query: str, params: Optional[Tuple] = None, dict_cursor: bool = True

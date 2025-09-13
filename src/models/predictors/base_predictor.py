@@ -274,7 +274,6 @@ class BasePredictor(ABC):
                 results_df["company_name"] = (
                     results_df["ticker_id"].map(name_map).fillna("Unknown")
                 )
-            data_loader.close()
         except Exception as e:
             logger.warning(f"   Could not fetch ticker metadata: {e}")
             results_df["ticker"] = results_df["ticker_id"]
@@ -336,10 +335,9 @@ class BasePredictor(ABC):
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
             return pd.DataFrame()
         else:
-            # logger.info("   🏆 Applying top 10 filtering by predicted_return per date...")
             results_df = (
                 results_df.sort_values(
-                    ["date", "predicted_return"], ascending=[True, False]
+                    ["date", "confidence_score"], ascending=[True, False]
                 )
                 .groupby("date")
                 .head(10)
@@ -419,8 +417,11 @@ class BasePredictor(ABC):
             logger.info(
                 f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
             )
-
-        return results_df
+        if friday_avg_profit > 5 or monday_avg_profit > 5:
+            return results_df
+        else:
+            logger.warning("   ⚠️  WARNING: No predictions should be exported!")
+            return pd.DataFrame()
 
     def evaluate_on_recent_data(
         self, days_back: int = 30

@@ -179,15 +179,6 @@ class OHLCVRecord(BaseModel):
         2. If no volume: Use typical price formula: (High + Low + Close) / 3
 
         This is a reasonable approximation when we don't have intraday volume data.
-
-        Args:
-            high: High price of the day
-            low: Low price of the day
-            close: Close price of the day
-            volume: Trading volume (optional)
-
-        Returns:
-            Calculated VWAP approximation
         """
         if volume and volume > 0:
             # Use a weighted approach favoring close price

@@ -48,6 +48,8 @@ dependencies = [
     "intentgraph>=0.2.2",
     "vulture>=2.14",
     "pytest-timeout>=2.4.0",
+    "polyfactory>=2.22.2",
+    "radon>=6.0.1",
 ]
 
 [build-system]
@@ -77,8 +79,21 @@ torchaudio = [{ index = "pytorch" }]
 [tool.ruff]
 line-length = 88
 
+[tool.radon]
+exclude = ["tests", "venv", ".venv", "build", "dist"]
+ignore = ["__init__.py"]
+# CC (cyclomatic complexity) configuration
+cc_min = "A"
+cc_max = "F"
+no_assert = false
+show_closures = false
+
+[tool.radon.cc]
+# Optional per-path settings
+average = true
+
 [tool.pytest.ini_options]
-addopts = "--strict-markers --verbose --cov=src --cov-report json:coverage.json --cov-fail-under=70 --timeout=30"
+addopts = "--strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=70 --timeout=30"
 markers = [
     "unit: Unit tests - test individual components in isolation",
     "integration: Integration tests - test multiple components working together",

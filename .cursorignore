@@ -12,5 +12,9 @@ autogluonModels/
 .hypothesis/
 .backup/
 .reports/
+.ruff_cache/
+.pytest_cache/
+.reports/
+AutogluonModels/
 checkpoints/
 mindmap/

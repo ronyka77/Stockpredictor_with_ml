@@ -5,21 +5,11 @@ from src.data_utils import ml_feature_loader as mfl
 from src.data_utils import ml_data_pipeline as mp
 
 
-def make_features_with_future(pred_horizon=10):
-    df = pd.DataFrame(
-        {
-            "ticker": ["A", "B", "C"],
-            "close": [10.0, 12.0, 11.0],
-            f"Future_Close_{pred_horizon}D": [11.0, None, 12.0],
-            "extra": [1, 2, 3],
-        }
-    )
-    return df
-
-
-def test__load_from_consolidated_uses_target_and_drops_future_cols(mocker):
+def test__load_from_consolidated_uses_target_and_drops_future_cols(
+    mocker, features_with_future
+):
     loader = mfl.MLFeatureLoader()
-    fake_df = make_features_with_future(10)
+    fake_df = features_with_future
     # patch consolidated storage loader
     mocker.patch.object(
         loader.consolidated_storage, "load_consolidated_features", return_value=fake_df
