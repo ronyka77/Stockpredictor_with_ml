@@ -24,23 +24,20 @@ def test_add_price_normalized_features_schema_and_values():
     out = add_price_normalized_features(df.copy())
 
     expected_cols = list(df.columns) + ["SMA_5_Ratio", "Close_Open_Ratio"]
-    if list(out.columns) != expected_cols:
-        raise AssertionError(
-            f"Unexpected schema after add_price_normalized_features: got {list(out.columns)}, expected {expected_cols}"
-        )
+    pdt.assert_index_equal(out.columns, pd.Index(expected_cols), obj="columns")
 
-    if out["SMA_5_Ratio"].dtype != np.float64:
-        raise AssertionError(
-            f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}"
-        )
-    if out["Close_Open_Ratio"].dtype != np.float64:
-        raise AssertionError(
-            f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}"
-        )
+    # dtype checks for newly added columns
+    assert out["SMA_5_Ratio"].dtype == np.float64, (
+        f"Unexpected dtype for SMA_5_Ratio: {out['SMA_5_Ratio'].dtype}"
+    )
+    assert out["Close_Open_Ratio"].dtype == np.float64, (
+        f"Unexpected dtype for Close_Open_Ratio: {out['Close_Open_Ratio'].dtype}"
+    )
 
     pdt.assert_series_equal(
-        out["SMA_5_Ratio"].reset_index(drop=True),
+        out["SMA_5_Ratio"].reset_index(drop=True).astype("float64"),
         pd.Series([100.0 / 95.0, 110.0 / 105.0], dtype="float64"),
+        check_dtype=True,
         check_names=False,
     )
 
@@ -91,10 +88,10 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
     if not ("a" in numeric_cols and "b" in numeric_cols):
         raise AssertionError(f"Missing numeric columns after cleaning: {numeric_cols}")
 
-    if out[numeric_cols].isnull().any().any():
-        raise AssertionError(
-            f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
-        )
+    # ensure no NaNs in numeric columns
+    assert not out[numeric_cols].isnull().any().any(), (
+        f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
+    )
     if out["a"].dtype != np.float64:
         raise AssertionError(
             f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"

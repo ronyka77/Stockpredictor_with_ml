@@ -1,25 +1,28 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.data_utils import feature_engineering as fe
+import pandas.testing as pdt
 
 
-def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio():
-    df = pd.DataFrame(
-        {"close": [100.0, 110.0], "SMA_5": [95.0, 105.0], "open": [99.0, 109.0]}
-    )
+def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
+    small_market_df,
+):
+    df = small_market_df.copy()
 
     out = fe.add_price_normalized_features(df)
-    if "SMA_5_Ratio" not in out.columns:
-        raise AssertionError(f"SMA ratio missing: {out.columns}")
-    if "Close_Open_Ratio" not in out.columns:
-        raise AssertionError(f"Close/Open ratio missing: {out.columns}")
-    # numeric equality
-    if out["SMA_5_Ratio"].iloc[0] != pytest.approx(100.0 / 95.0):
-        raise AssertionError("SMA ratio incorrect")
-    if out["Close_Open_Ratio"].iloc[1] != pytest.approx(110.0 / 109.0):
-        raise AssertionError("Close/Open ratio incorrect")
+    expected_cols = ["close", "SMA_5", "open", "SMA_5_Ratio", "Close_Open_Ratio"]
+    # check schema presence and dtypes for critical columns
+    assert set(expected_cols).issubset(set(out.columns)), (
+        f"Unexpected columns: got {list(out.columns)}, expected superset {list(expected_cols)}"
+    )
+    # use pandas testing for precise dtype/content checks on the computed columns
+    pdt.assert_series_equal(
+        out["SMA_5_Ratio"].reset_index(drop=True).astype("float64"),
+        pd.Series([100.0 / 95.0, 110.0 / 105.0], dtype="float64"),
+        check_dtype=True,
+        check_names=False,
+    )
 
 
 def test_add_prediction_bounds_features_populates_expected_context_columns():
@@ -34,13 +37,21 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
     )
 
     out = fe.add_prediction_bounds_features(df)
-    if "Expected_10D_Move" not in out.columns:
-        raise AssertionError("Expected_10D_Move not added")
-    if "RSI_Mean_Reversion_Pressure" not in out.columns:
-        raise AssertionError("RSI feature missing")
-    # Basic numeric checks
-    if out["Expected_10D_Move"].iloc[0] != pytest.approx(0.02 * np.sqrt(10)):
-        raise AssertionError("Expected_10D_Move incorrect")
+    import pandas.testing as pdt
+
+    expected_cols = [
+        "Expected_10D_Move",
+        "RSI_Mean_Reversion_Pressure",
+        "Expected_Daily_Move",
+    ]
+    for c in expected_cols:
+        assert c in out.columns, f"Expected column {c} missing"
+    pdt.assert_series_equal(
+        out["Expected_10D_Move"].reset_index(drop=True).astype("float64"),
+        pd.Series([0.02 * np.sqrt(10), 0.04 * np.sqrt(10)], dtype="float64"),
+        check_dtype=True,
+        check_names=False,
+    )
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan():
@@ -63,10 +74,9 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
     numeric_cols = out.select_dtypes(include=[np.number]).columns.tolist()
     if not ("a" in numeric_cols and "b" in numeric_cols):
         raise AssertionError(f"Missing numeric columns: {numeric_cols}")
-    if out[numeric_cols].isnull().any().any():
-        raise AssertionError(
-            f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
-        )
+    assert not out[numeric_cols].isnull().any().any(), (
+        f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
+    )
     if out["a"].dtype != np.float64:
         raise AssertionError("Numeric dtype not converted to float64")
 

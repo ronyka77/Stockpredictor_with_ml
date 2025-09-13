@@ -1,0 +1,112 @@
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+
+import pytest
+
+from src.data_collector.polygon_fundamentals.cache_manager import (
+    FundamentalCacheManager,
+)
+from src.data_collector.polygon_fundamentals.data_models import FinancialValue
+
+
+def make_cache_file(directory: Path, ticker: str, days_ago: int, payload: dict):
+    date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
+    path = directory / f"{ticker}_financials_{date}.json"
+    path.write_text(json.dumps(payload, default=str), encoding="utf-8")
+    return path
+
+
+def test_get_cached_data_returns_none_when_no_files(tmp_path):
+    # Setup
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+
+    # Execution
+    result = cm.get_cached_data("ZZZZ")
+
+    # Verification
+    assert result is None
+
+
+def test_get_cached_data_uses_most_recent_valid(tmp_path, fv_factory):
+    # Setup
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+
+    # older (expired) cache
+    make_cache_file(tmp_path, "AAPL", days_ago=10, payload={"results": []})
+    try:
+        fv = fv_factory.build(value=123.0)
+        revenues_field = fv.model_dump() if hasattr(fv, "model_dump") else fv.__dict__
+        recent = {"results": [{"revenues": revenues_field}]}
+    except Exception:
+        recent = {"results": [{"foo": "bar"}]}
+
+    p = make_cache_file(tmp_path, "AAPL", days_ago=3, payload=recent)
+
+    # Execution
+    data = cm.get_cached_data("AAPL")
+
+    # Verification
+    assert isinstance(data, dict)
+    assert data.get("results") == recent["results"]
+
+
+def test_save_cache_and_clear_expired(tmp_path):
+    # Setup
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+
+    # Execution: save cache for ticker
+    saved = cm.save_cache("msft", {"x": 1}, overwrite=True)
+
+    # Verification: file exists and has correct name
+    assert saved is not None
+    assert saved.exists()
+
+    # Create an artificially old file and ensure clear_expired_caches removes it
+    old = make_cache_file(tmp_path, "MSFT", days_ago=30, payload={"old": True})
+    removed = cm.clear_expired_caches()
+
+    assert removed >= 1
+    # The original saved file for today should remain
+    assert any(p.name.startswith("MSFT_financials_") for p in tmp_path.glob("MSFT_financials_*.json"))
+
+
+
+def test_save_cache_no_overwrite(tmp_path):
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+
+    # Save once
+    first = cm.save_cache("TEST", {"a": 1}, overwrite=True)
+    assert first is not None and first.exists()
+
+    # Save again with overwrite=False should return None and leave file unchanged
+    second = cm.save_cache("TEST", {"a": 2}, overwrite=False)
+    assert second is None
+
+    # Ensure content is still the original
+    data = json.loads(first.read_text(encoding="utf-8"))
+    assert data.get("a") == 1
+
+
+def test_parse_date_from_filename_invalid(tmp_path):
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+
+    # Create a file that doesn't match expected pattern
+    bad = tmp_path / "not_a_cache_file.txt"
+    bad.write_text("x")
+
+    # Attempt to get cached data returns None and should not raise
+    assert cm.get_cached_data("NOPE") is None
+
+
+def test_clear_expired_caches_empty_dir(tmp_path):
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+    removed = cm.clear_expired_caches()
+    assert removed == 0
+
+
+def test_save_cache_invalid_ticker(tmp_path):
+    cm = FundamentalCacheManager(cache_dir=str(tmp_path))
+    # Empty ticker should be rejected
+    res = cm.save_cache("", {"a": 1})
+    assert res is None

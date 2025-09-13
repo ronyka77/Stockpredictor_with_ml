@@ -1,22 +1,32 @@
 import os
 import builtins
-import time
 import pytest
-from tests._fixtures.helpers import make_sample_df, make_fake_db, make_fake_http_response
 
 
-@pytest.fixture
-def fake_http_response():
-    """Return a factory for fake HTTP responses used across client tests.
+# Central deterministic seed fixture for all tests (Polyfactory + numeric libs)
+@pytest.fixture(scope="session", autouse=True)
+def factory_seed():
+    """Set a single deterministic seed for factories and numeric RNGs.
 
-    Usage:
-        resp = fake_http_response(status=200, json_data={...})
-        mocker.patch.object(client.session, 'get', return_value=resp)
+    This fixture runs once per test session and makes Polyfactory-generated
+    data and any numpy/random-based behavior deterministic in CI.
     """
-    def _factory(status=200, json_data=None, raise_on_json=False):
-        return make_fake_http_response(status=status, json_data=json_data, raise_on_json=raise_on_json)
+    seed = 42
 
-    return _factory
+    # Seed Python random
+    import random
+
+    random.seed(seed)
+
+    # Seed numpy if available
+    try:
+        import numpy as np
+
+        np.random.seed(seed)
+    except Exception:
+        pass
+
+    return seed
 
 
 @pytest.fixture
@@ -32,11 +42,11 @@ def mock_http_client():
             self._aggregates = None
             self._grouped = None
 
-        def set_aggregates(self, data):
-            self._aggregates = data
+        # def set_aggregates(self, data):
+        #     self._aggregates = data
 
-        def set_grouped(self, data):
-            self._grouped = data
+        # def set_grouped(self, data):
+        #     self._grouped = data
 
         def get_aggregates(self, *args, **kwargs):
             if isinstance(self._aggregates, Exception):
@@ -52,33 +62,37 @@ def mock_http_client():
 
 
 @pytest.fixture
-def patch_execute_values_to_fake_pool(mocker, fake_pool):
-    """Patch the low-level execute_values to delegate to the shared fake pool.
+def make_fake_http_response():
+    """Factory fixture returning a function that constructs fake HTTP responses.
 
-    Usage: include `patch_execute_values_to_fake_pool` in the test signature and
-    the fixture will replace `src.data_collector.polygon_data.data_storage.execute_values`
-    with a wrapper that calls `fake_pool.execute_values`.
+    Returns a callable `make_fake_http_response(status, json_data, raise_on_json)`.
     """
 
-    def _execute_values_wrapper(insert_sql, rows, template=None, page_size=1000, commit=True):
-        # delegate to shared fake pool implementation
-        fake_pool.execute_values(insert_sql, rows, template=template, page_size=page_size)
+    def _factory(status=200, json_data=None, raise_on_json=False):
+        class FakeResponse:
+            def __init__(self, status, payload, raise_on_json):
+                self.status_code = status
+                self._payload = payload
+                self._raise = raise_on_json
 
-    mocker.patch(
-        "src.data_collector.polygon_data.data_storage.execute_values",
-        new=_execute_values_wrapper,
-    )
-    return None
+            def json(self):
+                if self._raise:
+                    raise ValueError("malformed json")
+                return self._payload
+
+            # def raise_for_status(self):
+            #     if not (200 <= self.status_code < 300):
+            #         raise Exception(f"HTTP {self.status_code}")
+
+        return FakeResponse(status, json_data, raise_on_json)
+
+    return _factory
 
 
 @pytest.fixture
-def make_sample_dataframe():
-    return make_sample_df
-
-
-@pytest.fixture
-def fake_pool():
-    return make_fake_db("logical")
+def fake_http_response(make_fake_http_response):
+    """Alias fixture for tests that request fake_http_response."""
+    return make_fake_http_response
 
 
 @pytest.fixture
