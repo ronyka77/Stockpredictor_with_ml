@@ -8,6 +8,7 @@ from src.data_utils import ml_data_pipeline as mp
 def test__load_from_consolidated_uses_target_and_drops_future_cols(
     mocker, features_with_future
 ):
+    """Load consolidated features, return targets Series, and drop future columns."""
     loader = mfl.MLFeatureLoader()
     fake_df = features_with_future
     # patch consolidated storage loader
@@ -25,6 +26,7 @@ def test__load_from_consolidated_uses_target_and_drops_future_cols(
 
 
 def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
+    """Combine yearly feature frames and map ticker metadata to `ticker_id`."""
     # prepare per-year frames: only one year has data
     df2024 = pd.DataFrame(
         {
@@ -58,6 +60,7 @@ def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
 
 
 def test_prepare_ml_data_for_training_raises_on_missing_date_column(mocker):
+    """Raise ValueError when loaded data is missing the 'date' column."""
     # load_all_data returns DataFrame without 'date' -> expect ValueError when splitting
     mocker.patch(
         "src.data_utils.ml_data_pipeline.load_all_data",
@@ -68,6 +71,7 @@ def test_prepare_ml_data_for_training_raises_on_missing_date_column(mocker):
 
 
 def test_prepare_ml_data_for_training_with_cleaning_uses_cache_when_available(mocker):
+    """Return cached cleaned training payload when cache exists and is fresh."""
     # patch cache to simulate existing valid cache
     fake_cached = {
         "X_train": pd.DataFrame([[1.0]]),

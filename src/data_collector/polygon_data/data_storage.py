@@ -39,7 +39,6 @@ class DataStorage:
         self,
         records: List[OHLCVRecord],
         batch_size: int = 1000,
-        on_conflict: str = "update",
     ) -> Dict[str, Any]:
         """
         Store validated OHLCV data to PostgreSQL database
@@ -47,7 +46,6 @@ class DataStorage:
         Args:
             records: List of validated OHLCV records
             batch_size: Number of records to insert in each batch
-            on_conflict: How to handle conflicts ('update', 'ignore', 'error')
 
         Returns:
             Dictionary with storage statistics
@@ -82,22 +80,13 @@ class DataStorage:
                 batch_df = df.iloc[i : i + batch_size]
 
                 try:
-                    if on_conflict == "update":
-                        batch_stored, batch_updated = self._upsert_batch(batch_df)
-                        stored_count += batch_stored
-                        updated_count += batch_updated
-                    elif on_conflict == "ignore":
-                        batch_stored = self._insert_ignore_batch(batch_df)
-                        stored_count += batch_stored
-                    else:  # error
-                        batch_stored = self._insert_batch(batch_df)
-                        stored_count += batch_stored
-
+                    batch_stored, batch_updated = self._upsert_batch(batch_df)
+                    stored_count += batch_stored
+                    updated_count += batch_updated
                     logger.info(
                         f"Processed batch {i // batch_size + 1}: "
                         f"{len(batch_df)} records"
                     )
-
                 except Exception as e:
                     logger.error(f"Error processing batch {i // batch_size + 1}: {e}")
                     error_count += len(batch_df)
@@ -490,7 +479,6 @@ class DataStorage:
 
                     # use centralized helper for batched upsert
                     execute_values(insert_sql, rows, page_size=500)
-
                     stored_count += len(batch_data)
 
                     logger.info(
@@ -519,95 +507,28 @@ class DataStorage:
             logger.error(f"Ticker storage failed: {e}")
             raise
 
-    def get_tickers(
-        self, market: str = "stocks", active: bool = True, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Get tickers from database
+    def get_tickers(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get tickers from database"""
 
-        Args:
-            market: Market type filter
-            active: Active status filter
-            limit: Maximum number of results
-
-        Returns:
-            List of ticker dictionaries
-        """
         query = "SELECT * FROM tickers WHERE 1=1"
-        params = {}
-
-        if market:
-            query += " AND market = :market"
-            params["market"] = market
-
-        if active is not None:
-            query += " AND active = :active"
-            params["active"] = active
-
+        query += " AND active = true"
+        if ticker:
+            query += f" AND ticker = '{ticker}'"
         query += " ORDER BY ticker"
 
-        if limit:
-            query += f" LIMIT {limit}"
-
         try:
-            with get_global_pool().connection() as conn:
-                result = conn.execute(query, params)
-                tickers = []
+            result = fetch_all(query, None, dict_cursor=False)
+            tickers = []
 
-                for row in result:
-                    ticker_dict = dict(row._mapping)
-                    tickers.append(ticker_dict)
+            for row in result:
+                ticker_dict = dict(row)
+                tickers.append(ticker_dict)
 
-                logger.info(f"Retrieved {len(tickers)} tickers from database")
-                return tickers
+            logger.info(f"Retrieved {len(tickers)} tickers from database")
+            return tickers
 
         except Exception as e:
             logger.error(f"Error retrieving tickers: {e}")
-            raise
-
-    def get_ticker_symbols(
-        self, market: str = "stocks", active: bool = True, limit: Optional[int] = None
-    ) -> List[str]:
-        """
-        Get ticker symbols only (for performance)
-
-        Args:
-            market: Market type filter
-            active: Active status filter
-            limit: Maximum number of results
-
-        Returns:
-            List of ticker symbols
-        """
-        query = "SELECT ticker FROM tickers WHERE 1=1"
-        params = {}
-
-        if market:
-            query += " AND market = :market"
-            params["market"] = market
-
-        if active is not None:
-            query += " AND active = :active"
-            params["active"] = active
-
-        # Add type filter for common stock
-        query += " AND type = 'CS' AND market_cap is null"
-
-        query += " ORDER BY ticker"
-
-        if limit:
-            query += f" LIMIT {limit}"
-
-        try:
-            with get_global_pool().connection() as conn:
-                result = conn.execute(query, params)
-                tickers = [row[0] for row in result]
-
-                logger.info(f"Retrieved {len(tickers)} ticker symbols from database")
-                return tickers
-
-        except Exception as e:
-            logger.error(f"Error retrieving ticker symbols: {e}")
             raise
 
     def __exit__(self):

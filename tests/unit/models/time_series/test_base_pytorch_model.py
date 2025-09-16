@@ -21,7 +21,7 @@ def _make_loader(n=20, batch_size=8):
 
 
 def test_fit_and_predict():
-    # Tests full training loop and prediction output shape
+    """Train a minimal PyTorch predictor and verify predict returns correct shape."""
     cfg = {"epochs": 2, "learning_rate": 1e-2, "batch_size": 8}
     p = MinimalPytorchPredictor(model_name="m", config=cfg)
     train_loader = _make_loader(24, batch_size=8)
@@ -38,7 +38,7 @@ def test_fit_and_predict():
 
 
 def test_get_prediction_confidence_simple_method():
-    # Verifies simple confidence method returns array of correct length
+    """Verify simple confidence method returns array matching input length."""
     cfg = {"epochs": 1, "learning_rate": 1e-2, "batch_size": 8}
     p = MinimalPytorchPredictor(model_name="m2", config=cfg)
     train_loader = _make_loader(16, batch_size=8)
@@ -50,7 +50,7 @@ def test_get_prediction_confidence_simple_method():
 
 
 def test_get_prediction_confidence_invalid_method_raises():
-    # Ensures invalid confidence method raises ValueError
+    """Invalid confidence method should raise ValueError."""
     cfg = {"epochs": 1, "learning_rate": 1e-2, "batch_size": 4}
     p = MinimalPytorchPredictor(model_name="m3", config=cfg)
     train_loader = _make_loader(8, batch_size=4)
@@ -65,8 +65,14 @@ def test_get_prediction_confidence_invalid_method_raises():
 
 
 def test_fit_with_huber_and_val_loader():
-    # Confirms training with Huber loss and validation loader runs
-    cfg = {"epochs": 1, "learning_rate": 1e-2, "batch_size": 8, "loss": "huber", "huber_delta": 0.5}
+    """Training with Huber loss and validation loader runs without error and marks trained."""
+    cfg = {
+        "epochs": 1,
+        "learning_rate": 1e-2,
+        "batch_size": 8,
+        "loss": "huber",
+        "huber_delta": 0.5,
+    }
     p = MinimalPytorchPredictor(model_name="huber", config=cfg)
     train_loader = _make_loader(16, batch_size=8)
     val_loader = _make_loader(8, batch_size=4)
@@ -76,7 +82,7 @@ def test_fit_with_huber_and_val_loader():
 
 
 def test_predict_raises_when_not_trained():
-    # Checks predict raises when model is not trained
+    """Predict must raise when model has not been trained."""
     cfg = {"epochs": 1, "learning_rate": 1e-2}
     p = MinimalPytorchPredictor(model_name="notr", config=cfg)
     features = pd.DataFrame({"x": [0.1, 0.2]})
@@ -89,7 +95,7 @@ def test_predict_raises_when_not_trained():
 
 
 def test_confidence_methods_variance_margin_leaf():
-    # Validates variance, margin, and leaf_depth confidence methods outputs
+    """Validate variance, margin, and leaf_depth confidence methods produce bounded arrays."""
     cfg = {"epochs": 1, "learning_rate": 1e-2, "batch_size": 8}
     p = MinimalPytorchPredictor(model_name="conf", config=cfg)
     train_loader = _make_loader(20, batch_size=10)

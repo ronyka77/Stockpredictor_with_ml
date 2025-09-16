@@ -193,48 +193,6 @@ class ConsolidatedFeatureStorage:
 
         return combined_data
 
-    def get_consolidated_stats(self) -> Dict[str, Any]:
-        """Get statistics about consolidated storage"""
-        parquet_files = list(self.consolidated_path.glob("*.parquet"))
-
-        if not parquet_files:
-            return {"files": 0, "total_size_mb": 0, "total_rows": 0}
-
-        total_size = 0
-        total_rows = 0
-        file_stats = []
-
-        for file_path in parquet_files:
-            try:
-                # Get file size
-                size_mb = file_path.stat().st_size / (1024 * 1024)
-                total_size += size_mb
-
-                # Get row count (read metadata only)
-                parquet_file = pq.ParquetFile(file_path)
-                rows = parquet_file.metadata.num_rows
-                total_rows += rows
-
-                file_stats.append(
-                    {
-                        "file": file_path.name,
-                        "size_mb": size_mb,
-                        "rows": rows,
-                        "columns": parquet_file.metadata.num_columns,
-                    }
-                )
-
-            except Exception as e:
-                logger.warning(f"Error reading stats for {file_path}: {str(e)}")
-
-        return {
-            "files": len(parquet_files),
-            "total_size_mb": total_size,
-            "total_rows": total_rows,
-            "file_stats": file_stats,
-            "storage_path": str(self.consolidated_path),
-        }
-
     def _combine_ticker_data(
         self, ticker_data: Dict[str, pd.DataFrame]
     ) -> pd.DataFrame:
@@ -350,15 +308,7 @@ class ConsolidatedFeatureStorage:
 
 # Convenience function
 def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
-    """
-    Consolidate existing individual Parquet files into year-partitioned format
-
-    Args:
-        strategy: Consolidation strategy (only "by_date" supported)
-
-    Returns:
-        Consolidation results
-    """
+    """Consolidate existing individual Parquet files into year-partitioned format"""
     if strategy != "by_date":
         logger.warning(
             f"Only 'by_date' strategy supported, using 'by_date' instead of '{strategy}'"

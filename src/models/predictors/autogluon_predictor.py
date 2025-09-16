@@ -93,10 +93,39 @@ def predict_all_model(model_dir: str):
         )
 
 
+def predict_all_model_folders():
+    """
+    Loops through all model folders in AutogluonModels directory and runs predictions for each.
+    """
+    base_dir = "AutogluonModels"
+
+    if not os.path.exists(base_dir):
+        logger.error(f"AutogluonModels directory not found at {base_dir}")
+        return
+
+    model_folders = [
+        f for f in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, f))
+    ]
+
+    if not model_folders:
+        logger.warning(f"No model folders found in {base_dir}")
+        return
+
+    for folder in model_folders:
+        model_dir = os.path.join(base_dir, folder)
+        logger.info(f"Processing model folder: {folder}")
+        try:
+            predict_all_model(model_dir)
+        except Exception as e:
+            logger.error(f"Failed to process {folder}: {str(e)}")
+            continue
+
+
 if __name__ == "__main__":
     for lg in ("autogluon", "autogluon.tabular", "autogluon.common", "autogluon.core"):
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore")
 
-    model_dir = "AutogluonModels/ag-20250909_203905"
+    model_dir = "AutogluonModels/ag-20250914_172204"
     predict_all_model(model_dir)
+    # predict_all_model_folders()

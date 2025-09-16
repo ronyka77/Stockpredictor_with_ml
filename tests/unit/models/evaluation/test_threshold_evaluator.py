@@ -5,6 +5,7 @@ from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
 
 
 def test_vectorized_profit_calculation_basic():
+    """Compute vectorized profits for basic positive/negative prediction scenarios."""
     te = ThresholdEvaluator(investment_amount=100.0)
 
     # y_true: actual percentage returns; y_pred: predicted percentage returns
@@ -28,6 +29,7 @@ def test_vectorized_profit_calculation_basic():
 
 
 def test_calculate_filtered_profit_edge_cases():
+    """Calculate filtered profit handling no-positive-prediction and single-positive cases."""
     te = ThresholdEvaluator(investment_amount=50.0)
 
     # No positive predictions -> zero profit
@@ -60,6 +62,7 @@ class MockModel:
 
 
 def test_optimize_prediction_threshold_success():
+    """Optimize prediction threshold over candidate thresholds and report success and optimal value."""
     te = ThresholdEvaluator(investment_amount=100.0)
 
     n = 100

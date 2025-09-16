@@ -14,11 +14,7 @@ from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
     nan_probability=st.floats(min_value=0.0, max_value=0.5),
 )
 def test_validate_and_clean_data_property(n_rows, n_cols, nan_probability):
-    """Property test: validate_and_clean_data should return a DataFrame without NaN/Inf values
-
-    This is a lightweight living example demonstrating Hypothesis usage with limited examples
-    so CI and local runs remain fast.
-    """
+    """Property: validate_and_clean_data returns DataFrame free of NaN/Inf values."""
 
     rng = np.random.RandomState(42)
     data = rng.normal(size=(n_rows, n_cols))

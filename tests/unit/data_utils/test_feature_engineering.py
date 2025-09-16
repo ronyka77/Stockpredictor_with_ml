@@ -8,6 +8,7 @@ import pandas.testing as pdt
 def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
     small_market_df,
 ):
+    """Ensure SMA_5_Ratio and Close_Open_Ratio are added and computed correctly."""
     df = small_market_df.copy()
 
     out = fe.add_price_normalized_features(df)
@@ -26,6 +27,7 @@ def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
 
 
 def test_add_prediction_bounds_features_populates_expected_context_columns():
+    """Verify prediction-bounds features (Expected_10D_Move, RSI pressure, daily move) are added."""
     df = pd.DataFrame(
         {
             "ATR_Percent": [0.02, 0.04],
@@ -55,6 +57,7 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan():
+    """Clean numeric columns: handle infinite/extreme values and remove NaNs, preserving non-numeric."""
     big = np.finfo(np.float32).max * 100.0
     df = pd.DataFrame(
         {
@@ -82,6 +85,7 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
 
 
 def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
+    """Detect constant and zero-variance features and report high-variance features."""
     df = pd.DataFrame(
         {
             "const": [1, 1, 1, 1],
@@ -100,6 +104,7 @@ def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
 
 def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves_essential():
     # essential columns must be preserved even if non-numeric/constant
+    """Remove non-numeric and highly correlated features while preserving essential columns like 'close'."""
     df = pd.DataFrame(
         {
             "close": ["100", "101", "102", "103"],  # object type but essential

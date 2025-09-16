@@ -6,6 +6,7 @@ from tests._fixtures import canned_api_factory
 
 
 def test_make_request_success(polygon_client):
+    """Verify successful HTTP response is parsed and contains 'results'"""
     fake_resp = canned_api_factory("grouped_daily")
     with patch.object(polygon_client.session, "get", return_value=fake_resp):
         data = polygon_client._make_request("/test/endpoint")
@@ -14,6 +15,7 @@ def test_make_request_success(polygon_client):
 
 
 def test_make_request_401_raises(polygon_client):
+    """Ensure 401 responses raise a PolygonAPIError with details"""
     fake = canned_api_factory("empty", status=401)
     fake._payload = {"error": "Invalid API key"}
     with patch.object(polygon_client.session, "get", return_value=fake):
@@ -25,7 +27,7 @@ def test_make_request_401_raises(polygon_client):
 
 
 def test_make_request_rate_limit_retries(polygon_client):
-    # Simulate successive low-level HTTP responses so retry logic executes
+    """Simulate successive HTTP rate-limit responses to exercise retry logic"""
     r1 = canned_api_factory("empty", status=429)
     r2 = canned_api_factory("empty", status=429)
     r3 = canned_api_factory("empty", status=200)
@@ -44,6 +46,7 @@ def test_make_request_rate_limit_retries(polygon_client):
 
 
 def test_fetch_paginated_data_concatenates_pages(polygon_client):
+    """Confirm paginated pages are fetched and concatenated into a single list"""
     page1 = canned_api_factory("empty")
     page1._payload = {
         "results": [{"a": 1}],
@@ -63,6 +66,7 @@ def test_fetch_paginated_data_concatenates_pages(polygon_client):
 
 
 def test_api_key_passed_and_api_error_handled(polygon_client):
+    """Validate API key is sent and API error responses raise PolygonAPIError"""
     fake = canned_api_factory("empty", status=200)
     fake._payload = {"status": "ERROR", "error": "bad"}
 
@@ -78,7 +82,7 @@ def test_api_key_passed_and_api_error_handled(polygon_client):
 
 
 def test_make_request_500_retries_and_raises(polygon_client):
-    # Simulate server error response via patched _make_request
+    """Simulate server 500 error and ensure PolygonAPIError is raised after retries"""
     with patch(
         "src.data_collector.polygon_data.client.PolygonDataClient._make_request",
         side_effect=PolygonAPIError("Server error", status_code=500),
@@ -88,7 +92,7 @@ def test_make_request_500_retries_and_raises(polygon_client):
 
 
 def test_make_request_malformed_json(polygon_client):
-    # Mimic malformed JSON by having patched _make_request raise
+    """Mimic malformed JSON response and ensure PolygonAPIError is raised"""
     with patch(
         "src.data_collector.polygon_data.client.PolygonDataClient._make_request",
         side_effect=PolygonAPIError("Malformed JSON", status_code=200),
@@ -98,7 +102,7 @@ def test_make_request_malformed_json(polygon_client):
 
 
 def test_api_key_present_in_headers_local_client():
-    # Create a local client with the expected API key for this test
+    """Verify local client stores API key and _make_request is callable"""
     client = PolygonDataClient(api_key="MYKEY", requests_per_minute=100)
 
     # Patch at _make_request level and validate client attribute

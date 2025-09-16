@@ -31,6 +31,7 @@ class TestMLPScalerImplementation:
         self.predictor.model = self.predictor.model.to("cpu")
 
     def test_validate_and_clean_data_method(self):
+        """Clean and scale data removes NaNs/Infs and returns a scaler instance."""
         cleaned = MLPDataUtils.validate_and_clean_data(self.X_test)
         X_clean, scaler = MLPDataUtils.scale_data(cleaned, None, True)
         # Use pandas testing to ensure no NaNs or infinities remain
@@ -43,6 +44,7 @@ class TestMLPScalerImplementation:
             raise AssertionError("Scaler should be created during scale_data")
 
     def test_predictor_with_scaler(self):
+        """Set a fitted scaler on predictor and ensure predictions run with expected length."""
         cleaned = MLPDataUtils.validate_and_clean_data(self.X_test)
         X_clean, _ = MLPDataUtils.scale_data(cleaned, None, True)
         scaler = StandardScaler()

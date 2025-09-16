@@ -12,6 +12,7 @@ from src.data_utils.feature_engineering import (
 
 
 def test_add_price_normalized_features_creates_expected_columns(small_market_df):
+    """Produce normalized price features (SMA ratios, ATR ratios, BB outputs) as expected."""
     df = small_market_df.copy()
 
     out = add_price_normalized_features(df)
@@ -62,6 +63,7 @@ def test_add_price_normalized_features_creates_expected_columns(small_market_df)
 
 
 def test_add_prediction_bounds_features_computes_expected_values():
+    """Compute expected prediction-bound metrics including 10D move and RSI pressure."""
     df = pd.DataFrame(
         {
             "ATR_Percent": [0.01, 0.02],
@@ -96,6 +98,7 @@ def test_add_prediction_bounds_features_computes_expected_values():
 
 
 def test_clean_data_for_training_handles_infinite_and_nan_and_types():
+    """Clean numeric data: coerce types, remove NaNs, and make values finite."""
     df = pd.DataFrame(
         {
             "a": [1.0, np.inf, -np.inf, 1e40],
@@ -117,6 +120,7 @@ def test_clean_data_for_training_handles_infinite_and_nan_and_types():
 
 
 def test_add_date_features_creates_temporal_columns():
+    """Extract temporal features from date strings including year/month/quarter indicators."""
     df = pd.DataFrame({"date": ["2020-01-01", "2020-03-15"]})
     out = add_date_features(df, "date")
     expected = {

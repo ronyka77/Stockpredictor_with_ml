@@ -1,5 +1,5 @@
 def test_feature_calculator_integrates_components(mocker):
-    # Verifies FeatureCalculator integrates component calculators into combined result
+    """Verify FeatureCalculator merges component outputs into a combined result"""
     import pandas as pd
     from src.data_collector.indicator_pipeline.base import IndicatorResult
     from src.data_collector.indicator_pipeline.feature_calculator import (

@@ -44,6 +44,7 @@ def _make_ohlcv_dataframe(num_rows: int = 120) -> pd.DataFrame:
 
 @pytest.mark.unit
 def test_calculate_obv_success():
+    """Verify OBV calculation returns expected columns and metadata"""
     df = _make_ohlcv_dataframe(60)
     result = calculate_obv(df)
 
@@ -57,6 +58,7 @@ def test_calculate_obv_success():
 
 @pytest.mark.unit
 def test_calculate_vpt_success():
+    """Verify VPT calculation returns expected columns and metadata"""
     df = _make_ohlcv_dataframe(60)
     result = calculate_vpt(df)
 
@@ -69,6 +71,7 @@ def test_calculate_vpt_success():
 
 @pytest.mark.unit
 def test_calculate_ad_line_success():
+    """Verify Accumulation/Distribution line calculation produces expected results"""
     df = _make_ohlcv_dataframe(60)
     result = calculate_ad_line(df)
 
@@ -81,6 +84,7 @@ def test_calculate_ad_line_success():
 
 @pytest.mark.unit
 def test_calculate_volume_profile_success_and_features():
+    """Ensure volume profile calculates expected feature columns and metadata"""
     df = _make_ohlcv_dataframe(100)
     result = calculate_volume_profile(df)
 
@@ -121,6 +125,7 @@ def test_calculate_volume_profile_success_and_features():
 
 @pytest.mark.unit
 def test_calculate_volume_profile_raises_with_insufficient_rows():
+    """Raise ValueError when there are too few rows to compute volume profile"""
     df = _make_ohlcv_dataframe(5)
     with pytest.raises(
         ValueError, match="No Volume Profile indicators could be calculated"
@@ -130,6 +135,7 @@ def test_calculate_volume_profile_raises_with_insufficient_rows():
 
 @pytest.mark.unit
 def test_calculate_mfi_default_and_warnings():
+    """Check MFI default period behavior and warnings on insufficient data"""
     # Enough rows for default period
     df_ok = _make_ohlcv_dataframe(20)
     res_ok = calculate_money_flow_index(df_ok)
@@ -145,6 +151,7 @@ def test_calculate_mfi_default_and_warnings():
 
 @pytest.mark.unit
 def test_volume_indicator_calculator_combines_all():
+    """Combined calculator returns merged features and metadata summary"""
     df = _make_ohlcv_dataframe(120)
     calc = VolumeIndicatorCalculator(df)
     combined = calc.calculate()

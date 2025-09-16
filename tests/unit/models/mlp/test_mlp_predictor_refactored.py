@@ -28,6 +28,7 @@ class TestMLPPredictorRefactored:
         self.predictor.device = "cpu"
 
     def test_predict_uses_validate_and_clean_data(self):
+        """Ensure predictor calls validate_and_clean_data before predicting."""
         with patch(VALIDATE_PATH) as mock_validate:
             mock_validate.return_value = pd.DataFrame(
                 {

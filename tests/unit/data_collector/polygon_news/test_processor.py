@@ -5,6 +5,7 @@ from src.data_collector.polygon_news.processor import NewsProcessor
 
 @pytest.mark.unit
 def test_process_article_full(sample_raw_article_full, processed_article_expected):
+    """Process full raw article and normalize fields as expected"""
     proc = NewsProcessor()
     processed = proc.process_article(sample_raw_article_full)
 
@@ -18,6 +19,7 @@ def test_process_article_full(sample_raw_article_full, processed_article_expecte
 
 @pytest.mark.unit
 def test_process_article_missing_fields(sample_raw_article_missing):
+    """Handle missing fields by filling defaults (empty strings, empty lists)"""
     proc = NewsProcessor()
     processed = proc.process_article(sample_raw_article_missing)
 
@@ -30,6 +32,7 @@ def test_process_article_missing_fields(sample_raw_article_missing):
 
 @pytest.mark.unit
 def test_process_article_malformed_types_raises(sample_raw_article_malformed):
+    """Raise when article fields have malformed types that cannot be processed"""
     proc = NewsProcessor()
     with pytest.raises(Exception):
         proc.process_article(sample_raw_article_malformed)

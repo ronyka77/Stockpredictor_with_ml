@@ -4,12 +4,7 @@ from src.utils import logger as logger_mod
 
 
 def test_get_logger_creates_file(tmp_path: Path) -> None:
-    """Ensure the central Loguru-based logger creates a file sink for a utility.
-
-    The test temporarily points the logger's base logs directory at `tmp_path`,
-    obtains a bound logger, writes a message, shuts down sinks to flush queued
-    messages, and asserts that at least one log file was created.
-    """
+    """Ensure the central logger writes a log file sink for a bound utility logger."""
     old_base = logger_mod.LOGS_BASE_DIR
     logger_mod.LOGS_BASE_DIR = tmp_path
 

@@ -5,6 +5,7 @@ from src.data_collector.polygon_news.news_pipeline import PolygonNewsCollector
 
 @pytest.mark.unit
 def test_collect_historical_news_respects_batching(mocker):
+    """collect_historical_news respects batching and returns stats dict"""
     collector = PolygonNewsCollector()
 
     # Provide prioritized tickers with 2 major tickers
@@ -44,6 +45,7 @@ def test_collect_historical_news_respects_batching(mocker):
 
 @pytest.mark.unit
 def test_main_handles_missing_database_url(mocker, tmp_path):
+    """main() returns False when API key is missing from config"""
     # mocker config to have no API key
     import importlib
     import src.data_collector.polygon_news.news_pipeline as np_mod

@@ -1,6 +1,5 @@
 from src.data_collector.polygon_fundamentals.data_validator import (
     FundamentalDataValidator,
-    ValidationResult,
 )
 from src.data_collector.polygon_fundamentals.data_models import (
     FundamentalDataResponse,
@@ -19,6 +18,7 @@ def make_income_stmt(revenues=None, gross=None, cost=None):
 
 
 def test_validate_response_no_statements():
+    """Validator marks response without statements as invalid and records error"""
     validator = FundamentalDataValidator()
     resp = FundamentalDataResponse(status="OK")
     result = validator.validate_response(resp)
@@ -27,6 +27,7 @@ def test_validate_response_no_statements():
 
 
 def test_validate_income_statement_warnings_and_outliers():
+    """Validator detects warnings for negative revenues and outliers for extreme values"""
     validator = FundamentalDataValidator()
     # revenues negative should trigger warning; extremely high revenues trigger outlier
     stmt1 = make_income_stmt(revenues=-100, gross=50, cost=60)
@@ -38,6 +39,7 @@ def test_validate_income_statement_warnings_and_outliers():
     # validator reports warnings and outliers and records missing essential fields
     assert "Negative revenues in income statement" in result.warnings
     assert "Extremely high revenues" in result.outliers
-    assert any("income_statement.earnings_per_share_basic" in mf for mf in result.missing_fields)
-
-
+    assert any(
+        "income_statement.earnings_per_share_basic" in mf
+        for mf in result.missing_fields
+    )

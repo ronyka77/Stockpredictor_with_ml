@@ -7,6 +7,7 @@ from tests.unit.data_collector.polygon_news.helpers import make_raw_article
 
 @pytest.mark.unit
 def test__collect_ticker_news_no_raw_articles(mocker):
+    """When no raw articles are returned, _collect_ticker_news reports zero fetched"""
     collector = PolygonNewsCollector()
 
     # mocker client to return no articles
@@ -21,6 +22,7 @@ def test__collect_ticker_news_no_raw_articles(mocker):
 
 @pytest.mark.unit
 def test__collect_ticker_news_happy_flow(mocker, processed_article_expected):
+    """Happy flow collects, processes and stores articles and returns counts"""
     collector = PolygonNewsCollector()
     raw_articles = [make_raw_article({"id": "a1"})]
     mocker.patch.object(
@@ -53,6 +55,7 @@ def test__collect_ticker_news_happy_flow(mocker, processed_article_expected):
 
 @pytest.mark.unit
 def test__collect_ticker_news_skips_invalid(mocker, processed_article_expected):
+    """Skip invalid processed articles while storing valid ones in a batch"""
     collector = PolygonNewsCollector()
     raw_articles = [make_raw_article({"id": "a1"}), make_raw_article({"id": "a2"})]
     mocker.patch.object(
@@ -104,6 +107,7 @@ def test__collect_ticker_news_skips_invalid(mocker, processed_article_expected):
 
 @pytest.mark.unit
 def test__collect_ticker_news_processing_exception_per_article(mocker):
+    """Per-article processing exceptions are isolated and do not stop batch"""
     collector = PolygonNewsCollector()
     raw_articles = [make_raw_article({"id": "a1"}), make_raw_article({"id": "a2"})]
     mocker.patch.object(
@@ -146,6 +150,7 @@ def test__collect_ticker_news_processing_exception_per_article(mocker):
 
 @pytest.mark.unit
 def test_collect_targeted_news_happy_flow(mocker):
+    """Collect targeted news using ticker info and return aggregated stats"""
     collector = PolygonNewsCollector()
 
     # validate_ticker_list -> one valid
@@ -181,6 +186,7 @@ def test_collect_targeted_news_happy_flow(mocker):
 
 @pytest.mark.unit
 def test_get_collection_status_handles_healthy_and_error(mocker):
+    """Return collection status combining storage health and article stats; handle errors"""
     collector = PolygonNewsCollector()
 
     mocker.patch.object(
@@ -211,5 +217,6 @@ def test_get_collection_status_handles_healthy_and_error(mocker):
 
 @pytest.mark.unit
 def test_context_manager_enter_exit():
+    """Context manager yields a PolygonNewsCollector instance and exits cleanly"""
     with PolygonNewsCollector() as c:
         assert isinstance(c, PolygonNewsCollector)

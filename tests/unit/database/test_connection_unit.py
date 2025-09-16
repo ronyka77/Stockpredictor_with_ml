@@ -150,7 +150,7 @@ def test_connection_replaces_broken_conn_and_calls_putconn_close(patched_threade
     patched_threaded_pool.putconn.assert_any_call(good_conn)
 
 
-def test_fetch_and_execute_helpers_use_global_pool(monkeypatch):
+def test_fetch_and_execute_helpers_use_global_pool():
     # Build a dummy pool that yields a fake connection and cursor
     fake_conn = MagicMock()
     fake_cursor = MagicMock()
@@ -166,10 +166,7 @@ def test_fetch_and_execute_helpers_use_global_pool(monkeypatch):
         def connection(self):
             return conn_cm()
 
-    monkeypatch = patch(
-        "src.database.connection.get_global_pool", return_value=DummyPool()
-    )
-    with monkeypatch:
+    with patch("src.database.connection.get_global_pool", return_value=DummyPool()):
         from src.database import connection as conn_mod
 
         res_all = conn_mod.fetch_all("select 1")

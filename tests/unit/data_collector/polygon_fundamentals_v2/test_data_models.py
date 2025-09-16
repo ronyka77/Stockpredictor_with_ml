@@ -11,6 +11,7 @@ def make_financial_value(v=100.0):
 
 
 def test_extract_financial_value_dict_and_numeric_and_missing():
+    """Extract numeric values from nested dicts and handle missing keys"""
     data = {"revenues": {"value": 123.0}, "net": 50}
     if dm.extract_financial_value(data, "revenues") != 123.0:
         raise AssertionError("extract_financial_value failed for revenues")
@@ -23,6 +24,7 @@ def test_extract_financial_value_dict_and_numeric_and_missing():
 
 
 def test_safe_divide_and_growth_and_cagr():
+    """Test safe division, growth rate, and CAGR calculations including edge cases"""
     # safe_divide
     if dm.safe_divide(10, 2) != 5:
         raise AssertionError("safe_divide returned unexpected result")
@@ -53,6 +55,7 @@ def test_safe_divide_and_growth_and_cagr():
 
 
 def test_financial_statement_date_parsing_and_company_details():
+    """Parse date strings into date objects for statements and company details"""
     # Create statements with string dates to ensure field_validator parses them
     inc = dm.IncomeStatement(
         start_date="2020-01-01", filing_date="2021-03-01", fiscal_period="Q1"
@@ -74,6 +77,7 @@ def test_financial_statement_date_parsing_and_company_details():
 
 
 def test_fundamental_data_response_latest_and_by_period_and_quality():
+    """Validate selection of latest statements and calculation of data quality"""
     # Build several statements with filing_dates
     s1 = dm.IncomeStatement(filing_date="2020-01-01", fiscal_period="Q1")
     s2 = dm.IncomeStatement(filing_date="2021-01-01", fiscal_period="Q1")

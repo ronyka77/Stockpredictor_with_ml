@@ -6,6 +6,7 @@ import json
 
 @pytest.mark.unit
 def test_store_article_invalid_data_returns_none(sample_raw_article_missing):
+    """store_article returns None when input article data is invalid"""
     storage = PolygonNewsStorage()
     # missing required fields -> validate_article_data should reject
     result = storage.store_article(sample_raw_article_missing)
@@ -14,6 +15,7 @@ def test_store_article_invalid_data_returns_none(sample_raw_article_missing):
 
 @pytest.mark.unit
 def test_store_article_create_and_update_flow(mocker, sample_raw_article_full):
+    """Create new article then update same article; both paths return expected ids"""
     storage = PolygonNewsStorage()
 
     # Simulate successful DB insertion via run_in_transaction
@@ -35,6 +37,7 @@ def test_store_article_create_and_update_flow(mocker, sample_raw_article_full):
 def test_store_articles_batch_mixed(
     mocker, sample_raw_article_full, sample_raw_article_missing
 ):
+    """Batch storage handles mixture of valid and invalid articles appropriately"""
     storage = PolygonNewsStorage()
 
     # Ensure run_in_transaction returns an id for created articles

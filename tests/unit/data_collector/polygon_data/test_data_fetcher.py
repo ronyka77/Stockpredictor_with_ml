@@ -10,12 +10,11 @@ from src.data_collector.polygon_data.data_validator import (
 )
 from src.data_collector.polygon_data.client import PolygonDataClient
 from tests._fixtures import canned_api_factory
-from tests._fixtures.remote_api_responses import canned_api_factory
 from tests._fixtures.factories import polygon_payload_dict
 
 
 def test_get_historical_data_returns_empty_when_no_data(polygon_client):
-    """Return empty records and metrics when API returns no aggregates."""
+    """Return empty records and metrics when API returns no aggregates"""
     empty_resp = canned_api_factory("empty")
     with patch.object(
         PolygonDataClient,
@@ -32,7 +31,7 @@ def test_get_historical_data_returns_empty_when_no_data(polygon_client):
 
 
 def test_get_historical_data_validation_path(polygon_client):
-    """Use provided validator to transform raw API payload into validated records."""
+    """Use provided validator to transform raw API payload into validated records"""
     # use polygon_client fixture
 
     fake_validated = ["vrec1", "vrec2"]
@@ -58,7 +57,7 @@ def test_get_historical_data_validation_path(polygon_client):
 
 
 def test_get_historical_data_transform_without_validation(polygon_client):
-    """Transform raw polygon record into OHLCVRecord when validation is disabled."""
+    """Transform raw polygon record into OHLCVRecord when validation is disabled"""
     rec = polygon_payload_dict()
     resp = canned_api_factory("empty")
     resp._payload = {"results": [rec]}
@@ -78,7 +77,7 @@ def test_get_historical_data_transform_without_validation(polygon_client):
 
 
 def test_get_historical_data_raises_on_client_exception(polygon_client):
-    """Raise an exception when the underlying client fails during fetch."""
+    """Raise an exception when the underlying client fails during fetch"""
     with patch.object(
         PolygonDataClient, "get_aggregates", side_effect=Exception("API down")
     ):
@@ -88,7 +87,7 @@ def test_get_historical_data_raises_on_client_exception(polygon_client):
 
 
 def test_get_grouped_daily_data_without_validation(polygon_client):
-    """Return grouped OHLCVRecord objects without invoking validator."""
+    """Return grouped OHLCVRecord objects without invoking validator"""
     grouped_rec = polygon_payload_dict(T="AAA", o=1.0, h=2.0, l=0.5, c=1.5, v=200)
     resp = canned_api_factory("empty")
     resp._payload = {"results": [grouped_rec]}
@@ -105,7 +104,7 @@ def test_get_grouped_daily_data_without_validation(polygon_client):
 
 
 def test_get_bulk_historical_data_batches(polygon_client):
-    """Fetch multiple tickers in batches and return per-ticker results and metrics."""
+    """Fetch multiple tickers in batches and return per-ticker results and metrics"""
     rec = polygon_payload_dict()
     resp = canned_api_factory("empty")
     resp._payload = {"results": [rec]}
@@ -125,7 +124,7 @@ def test_get_bulk_historical_data_batches(polygon_client):
 
 
 def test_get_historical_data_no_data(polygon_client):
-    """Return no records and zero total_records when API returns empty results."""
+    """Return no records and zero total_records when API returns empty results"""
     empty_resp = canned_api_factory("empty")
     with patch.object(
         PolygonDataClient,
@@ -142,7 +141,7 @@ def test_get_historical_data_no_data(polygon_client):
 
 
 def test_get_historical_data_transforms_and_validates(polygon_client):
-    """Transform raw polygon records and report consistent quality metrics after validation."""
+    """Transform raw polygon records and report consistent quality metrics after validation"""
     # polygon-style records
     raw = [
         polygon_payload_dict(T=None, t=1577923200000, o=10, h=12, l=9, c=11, v=100),
@@ -164,7 +163,7 @@ def test_get_historical_data_transforms_and_validates(polygon_client):
 
 
 def test_get_grouped_daily_data(polygon_client):
-    """Fetch grouped daily data and return correctly keyed OHLCVRecord entries."""
+    """Fetch grouped daily data and return correctly keyed OHLCVRecord entries"""
     grouped = [
         {"T": "CCC", "t": 1577923200000, "o": 5, "h": 6, "l": 4, "c": 5, "v": 50},
     ]

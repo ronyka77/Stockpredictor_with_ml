@@ -68,6 +68,18 @@ def prepare_ml_data_for_training(
         combined_data, target_column = convert_absolute_to_percentage_returns(
             combined_data, prediction_horizon
         )
+        # Filter out extreme target values
+        valid_mask = (combined_data[target_column] <= 2.0) & (
+            combined_data[target_column] >= -0.7
+        )
+        original_rows = len(combined_data)
+        combined_data = combined_data[valid_mask]
+        filtered_rows = len(combined_data)
+
+        logger.info("🔍 Filtered extreme target values (>200% or <-70%)")
+        logger.info(
+            f"   Removed {original_rows - filtered_rows:,} rows ({((original_rows - filtered_rows) / original_rows) * 100:.1f}% of data)"
+        )
 
         # Extract percentage return targets (instead of absolute prices)
         y = combined_data[target_column].copy()
@@ -128,7 +140,6 @@ def prepare_ml_data_for_training(
 
         logger.info(f"✅ After target cleaning: {len(X_clean)} valid samples")
 
-        # Handle missing values in features
         # Replace infinite values with NaN first
         X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
 
@@ -171,12 +182,10 @@ def prepare_ml_data_for_training(
         test_dates = dates_clean[test_mask]
         train_dates = dates_clean[train_mask]
 
-        # Filter test set to include only Mondays and Fridays
+        # Filter test set to include only Fridays
         if not test_dates.empty:
-            logger.info("📅 Filtering test set to include only Mondays and Fridays.")
-            is_monday_or_friday = (test_dates.dt.dayofweek == 0) | (
-                test_dates.dt.dayofweek == 4
-            )
+            logger.info("📅 Filtering test set to include only Fridays.")
+            is_monday_or_friday = test_dates.dt.dayofweek == 4
 
             X_test = X_test[is_monday_or_friday]
             y_test = y_test[is_monday_or_friday]
@@ -185,34 +194,14 @@ def prepare_ml_data_for_training(
             test_dates = test_dates[is_monday_or_friday]
 
         if not train_dates.empty and filter_train_set:
-            logger.info("📅 Filtering train set to include only Mondays and Fridays.")
-            is_monday_or_friday = (train_dates.dt.dayofweek == 0) | (
-                train_dates.dt.dayofweek == 4
-            )
+            logger.info("📅 Filtering train set to include only Fridays.")
+            is_monday_or_friday = train_dates.dt.dayofweek == 4
 
             X_train = X_train[is_monday_or_friday]
             y_train = y_train[is_monday_or_friday]
 
             # Update train_dates to reflect the change for logging and further processing
             train_dates = train_dates[is_monday_or_friday]
-
-        # Reserve last 3 days of test data for unseen prediction
-        # if not test_dates.empty:
-        #     original_test_size = len(X_test)
-        #     max_test_date = test_dates.max()
-        #     holdout_cutoff_date = max_test_date
-
-        #     # Create a mask to select rows for the new, smaller test set
-        #     final_test_selection_mask = test_dates <= holdout_cutoff_date
-
-        #     X_test = X_test[final_test_selection_mask]
-        #     y_test = y_test[final_test_selection_mask]
-
-        #     # Update test_dates to reflect the change for logging
-        #     test_dates = test_dates[final_test_selection_mask]
-
-        #     logger.info("🔪 Reserving last 3 days of test data for unseen prediction.")
-        #     logger.info(f"   (Removed {original_test_size - len(X_test)} samples)")
 
         # Get date ranges for logging
         train_date_range = (
@@ -364,20 +353,16 @@ def prepare_ml_data_for_prediction(
         X_test = X[test_mask].copy()
         y_test = y[test_mask].copy()
 
-        # Filter prediction set to include only Mondays and Fridays
+        # Filter prediction set to include only Fridays
         test_dates_for_pred = date_col[test_mask]
         if not test_dates_for_pred.empty:
-            logger.info(
-                "📅 Filtering prediction set to include only Mondays and Fridays."
-            )
-            is_monday_or_friday_pred = (test_dates_for_pred.dt.dayofweek == 0) | (
-                test_dates_for_pred.dt.dayofweek == 4
-            )
+            logger.info("📅 Filtering prediction set to include only Fridays.")
+            is_monday_or_friday_pred = test_dates_for_pred.dt.dayofweek == 4
 
             X_test = X_test[is_monday_or_friday_pred]
             y_test = y_test[is_monday_or_friday_pred]
 
-            # Get the original indices that correspond to mondays/fridays
+            # Get the original indices that correspond to fridays
             true_indices = test_dates_for_pred[is_monday_or_friday_pred].index
             final_mask = date_col.index.isin(true_indices)
             test_mask = test_mask & final_mask

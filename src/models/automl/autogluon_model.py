@@ -109,11 +109,11 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             valid_df[label] = y_val.values
 
         hyperparams = {
-            # "FASTAI": {},
-            "GBM": {"verbosity": -1},
-            "XGB": {"verbosity": 0},
+            "FASTAI": {},
+            "GBM": {},
+            "XGB": {},
             # "TABM": {},
-            "RF": {"verbose": 0},
+            # "RF": {"verbose": 0},
             # "CAT": {'task_type': 'GPU'}
             # "REALMLP": {},
         }
@@ -138,8 +138,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             num_stack_levels=2,
             num_bag_folds=4,
             use_bag_holdout=True,
-            fit_strategy="sequential",
-            ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+            fit_strategy="parallel",
+            ag_args_ensemble={"fold_fitting_strategy": "parallel_local"},
         )
         summary = self.predictor.fit_summary(show_plot=True)
         logger.info(summary)

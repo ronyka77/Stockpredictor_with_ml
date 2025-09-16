@@ -114,7 +114,6 @@ class NewsTickerIntegration:
         self,
         max_tickers: int = 100,
         include_etfs: bool = True,
-        market_cap_min: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Get prioritized list of tickers for news collection
@@ -122,7 +121,6 @@ class NewsTickerIntegration:
         Args:
             max_tickers: Maximum number of tickers to return
             include_etfs: Whether to include ETFs
-            market_cap_min: Minimum market cap filter (in billions)
 
         Returns:
             List of ticker dictionaries with priority information
@@ -130,7 +128,7 @@ class NewsTickerIntegration:
         if self.ticker_manager:
             try:
                 return self._get_tickers_from_manager(
-                    max_tickers, include_etfs, market_cap_min
+                    max_tickers, include_etfs
                 )
             except Exception as e:
                 self.logger.warning(f"Failed to get tickers from manager: {e}")
@@ -140,12 +138,12 @@ class NewsTickerIntegration:
             return self._get_fallback_tickers(max_tickers, include_etfs)
 
     def _get_tickers_from_manager(
-        self, max_tickers: int, include_etfs: bool, market_cap_min: Optional[float]
+        self, max_tickers: int, include_etfs: bool
     ) -> List[Dict[str, Any]]:
         """Get tickers from the ticker manager with prioritization"""
         try:
             # Get active tickers from manager
-            active_tickers = self.ticker_manager.get_active_tickers()
+            active_tickers = self.ticker_manager.storage.get_tickers()
 
             prioritized_tickers = []
 
@@ -155,17 +153,13 @@ class NewsTickerIntegration:
                 avg_volume = ticker_info.get("avg_volume", 0)
                 sector = ticker_info.get("sector", "")
 
-                # Apply market cap filter
-                if market_cap_min and market_cap < market_cap_min * 1e9:
-                    continue
-
                 # Skip ETFs if not requested
                 if not include_etfs and self._is_etf(ticker):
                     continue
 
                 # Calculate priority score
                 priority_score = self._calculate_priority_score(
-                    market_cap, avg_volume, sector, ticker
+                    market_cap, avg_volume
                 )
 
                 prioritized_tickers.append(
@@ -176,7 +170,7 @@ class NewsTickerIntegration:
                         "avg_volume": avg_volume,
                         "sector": sector,
                         "is_major": ticker in self.fallback_major_tickers,
-                        "category": self._categorize_ticker(ticker, sector, market_cap),
+                        "category": self._categorize_ticker(ticker, market_cap),
                     }
                 )
 
@@ -212,25 +206,6 @@ class NewsTickerIntegration:
                 }
             )
 
-        # Add growth tickers if we need more
-        if len(fallback_tickers) < max_tickers:
-            for i, ticker in enumerate(self.fallback_growth_tickers):
-                if len(fallback_tickers) >= max_tickers:
-                    break
-
-                if ticker not in [t["ticker"] for t in fallback_tickers]:
-                    fallback_tickers.append(
-                        {
-                            "ticker": ticker,
-                            "priority_score": 50 - i,
-                            "market_cap": None,
-                            "avg_volume": None,
-                            "sector": "Technology",
-                            "is_major": False,
-                            "category": "growth",
-                        }
-                    )
-
         # Add value tickers if we still need more
         if len(fallback_tickers) < max_tickers:
             for i, ticker in enumerate(self.fallback_value_tickers):
@@ -253,7 +228,7 @@ class NewsTickerIntegration:
         return fallback_tickers[:max_tickers]
 
     def _calculate_priority_score(
-        self, market_cap: float, avg_volume: float, sector: str, ticker: str
+        self, market_cap: float, avg_volume: float
     ) -> float:
         """
         Calculate priority score for news collection
@@ -294,13 +269,11 @@ class NewsTickerIntegration:
         return score
 
     def _categorize_ticker(
-        self, ticker: str, sector: str, market_cap: Optional[float]
+        self, ticker: str, market_cap: Optional[float]
     ) -> str:
         """Categorize ticker for news collection strategy"""
         if ticker in self.fallback_major_tickers:
             return "major"
-        elif ticker in self.fallback_growth_tickers:
-            return "growth"
         elif ticker in self.fallback_value_tickers:
             return "value"
         elif self._is_etf(ticker):

@@ -6,6 +6,7 @@ from src.utils.cleaned_data_cache import CleanedDataCache
 
 
 def test_cleaned_data_cache_basic(tmp_path):
+    """Basic set/get roundtrip for CleanedDataCache stores and retrieves DataFrame."""
     cache = CleanedDataCache(cache_dir=tmp_path)
     df = pd.DataFrame({"a": [1, 2, 3]})
     cache.set("test_key", df)
@@ -16,6 +17,7 @@ def test_cleaned_data_cache_basic(tmp_path):
 
 @pytest.mark.unit
 def test_cache_key_and_roundtrip(tmp_path):
+    """Generate a cache key, save cleaned data payload, and verify roundtrip behavior."""
     cache_dir = tmp_path / "cache"
     c = CleanedDataCache(cache_dir=str(cache_dir))
 
@@ -57,6 +59,7 @@ def test_cache_key_and_roundtrip(tmp_path):
 
 @pytest.mark.unit
 def test_clear_cache(tmp_path):
+    """Clear the cache directory and ensure temporary contents are removed."""
     c = CleanedDataCache(cache_dir=str(tmp_path))
     key = c._generate_cache_key(a=1)
     # create dummy info file to simulate existence

@@ -17,6 +17,7 @@ def create_dataloader(X, y, batch_size=16):
 
 
 def test_basic_training():
+    """Train MLPPredictor on dummy data and assert prediction dimensionality."""
     config = {
         "input_size": 10,
         "layer_sizes": [64, 32],

@@ -43,6 +43,7 @@ def test_add_price_normalized_features_schema_and_values():
 
 
 def test_add_prediction_bounds_features_expected_columns_and_values():
+    """Check that prediction bounds features are added with correct values."""
     df = pd.DataFrame(
         {
             "ATR_Percent": pd.Series([0.02, 0.04], dtype="float64"),
@@ -71,6 +72,7 @@ def test_add_prediction_bounds_features_expected_columns_and_values():
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
+    """Ensure cleaning coerces numeric dtypes, handles infinities, and removes NaNs."""
     big = np.finfo(np.float32).max * 100.0
     df = pd.DataFrame(
         {
@@ -99,6 +101,7 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
 
 
 def test_add_date_features_creates_expected_columns():
+    """Add temporal features from a date column and verify expected fields."""
     dates = pd.to_datetime(pd.Series(["2025-03-01", "2025-03-02"]))
     df = pd.DataFrame({"date": dates, "close": [1.0, 2.0]})
 

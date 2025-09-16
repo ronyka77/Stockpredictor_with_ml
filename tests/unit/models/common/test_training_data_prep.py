@@ -6,8 +6,10 @@ from src.models.common.training_data_prep import prepare_common_training_data
 
 
 def _make_sample_data():
-    idx = pd.RangeIndex(0, 100)
-    X = pd.DataFrame({"f1": np.linspace(0, 1, 100), "date_int": np.repeat(np.arange(20), 5)})
+    pd.RangeIndex(0, 100)
+    X = pd.DataFrame(
+        {"f1": np.linspace(0, 1, 100), "date_int": np.repeat(np.arange(20), 5)}
+    )
     y = pd.Series(np.linspace(-1, 1, 100))
     # split
     X_train = X.iloc[:80].reset_index(drop=True)
@@ -26,10 +28,16 @@ def _make_sample_data():
 
 
 def test_prepare_common_training_data_outlier_and_date_filtering():
+    """Verify prepare_common_training_data applies outlier and date filtering correctly."""
     sample = _make_sample_data()
 
-    with patch("src.models.common.training_data_prep.prepare_ml_data_for_training_with_cleaning", return_value=sample):
-        res = prepare_common_training_data(prediction_horizon=1, outlier_quantiles=(0.0, 1.0), recent_date_int_cut=2)
+    with patch(
+        "src.models.common.training_data_prep.prepare_ml_data_for_training_with_cleaning",
+        return_value=sample,
+    ):
+        res = prepare_common_training_data(
+            prediction_horizon=1, outlier_quantiles=(0.0, 1.0), recent_date_int_cut=2
+        )
         # Since outlier_quantiles include full range, lengths should match original splits after cleaning
         assert "X_train" in res and "X_test" in res
         assert res["X_train"].shape[0] <= 80

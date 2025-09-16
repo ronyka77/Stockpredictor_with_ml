@@ -6,6 +6,7 @@ import pytest
 
 @pytest.mark.unit
 def test_main_returns_none_when_no_available_tickers():
+    """Return None when there are no tickers to consolidate"""
     from src.data_collector.indicator_pipeline import consolidate_features as mod
 
     fake_storage = MagicMock()
@@ -23,6 +24,7 @@ def test_main_returns_none_when_no_available_tickers():
 
 @pytest.mark.unit
 def test_main_success_with_sampling_and_consolidation():
+    """Ensure consolidation returns expected file summary when sampling succeeds"""
     from src.data_collector.indicator_pipeline import consolidate_features as mod
 
     # Prepare fake storage with 3 tickers; one load raises to hit warning path
@@ -73,6 +75,7 @@ def test_main_success_with_sampling_and_consolidation():
 
 @pytest.mark.unit
 def test_main_handles_consolidation_exception_and_returns_none():
+    """Swallow consolidation exceptions and return None to indicate failure"""
     from src.data_collector.indicator_pipeline import consolidate_features as mod
 
     fake_storage = MagicMock()

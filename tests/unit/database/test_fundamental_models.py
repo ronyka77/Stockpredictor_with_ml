@@ -29,7 +29,7 @@ def db_session_mock():
 def test_get_latest_fundamental_data_various_combinations(
     db_session_mock, has_growth, has_scores, has_sector
 ):
-    # Setup: create model instances or None depending on parameters
+    """Return latest fundamental data combining optional growth/scores/sector sections"""
     ratios = FundamentalRatiosFactory.build(ticker="AAPL", date=date(2025, 1, 1))
     growth = (
         FundamentalGrowthMetricsFactory.build(ticker="AAPL", date=date(2025, 1, 1))
@@ -85,7 +85,7 @@ def test_get_latest_fundamental_data_various_combinations(
 
 
 def test_get_fundamental_data_by_date_returns_none_when_no_ratios(db_session_mock):
-    # Setup
+    """Return None when no ratios exist for given date"""
     db_session_mock.query.return_value.filter_by.return_value.first.return_value = None
 
     # Execution
@@ -100,7 +100,7 @@ def test_get_fundamental_data_by_date_returns_none_when_no_ratios(db_session_moc
 def test_get_fundamental_data_by_date_returns_all_sections_when_present(
     db_session_mock,
 ):
-    # Setup
+    """Return all fundamental sections when ratios, growth, scores and sector present"""
     target = date(2025, 6, 30)
     ratios = FundamentalRatiosFactory.build(ticker="MSFT", date=target)
     growth = FundamentalGrowthMetricsFactory.build(ticker="MSFT", date=target)
@@ -130,7 +130,7 @@ def test_get_fundamental_data_by_date_returns_all_sections_when_present(
 
 
 def test_get_sector_companies_returns_list(db_session_mock):
-    # Setup
+    """Return list of FundamentalSectorAnalysis items for a sector and date"""
     target = date(2025, 1, 1)
     items = [
         build_fundamental_sector.build(gics_sector="Tech", date=target)
@@ -157,7 +157,7 @@ def test_get_sector_companies_returns_list(db_session_mock):
     ],
 )
 def test_calculate_data_quality_score_variants(missing, total, expected):
-    # Execution
+    """Calculate data quality score for various missing/total combinations"""
     result = fm.calculate_data_quality_score(missing, total)
 
     # Verification

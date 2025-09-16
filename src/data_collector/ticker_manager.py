@@ -31,30 +31,6 @@ class TickerManager:
         self.storage = storage or DataStorage()
         self.validator = DataValidator(strict_mode=False)
 
-    def get_all_active_tickers(self, market: str = "stocks") -> List[str]:
-        """
-        Get all active stock tickers from database
-
-        Args:
-            market: Market type (stocks, crypto, fx, etc.)
-
-        Returns:
-            List of active ticker symbols
-        """
-        try:
-            db_tickers = self.storage.get_ticker_symbols(market=market, active=True)
-            if db_tickers:
-                logger.info(
-                    f"Retrieved {len(db_tickers)} {market} tickers from database"
-                )
-                return db_tickers
-        except Exception as e:
-            logger.error(f"Failed to get tickers from database: {e}")
-            raise
-
-        logger.warning(f"No {market} tickers found in database")
-        return []
-
     def get_ticker_details(self, ticker: str) -> Optional[Dict]:
         """
         Get detailed information about a specific ticker from database
@@ -86,6 +62,33 @@ class TickerManager:
             logger.error(f"Failed to get ticker details from database: {e}")
 
         logger.warning(f"No details found for ticker {ticker}")
+        return None
+
+    def resolve_ticker_to_id(self, ticker: str) -> Optional[int]:
+        """
+        Resolve a ticker symbol to its database `id` in the `tickers` table.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Integer `id` of the ticker if found, otherwise None
+        """
+        if not ticker:
+            logger.warning("resolve_ticker_to_id called with empty ticker")
+            return None
+
+        try:
+            
+            storage_tickers = self.storage.get_tickers(ticker)
+
+            if storage_tickers:
+                return storage_tickers[0]["id"]
+
+        except Exception as e:
+            logger.error(f"Failed to resolve ticker to id for {ticker}: {e}")
+
+        logger.warning(f"Ticker id not found for {ticker}")
         return None
 
     def refresh_ticker_details(
@@ -198,7 +201,7 @@ def main():
         ticker_manager = TickerManager(client, storage)
 
         ticker_manager.refresh_ticker_details(
-            tickers=ticker_manager.get_all_active_tickers(market="stocks"),
+            tickers=ticker_manager.storage.get_tickers(),
             batch_size=50,
         )
 

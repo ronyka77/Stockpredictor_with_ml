@@ -96,9 +96,7 @@ class OptimizedFundamentalCollector:
             logger.info("Loading ticker metadata into cache...")
 
             # Get tickers from database using DataStorage
-            tickers_data = self.data_storage.get_tickers(
-                market="stocks", active=True, limit=None
-            )
+            tickers_data = self.data_storage.get_tickers()
 
             if tickers_data:
                 ticker_cache = {}

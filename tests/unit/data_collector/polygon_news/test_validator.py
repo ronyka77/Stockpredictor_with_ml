@@ -6,6 +6,7 @@ from src.data_collector.polygon_news.validator import NewsValidator
 
 @pytest.mark.unit
 def test_validate_article_returns_true_for_complete_article(processed_article_expected):
+    """Validator returns True and reasonable score for complete article payload"""
     v = NewsValidator()
     is_valid, score, issues = v.validate_article(processed_article_expected)
     if is_valid is not True:
@@ -22,6 +23,7 @@ def test_validate_article_returns_true_for_complete_article(processed_article_ex
 
 @pytest.mark.unit
 def test_validate_article_detects_missing_required_fields(processed_article_expected):
+    """Detect missing required fields and report them in issues list"""
     v = NewsValidator()
     article = processed_article_expected.copy()
     article.pop("polygon_id", None)
@@ -34,6 +36,7 @@ def test_validate_article_detects_missing_required_fields(processed_article_expe
 
 @pytest.mark.unit
 def test_validate_article_scores_length_and_source(processed_article_expected):
+    """Short titles and poor source evidence reduce quality score and add issues"""
     v = NewsValidator()
     article = processed_article_expected.copy()
     article["title"] = "Short"
@@ -47,6 +50,7 @@ def test_validate_article_scores_length_and_source(processed_article_expected):
 
 @pytest.mark.unit
 def test_validate_article_handles_old_and_future_dates(processed_article_expected):
+    """Penalize articles with very old or future publication dates"""
     v = NewsValidator()
     article = processed_article_expected.copy()
     # Old date

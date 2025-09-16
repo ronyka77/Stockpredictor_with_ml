@@ -12,6 +12,7 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
     ["relu", "leaky_relu", "elu", "gelu"],
 )
 def test_activation_output_shape(activation):
+    """Ensure activations produce consistent output shape for MLPModule."""
     input_size = 5
     layer_sizes = [10, 5]
     batch_size = 8
@@ -29,6 +30,7 @@ def test_activation_output_shape(activation):
 
 
 def test_residual_and_architecture_info():
+    """Validate residual architecture forward pass and returned architecture info."""
     input_size = 6
     layer_sizes = [6, 4]
     model = MLPModule(
@@ -53,6 +55,7 @@ def test_residual_and_architecture_info():
 
 
 def test_invalid_configurations_raise():
+    """Invalid MLP configurations should raise ValueError during construction."""
     with pytest.raises(ValueError):
         MLPModule(input_size=10, layer_sizes=[], output_size=1)
 
@@ -61,6 +64,7 @@ def test_invalid_configurations_raise():
 
 
 def test_predictor_create_model_and_predict_raises_for_untrained():
+    """Create predictor model and ensure predict raises when untrained."""
     cfg = {"input_size": 10, "layer_sizes": [32, 16], "epochs": 1}
     predictor = MLPPredictor(model_name="t", config=cfg)
     model = predictor._create_model()

@@ -767,10 +767,6 @@ class MLPPredictor(PyTorchBasePredictor):
 
         return predictions_np
 
-    def get_training_history(self) -> dict:
-        """Return the training history dictionary."""
-        return getattr(self, "training_history", {})
-
     def get_prediction_confidence(
         self, X: pd.DataFrame, method: str = "variance"
     ) -> np.ndarray:

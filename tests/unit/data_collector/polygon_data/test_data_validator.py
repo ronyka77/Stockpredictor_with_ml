@@ -10,6 +10,7 @@ from tests._fixtures.factories import (
 
 
 def test_ohlcv_record_valid_and_invalid():
+    """Validate OHLCVRecord accepts valid input and rejects invalid ranges"""
     rec = OHLCVRecordFactory.build(
         ticker="aapl",
         timestamp="2020-01-02",
@@ -31,6 +32,7 @@ def test_ohlcv_record_valid_and_invalid():
 
 
 def test_vwap_fallback_on_invalid_vwap(caplog):
+    """Ensure invalid VWAP is replaced by computed fallback value"""
     data = {
         "ticker": "msft",
         "timestamp": "2020-01-02",

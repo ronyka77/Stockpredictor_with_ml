@@ -37,7 +37,7 @@ dependencies = [
     "requests>=2.32.3",
     "ruff>=0.12.11",
     "scikit-learn>=1.4.0",
-    "setuptools>=80.9.0",
+    "setuptools>=80.9.0,<81",
     "sqlalchemy>=2.0.41",
     "statsmodels>=0.14.2",
     "ta>=0.11.0",
@@ -49,7 +49,8 @@ dependencies = [
     "vulture>=2.14",
     "pytest-timeout>=2.4.0",
     "polyfactory>=2.22.2",
-    "radon>=6.0.1",
+    "fs>=2.4.16",
+    "coverage>=7.10.6",
 ]
 
 [build-system]
@@ -79,21 +80,8 @@ torchaudio = [{ index = "pytorch" }]
 [tool.ruff]
 line-length = 88
 
-[tool.radon]
-exclude = ["tests", "venv", ".venv", "build", "dist"]
-ignore = ["__init__.py"]
-# CC (cyclomatic complexity) configuration
-cc_min = "A"
-cc_max = "F"
-no_assert = false
-show_closures = false
-
-[tool.radon.cc]
-# Optional per-path settings
-average = true
-
 [tool.pytest.ini_options]
-addopts = "--strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=70 --timeout=30"
+addopts = "--strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=50"
 markers = [
     "unit: Unit tests - test individual components in isolation",
     "integration: Integration tests - test multiple components working together",

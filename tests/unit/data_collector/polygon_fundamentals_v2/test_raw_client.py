@@ -1,9 +1,11 @@
 import asyncio
-from unittest import mock
+from unittest.mock import patch, AsyncMock
 
 import pytest
 
-from src.data_collector.polygon_fundamentals_v2.raw_client import RawPolygonFundamentalsClient
+from src.data_collector.polygon_fundamentals_v2.raw_client import (
+    RawPolygonFundamentalsClient,
+)
 from src.data_collector.polygon_fundamentals import config as pf_config
 
 
@@ -49,65 +51,65 @@ class _FakeRateLimiter:
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
-def test_get_financials_raw_success(monkeypatch):
+def test_get_financials_raw_success():
+    """Successfully fetch raw financials and return parsed JSON payload"""
     # Setup
     pf_config.polygon_fundamentals_config.API_KEY = "testkey"
     payload = {"status": "OK", "results": []}
 
     fake_session = _FakeSession([_FakeResp(200, payload)])
 
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **k: fake_session)
-    monkeypatch.setattr(
+    with patch("aiohttp.ClientSession", lambda *a, **k: fake_session), patch(
         "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
         _FakeRateLimiter,
-    )
+    ):
 
-    # Execution
-    async def _call():
-        async with RawPolygonFundamentalsClient() as client:
-            return await client.get_financials_raw("TST")
+        # Execution
+        async def _call():
+            async with RawPolygonFundamentalsClient() as client:
+                return await client.get_financials_raw("TST")
 
-    res = _run(_call())
+        res = _run(_call())
 
     # Verification
     assert isinstance(res, dict)
     assert res["status"] == "OK"
 
 
-def test_get_financials_raw_rate_limit_retry(monkeypatch):
+def test_get_financials_raw_rate_limit_retry():
+    """Retry on 429 responses and succeed when service returns 200"""
     # Setup: first two responses 429 then 200
     pf_config.polygon_fundamentals_config.API_KEY = "testkey"
     payload_ok = {"status": "OK"}
 
-    fake_session = _FakeSession([
-        _FakeResp(429, {}),
-        _FakeResp(429, {}),
-        _FakeResp(200, payload_ok),
-    ])
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **k: fake_session)
-    monkeypatch.setattr(
-        "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
-        _FakeRateLimiter,
+    fake_session = _FakeSession(
+        [
+            _FakeResp(429, {}),
+            _FakeResp(429, {}),
+            _FakeResp(200, payload_ok),
+        ]
     )
 
-    # Prevent real asyncio.sleep delays
-    async def _nosleep(*args, **kwargs):
-        return None
+    with patch("aiohttp.ClientSession", lambda *a, **k: fake_session), patch(
+        "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
+        _FakeRateLimiter,
+    ), patch("asyncio.sleep", new=AsyncMock(return_value=None)):
 
-    monkeypatch.setattr("asyncio.sleep", _nosleep)
+        # Execution
+        async def _call():
+            async with RawPolygonFundamentalsClient() as client:
+                return await client.get_financials_raw("TST")
 
-    # Execution
-    async def _call():
-        async with RawPolygonFundamentalsClient() as client:
-            return await client.get_financials_raw("TST")
-
-    res = _run(_call())
+        res = _run(_call())
 
     # Verification
     assert res["status"] == "OK"
 
-
+def test_get_financials_raw_raises_on_no_session():
+    """Internal _get should raise when no aiohttp session is available"""
+    client = RawPolygonFundamentalsClient()
+    with pytest.raises(RuntimeError):
+        _run(client._get("http://example.com", {}))

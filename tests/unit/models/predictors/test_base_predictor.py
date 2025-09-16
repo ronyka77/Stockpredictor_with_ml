@@ -1,7 +1,6 @@
-import os
 import pandas as pd
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.models.predictors.base_predictor import BasePredictor
 
@@ -12,17 +11,27 @@ class DummyPredictor(BasePredictor):
 
 
 def _make_features_and_targets(n=5):
-    features = pd.DataFrame({"close": np.linspace(10, 15, n), "date_int": np.arange(n), "ticker_id": np.arange(n)})
+    features = pd.DataFrame(
+        {
+            "close": np.linspace(10, 15, n),
+            "date_int": np.arange(n),
+            "ticker_id": np.arange(n),
+        }
+    )
     targets = pd.Series(np.linspace(0.1, 0.5, n))
     return features, targets
 
 
 def test_load_recent_data_calls_pipeline_and_returns_dfs():
+    """Call prediction pipeline to load recent data and return features and metadata DataFrames."""
     features, targets = _make_features_and_targets(6)
     fake_result = {"X_test": features, "y_test": targets}
 
     dp = DummyPredictor(run_id="r1", model_type="test")
-    with patch("src.models.predictors.base_predictor.prepare_ml_data_for_prediction_with_cleaning", return_value=fake_result) as mock_pipe:
+    with patch(
+        "src.models.predictors.base_predictor.prepare_ml_data_for_prediction_with_cleaning",
+        return_value=fake_result,
+    ) as mock_pipe:
         X, meta = dp.load_recent_data(days_back=7)
         mock_pipe.assert_called_once()
         assert isinstance(X, pd.DataFrame)
@@ -30,6 +39,7 @@ def test_load_recent_data_calls_pipeline_and_returns_dfs():
 
 
 def test_save_predictions_to_excel_writes_file(tmp_path):
+    """Save predictions to excel and return file path or None without raising."""
     dp = DummyPredictor(run_id="r2", model_type="testtype")
     features, targets = _make_features_and_targets(3)
     metadata = pd.DataFrame({"target_values": targets.values})

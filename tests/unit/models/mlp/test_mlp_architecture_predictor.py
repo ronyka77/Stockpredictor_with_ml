@@ -8,7 +8,7 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
 
 def test_mlp_forward_and_architecture_info():
-    # Small MLP for testing
+    """Run forward pass and validate architecture info and input handling."""
     input_size = 5
     layer_sizes = [4, 3]
     output_size = 2
@@ -42,7 +42,7 @@ def test_mlp_forward_and_architecture_info():
 
 
 def test_mlppredictor_fit_predict_and_confidence(tmp_path):
-    # Create tiny synthetic dataset
+    """Fit MLPPredictor for one epoch and verify predictions plus confidence outputs."""
     n_samples = 10
     n_features = 3
     # use local RNG to avoid global state

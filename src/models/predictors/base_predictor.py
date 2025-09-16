@@ -336,9 +336,8 @@ class BasePredictor(ABC):
             return pd.DataFrame()
         else:
             results_df = (
-                results_df.sort_values(
-                    ["date", "confidence_score"], ascending=[True, False]
-                )
+                results_df[results_df["predicted_return"] > 0]
+                .sort_values(["date", "confidence_score"], ascending=[True, False])
                 .groupby("date")
                 .head(10)
                 .reset_index(drop=True)
@@ -385,7 +384,7 @@ class BasePredictor(ABC):
         avg_profit_per_investment = (
             float(valid_profit_df["profit_100_investment"].mean())
             if not valid_profit_df.empty
-            else float("nan")
+            else 0
         )
         valid_profit_count = valid_profit_df.shape[0]
         logger.info(
@@ -395,33 +394,36 @@ class BasePredictor(ABC):
         # 4a) Weekday-specific profit aggregates (Friday and Monday)
         if not valid_profit_df.empty:
             friday_mask = results_df["day_of_week"] == "Friday"
-            monday_mask = results_df["day_of_week"] == "Monday"
+            # monday_mask = results_df["day_of_week"] == "Monday"
+            # monday_df = valid_profit_df[monday_mask]
+            # monday_avg_profit = (
+            #     float(monday_df["profit_100_investment"].mean())
+            #     if not monday_df.empty
+            #     else 0
+            # )
 
             friday_df = valid_profit_df[friday_mask]
-            monday_df = valid_profit_df[monday_mask]
 
             friday_avg_profit = (
                 float(friday_df["profit_100_investment"].mean())
                 if not friday_df.empty
-                else float("nan")
-            )
-            monday_avg_profit = (
-                float(monday_df["profit_100_investment"].mean())
-                if not monday_df.empty
-                else float("nan")
+                else 0
             )
 
             logger.info(
                 f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
             )
-            logger.info(
-                f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
-            )
-        if friday_avg_profit > 5 or monday_avg_profit > 5:
-            return results_df
-        else:
-            logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-            return pd.DataFrame()
+            # logger.info(
+            #     f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
+            # )
+            if friday_avg_profit > 10:
+                return results_df
+            else:
+                logger.warning("   ⚠️  WARNING: No predictions should be exported!")
+                return pd.DataFrame()
+
+        logger.warning("   ⚠️  WARNING: No predictions should be exported!")
+        return pd.DataFrame()
 
     def evaluate_on_recent_data(
         self, days_back: int = 30

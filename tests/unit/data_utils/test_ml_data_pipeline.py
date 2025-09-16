@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -36,8 +35,8 @@ def sample_combined_data() -> pd.DataFrame:
 def _fake_convert_absolute_to_percentage_returns(df: pd.DataFrame, horizon: int):
     df2 = df.copy()
     col = f"target_{horizon}d"
-    # deterministic target: increasing sequence
-    df2[col] = np.arange(len(df2), dtype=float)
+    # deterministic small returns that pass pipeline filtering (-0.7 .. 2.0)
+    df2[col] = np.linspace(0.0, 1.0, len(df2), dtype=float)
     return df2, col
 
 
@@ -80,14 +79,7 @@ def test_prepare_ml_data_for_training_splits_and_filters(
     _add_price,
     sample_combined_data,
 ):
-    """
-    Setup: Provide a deterministic combined dataset and stub out heavy transformations.
-
-    Execution: Call `prepare_ml_data_for_training` and let the function perform splits.
-
-    Verification: Ensure returned dict contains expected keys, non-empty train/test,
-    and that day-of-week filtering kept only Mondays and Fridays where applicable.
-    """
+    """Verify training data is prepared, split, and filtered to expected weekdays."""
 
     # Arrange
     mock_load_all_data.return_value = sample_combined_data
@@ -104,26 +96,20 @@ def test_prepare_ml_data_for_training_splits_and_filters(
     assert "X_train" in result and "X_test" in result
     assert result["feature_count"] == result["X_train"].shape[1]
 
-    # Days kept in test set must be Monday (0) or Friday (4)
+    # Days kept in test set must be Friday (4)
     if len(result["X_test"]) > 0:
         test_dates = pd.to_datetime(
             sample_combined_data.loc[result["X_test"].index, "date"]
         )
         dow = test_dates.dt.dayofweek.unique()
-        assert set(dow).issubset({0, 4})
+        assert set(dow).issubset({4})
 
 
 @patch("src.data_utils.ml_data_pipeline.prepare_ml_data_for_training")
 def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
     mock_prepare, sample_combined_data
 ):
-    """
-    Setup: Simulate the cache returning precomputed cleaned data.
-
-    Execution: Call `prepare_ml_data_for_training_with_cleaning`.
-
-    Verification: The function should return the cached payload and skip heavy work.
-    """
+    """Return cached cleaned payload when cache exists and is recent."""
 
     from src.data_utils import ml_data_pipeline as pipeline
 
@@ -157,13 +143,7 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
 def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
     sample_combined_data,
 ):
-    """
-    Setup: Ensure cache is reported missing so the function runs the pipeline and saves result.
-
-    Execution: Call `prepare_ml_data_for_training_with_cleaning` with patched internals.
-
-    Verification: `save_cleaned_data` should be called once and output must contain expected keys.
-    """
+    """Run full cleaning pipeline and save cleaned data when no cache exists."""
 
     from src.data_utils import ml_data_pipeline as pipeline
 
@@ -209,13 +189,7 @@ def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
 
 
 def test_prepare_ml_data_for_training_empty_raises():
-    """
-    Setup: load_all_data returns an empty DataFrame.
-
-    Execution: prepare_ml_data_for_training should raise a ValueError.
-
-    Verification: error message indicates no data loaded.
-    """
+    """Raise ValueError when no data is loaded for training preparation."""
 
     from src.data_utils import ml_data_pipeline as pipeline
 
@@ -229,13 +203,7 @@ def test_prepare_ml_data_for_training_empty_raises():
 
 
 def test_prepare_ml_data_for_training_missing_date_raises(sample_combined_data):
-    """
-    Setup: data missing the `date` column.
-
-    Execution: pipeline should reject the input early.
-
-    Verification: ValueError mentions missing 'date' column.
-    """
+    """Error when input data lacks required 'date' column during preparation."""
 
     from src.data_utils import ml_data_pipeline as pipeline
 
@@ -256,9 +224,7 @@ def test_prepare_ml_data_for_training_missing_date_raises(sample_combined_data):
 def test_prepare_ml_data_for_prediction_filters_days(
     mock_load, _conv, sample_combined_data
 ):
-    """
-    Ensure prediction path filters X_test to Mondays and Fridays.
-    """
+    """Ensure prediction path filters X_test to Mondays and Fridays."""
 
     mock_load.return_value = sample_combined_data
 
@@ -271,14 +237,11 @@ def test_prepare_ml_data_for_prediction_filters_days(
     if len(out["X_test"]) > 0:
         # recover dates for asserted indices
         dates = pd.to_datetime(sample_combined_data.loc[out["X_test"].index, "date"])
-        assert set(dates.dt.dayofweek.unique()).issubset({0, 4})
+        assert set(dates.dt.dayofweek.unique()).issubset({4})
 
 
 def test_prepare_ml_data_for_prediction_with_cleaning_cache_old_triggers_clear_and_save():
-    """
-    When the cache exists but is older than 24h, the function should clear the cache
-    and proceed to prepare fresh prediction data and save it.
-    """
+    """Clear stale cache older than 24h, regenerate prediction data, and save it."""
 
     from src.data_utils import ml_data_pipeline as pipeline
 

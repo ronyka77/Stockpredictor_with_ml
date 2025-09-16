@@ -275,6 +275,37 @@ class PolygonDataClient:
 
         return all_results
 
+    def get_dividends(
+        self,
+        ticker: str,
+        order: str = "desc",
+        limit: int = 1000,
+        sort: str = "ex_dividend_date",
+    ) -> List[Dict]:
+        """
+        Get dividends for a single ticker. Polygon's dividends endpoint only supports
+        querying one ticker at a time, so this method requires a ticker parameter.
+
+        Args:
+            ticker: Stock ticker symbol (required)
+            order: 'asc' or 'desc' ordering of results (default 'desc')
+            limit: Number of results per page (capped to API limits)
+            sort: Field to sort by (default 'ex_dividend_date')
+
+        Returns:
+            List of dividend records as returned by Polygon
+        """
+        if not ticker:
+            raise ValueError("ticker is required for get_dividends")
+
+        params = {
+            "ticker": ticker,
+            "order": order,
+            "limit": min(limit, 1000),
+            "sort": sort,
+        }
+        return self._fetch_paginated_data("/v3/reference/dividends", params)
+
     def get_tickers(
         self, market: str = "stocks", active: bool = True, limit: int = 1000, **kwargs
     ) -> List[Dict]:

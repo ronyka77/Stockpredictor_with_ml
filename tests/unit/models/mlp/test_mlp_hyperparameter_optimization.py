@@ -24,6 +24,7 @@ def create_test_data(n_samples=1000, n_features=20):
 
 
 def test_mlp_hyperparameter_objective_callable():
+    """Construct hyperparameter objective callable for MLP optimization."""
     X_train, y_train, X_test, y_test = create_test_data(n_samples=200, n_features=10)
     threshold_evaluator = ThresholdEvaluator()
 
@@ -55,6 +56,7 @@ def test_mlp_hyperparameter_objective_callable():
 
 @pytest.mark.slow
 def test_mlp_hyperparameter_optimization_integration():
+    """Run a short hyperparameter optimization integration to validate study flow."""
     X_train, y_train, X_test, y_test = create_test_data(n_samples=400, n_features=12)
     threshold_evaluator = ThresholdEvaluator()
 

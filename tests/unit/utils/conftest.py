@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -46,7 +44,9 @@ def fake_mlflow_client(dummy_run):
 @pytest.fixture
 def patch_mlflow_client(fake_mlflow_client):
     """Patch the MlflowClient used in `src.utils.mlflow_integration` to return our fake client."""
-    with patch("src.utils.mlflow_integration.MlflowClient", return_value=fake_mlflow_client):
+    with patch(
+        "src.utils.mlflow_integration.MlflowClient", return_value=fake_mlflow_client
+    ):
         yield fake_mlflow_client
 
 
@@ -62,5 +62,3 @@ def start_run_cm():
 def patch_mlflow_start(start_run_cm):
     with patch("mlflow.start_run", return_value=start_run_cm) as s:
         yield s
-
-

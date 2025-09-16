@@ -10,6 +10,7 @@ from src.data_collector.indicator_pipeline.feature_storage import (
 
 @pytest.mark.integration
 def test_feature_storage_roundtrip(tmp_path):
+    """Verify saving and loading feature DataFrame and metadata via FeatureStorage"""
     cfg = StorageConfig()
     cfg.base_path = str(tmp_path)
     cfg.version = "v1"

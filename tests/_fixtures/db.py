@@ -11,7 +11,6 @@ continue to work during incremental migration.
 
 from contextlib import contextmanager
 from typing import Any, Dict, Iterable, List, Optional, Tuple
-import pytest
 
 
 class CursorFake:
@@ -174,30 +173,6 @@ class PoolFake:
         conn = ConnectionFake()
         conn.execute_values(insert_sql, rows, template=template, page_size=page_size)
         return None
-
-
-# Backwards-compatible aliases expected by existing tests. These point to the
-# canonical fakes implemented above so migration can be incremental.
-FakeLogicalStore = ConnectionFake
-FakeConnectionPool = PoolFake
-PostgresPoolCompat = PoolFake
-FakeThreadedPool = PoolFake
-
-# Old aliases used in fixtures imports
-FakePool = FakeLogicalStore
-FakeDBPool = FakeConnectionPool
-PoolCompat = PostgresPoolCompat
-
-
-# pytest fixtures exposing the canonical fakes
-@pytest.fixture
-def pool_fake():
-    return PoolFake()
-
-
-@pytest.fixture
-def connection_fake():
-    return ConnectionFake()
 
 
 def patch_global_pool(mocker, pool):

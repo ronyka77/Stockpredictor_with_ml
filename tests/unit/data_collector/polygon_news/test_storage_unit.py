@@ -11,6 +11,7 @@ from tests.unit.data_collector.polygon_news.helpers import (
 
 @pytest.mark.unit
 def test__create_new_article_returns_id_on_success():
+    """_create_new_article returns DB id when transaction succeeds"""
     storage = PolygonNewsStorage()
     article = processed_article_expected()
 
@@ -25,6 +26,7 @@ def test__create_new_article_returns_id_on_success():
 
 @pytest.mark.unit
 def test__create_new_article_invalid_published_date_returns_none():
+    """Return None when published_utc cannot be parsed; avoid DB calls"""
     storage = PolygonNewsStorage()
     article = processed_article_expected()
     article["published_utc"] = "not-a-date"
@@ -39,6 +41,7 @@ def test__create_new_article_invalid_published_date_returns_none():
 
 @pytest.mark.unit
 def test__update_existing_article_updates_and_returns_true():
+    """Update path applies DB changes and returns True when changes occur"""
     storage = PolygonNewsStorage()
 
     existing = {
@@ -68,6 +71,7 @@ def test__update_existing_article_updates_and_returns_true():
 
 @pytest.mark.unit
 def test__parse_datetime_variants_and_failure():
+    """Parse various datetime inputs and return None on failure"""
     storage = PolygonNewsStorage()
 
     # datetime object passthrough
@@ -128,7 +132,7 @@ def test_get_articles_for_ticker_calls_fetch_all_and_returns_rows():
 
 
 @pytest.mark.unit
-def test_get_article_statistics_success_path(monkeypatch):
+def test_get_article_statistics_success_path():
     # Prepare controlled returns for fetch_one and fetch_all
     storage = PolygonNewsStorage()
     total = {"cnt": 5}
@@ -151,20 +155,13 @@ def test_get_article_statistics_success_path(monkeypatch):
             return publishers
         return []
 
-    monkeypatch.setattr(
-        "src.data_collector.polygon_news.storage.fetch_one", fake_fetch_one
-    )
-    monkeypatch.setattr(
+    with patch("src.data_collector.polygon_news.storage.fetch_one", fake_fetch_one), patch(
         "src.data_collector.polygon_news.storage.fetch_all", fake_fetch_all
-    )
-    # also patch get_latest_date_overall to avoid DB call
-    monkeypatch.setattr(
-        storage,
-        "get_latest_date_overall",
-        lambda: datetime(2025, 8, 1, tzinfo=timezone.utc),
-    )
+    ), patch.object(
+        storage, "get_latest_date_overall", lambda: datetime(2025, 8, 1, tzinfo=timezone.utc)
+    ):
 
-    stats = storage.get_article_statistics()
+        stats = storage.get_article_statistics()
 
     assert stats["total_articles"] == 5
     assert "top_tickers" in stats
@@ -173,13 +170,12 @@ def test_get_article_statistics_success_path(monkeypatch):
 
 
 @pytest.mark.unit
-def test_health_check_unhealthy_on_exception(monkeypatch):
+def test_health_check_unhealthy_on_exception():
     storage = PolygonNewsStorage()
 
     def raise_exc(*a, **k):
         raise RuntimeError("db")
 
-    monkeypatch.setattr("src.data_collector.polygon_news.storage.fetch_one", raise_exc)
-
-    res = storage.health_check()
-    assert res.get("status") == "unhealthy"
+    with patch("src.data_collector.polygon_news.storage.fetch_one", raise_exc):
+        res = storage.health_check()
+        assert res.get("status") == "unhealthy"

@@ -84,10 +84,6 @@ class PolygonFundamentalsConfig:
         """Get the full URL for financials endpoint"""
         return f"{self.BASE_URL}{self.FINANCIALS_ENDPOINT}"
 
-    def get_company_details_url(self, ticker: str) -> str:
-        """Get the full URL for company details endpoint"""
-        return f"{self.BASE_URL}{self.COMPANY_DETAILS_ENDPOINT}/{ticker}"
-
     def get_request_params(self, ticker: str, **kwargs) -> Dict[str, Any]:
         """Get standard request parameters for API calls"""
         params = {

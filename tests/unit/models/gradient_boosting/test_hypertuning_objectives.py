@@ -3,9 +3,7 @@ import pandas as pd
 import pytest
 from unittest.mock import Mock
 
-import optuna
 
-from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.gradient_boosting.xgboost_model import XGBoostModel
 
 
@@ -26,13 +24,15 @@ def _make_dummy_trial(number, params_overrides=None):
     return trial
 
 
-def test_lightgbm_objective_selects_best_trial_and_finalize(small_dataset, lgb_model_instance):
+def test_lightgbm_objective_selects_best_trial_and_finalize(
+    small_dataset, lgb_model_instance
+):
     """Setup: create objective then simulate two trials calling the objective function directly with mocked training behavior."""
 
     X, y = small_dataset
 
     # Create objective callable
-    obj = lgb_model_instance.objective(X, y, X, y)
+    lgb_model_instance.objective(X, y, X, y)
 
     # Patch the model's _create_model and fit to avoid heavy training; use small side effects
     def fake_fit(X_train, y_train, X_test, y_test, params=None):
@@ -42,9 +42,10 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(small_dataset, lgb_m
         m.best_score = {"test": {lgb_model_instance.eval_metric: np.random.rand()}}
         return m
 
-    lgb_model_instance._create_model = Mock(side_effect=lambda params, model_name=None: lgb_model_instance)
+    lgb_model_instance._create_model = Mock(
+        side_effect=lambda params, model_name=None: lgb_model_instance
+    )
     # Use the real fit but patch internal training to set model
-    original_fit = lgb_model_instance.fit
 
     def patched_fit(X_train, y_train, X_test, y_test, params=None):
         # set a fake model with different scores depending on a param value
@@ -59,8 +60,8 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(small_dataset, lgb_m
     lgb_model_instance.fit = patched_fit
 
     # Simulate two trials with different scores
-    t1 = _make_dummy_trial(1)
-    t2 = _make_dummy_trial(2)
+    _make_dummy_trial(1)
+    _make_dummy_trial(2)
 
     # Call objective with trial-like behavior by directly setting params and calling patched_fit
     params1 = {"_score": 0.5, "n_estimators": 100}
@@ -68,7 +69,6 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(small_dataset, lgb_m
 
     # Simulate trial outcomes (call patched_fit manually to mimic objective behavior)
     lgb_model_instance.fit(X, y, X, y, params=params1)
-    best1 = 0.5
 
     lgb_model_instance.fit(X, y, X, y, params=params2)
     best2 = 0.8
@@ -105,7 +105,7 @@ def test_xgboost_objective_tracks_best_trial_and_finalize(small_dataset):
     def patched_fit(X_train, y_train, X_test, y_test, params=None):
         fake_model = Mock()
         fake_model.best_iteration = 1
-        score = params.get("_score", 0)
+        params.get("_score", 0)
         xgb_model.model = fake_model
         xgb_model.feature_names = list(X_train.columns)
         return xgb_model
@@ -113,14 +113,13 @@ def test_xgboost_objective_tracks_best_trial_and_finalize(small_dataset):
     xgb_model.fit = patched_fit
 
     # Prepare objective and simulate trials
-    obj = xgb_model.objective(X, y, X, y)
+    xgb_model.objective(X, y, X, y)
 
     # Simulate two trials
     params_a = {"_score": 0.3, "n_estimators": 100}
     params_b = {"_score": 0.9, "n_estimators": 300}
 
     xgb_model.fit(X, y, X, y, params=params_a)
-    score_a = 0.3
 
     xgb_model.fit(X, y, X, y, params=params_b)
     score_b = 0.9

@@ -2,12 +2,10 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
-import pytest
 
 from src.data_collector.polygon_fundamentals.cache_manager import (
     FundamentalCacheManager,
 )
-from src.data_collector.polygon_fundamentals.data_models import FinancialValue
 
 
 def make_cache_file(directory: Path, ticker: str, days_ago: int, payload: dict):
@@ -18,7 +16,7 @@ def make_cache_file(directory: Path, ticker: str, days_ago: int, payload: dict):
 
 
 def test_get_cached_data_returns_none_when_no_files(tmp_path):
-    # Setup
+    """Return None when no cache files exist for a ticker"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
 
     # Execution
@@ -29,7 +27,7 @@ def test_get_cached_data_returns_none_when_no_files(tmp_path):
 
 
 def test_get_cached_data_uses_most_recent_valid(tmp_path, fv_factory):
-    # Setup
+    """Prefer most recent valid cache file over older/expired ones"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
 
     # older (expired) cache
@@ -41,7 +39,7 @@ def test_get_cached_data_uses_most_recent_valid(tmp_path, fv_factory):
     except Exception:
         recent = {"results": [{"foo": "bar"}]}
 
-    p = make_cache_file(tmp_path, "AAPL", days_ago=3, payload=recent)
+    make_cache_file(tmp_path, "AAPL", days_ago=3, payload=recent)
 
     # Execution
     data = cm.get_cached_data("AAPL")
@@ -52,7 +50,7 @@ def test_get_cached_data_uses_most_recent_valid(tmp_path, fv_factory):
 
 
 def test_save_cache_and_clear_expired(tmp_path):
-    # Setup
+    """Save cache files and ensure clear_expired_caches removes old files"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
 
     # Execution: save cache for ticker
@@ -63,16 +61,19 @@ def test_save_cache_and_clear_expired(tmp_path):
     assert saved.exists()
 
     # Create an artificially old file and ensure clear_expired_caches removes it
-    old = make_cache_file(tmp_path, "MSFT", days_ago=30, payload={"old": True})
+    make_cache_file(tmp_path, "MSFT", days_ago=30, payload={"old": True})
     removed = cm.clear_expired_caches()
 
     assert removed >= 1
     # The original saved file for today should remain
-    assert any(p.name.startswith("MSFT_financials_") for p in tmp_path.glob("MSFT_financials_*.json"))
-
+    assert any(
+        p.name.startswith("MSFT_financials_")
+        for p in tmp_path.glob("MSFT_financials_*.json")
+    )
 
 
 def test_save_cache_no_overwrite(tmp_path):
+    """Saving with overwrite=False does not replace existing cache file"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
 
     # Save once
@@ -89,6 +90,7 @@ def test_save_cache_no_overwrite(tmp_path):
 
 
 def test_parse_date_from_filename_invalid(tmp_path):
+    """Gracefully handle filenames that don't match the cache pattern"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
 
     # Create a file that doesn't match expected pattern
@@ -100,12 +102,14 @@ def test_parse_date_from_filename_invalid(tmp_path):
 
 
 def test_clear_expired_caches_empty_dir(tmp_path):
+    """clear_expired_caches returns 0 when directory has no cache files"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
     removed = cm.clear_expired_caches()
     assert removed == 0
 
 
 def test_save_cache_invalid_ticker(tmp_path):
+    """Reject saving cache for empty ticker strings"""
     cm = FundamentalCacheManager(cache_dir=str(tmp_path))
     # Empty ticker should be rejected
     res = cm.save_cache("", {"a": 1})

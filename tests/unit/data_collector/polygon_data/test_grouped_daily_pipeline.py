@@ -3,8 +3,6 @@ import pytest
 
 
 from src.data_collector.polygon_data.data_pipeline import DataPipeline
-from tests._fixtures import canned_api_factory
-from src.data_collector.polygon_data.client import PolygonDataClient
 
 
 @pytest.mark.parametrize(
@@ -15,10 +13,7 @@ from src.data_collector.polygon_data.client import PolygonDataClient
     ],
 )
 def test_run_grouped_daily_pipeline_mocks(api_results, expected_count, tmp_path):
-    """
-    Unit test for run_grouped_daily_pipeline that patches external API client and storage.
-    Uses unittest.mock.patch (preferred) and parametrization per ETL guide.
-    """
+    """Unit test that patches external API client and storage for grouped daily pipeline"""
 
     # Arrange - patch health check and data fetching
     with patch(
@@ -45,11 +40,3 @@ def test_run_grouped_daily_pipeline_mocks(api_results, expected_count, tmp_path)
                 # Assert - the pipeline tracked stored records correctly
                 assert stats.total_records_stored == expected_count
 
-
-def test_ticker_manager_get_all_active_tickers_returns_from_db(polygon_client):
-    from src.data_collector.ticker_manager import TickerManager
-
-    tm = TickerManager(polygon_client)
-    with patch.object(tm.storage, "get_ticker_symbols", return_value=["A", "B"]):
-        out = tm.get_all_active_tickers()
-    assert out == ["A", "B"]

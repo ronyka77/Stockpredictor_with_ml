@@ -31,6 +31,7 @@ def make_ohlcv(n=60, seed=42):
 
 @pytest.mark.unit
 def test_sma_ema_column_naming_and_determinism():
+    """Validate SMA/EMA column names are present and outputs are deterministic."""
     df = make_ohlcv(n=100)
     sma = calculate_sma(df, periods=[5, 10, 20])
     ema = calculate_ema(df, periods=[5, 10, 20])
@@ -49,6 +50,7 @@ def test_sma_ema_column_naming_and_determinism():
 
 @pytest.mark.unit
 def test_rsi_bounds_and_signals():
+    """Ensure RSI produces expected signal columns and values stay within [0,100]."""
     df = make_ohlcv(n=100)
     rsi = calculate_rsi(df, periods=[14])
     cols = [c for c in rsi.data.columns if c.startswith("RSI_14")]

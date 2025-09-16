@@ -39,6 +39,7 @@ def make_price_df(n=50):
 
 
 def test_trend_indicators_smoke():
+    """Smoke test: trend indicator calculators produce non-empty results"""
     df = make_price_df(60)
     for fn in (calculate_sma, calculate_ema, calculate_macd, calculate_ichimoku):
         res = fn(df)
@@ -46,6 +47,7 @@ def test_trend_indicators_smoke():
 
 
 def test_momentum_indicators_smoke():
+    """Smoke test: momentum indicator calculators produce non-empty results"""
     df = make_price_df(60)
     for fn in (
         calculate_rsi,
@@ -58,6 +60,7 @@ def test_momentum_indicators_smoke():
 
 
 def test_volatility_and_volume_indicators_smoke():
+    """Smoke test: volatility and volume indicators run without error and return data"""
     df = make_price_df(100)
     for fn in (calculate_bollinger_bands, calculate_atr):
         res = fn(df)
