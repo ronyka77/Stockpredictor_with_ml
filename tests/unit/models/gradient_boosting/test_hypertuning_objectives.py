@@ -15,6 +15,21 @@ def small_dataset():
 
 
 def _make_dummy_trial(number, params_overrides=None):
+    """
+    Create a lightweight Mock trial object used in tests.
+    
+    This returns a Mock with a numeric `number` attribute and mocked
+    suggestion methods (`suggest_int`, `suggest_float`, `suggest_categorical`)
+    so it can be passed to objective functions without invoking a real
+    Optuna trial.
+    
+    Parameters:
+        number (int): Identifier for the mock trial, set on the `number` attribute.
+        params_overrides (dict, optional): Accepted for API compatibility but not used.
+    
+    Returns:
+        unittest.mock.Mock: A Mock shaped like an Optuna trial with the above attributes.
+    """
     trial = Mock()
     trial.number = number
     # suggest_int/suggest_float etc used inside objective - we don't call them when we patch objective
@@ -37,6 +52,20 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(
     # Patch the model's _create_model and fit to avoid heavy training; use small side effects
     def fake_fit(X_train, y_train, X_test, y_test, params=None):
         # Create a tiny model-like object with predictable best_iteration and best_score
+        """
+        Create a minimal mock "model" used in tests that mimics LightGBM fit output.
+        
+        Returns a unittest.mock.Mock with:
+        - best_iteration set to 1
+        - best_score set to {"test": {<eval_metric>: <random float>}} where <eval_metric> is taken from the enclosing lgb_model_instance and the value is drawn from numpy.random.rand()
+        
+        Parameters:
+            X_train, y_train, X_test, y_test: Ignored; present to match the real `fit` signature.
+            params (dict, optional): Ignored; included for signature compatibility.
+        
+        Returns:
+            unittest.mock.Mock: A mock object with predictable attributes used by tests.
+        """
         m = Mock()
         m.best_iteration = 1
         m.best_score = {"test": {lgb_model_instance.eval_metric: np.random.rand()}}
@@ -49,6 +78,25 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(
 
     def patched_fit(X_train, y_train, X_test, y_test, params=None):
         # set a fake model with different scores depending on a param value
+        """
+        Create a fake trained LightGBM-like model and attach it to the enclosing lgb_model_instance for testing.
+        
+        This test helper builds a Mock model with a fixed best_iteration (1) and a best_score derived from params["_score"] (defaults to 0). It assigns that mock to lgb_model_instance.model and sets lgb_model_instance.feature_names from X_train.columns, then returns lgb_model_instance.
+        
+        Parameters:
+            X_train: DataFrame whose columns are used to populate lgb_model_instance.feature_names.
+            y_train: Unused training targets (kept for signature compatibility).
+            X_test: Unused test features (kept for signature compatibility).
+            y_test: Unused test targets (kept for signature compatibility).
+            params: Optional dict; if present, params.get("_score", 0) determines the fake model's best_score.
+        
+        Returns:
+            The modified lgb_model_instance with a mocked .model and .feature_names set.
+        
+        Side effects:
+            - Mutates lgb_model_instance.model to a Mock with attributes best_iteration and best_score.
+            - Mutates lgb_model_instance.feature_names to list(X_train.columns).
+        """
         fake_model = Mock()
         fake_model.best_iteration = 1
         score = params.get("_score", 0)
@@ -103,6 +151,22 @@ def test_xgboost_objective_tracks_best_trial_and_finalize(small_dataset):
 
     # Patch fit to set a fake model with varying score depending on params
     def patched_fit(X_train, y_train, X_test, y_test, params=None):
+        """
+        Test helper that fakes training of an XGBoost model.
+        
+        Creates a Mock model with best_iteration = 1, assigns it to the module-level `xgb_model.model`,
+        sets `xgb_model.feature_names` from X_train.columns, and returns the modified xgb_model.
+        
+        Parameters:
+            X_train (pandas.DataFrame): Used to obtain feature names for xgb_model.feature_names.
+            y_train: Ignored.
+            X_test: Ignored.
+            y_test: Ignored.
+            params (dict, optional): Optional parameter dict; if present may contain "_score" but its value is not used.
+        
+        Returns:
+            The module-level xgb_model with a mocked `.model` and `.feature_names` set.
+        """
         fake_model = Mock()
         fake_model.best_iteration = 1
         params.get("_score", 0)

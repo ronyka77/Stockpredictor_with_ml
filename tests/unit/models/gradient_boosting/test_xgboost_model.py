@@ -7,6 +7,12 @@ from src.models.gradient_boosting.xgboost_model import XGBoostModel
 
 @pytest.fixture()
 def xgb_model_instance() -> XGBoostModel:
+    """
+    PyTest fixture that returns a preconfigured XGBoostModel for tests.
+    
+    Returns:
+        XGBoostModel: An XGBoostModel instance with model_name="xgb_test_model" and prediction_horizon=10.
+    """
     return XGBoostModel(model_name="xgb_test_model", prediction_horizon=10)
 
 
@@ -19,11 +25,34 @@ def test_get_prediction_confidence_leaf_and_margin(
 
     class DummyXGB:
         def __init__(self):
+            """
+            Initialize the instance and set a default best_iteration.
+            
+            Sets self.best_iteration to 20 to provide a stable default value for components that inspect the model's best_iteration attribute.
+            """
             self.best_iteration = 20
 
         def predict(
             self, dmatrix, pred_leaf=False, output_margin=False, ntree_limit=None
         ):
+            """
+            Predict using a simplified dummy XGBoost-like model used in tests.
+            
+            This test helper accepts either an array-like input or an object exposing get_label(). It returns deterministic mock predictions:
+            - If pred_leaf is True: a 2D integer array of shape (n, 10) where each row is the sequence 1..10 (replicated for each instance).
+            - If output_margin is True: a 1D float array of length n filled with 2.0.
+            - Otherwise: a 1D float array of length n with values [0.5, 1.5, 2.5, ...].
+            
+            Parameters:
+                dmatrix: array-like or object with get_label() -> array-like
+                    Input data or a wrapper providing labels; only its length is used to determine the number of predictions.
+                pred_leaf (bool): If True, return per-instance leaf index vectors (shape (n, 10)).
+                output_margin (bool): If True, return margin-style scores (1D array of 2.0).
+                ntree_limit: Ignored (present for API compatibility).
+            
+            Returns:
+                numpy.ndarray: Mock predictions as described above.
+            """
             n = (
                 len(dmatrix.get_label())
                 if hasattr(dmatrix, "get_label")
@@ -43,6 +72,11 @@ def test_get_prediction_confidence_leaf_and_margin(
             self._data = data
 
         def get_label(self):
+            """
+            Return a zero-valued label array matching the number of samples in the stored data.
+            
+            The returned NumPy 1-D array has length equal to len(self._data) and contains zeros (dtype float).
+            """
             return np.zeros(len(self._data))
 
     with patch(
@@ -92,6 +126,26 @@ def test_predict_uses_dmatrix_and_returns_array(
 
         def predict(self, dmatrix, ntree_limit=None):
             # Accept either DMatrix or ndarray-like
+            """
+            Return a 1D numpy array of zeros matching the number of rows in the input.
+            
+            This method accepts either an xgboost.DMatrix-like object (providing get_label())
+            or any array-like object with a length (e.g., numpy array, list). The optional
+            ntree_limit parameter is accepted for API compatibility but ignored by this
+            implementation.
+            
+            Parameters:
+                dmatrix: DMatrix or array-like
+                    Input data used to determine the output length. If a DMatrix-like object
+                    is provided, its get_label() method is used to determine the number of
+                    rows; otherwise, len(dmatrix) is used.
+                ntree_limit (optional): int
+                    Ignored; present for compatibility with XGBoost predict signatures.
+            
+            Returns:
+                numpy.ndarray
+                    1D array of zeros with length equal to the number of input rows.
+            """
             size = (
                 len(dmatrix.get_label())
                 if hasattr(dmatrix, "get_label")
@@ -108,6 +162,11 @@ def test_predict_uses_dmatrix_and_returns_array(
             self._label = label
 
         def get_label(self):
+            """
+            Return a zero-valued label array matching the number of samples in the stored data.
+            
+            The returned NumPy 1-D array has length equal to len(self._data) and contains zeros (dtype float).
+            """
             return np.zeros(len(self._data))
 
     with patch(

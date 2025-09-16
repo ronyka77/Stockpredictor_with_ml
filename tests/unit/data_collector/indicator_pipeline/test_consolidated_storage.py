@@ -11,6 +11,14 @@ from src.data_collector.indicator_pipeline.consolidated_storage import (
 
 
 def make_sample_ticker_df():
+    """
+    Create a small sample ticker DataFrame for tests.
+    
+    Returns:
+        pandas.DataFrame: 4-row DataFrame with a DatetimeIndex named 'date' and a single column 'a'
+        containing values [1, 2, 3, 4]. The index name is set so resetting the index yields a 'date'
+        column suitable for consolidation tests.
+    """
     idx = pd.date_range("2025-01-01", periods=4)
     # Ensure index has name 'date' so reset_index creates a 'date' column
     idx.name = "date"
@@ -207,6 +215,12 @@ def test_consolidate_existing_features_handles_no_available_and_success(tmp_path
     # Patch FeatureStorage to simulate no available tickers
     class FakeStorageEmpty:
         def get_available_tickers(self):
+            """
+            Return a list of available tickers.
+            
+            Returns:
+                list[str]: Available ticker identifiers. This implementation currently returns an empty list.
+            """
             return []
 
     with patch(
@@ -221,6 +235,21 @@ def test_consolidate_existing_features_handles_no_available_and_success(tmp_path
     # Now simulate success path
     class FakeMeta:
         def __init__(self):
+            """
+            Initialize a feature metadata container.
+            
+            Sets default metadata attributes describing a consolidated feature file.
+            
+            Attributes:
+                feature_version (str): Schema/version identifier for features (default "v1").
+                calculation_date (str): ISO date string when features were computed (default "2025-01-01").
+                quality_score (float): Quality metric for the dataset (0.0–1.0, default 0.9).
+                total_features (int): Number of feature columns included (default 5).
+                file_size_mb (float): Approximate file size in megabytes (default 0.1).
+                record_count (int): Number of rows/records in the file (default 2).
+                feature_categories (Optional[Sequence[str]]): Optional list of categories/tags for features.
+                warnings (Optional[Sequence[str]]): Optional list of warning messages related to the metadata.
+            """
             self.feature_version = "v1"
             self.calculation_date = "2025-01-01"
             self.quality_score = 0.9
@@ -232,18 +261,52 @@ def test_consolidate_existing_features_handles_no_available_and_success(tmp_path
 
     class FakeStorage:
         def get_available_tickers(self):
+            """
+            Return the list of available tickers.
+            
+            Returns:
+                list[str]: A list of ticker symbols available for processing (e.g., ["AAA"]).
+            """
             return ["AAA"]
 
         def load_features(self, ticker):
+            """
+            Load feature data for a given ticker.
+            
+            Returns a tuple of (DataFrame, metadata) where the DataFrame contains feature rows indexed by a 'date' column and the metadata object provides provenance/summary information for the loaded features.
+            
+            Parameters:
+                ticker (str): Ticker symbol to load features for.
+            
+            Returns:
+                tuple[pandas.DataFrame, Any]: (features_df, metadata)
+            """
             df = pd.DataFrame({"date": pd.to_datetime(["2025-01-01"]), "a": [1]})
             return df, FakeMeta()
 
     # Create a fake consolidated storage that avoids filesystem mkdir/write
     class FakeConsolidated:
         def __init__(self):
+            """
+            Initialize the instance. No initialization actions are required.
+            """
             pass
 
         def save_multiple_tickers(self, ticker_data, metadata):
+            """
+            Save consolidated feature data for multiple tickers and return a summary of the saved output.
+            
+            Parameters:
+                ticker_data (Mapping[str, pandas.DataFrame]): Mapping from ticker symbol to its DataFrame of features to be saved.
+                metadata (Mapping[str, Any]): Metadata used to control partitioning, filenames, or other save-time attributes.
+            
+            Returns:
+                dict: Summary of the save operation with keys:
+                    - files_created (int): Number of files written.
+                    - total_size_mb (float): Total size of written files in megabytes.
+                    - compression_ratio (float): Observed compression ratio (uncompressed_size / compressed_size).
+                    - files (List[str]): Paths or identifiers of the files created.
+            """
             return {"files_created": 1, "total_size_mb": 0.1, "compression_ratio": 1.0, "files": []}
 
     with patch(

@@ -15,6 +15,13 @@ from src.data_collector.indicator_pipeline.feature_storage import (
 
 
 def make_df():
+    """
+    Create a small deterministic pandas DataFrame used in tests.
+    
+    Returns:
+        pd.DataFrame: DataFrame with a single column 'f1' containing [1, 2, 3]
+        and a DatetimeIndex from 2025-01-01 to 2025-01-03 (3 periods).
+    """
     idx = pd.date_range("2025-01-01", periods=3)
     return pd.DataFrame({"f1": [1, 2, 3]}, index=idx)
 

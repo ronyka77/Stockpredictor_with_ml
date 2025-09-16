@@ -13,6 +13,16 @@ def test_run_grouped_daily_pipeline_skips_weekends_and_counts_success():
     with patch.object(dp, "_perform_health_checks", return_value=None):
         # deterministic fetcher: weekday produce one ticker
         def fake_get_grouped_daily_data(target_date, validate_data=True):
+            """
+            Fake data fetcher used in tests: returns a non-empty grouped-daily payload for weekdays and an empty payload for weekends.
+            
+            Parameters:
+                target_date (datetime.date | datetime.datetime): Date for which to fetch grouped daily data.
+                validate_data (bool, optional): Accepted for API compatibility; ignored by this fake implementation.
+            
+            Returns:
+                dict: For weekday dates (Mon–Fri) returns {"T": [1]}; for weekend dates (Sat–Sun) returns an empty dict.
+            """
             if target_date.weekday() < 5:
                 return {"T": [1]}
             return {}

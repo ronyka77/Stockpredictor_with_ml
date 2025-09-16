@@ -116,16 +116,31 @@ class ConsolidatedFeatureStorage:
         categories: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
-        Load features from consolidated storage with filtering
-
-        Args:
-            ticker: Single ticker to load (None for ALL tickers)
-            start_date: Start date filter
-            end_date: End date filter
-            categories: Feature categories to load
-
+        Load consolidated features from year-partitioned Parquet files with optional filtering.
+        
+        Loads all Parquet files under the consolidated storage path and optionally filters rows by
+        ticker and date range, and columns by feature categories.
+        
+        Parameters:
+            ticker (Optional[str]): If provided, only rows for this ticker are returned. If omitted,
+                data for all tickers is returned.
+            start_date (Optional[date]): Inclusive lower bound for the `date` column filter.
+            end_date (Optional[date]): Inclusive upper bound for the `date` column filter.
+            categories (Optional[List[str]]): If provided, only feature columns belonging to the
+                listed categories are retained; the `ticker` and `date` columns are always kept.
+        
         Returns:
-            Combined DataFrame with features
+            pandas.DataFrame: Concatenated DataFrame of matching records. Returns an empty DataFrame
+            when no files match the filters or when no data is found for the requested ticker.
+        
+        Raises:
+            FileNotFoundError: If no consolidated Parquet files exist in the storage path.
+        
+        Notes:
+            - Individual file read errors are caught and logged; a failure to read one file does not
+              abort loading of other files.
+            - Category filtering uses the project's column-category mapping (via
+              `filter_columns_by_categories`) to determine which feature columns to keep.
         """
         if ticker is None:
             logger.info("Loading features for ALL tickers from consolidated storage")
@@ -196,7 +211,17 @@ class ConsolidatedFeatureStorage:
     def _combine_ticker_data(
         self, ticker_data: Dict[str, pd.DataFrame]
     ) -> pd.DataFrame:
-        """Combine multiple ticker DataFrames into single DataFrame"""
+        """
+        Combine multiple per-ticker feature DataFrames into a single, concatenated DataFrame.
+        
+        Each input DataFrame is copied and annotated with a "ticker" column set to its dict key. If a DataFrame's index is named "date" or is a DatetimeIndex, the index is reset so the date becomes a column; if a "date" column exists it is coerced to pandas datetime. The combined result is sorted by "ticker" and "date".
+        
+        Parameters:
+            ticker_data (Dict[str, pd.DataFrame]): Mapping from ticker symbol to its feature DataFrame. Each DataFrame may have a date index or a "date" column.
+        
+        Returns:
+            pd.DataFrame: Concatenated DataFrame containing all tickers. Returns an empty DataFrame if input is empty.
+        """
         combined_data = []
 
         for ticker, features in ticker_data.items():
@@ -308,7 +333,18 @@ class ConsolidatedFeatureStorage:
 
 # Convenience function
 def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
-    """Consolidate existing individual Parquet files into year-partitioned format"""
+    """
+    Consolidate existing per-ticker Parquet feature files into a year-partitioned consolidated storage.
+    
+    Parameters:
+        strategy (str): Partitioning strategy to use. Only "by_date" is supported; if another value is passed a warning is logged and "by_date" is used.
+    
+    Returns:
+        dict: Summary returned by ConsolidatedFeatureStorage.save_multiple_tickers containing keys such as 'files_created' and 'total_size_mb'.
+    
+    Raises:
+        ValueError: If no existing feature files are found to consolidate.
+    """
     if strategy != "by_date":
         logger.warning(
             f"Only 'by_date' strategy supported, using 'by_date' instead of '{strategy}'"

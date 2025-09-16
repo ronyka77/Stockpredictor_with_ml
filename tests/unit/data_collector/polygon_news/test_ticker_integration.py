@@ -31,6 +31,18 @@ def test_get_ticker_info_from_manager(mocker):
     # Patch self.ticker_manager.storage.get_tickers() to return fake ticker data
     class FakeStorage:
         def get_tickers(self):
+            """
+            Return a list of example ticker records used for testing.
+            
+            Each entry is a dict with the following keys:
+            - "ticker" (str): Ticker symbol.
+            - "market_cap" (float): Market capitalization in USD.
+            - "avg_volume" (float): Average trading volume.
+            - "sector" (str): Sector name.
+            
+            Returns:
+                list[dict]: Two sample ticker records ("XYZ" and "ABC") used by tests.
+            """
             return [
                 {
                     "ticker": "XYZ",
@@ -48,6 +60,11 @@ def test_get_ticker_info_from_manager(mocker):
 
     class FakeManager:
         def __init__(self):
+            """
+            Initialize the fake manager by creating and assigning a FakeStorage instance to self.storage.
+            
+            Provides a storage-backed ticker source accessible as the manager's .storage attribute for tests.
+            """
             self.storage = FakeStorage()
 
     nti = NewsTickerIntegration(ticker_manager=FakeManager())

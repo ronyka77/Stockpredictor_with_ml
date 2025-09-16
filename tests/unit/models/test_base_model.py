@@ -12,17 +12,65 @@ class DummyModel(BaseModel):
     """Minimal concrete implementation for testing BaseModel behavior."""
 
     def _create_model(self, **kwargs):
+        """
+        Create and return a simple mock underlying model for testing.
+        
+        The returned Mock stands in for a real predictive model used by BaseModel tests.
+        Any keyword arguments are accepted for compatibility but ignored.
+        """
         return Mock()
 
     def fit(self, X, y, X_val=None, y_val=None, **kwargs):
         # simple behavior: store feature names and mark trained
+        """
+        Train the dummy model by recording feature names, installing deterministic prediction functions, and marking the instance as trained.
+        
+        This fit implementation is a test-only, deterministic trainer used by DummyModel:
+        - If X has a .columns attribute, stores feature_names as a list of column names; otherwise sets feature_names to None.
+        - Replaces self.model with a Mock whose predict(...) returns a zero-filled integer array of length n_samples and whose predict_proba(...) returns a (n_samples, 2) array with constant probabilities [[0.3, 0.7]].
+        - Sets is_trained to True.
+        
+        Parameters:
+            X: array-like or pandas.DataFrame
+                Training features; if a DataFrame, its column order is recorded in feature_names.
+            y: array-like
+                Training targets (ignored by this dummy implementation).
+            X_val, y_val: optional
+                Validation data (ignored by this dummy implementation).
+            **kwargs:
+                Ignored.
+        
+        Returns:
+            self: DummyModel
+                The trained model instance (allows method chaining).
+        """
         self.feature_names = list(X.columns) if hasattr(X, "columns") else None
         self.model = Mock()
         # create predictable predict / predict_proba outputs based on X shape
         def predict_fn(inp):
+            """
+            Return a 1-D integer array of zeros with the same length as the input.
+            
+            Parameters:
+                inp: sequence-like
+                    Iterable whose length denotes the number of samples to predict for.
+            
+            Returns:
+                numpy.ndarray
+                    1-D array of zeros (dtype int) with shape (len(inp),).
+            """
             return np.zeros(len(inp), dtype=int)
 
         def predict_proba_fn(inp):
+            """
+            Return class probability estimates for each input, using a fixed distribution [0.3, 0.7].
+            
+            Parameters:
+                inp (Sequence): Input collection whose length determines the number of output rows.
+            
+            Returns:
+                numpy.ndarray: Array of shape (len(inp), 2) where each row is [0.3, 0.7].
+            """
             return np.tile(np.array([[0.3, 0.7]]), (len(inp), 1))
 
         self.model.predict = Mock(side_effect=predict_fn)
@@ -34,11 +82,25 @@ class DummyModel(BaseModel):
 @pytest.fixture
 def sample_dataframe():
     # three rows, two feature columns
+    """
+    Fixture providing a small sample pandas DataFrame for tests.
+    
+    Returns:
+        pd.DataFrame: Three-row DataFrame with two feature columns:
+            - f1: [1.0, 2.0, 3.0]
+            - f2: [0.1, 0.2, 0.3]
+    """
     return pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [0.1, 0.2, 0.3]})
 
 
 @pytest.fixture
 def sample_series():
+    """
+    Return a pandas Series of sample labels used by tests.
+    
+    Returns:
+        pd.Series: A Series of length 3 with values [0, 1, 0].
+    """
     return pd.Series([0, 1, 0])
 
 

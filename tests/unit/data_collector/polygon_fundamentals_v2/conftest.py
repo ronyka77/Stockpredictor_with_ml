@@ -12,6 +12,11 @@ class FinancialValueFactory(ModelFactory[FinancialValue]):
 
 @pytest.fixture
 def fv_factory():
+    """
+    Pytest fixture that provides the FinancialValueFactory class for tests.
+    
+    Returns the FinancialValueFactory class if it's available in the module; otherwise returns None. Tests use this fixture to construct FinancialValue model instances.
+    """
     if FinancialValueFactory:
         return FinancialValueFactory
 

@@ -9,6 +9,20 @@ from src.data_collector.polygon_fundamentals.cache_manager import (
 
 
 def make_cache_file(directory: Path, ticker: str, days_ago: int, payload: dict):
+    """
+    Create a JSON cache file for a ticker dated days_ago days before today and return its path.
+    
+    The file is named "{TICKER}_financials_{YYYYMMDD}.json" and is written under the provided directory. The payload is serialized with json.dumps(..., default=str) and written using UTF-8 encoding. If a file with the same name exists it will be overwritten.
+    
+    Parameters:
+        directory (Path): Target directory for the cache file.
+        ticker (str): Ticker symbol used as the filename prefix.
+        days_ago (int): Number of days to subtract from today to form the date in the filename.
+        payload (dict): JSON-serializable data to write to the file.
+    
+    Returns:
+        Path: Path to the created cache file.
+    """
     date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
     path = directory / f"{ticker}_financials_{date}.json"
     path.write_text(json.dumps(payload, default=str), encoding="utf-8")

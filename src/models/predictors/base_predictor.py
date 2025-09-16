@@ -288,9 +288,24 @@ class BasePredictor(ABC):
         predictions: np.ndarray,
     ) -> Tuple[pd.DataFrame, float]:
         """
-        Build the results DataFrame and compute the average profit per investment
-        without writing to disk.
-        Returns a tuple of (results_df, avg_profit_per_investment).
+        Build a results DataFrame from predictions and compute average profit per $100 investment.
+        
+        This function merges prediction metadata with feature-derived values, applies optional confidence-threshold filtering, keeps the top 10 positive predictions per date, computes derived evaluation columns (predicted/actual prices, profit per $100, prediction error, success flag), and aggregates profit metrics including a Friday-specific average.
+        
+        Parameters:
+            features_df (pd.DataFrame): Feature matrix used for prediction; must contain at least "date_int" and "close". If present, "ticker_id" is used to enrich results.
+            metadata_df (pd.DataFrame): One-row-per-prediction metadata (expects a "target_values" column which will be renamed to "actual_return").
+            predictions (np.ndarray): Model prediction values interpreted as percentage returns.
+        
+        Returns:
+            Tuple[pd.DataFrame, float] or pd.DataFrame:
+                On a successful, exportable result set: a tuple (results_df, avg_profit_per_investment) where results_df contains merged metadata and derived columns (including "predicted_return", "predicted_price", "current_price", "actual_price", "profit_100_investment", "price_prediction_error", "prediction_successful", "confidence_score", "passes_threshold", and "optimal_threshold" when applicable), and avg_profit_per_investment is the mean profit per $100 investment across valid rows.
+                If no predictions pass filtering or business gates (e.g., insufficient Friday profitability), an empty pd.DataFrame is returned.
+        
+        Notes:
+            - If self.optimal_threshold is set, confidence scores are obtained and threshold filtering is applied; only rows that pass the threshold are considered for further ranking and evaluation.
+            - Only positive "predicted_return" rows are considered when selecting the top 10 per date.
+            - The function may return an empty DataFrame in multiple early-exit cases (no threshold-passing rows, or failing the Friday profitability gate).
         """
         # 1) Minimal result skeleton from predictions and metadata
         results_df = metadata_df.copy()
@@ -429,12 +444,20 @@ class BasePredictor(ABC):
         self, days_back: int = 30
     ) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
-        Run the prediction pipeline without writing to disk and return:
-        - results_df
-        - avg_profit_per_investment
-        - features_df
-        - metadata_df
-        - predictions
+        Evaluate the loaded model on recent data without writing outputs to disk.
+        
+        Loads the model and its metadata if not already loaded, prepares recent features/targets for the given lookback window, produces model predictions, and constructs an evaluation results DataFrame with aggregated profit metrics.
+        
+        Parameters:
+            days_back (int): Number of past days of data to include when building recent features (default 30).
+        
+        Returns:
+            Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
+                - results_df: Filtered and annotated DataFrame of prediction results (may be empty if export conditions are not met).
+                - avg_profit_per_investment: Average profit per 100-unit investment computed over valid predictions (0 if no valid rows).
+                - features_df: DataFrame of input features used for prediction.
+                - metadata_df: DataFrame containing target values and related metadata for each row.
+                - predictions: Numpy array of raw model predictions corresponding to features_df.
         """
         logger.info(
             f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)..."

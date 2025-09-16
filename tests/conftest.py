@@ -25,7 +25,16 @@ def no_sleep(mocker):
 
 @pytest.fixture
 def patch_execute_values_to_fake_pool(mocker):
-    """Expose wrapper fixture at top-level tests for delegating execute_values to fake pool."""
+    """
+    Patch the module-level `execute_values` used in production to delegate inserts to a local fake DB pool.
+    
+    This fixture creates a ConnectionFake instance and replaces
+    `src.data_collector.polygon_data.data_storage.execute_values` with a wrapper that
+    calls the fake pool's `execute_values(insert_sql, rows, template, page_size)`.
+    The wrapper signature preserves `template`, `page_size`, and `commit` for compatibility;
+    the `commit` argument is accepted but ignored by the fake pool. Intended for use
+    as a pytest fixture to prevent real database interactions during tests.
+    """
     # Create a local fake pool instance (centralized fake implementation)
     from tests._fixtures import ConnectionFake as _FakePool
 
@@ -47,21 +56,48 @@ def patch_execute_values_to_fake_pool(mocker):
 
 @pytest.fixture(autouse=True)
 def patch_global_db_pool(mocker):
-    """Patch global pool helpers to use a fake Postgres-like pool from test helpers.
-
-    Ensures `init_global_pool`, `get_global_pool`, and `close_global_pool` in
-    `src.database.connection` operate against a test-controlled fake pool so
-    tests never touch a real database connection.
+    """
+    Patch src.database.connection's global pool helpers to use a test-controlled PoolFake.
+    
+    This fixture replaces init_global_pool, get_global_pool, and close_global_pool with
+    in-process implementations backed by a single PoolFake instance so tests never
+    open real database connections. The patched helpers:
+    - init_global_pool_fake(minconn=1, maxconn=10): creates and stores a PoolFake.
+    - get_global_pool_fake(): returns the stored PoolFake, initializing one if absent.
+    - close_global_pool_fake(): clears the stored PoolFake.
+    
+    The fixture yields once patched so callers (tests) run with the fake pool in place.
     """
     from tests._fixtures import PoolFake
 
     pool_ref = {"pool": None}
 
     def init_global_pool_fake(minconn: int = 1, maxconn: int = 10):
+        """
+        Initialize and store a test fake database connection pool and return it.
+        
+        Creates a PoolFake instance with the given connection bounds, stores it in the shared
+        pool_ref under the "pool" key (replacing any existing value), and returns the instance.
+        
+        Parameters:
+            minconn (int): Minimum number of connections the fake pool should emulate. Defaults to 1.
+            maxconn (int): Maximum number of connections the fake pool should emulate. Defaults to 10.
+        
+        Returns:
+            PoolFake: The initialized fake pool instance stored in pool_ref["pool"].
+        """
         pool_ref["pool"] = PoolFake(minconn=minconn, maxconn=maxconn)
         return pool_ref["pool"]
 
     def get_global_pool_fake():
+        """
+        Return the global test fake database pool, creating and storing one if it does not yet exist.
+        
+        This function provides a single shared PoolFake instance used by tests; it lazily initializes the pool on first call and subsequently returns the same instance.
+        
+        Returns:
+            PoolFake: The shared fake connection pool used for testing.
+        """
         if pool_ref["pool"] is None:
             return init_global_pool_fake()
         return pool_ref["pool"]

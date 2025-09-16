@@ -6,6 +6,19 @@ from src.models.common.training_data_prep import prepare_common_training_data
 
 
 def _make_sample_data():
+    """
+    Create a small synthetic dataset split into training and test subsets for use in tests.
+    
+    Returns:
+        dict: Contains the following keys:
+            - X_train (pd.DataFrame): Training features (80 rows) with columns "f1" and "date_int".
+            - X_test (pd.DataFrame): Test features (20 rows) with columns "f1" and "date_int".
+            - y_train (pd.Series): Training target values (80 entries).
+            - y_test (pd.Series): Test target values (20 entries).
+            - target_column (str): Name of the target column ("target").
+            - train_date_range (tuple): Inclusive integer index range for training rows (0, 79).
+            - test_date_range (tuple): Inclusive integer index range for test rows (80, 99).
+    """
     pd.RangeIndex(0, 100)
     X = pd.DataFrame(
         {"f1": np.linspace(0, 1, 100), "date_int": np.repeat(np.arange(20), 5)}

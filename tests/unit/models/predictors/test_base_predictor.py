@@ -11,6 +11,22 @@ class DummyPredictor(BasePredictor):
 
 
 def _make_features_and_targets(n=5):
+    """
+    Create synthetic features and target data for tests.
+    
+    Generates a DataFrame `features` with `n` rows and columns:
+    - `close`: linearly spaced floats from 10 to 15,
+    - `date_int`: integer indices 0..n-1,
+    - `ticker_id`: integer ids 0..n-1
+    
+    Also returns a Series `targets` of length `n` with linearly spaced floats from 0.1 to 0.5.
+    
+    Parameters:
+        n (int): Number of rows to generate (default: 5).
+    
+    Returns:
+        tuple[pd.DataFrame, pd.Series]: (features, targets)
+    """
     features = pd.DataFrame(
         {
             "close": np.linspace(10, 15, n),

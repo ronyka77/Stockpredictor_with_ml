@@ -33,6 +33,15 @@ BAD_STAGING_PATH = os.getenv("DIVIDENDS_BAD_STAGING", "./dividends_staging_bad.j
 
 
 def _write_bad_record(raw: Dict[str, Any], reason: str) -> None:
+    """
+    Append a failed/divergent raw record and a short reason to the bad-record staging file (JSONL).
+    
+    Writes a single JSON line to the file configured by BAD_STAGING_PATH containing {"reason": <reason>, "payload": <raw>}. The payload is serialized using JSON with a string fallback for non-serializable objects. Any IO/serialization failure is swallowed after logging an error; callers should not rely on this function to raise on write failure.
+    
+    Parameters:
+        raw (Dict[str, Any]): The original raw record that failed validation or transformation.
+        reason (str): Short human-readable explanation of why the record was staged (e.g., validation error).
+    """
     try:
         with open(BAD_STAGING_PATH, "a", encoding="utf-8") as fh:
             fh.write(json.dumps({"reason": reason, "payload": raw}, default=str) + "\n")
@@ -42,17 +51,35 @@ def _write_bad_record(raw: Dict[str, Any], reason: str) -> None:
 
 def transform_dividend_record(raw: Dict[str, Any], ticker_id: int) -> Dict[str, Any]:
     """
-    Transform and validate a raw Polygon dividend record into the DB row dict.
-
-    Rules (per plan):
-        - Require `id` (Polygon id) — if absent, raise SkipRecord
-        - Parse date fields to date objects
-        - Parse `cash_amount` to Decimal
-        - Validate `currency` length == 3 if present
-        - Attach `raw_payload` and `ticker_id`
-
-    Returns a dict suitable for `_upsert_dividends_batch`.
-    Raises TransformError on validation failure, SkipRecord to intentionally skip.
+    Transform and validate a raw Polygon dividend record into a database-ready row dict.
+    
+    Parses and normalizes fields from a raw Polygon dividend payload:
+    - Ensures a polygon identifier is present (checks "id", "dividend_id", "polygon_id"); missing id stages the record and raises SkipRecord.
+    - Normalizes the identifier to a string and attaches ticker_id (DB PK for the ticker).
+    - Parses monetary amount from "cash_amount", "amount", or "cash" into a Decimal; missing or invalid amounts stage the record and raise TransformError.
+    - Parses date fields ("declaration_date", "ex_dividend_date", "pay_date", "record_date") into datetime.date objects; invalid dates stage the record and raise TransformError.
+    - Validates optional "currency" is a 3-character string; invalid currency stages the record and raises TransformError.
+    - Preserves optional "frequency" and "type"/"dividend_type" and includes the original raw payload under "raw_payload".
+    
+    Returns:
+        dict: A transformed row with keys suitable for _upsert_dividends_batch:
+        {
+            "id": str,
+            "ticker_id": int,
+            "cash_amount": Decimal,
+            "currency": Optional[str],
+            "declaration_date": Optional[date],
+            "ex_dividend_date": Optional[date],
+            "pay_date": Optional[date],
+            "record_date": Optional[date],
+            "frequency": Optional[Any],
+            "dividend_type": Optional[Any],
+            "raw_payload": Dict[str, Any],
+        }
+    
+    Raises:
+        SkipRecord: when the record must be skipped because it lacks a polygon identifier.
+        TransformError: for validation or parsing failures (amount, dates, currency, etc.).
     """
     try:
         polygon_id = raw.get("id") or raw.get("dividend_id") or raw.get("polygon_id")
@@ -77,6 +104,19 @@ def transform_dividend_record(raw: Dict[str, Any], ticker_id: int) -> Dict[str, 
 
         # Dates: try common key names
         def _parse_date_field(key: str) -> Optional[date]:
+            """
+            Parse an ISO-8601 datetime string stored under `key` in the surrounding `raw` mapping and return a datetime.date.
+            
+            Parameters:
+                key (str): Key to look up in the surrounding `raw` mapping (closure). If the key is missing or the value is falsy, returns None.
+            
+            Returns:
+                Optional[date]: The parsed date component when a valid ISO datetime string is present, otherwise None.
+            
+            Notes:
+                - This function reads from a `raw` variable that must exist in the enclosing scope.
+                - Any exception raised by `isoparse` is propagated to the caller.
+            """
             val = raw.get(key)
             if not val:
                 return None
@@ -153,16 +193,20 @@ def ingest_dividends_for_ticker(
     client, storage, ticker: Dict[str, Any], batch_size: int = 500
 ) -> Dict[str, int]:
     """
-    Fetch, transform and upsert dividends for a single ticker.
-
-    Args:
-        client: PolygonDataClient instance
-        storage: DataStorage-like with `_upsert_dividends_batch` available (db_utils helper)
-        ticker: ticker dictionary
-        batch_size: batch size for DB upsert
-
+    Fetch, transform, and upsert dividends for a single ticker in batched transactions.
+    
+    Fetches raw dividend records from the provided client for the given ticker, transforms and validates each record via transform_dividend_record, stages bad records, and upserts validated rows to the database in batches. Tracks and returns simple ingestion statistics.
+    
+    Parameters:
+        ticker (Dict[str, Any]): Ticker record containing at least `id` (int) and `ticker` (str).
+        batch_size (int): Number of rows per upsert batch (default 500).
+    
     Returns:
-        Dict with counts: fetched, inserted/updated, invalid, skipped
+        Dict[str, int]: Counts for the ingestion run with keys:
+            - fetched: number of raw records retrieved from the client
+            - upserted: number of rows successfully upserted into the DB
+            - invalid: number of records that failed transformation/validation
+            - skipped: number of records intentionally skipped (e.g., missing polygon id)
     """
     stats = {"fetched": 0, "upserted": 0, "invalid": 0, "skipped": 0}
     rows = []
@@ -203,7 +247,22 @@ def ingest_dividends_for_ticker(
 
 
 def ingest_dividends_for_all_tickers(batch_size: int = 500) -> Dict[str, int]:
-    """Orchestrator over all tickers in storage.get_available_tickers()."""
+    """
+    Run dividend ingestion for every ticker in storage and return aggregated statistics.
+    
+    Creates a PolygonDataClient and DataStorage, retrieves all tickers via storage.get_tickers(), and invokes ingest_dividends_for_ticker for each ticker. Accumulates and returns totals:
+    - tickers_processed: number of tickers successfully processed
+    - total_fetched: sum of fetched dividend records across tickers
+    - total_upserted: sum of upserted rows across tickers
+    
+    Per-ticker failures are logged and skipped so processing continues for remaining tickers.
+    
+    Parameters:
+        batch_size (int): Maximum number of transformed rows to buffer before flushing an upsert for each ticker.
+    
+    Returns:
+        Dict[str, int]: Aggregated statistics with keys "tickers_processed", "total_fetched", and "total_upserted".
+    """
     client = PolygonDataClient()
     storage = DataStorage()
     tickers = storage.get_tickers()

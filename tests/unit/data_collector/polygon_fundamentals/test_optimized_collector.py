@@ -77,6 +77,20 @@ def test_prepare_raw_data_parses_dates_and_computes_quality():
     collector = OptimizedFundamentalCollector.__new__(OptimizedFundamentalCollector)
 
     def fake_extract(stmt, fields):
+        """
+        Deterministically map requested field names to numeric placeholder values.
+        
+        This helper returns a dict mapping each field name in `fields` to a predictable numeric value:
+        - If a field name ends with the letter "s", its value is 100.
+        - Otherwise its value is 10.
+        
+        Parameters:
+            stmt: Ignored input representing a statement (kept for signature compatibility).
+            fields (Iterable[str]): Field names to extract values for.
+        
+        Returns:
+            dict: A mapping from each field name to its generated numeric value.
+        """
         return {f: (100 if f.endswith("s") else 10) for f in fields}
 
     collector._extract_financial_values = fake_extract
@@ -169,6 +183,16 @@ def test_find_matching_statement_with_dict_and_object_inputs():
 
     class ObjStmt:
         def __init__(self):
+            """
+            Initialize a simple statement-like test object with preset date and fiscal fields.
+            
+            This constructor creates an object that mimics a financial statement by setting:
+            - end_date to "2025-02-02"
+            - fiscal_period to "Q2"
+            - fiscal_year to 2025
+            
+            Used in tests to provide an object-form statement equivalent to the dict-form inputs.
+            """
             self.end_date = "2025-02-02"
             self.fiscal_period = "Q2"
             self.fiscal_year = 2025

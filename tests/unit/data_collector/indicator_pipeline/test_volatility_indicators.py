@@ -32,6 +32,21 @@ def test_atr_insufficient_data_warning(ohlcv_df):
 
     # Patch the ta function to avoid IndexError from the underlying library
     def fake_atr(high, low, close, window):
+        """
+        Stubbed Average True Range (ATR) implementation that returns all-NaN values.
+        
+        Used in tests to simulate insufficient-data behavior for ATR calculations by producing a pandas Series of NaNs
+        with the same index as the provided `close` series.
+        
+        Parameters:
+            high (pd.Series): High price series (only used for length/index alignment).
+            low (pd.Series): Low price series (only used for length/index alignment).
+            close (pd.Series): Close price series whose index and length are preserved in the returned Series.
+            window (int): ATR window/period (ignored by this stub).
+        
+        Returns:
+            pd.Series: A Series of NaNs matching the length and index of `close`.
+        """
         return pd.Series([np.nan] * len(close), index=close.index)
 
     with patch(

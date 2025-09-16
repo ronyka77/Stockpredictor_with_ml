@@ -25,6 +25,17 @@ from src.data_collector.indicator_pipeline.volume_indicators import (
 
 
 def make_price_df(n=60):
+    """
+    Create a synthetic OHLCV pandas DataFrame for testing.
+    
+    Returns a DataFrame with `n` rows of linearly increasing synthetic price and volume data suitable for indicator smoke tests. The index is a daily DateTimeIndex starting at 2025-01-01.
+    
+    Parameters:
+        n (int): Number of periods (rows) to generate. Defaults to 60.
+    
+    Returns:
+        pandas.DataFrame: Columns are ['open', 'high', 'low', 'close', 'volume'] with a DateTimeIndex.
+    """
     idx = pd.date_range("2025-01-01", periods=n)
     df = pd.DataFrame(
         {

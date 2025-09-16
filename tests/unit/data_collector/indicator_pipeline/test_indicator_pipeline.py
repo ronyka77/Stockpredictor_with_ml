@@ -538,6 +538,17 @@ def test_process_batch_future_exception(processor, mocker):
 
     # Arrange: make process_single_ticker raise to simulate executor future.exception path
     def raise_exc(ticker, cfg, job_id):
+        """
+        Always raises a RuntimeError with message "boom".
+        
+        Parameters:
+            ticker: Identifier for the ticker (unused).
+            cfg: Job configuration object or mapping (unused).
+            job_id: Identifier for the job run (unused).
+        
+        Raises:
+            RuntimeError: Always raised with the message "boom".
+        """
         raise RuntimeError("boom")
 
     mocker.patch.object(processor, "process_single_ticker", side_effect=raise_exc)

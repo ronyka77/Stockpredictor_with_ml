@@ -170,15 +170,37 @@ class PoolFake:
         page_size: int = 1000,
     ):
         # Convenience proxy: use a transient connection to perform execute_values
+        """
+        Convenience proxy that delegates bulk insert logic to a transient ConnectionFake.
+        
+        This calls ConnectionFake.execute_values with the given SQL and rows using a short-lived
+        ConnectionFake instance. Accepts iterable rows of tuple-like or dict-like mappings (same
+        semantics as ConnectionFake.execute_values). The transient connection is not retained, so
+        any stored data remains inside the temporary connection and is not exposed to callers.
+        
+        Parameters:
+            insert_sql (str): INSERT statement or SQL template used by execute_values.
+            rows (Iterable[Tuple] | Iterable[Mapping]): Rows to insert; may be tuple/list rows or dict-like rows.
+            template (Optional[str]): Optional template passed through to ConnectionFake.execute_values.
+            page_size (int): Page size passed through to ConnectionFake.execute_values (default 1000).
+        """
         conn = ConnectionFake()
         conn.execute_values(insert_sql, rows, template=template, page_size=page_size)
         return None
 
 
 def patch_global_pool(mocker, pool):
-    """Patch module-level pool helpers to return the provided `pool`.
-
-    Mirrors older test helper behavior but uses the canonical PoolFake.
+    """
+    Patch module-level pool helper functions so they return the provided pool.
+    
+    This replaces src.database.connection.init_global_pool, get_global_pool,
+    and close_global_pool with test fakes that respectively return `pool`,
+    return `pool`, and do nothing. Intended for use in tests to force a
+    specific PoolFake instance.
+    
+    Parameters:
+        mocker: The pytest-mock fixture (or compatible object) used to apply patches.
+        pool: The pool object to be returned by the patched helpers.
     """
 
     def init_global_pool_fake(minconn: int = 1, maxconn: int = 10):

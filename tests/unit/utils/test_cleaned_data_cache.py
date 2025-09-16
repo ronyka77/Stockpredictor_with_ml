@@ -59,7 +59,14 @@ def test_cache_key_and_roundtrip(tmp_path):
 
 @pytest.mark.unit
 def test_clear_cache(tmp_path):
-    """Clear the cache directory and ensure temporary contents are removed."""
+    """
+    Verify that ClearedDataCache.clear_cache removes cache artifacts.
+    
+    Creates a partial cache info file to simulate an incomplete entry and asserts that:
+    - cache_exists reports the partial entry as non-existent
+    - clear_cache completes without error
+    - the cache directory is empty after clearing
+    """
     c = CleanedDataCache(cache_dir=str(tmp_path))
     key = c._generate_cache_key(a=1)
     # create dummy info file to simulate existence

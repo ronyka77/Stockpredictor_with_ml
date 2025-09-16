@@ -97,6 +97,21 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         y_val: Optional[pd.Series] = None,
         **kwargs,
     ) -> "AutoGluonModel":
+        """
+        Fit the AutoGluon TabularPredictor on provided training (and optional validation) data and update the wrapper's internal state.
+        
+        This trains an AutoGluon TabularPredictor using the label name from self.config ("Future_Return_10D" by default) and the mae_scorer evaluation metric. It builds a training DataFrame by adding the label column to X, optionally builds a validation DataFrame from X_val/y_val, configures a predefined set of hyperparameter families, runs predictor.fit with preset training options, stores the predictor, captures feature names (excluding the label and group column), and marks the model as trained.
+        
+        Parameters:
+            X (pd.DataFrame): Feature matrix for training. A copy is made and the label column is appended.
+            y (pd.Series): Target values aligned with X.
+            X_val (Optional[pd.DataFrame]): Optional validation features; when provided, used as tuning_data.
+            y_val (Optional[pd.Series]): Optional validation targets aligned with X_val.
+            **kwargs: Ignored by this implementation (accepted for interface compatibility).
+        
+        Returns:
+            AutoGluonModel: self after training (predictor assigned, feature_names set, and is_trained=True).
+        """
         label = self.config.get("label", "Future_Return_10D")
         groups = self.config.get("groups", "year")
         eval_metric = mae_scorer

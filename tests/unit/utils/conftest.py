@@ -43,7 +43,11 @@ def fake_mlflow_client(dummy_run):
 
 @pytest.fixture
 def patch_mlflow_client(fake_mlflow_client):
-    """Patch the MlflowClient used in `src.utils.mlflow_integration` to return our fake client."""
+    """
+    Patch the MlflowClient used by src.utils.mlflow_integration so it returns the provided fake client.
+    
+    This fixture temporarily replaces src.utils.mlflow_integration.MlflowClient with a factory that returns the given fake_mlflow_client, then yields that fake client to the test.
+    """
     with patch(
         "src.utils.mlflow_integration.MlflowClient", return_value=fake_mlflow_client
     ):
@@ -60,5 +64,16 @@ def start_run_cm():
 
 @pytest.fixture
 def patch_mlflow_start(start_run_cm):
+    """
+    Patch mlflow.start_run to return the provided context-manager mock and yield the patch handle.
+    
+    The fixture replaces mlflow.start_run with a function that returns `start_run_cm` (a context-manager-like mock), allowing tests to enter a fake run context. Yields the patch object so callers can assert calls or configure the mock further.
+    
+    Parameters:
+        start_run_cm: A context-manager mock whose `__enter__`/`__exit__` behave like a started MLflow run.
+    
+    Returns:
+        The patch object for `mlflow.start_run` (a Mock) so tests can inspect or modify the patched callable.
+    """
     with patch("mlflow.start_run", return_value=start_run_cm) as s:
         yield s

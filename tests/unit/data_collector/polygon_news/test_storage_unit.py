@@ -147,6 +147,23 @@ def test_get_article_statistics_success_path():
         return None
 
     def fake_fetch_all(sql, params=None, dict_cursor=False):
+        """
+        Test helper that returns pre-defined result sets based on the SQL query string.
+        
+        Given a SQL snippet, returns one of the canned datasets used in tests:
+        - If the SQL contains "FROM polygon_news_tickers" returns the `tickers` list.
+        - If the SQL contains "FROM polygon_news_insights" returns the `sentiments` list.
+        - If the SQL contains "FROM polygon_news_articles GROUP BY publisher_name" returns the `publishers` list.
+        For any other SQL, returns an empty list.
+        
+        Parameters:
+            sql (str): The SQL query string used to select which canned dataset to return.
+            params: Ignored in this fake implementation.
+            dict_cursor (bool): Ignored in this fake implementation.
+        
+        Returns:
+            list: One of the predefined lists (`tickers`, `sentiments`, `publishers`) or an empty list.
+        """
         if "FROM polygon_news_tickers" in sql:
             return tickers
         if "FROM polygon_news_insights" in sql:
@@ -174,6 +191,13 @@ def test_health_check_unhealthy_on_exception():
     storage = PolygonNewsStorage()
 
     def raise_exc(*a, **k):
+        """
+        Raise a RuntimeError("db") to simulate a database failure.
+        
+        This helper accepts and ignores any positional and keyword arguments and
+        unconditionally raises RuntimeError with the message "db". Intended for use
+        in tests to simulate a database exception.
+        """
         raise RuntimeError("db")
 
     with patch("src.data_collector.polygon_news.storage.fetch_one", raise_exc):

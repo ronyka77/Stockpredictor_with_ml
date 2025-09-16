@@ -26,17 +26,25 @@ def _row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
 def bulk_upsert_technical_features(
     rows: Iterable[Dict[str, Any]], page_size: int = 1000, overwrite: bool = True
 ) -> int:
-    """Bulk upsert technical features using execute_values for performance.
-
-    Args:
-        rows:   Iterable of dicts with keys: ticker, date, feature_category,
-                feature_name, feature_value, quality_score
-        page_size: page size passed to execute_values
-        overwrite: If True, ON CONFLICT DO UPDATE; if False, ON CONFLICT DO NOTHING
-
+    """
+    Bulk upsert technical feature records into the `technical_features` table.
+    
+    Expects `rows` to be an iterable of dicts containing the keys:
+    `ticker`, `date`, `feature_category`, `feature_name`, `feature_value`, and optional `quality_score`.
+    Performs a single multi-row INSERT using psycopg2.extras.execute_values for performance.
+    
+    Parameters:
+        rows: Iterable of feature dictionaries as described above.
+        page_size: Number of rows per batch passed to execute_values (default 1000).
+        overwrite: If True, conflicts on (ticker, date, feature_category, feature_name) will update
+                   feature_value, quality_score, and calculation_timestamp. If False, conflicting rows
+                   are ignored.
+    
     Returns:
-        Number of rows attempted to insert (best-effort). If DB returns
-        rowcount it is returned; otherwise returns len(rows).
+        int: Number of rows attempted (returns cursor.rowcount if available, otherwise len(rows)).
+    
+    Raises:
+        Exception: Any database error is rolled back, logged, and re-raised.
     """
     rows = list(rows)
     if not rows:
@@ -85,6 +93,18 @@ def bulk_upsert_technical_features(
 
 
 def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
+    """
+    Convert a dividend record dictionary into a tuple ordered for DB insertion.
+    
+    The returned tuple matches the dividends table columns:
+      (id, ticker_id, cash_amount, currency, declaration_date,
+       ex_dividend_date, pay_date, record_date, frequency,
+       dividend_type, raw_payload)
+    
+    Notes:
+    - Optional fields are taken via dict.get and will be None if missing.
+    - `raw_payload`, if present, is JSON-serialized with `json.dumps(..., default=str)` so non-serializable values are stringified; if absent, the tuple value is None.
+    """
     return (
         d["id"],
         d["ticker_id"],
@@ -102,8 +122,10 @@ def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
 
 def _drop_dividend_duplicates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Remove duplicate dividend records based on ticker_id, cash_amount, ex_dividend_date, pay_date.
-    Keeps the first occurrence of each unique combination.
+    Return a list of dividend rows with duplicates removed.
+    
+    Rows are considered duplicates when all of (ticker_id, cash_amount, ex_dividend_date, pay_date) are identical.
+    Keeps the first occurrence for each unique combination and preserves the original input order. The input may be any iterable of dict-like rows; a list is returned.
     """
     seen = set()
     unique_rows = []
@@ -121,15 +143,31 @@ def _drop_dividend_duplicates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, 
 
 
 def _upsert_dividends_batch(rows: Iterable[Dict[str, Any]], page_size: int = 500) -> int:
-    """Bulk upsert dividend rows into the `dividends` table.
-
-    Args:
-        rows: Iterable of dicts with keys matching transformed dividend records
-        page_size: page size passed to execute_values
-
+    """
+    Bulk upsert dividend records into the `dividends` table.
+    
+    This function deduplicates the input rows (keeps the first occurrence for each unique
+    combination of ticker_id, cash_amount, ex_dividend_date, pay_date), then performs a
+    batched INSERT using psycopg2.extras.execute_values. On conflict by `id` the row is
+    updated with the incoming ex_dividend_date, pay_date, cash_amount, raw_payload and
+    updated_at = now().
+    
+    Parameters:
+        rows: Iterable of dicts representing dividend records. Expected keys include
+            at minimum: id, ticker_id, cash_amount, currency, declaration_date,
+            ex_dividend_date, pay_date, record_date, frequency, dividend_type,
+            and (optionally) raw_payload. Raw payload JSON serialization is handled
+            by the helper that builds DB tuples.
+        page_size: Number of rows per batch passed to execute_values (default 500).
+    
     Returns:
-        Number of rows attempted to insert (best-effort). If DB returns
-        rowcount it is returned; otherwise returns len(rows).
+        The number of rows the function attempted to insert/update. If the DB cursor
+        provides a rowcount that value is returned; otherwise the number of tuples
+        actually sent to the database (after deduplication) is returned.
+    
+    Raises:
+        Propagates any exception raised by the database operations (the transaction
+        will be rolled back before re-raising).
     """
     rows = list(rows)
     if not rows:

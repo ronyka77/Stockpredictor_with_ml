@@ -22,12 +22,29 @@ class OptimizedFundamentalProcessor:
 
     def __init__(self):
         # Get connection pool instead of creating new connections
+        """
+        Initialize the OptimizedFundamentalProcessor.
+        
+        Sets up a global database connection pool and creates the collector and storage components used for per-ticker fundamental data collection:
+        - self.db_pool: shared connection pool from get_global_pool()
+        - self.collector: OptimizedFundamentalCollector instance
+        - self.data_storage: DataStorage instance
+        """
         self.db_pool = get_global_pool()
         self.collector = OptimizedFundamentalCollector()
         self.data_storage = DataStorage()
 
     async def process_with_progress(self, tickers: List[str]) -> Dict[str, bool]:
-        """Process tickers with real-time progress tracking - one ticker at a time"""
+        """Process a list of ticker symbols sequentially, collecting fundamental data with real-time progress logging.
+        
+        Each ticker is processed one at a time by calling the collector's collect_fundamental_data method. Any exception raised while processing a ticker is caught and treated as a failure for that ticker.
+        
+        Parameters:
+            tickers (List[str]): Sequence of ticker symbols to process in order.
+        
+        Returns:
+            Dict[str, bool]: Mapping from each ticker to a boolean indicating success (True) or failure (False).
+        """
         results = {}
 
         logger.info(f"Processing {len(tickers)} tickers - one ticker at a time")

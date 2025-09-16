@@ -7,6 +7,18 @@ from src.data_collector.polygon_data.dividend_pipeline import (
 
 
 def make_raw(id_suffix: int):
+    """
+    Build a mock raw dividend record for tests.
+    
+    Returns a dict shaped like a Polygon dividend payload with predictable fields useful for unit tests.
+    Parameters:
+        id_suffix (int): Numeric suffix appended to the "id" field (resulting id like "poly-1").
+    
+    Returns:
+        dict: Mock raw dividend record containing string-form amounts and ISO date strings for fields
+              such as `ex_dividend_date`, `pay_date`, `declaration_date`, `record_date`, plus
+              `currency`, `frequency`, and `type`.
+    """
     return {
         "id": f"poly-{id_suffix}",
         "cash_amount": "1.00",

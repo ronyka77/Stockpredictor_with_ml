@@ -164,6 +164,15 @@ def test_fetch_and_execute_helpers_use_global_pool():
 
     class DummyPool:
         def connection(self):
+            """
+            Return a context manager that yields a database connection from the pool.
+            
+            Use as:
+                with connection() as conn:
+                    ...
+            
+            The returned context manager supplies a connection-like object and ensures it is returned to the pool when the context exits.
+            """
             return conn_cm()
 
     with patch("src.database.connection.get_global_pool", return_value=DummyPool()):

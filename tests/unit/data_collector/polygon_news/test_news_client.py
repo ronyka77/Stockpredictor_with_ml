@@ -86,6 +86,22 @@ def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     def fake_get(ticker, **kwargs):
+        """
+        Fake per-ticker fetch used in tests.
+        
+        Simulates the behavior of a real ticker-news fetch:
+        - Raises PolygonAPIError for ticker "BAD" to emulate an API failure.
+        - Otherwise returns a single-item list with a dict containing an "id" field in the form "ok-<ticker>".
+        
+        Parameters:
+            ticker (str): Ticker symbol to fetch.
+        
+        Returns:
+            list[dict]: List containing a single article-like dict with an "id" key.
+        
+        Raises:
+            PolygonAPIError: When ticker == "BAD".
+        """
         if ticker == "BAD":
             raise PolygonAPIError("simulated")
         return [{"id": f"ok-{ticker}"}]

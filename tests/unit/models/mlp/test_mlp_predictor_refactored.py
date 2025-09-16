@@ -15,6 +15,11 @@ SCALE_PATH = "src.models.time_series.mlp.mlp_architecture.MLPDataUtils.scale_dat
 class TestMLPPredictorRefactored:
     def setup_method(self):
         # Use a deterministic RNG for construction
+        """
+        Prepare test fixtures for TestMLPPredictorRefactored.
+        
+        Creates a deterministic 5x3 DataFrame (self.X_test) with a seeded RNG, injects a NaN and an Inf value at fixed positions, instantiates an MLPPredictor named "test_mlp", replaces its model with a MagicMock that returns a fixed 5x1 torch.Tensor and has a no-op eval(), and sets the predictor device to "cpu". Intended to establish reproducible inputs and a predictable model for downstream tests.
+        """
         rng = np.random.RandomState(0)
         arr = rng.randn(5, 3)
         # inject NaN and inf deterministically

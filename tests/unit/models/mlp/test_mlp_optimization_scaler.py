@@ -10,6 +10,14 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
 class TestMLPOptimizationScalerIntegration:
     def setup_method(self):
+        """
+        Test setup that creates deterministic synthetic train/test datasets and configures an MLP predictor and optimization mixin.
+        
+        Creates:
+        - X_train (DataFrame, 200 rows) with features 'feature1', 'feature2', 'feature3' (standard normal) and 'close' (uniform 50–150).
+        - y_train (Series, 200 rows), X_test (DataFrame, 50 rows), y_test (Series, 50 rows) with the same feature distributions.
+        Also initializes an MLPPredictor named "test_mlp_optimization" with a simple MLPModule (input_size=4, layer_sizes=[10,5], output_size=1) on CPU, and prepares an MLPOptimizationMixin configured for that predictor.
+        """
         rng = np.random.RandomState(42)
         self.X_train = pd.DataFrame(
             {

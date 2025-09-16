@@ -51,6 +51,19 @@ class _FakeRateLimiter:
 
 
 def _run(coro):
+    """
+    Run the given coroutine to completion using asyncio.run and return its result.
+    
+    Parameters:
+        coro: An awaitable or coroutine object to execute.
+    
+    Returns:
+        The value returned by the coroutine.
+    
+    Notes:
+        - Executes the coroutine in a new event loop; calling this when an asyncio event loop is already running will raise a RuntimeError.
+        - Any exception raised by the coroutine is propagated to the caller.
+    """
     return asyncio.run(coro)
 
 
@@ -69,6 +82,12 @@ def test_get_financials_raw_success():
 
         # Execution
         async def _call():
+            """
+            Fetch raw financials for the ticker "TST" using RawPolygonFundamentalsClient and return the parsed JSON response.
+            
+            Returns:
+                dict: JSON payload returned by get_financials_raw for "TST".
+            """
             async with RawPolygonFundamentalsClient() as client:
                 return await client.get_financials_raw("TST")
 
@@ -100,6 +119,12 @@ def test_get_financials_raw_rate_limit_retry():
 
         # Execution
         async def _call():
+            """
+            Fetch raw financials for the ticker "TST" using RawPolygonFundamentalsClient and return the parsed JSON response.
+            
+            Returns:
+                dict: JSON payload returned by get_financials_raw for "TST".
+            """
             async with RawPolygonFundamentalsClient() as client:
                 return await client.get_financials_raw("TST")
 

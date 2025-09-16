@@ -9,6 +9,17 @@ from src.data_utils.target_engineering import (
 
 
 def make_combined_df(close, future_close, prefix="Future_Close_"):
+    """
+    Create a DataFrame with a 'close' column and a future price column for a 10-day horizon.
+    
+    Parameters:
+        close: Iterable of current close prices (e.g., list, Series, or array).
+        future_close: Iterable of future close prices corresponding to the same indices as `close`.
+        prefix (str): Prefix for the future column name; final column will be `f"{prefix}10D"`.
+    
+    Returns:
+        pandas.DataFrame: DataFrame containing 'close' and the horizon-specific future price column.
+    """
     df = pd.DataFrame({"close": close})
     df[f"{prefix}10D"] = future_close
     return df

@@ -8,7 +8,14 @@ from src.data_utils import ml_data_pipeline as mp
 def test__load_from_consolidated_uses_target_and_drops_future_cols(
     mocker, features_with_future
 ):
-    """Load consolidated features, return targets Series, and drop future columns."""
+    """
+    Verify that loading consolidated features:
+    - returns targets as a pandas Series,
+    - removes any future-labelled feature columns (e.g., `Future_Close_10D`) from the feature frame,
+    - and preserves one-to-one alignment between features and targets with a non-empty result.
+    
+    This test patches the loader's consolidated storage to return a DataFrame that includes future horizon columns, calls `_load_from_consolidated(prediction_horizon=10)`, and asserts the outcomes above.
+    """
     loader = mfl.MLFeatureLoader()
     fake_df = features_with_future
     # patch consolidated storage loader

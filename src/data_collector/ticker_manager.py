@@ -21,11 +21,10 @@ class TickerManager:
         self, client: PolygonDataClient, storage: Optional[DataStorage] = None
     ):
         """
-        Initialize the ticker manager
-
-        Args:
-            client: Polygon.io API client
-            storage: Database storage instance (optional, will create if not provided)
+        Create a TickerManager tied to a PolygonDataClient and optional persistent storage.
+        
+        If `storage` is not provided a new DataStorage instance will be created. A
+        DataValidator is constructed in non-strict mode for incoming ticker data.
         """
         self.client = client
         self.storage = storage or DataStorage()
@@ -33,13 +32,9 @@ class TickerManager:
 
     def get_ticker_details(self, ticker: str) -> Optional[Dict]:
         """
-        Get detailed information about a specific ticker from database
-
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns:
-            Ticker details dictionary or None if not found
+        Retrieve detailed ticker record from the database.
+        
+        Ticker symbol is uppercased before querying. Returns a dictionary of column names to values for the first matching row, or None if no record is found or an error occurs (errors are logged).
         """
         try:
             # Get ticker from database using a more efficient query
@@ -66,13 +61,9 @@ class TickerManager:
 
     def resolve_ticker_to_id(self, ticker: str) -> Optional[int]:
         """
-        Resolve a ticker symbol to its database `id` in the `tickers` table.
-
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns:
-            Integer `id` of the ticker if found, otherwise None
+        Resolve a stock ticker symbol to its database id.
+        
+        Looks up the ticker via self.storage.get_tickers and returns the 'id' of the first matching record. If the input ticker is empty, no match is found, or an error occurs during lookup, the function returns None.
         """
         if not ticker:
             logger.warning("resolve_ticker_to_id called with empty ticker")
@@ -95,14 +86,20 @@ class TickerManager:
         self, tickers: List[str], batch_size: int = 50
     ) -> Dict[str, int]:
         """
-        Refresh detailed information for specific tickers
-
-        Args:
-            tickers: List of ticker symbols to refresh
-            batch_size: Number of tickers to process in each batch
-
+        Refresh detailed metadata for a list of tickers by querying the Polygon client and persisting results to storage.
+        
+        For each ticker the method fetches details from self.client.get_ticker_details, transforms selected fields into a storage-friendly dict (ticker is uppercased when persisted), and calls self.storage.store_tickers in batches. Processing is performed in batches of size `batch_size` with a short pause between batches to help respect rate limits.
+        
+        Parameters:
+            tickers (List[str]): Ticker symbols to refresh.
+            batch_size (int): Number of tickers to process per batch (default: 50).
+        
         Returns:
-            Dictionary with refresh statistics
+            Dict[str, int]: A stats dictionary with counts:
+                - "processed": total tickers attempted
+                - "updated": number of tickers whose details were stored/updated
+                - "not_found": tickers for which no details were returned by the client
+                - "errors": tickers that raised exceptions during processing
         """
         logger.info(f"🔍 Refreshing detailed information for {len(tickers)} tickers")
 
@@ -183,7 +180,14 @@ class TickerManager:
 
 def main():
     """
-    Main function to refresh ticker data in database
+    Entry point that refreshes ticker details stored in the database.
+    
+    This function initializes the data storage and Polygon API client (using config.API_KEY),
+    creates a TickerManager, and runs refresh_ticker_details for all tickers returned by storage.
+    It logs progress and returns a POSIX-style exit code.
+    
+    Returns:
+        int: 0 on successful completion, 1 on any error.
     """
     from src.utils.logger import get_general_logger
 

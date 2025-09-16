@@ -96,6 +96,14 @@ def test_baseindicator_validate_and_standardize_columns(mocker):
     # Minimal concrete subclass to exercise BaseIndicator.__init__
     class DummyIndicator(base_mod.BaseIndicator):
         def calculate(self):
+            """
+            Return an IndicatorResult built from the indicator's current data.
+            
+            Creates and returns an IndicatorResult by calling create_indicator_result on this instance's data with an empty metadata dict.
+            
+            Returns:
+                IndicatorResult: result object containing the indicator data and its computed quality score.
+            """
             return create_indicator_result(self.data, metadata={})
 
     # Missing required columns -> ValueError raised by validate_data()
@@ -128,6 +136,14 @@ def test_validate_data_rejects_too_many_missing(mocker):
 
     class DummyIndicator(base_mod.BaseIndicator):
         def calculate(self):
+            """
+            Return an IndicatorResult built from the indicator's current data.
+            
+            Creates and returns an IndicatorResult by calling create_indicator_result on this instance's data with an empty metadata dict.
+            
+            Returns:
+                IndicatorResult: result object containing the indicator data and its computed quality score.
+            """
             return create_indicator_result(self.data, metadata={})
 
     # Patch MAX_MISSING_PCT to a very small number to force failure

@@ -10,6 +10,17 @@ from src.data_collector.polygon_data.dividend_pipeline import (
 
 
 def make_valid_raw():
+    """
+    Return a valid raw dividend record payload used by tests.
+    
+    The returned dict matches the shape expected by transform_dividend_record and contains example values:
+    - id (str): external polygon id ("poly-123")
+    - cash_amount (str): decimal string ("0.50")
+    - ex_dividend_date, pay_date, declaration_date, record_date (str): ISO date strings ("YYYY-MM-DD")
+    - currency (str): 3-letter currency code ("USD")
+    - frequency (int): payout frequency (1)
+    - type (str): dividend type ("CASH")
+    """
     return {
         "id": "poly-123",
         "cash_amount": "0.50",
@@ -37,6 +48,12 @@ def test_transform_valid_record():
 
 @pytest.mark.parametrize("bad_cash", [None, "not-a-number", ""])
 def test_transform_invalid_cash(bad_cash):
+    """
+    Parametrized test that verifies transform_dividend_record raises TransformError for invalid cash_amount values.
+    
+    Parameters:
+        bad_cash: An invalid value to place in the raw record's "cash_amount" field (e.g., None, non-numeric string, or empty string).
+    """
     raw = make_valid_raw()
     raw["cash_amount"] = bad_cash
     with pytest.raises(TransformError):

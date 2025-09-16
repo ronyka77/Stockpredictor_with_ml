@@ -116,14 +116,17 @@ class NewsTickerIntegration:
         include_etfs: bool = True,
     ) -> List[Dict[str, Any]]:
         """
-        Get prioritized list of tickers for news collection
-
-        Args:
-            max_tickers: Maximum number of tickers to return
-            include_etfs: Whether to include ETFs
-
+        Return a prioritized list of tickers for news collection.
+        
+        If a TickerManager was provided at construction, attempts to retrieve prioritized tickers from it; on any error it falls back to the built-in static lists. If no manager is available, returns the fallback tickers.
+        
+        Parameters:
+            max_tickers (int): Maximum number of tickers to return.
+            include_etfs (bool): Whether ETFs should be included in the returned list.
+        
         Returns:
-            List of ticker dictionaries with priority information
+            List[Dict[str, Any]]: Ordered list of ticker dictionaries. Each dictionary contains keys such as
+            'ticker', 'priority_score', 'market_cap', 'avg_volume', 'sector', 'is_major', and 'category'.
         """
         if self.ticker_manager:
             try:
@@ -140,7 +143,33 @@ class NewsTickerIntegration:
     def _get_tickers_from_manager(
         self, max_tickers: int, include_etfs: bool
     ) -> List[Dict[str, Any]]:
-        """Get tickers from the ticker manager with prioritization"""
+        """
+        Builds and returns a prioritized list of tickers sourced from the configured ticker manager.
+        
+        Retrieves tickers from self.ticker_manager.storage.get_tickers(), computes a numeric
+        priority score for each entry using market cap and average volume, filters out ETFs
+        when include_etfs is False, categorizes each ticker, and returns the top results
+        sorted by descending priority.
+        
+        Parameters:
+            max_tickers (int): Maximum number of ticker entries to return.
+            include_etfs (bool): If False, ETF-like tickers (per _is_etf) are excluded.
+        
+        Returns:
+            List[Dict[str, Any]]: Sorted list (highest priority first) of ticker dictionaries.
+            Each dictionary contains:
+                - ticker (str)
+                - priority_score (float)
+                - market_cap (Optional[float])
+                - avg_volume (Optional[float])
+                - sector (str)
+                - is_major (bool)  # whether the ticker is in the fallback major list
+                - category (str)   # value from _categorize_ticker
+        
+        Raises:
+            Exception: Propagates exceptions raised while fetching or processing tickers
+            from the ticker manager.
+        """
         try:
             # Get active tickers from manager
             active_tickers = self.ticker_manager.storage.get_tickers()
@@ -186,7 +215,26 @@ class NewsTickerIntegration:
     def _get_fallback_tickers(
         self, max_tickers: int, include_etfs: bool
     ) -> List[Dict[str, Any]]:
-        """Get fallback ticker list when ticker manager is unavailable"""
+        """
+        Return a stable fallback list of prioritized ticker dictionaries when the ticker manager is unavailable.
+        
+        The list places predefined major tickers first (highest priority), then appends value tickers until the requested maximum is reached.
+        ETFs are excluded when include_etfs is False. Each returned entry is a dict with keys:
+        - ticker: ticker symbol (str)
+        - priority_score: numeric priority (higher = more important)
+        - market_cap: None (fallback entries do not include market cap)
+        - avg_volume: None (fallback entries do not include average volume)
+        - sector: a best-effort sector string ("Unknown" for major, "Financial" for value)
+        - is_major: True for major list members, False for value list members
+        - category: "major" or "value"
+        
+        Parameters:
+            max_tickers (int): Maximum number of tickers to return.
+            include_etfs (bool): If False, ETF-like tickers are omitted.
+        
+        Returns:
+            List[Dict[str, Any]]: Up to max_tickers fallback ticker dictionaries ordered by priority.
+        """
         fallback_tickers = []
 
         # Major tickers (highest priority)
@@ -231,8 +279,18 @@ class NewsTickerIntegration:
         self, market_cap: float, avg_volume: float
     ) -> float:
         """
-        Calculate priority score for news collection
-        Higher score = higher priority for news collection
+        Compute a numeric priority score for a ticker based on market capitalization and average trading volume.
+        
+        Higher returned values indicate higher priority for news collection. The score is composed of two weighted components:
+        - Market cap (0–40 points) determined by descending thresholds.
+        - Average daily volume (0–30 points) determined by descending thresholds.
+        
+        Parameters:
+            market_cap (float): Market capitalization in dollars (e.g., 1.5e11 for $150B). If falsy or None, the market-cap component is omitted.
+            avg_volume (float): Average daily trading volume in shares. If falsy or None, the volume component is omitted.
+        
+        Returns:
+            float: Combined priority score (higher = higher priority).
         """
         score = 0.0
 
@@ -271,7 +329,19 @@ class NewsTickerIntegration:
     def _categorize_ticker(
         self, ticker: str, market_cap: Optional[float]
     ) -> str:
-        """Categorize ticker for news collection strategy"""
+        """
+        Determine the news-collection category for a given ticker.
+        
+        Returns one of: "major", "value", "etf", "large_cap", "mid_cap", or "small_cap".
+        - Tickers present in the instance fallback_major_tickers return "major".
+        - Tickers present in fallback_value_tickers return "value".
+        - ETF-like tickers (per _is_etf) return "etf".
+        - If market_cap (USD) is provided, >= 100e9 → "large_cap"; >= 10e9 → "mid_cap".
+        - Otherwise returns "small_cap".
+        
+        Parameters:
+            market_cap (Optional[float]): Market capitalization in USD; may be None.
+        """
         if ticker in self.fallback_major_tickers:
             return "major"
         elif ticker in self.fallback_value_tickers:

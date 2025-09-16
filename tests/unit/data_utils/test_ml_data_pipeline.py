@@ -33,6 +33,18 @@ def sample_combined_data() -> pd.DataFrame:
 
 
 def _fake_convert_absolute_to_percentage_returns(df: pd.DataFrame, horizon: int):
+    """
+    Create a test-only copy of `df` with a deterministic synthetic target column for a given horizon.
+    
+    The function returns a copy of the input DataFrame with a new column named `target_{horizon}d` containing a linear sequence of floats from 0.0 to 1.0 (inclusive) across the rows. Designed for tests — values are deterministic and fall within the pipeline's expected filtering window.
+    
+    Parameters:
+        df (pd.DataFrame): Source dataframe to copy and augment.
+        horizon (int): Prediction horizon used to name the target column.
+    
+    Returns:
+        (pd.DataFrame, str): Tuple of (modified_dataframe, target_column_name).
+    """
     df2 = df.copy()
     col = f"target_{horizon}d"
     # deterministic small returns that pass pipeline filtering (-0.7 .. 2.0)

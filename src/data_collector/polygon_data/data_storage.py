@@ -41,14 +41,20 @@ class DataStorage:
         batch_size: int = 1000,
     ) -> Dict[str, Any]:
         """
-        Store validated OHLCV data to PostgreSQL database
-
-        Args:
-            records: List of validated OHLCV records
-            batch_size: Number of records to insert in each batch
-
+        Store a list of validated OHLCV records into the PostgreSQL historical_prices table using batched upserts.
+        
+        Processes the provided OHLCVRecord objects by converting them to row dicts, dropping duplicate (ticker, date) pairs, normalizing types (date and volume), and writing the data in batches. Each batch is upserted (insert or update on conflict) via the internal _upsert_batch method; per-batch errors are counted and the routine continues with subsequent batches. Unexpected errors during the overall operation are re-raised.
+        
+        Parameters:
+            records (List[OHLCVRecord]): Validated OHLCVRecord instances to store. If empty, no action is taken.
+            batch_size (int): Number of rows to write per batch (default: 1000).
+        
         Returns:
-            Dictionary with storage statistics
+            Dict[str, Any]: Storage summary containing:
+                - stored_count (int): number of rows inserted (sum of batch insert counts),
+                - updated_count (int): number of rows reported as updated,
+                - error_count (int): number of rows that failed to process due to batch errors,
+                - total_processed (int): total number of input records.
         """
         if not records:
             logger.warning("No records to store")
@@ -402,14 +408,20 @@ class DataStorage:
         self, tickers_data: List[Dict[str, Any]], batch_size: int = 1000
     ) -> Dict[str, Any]:
         """
-        Store ticker information to database
-
-        Args:
-            tickers_data: List of ticker dictionaries
-            batch_size: Number of records to insert in each batch
-
+        Upsert ticker metadata into the database in batches.
+        
+        Processes a list of ticker dictionaries, normalizing the ticker symbol to uppercase, removing fields with None values, and performing batched INSERT ... ON CONFLICT (ticker) DO UPDATE upserts. Failures in an individual batch are counted and do not stop processing of subsequent batches.
+        
+        Parameters:
+            tickers_data (List[dict]): List of ticker records. Each record may contain keys such as "ticker", "name", "market", "locale", "primary_exchange", "currency_name", "active", "type", "market_cap", "weighted_shares_outstanding", "round_lot", "cik", "composite_figi", "share_class_figi", "sic_code", "sic_description", "ticker_root", "total_employees", "list_date". The "ticker" value will be uppercased.
+            batch_size (int): Maximum number of records to write in a single database batch (default 1000).
+        
         Returns:
-            Dictionary with storage statistics
+            dict: Statistics about the operation with keys:
+                - stored_count (int): number of records successfully sent to the database (counts per processed batch).
+                - updated_count (int): number of rows updated (implementation currently returns 0).
+                - error_count (int): number of records in batches that failed.
+                - total_processed (int): total number of input records.
         """
         if not tickers_data:
             logger.warning("No ticker data to store")
@@ -508,7 +520,20 @@ class DataStorage:
             raise
 
     def get_tickers(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get tickers from database"""
+        """
+        Retrieve active tickers from the database.
+        
+        If `ticker` is provided, returns only the active row matching that exact ticker symbol (case-sensitive as stored). Results are returned as a list of dictionaries mapping column names to values, ordered by the ticker column.
+        
+        Parameters:
+            ticker (Optional[str]): Optional exact ticker symbol to filter by.
+        
+        Returns:
+            List[Dict[str, Any]]: List of ticker records (as dicts). May be empty if no matching active tickers exist.
+        
+        Raises:
+            Exception: Propagates any database-related errors encountered during query execution.
+        """
 
         query = "SELECT * FROM tickers WHERE 1=1"
         query += " AND active = true"
@@ -532,5 +557,9 @@ class DataStorage:
             raise
 
     def __exit__(self):
-        """Context manager exit"""
+        """
+        Context manager exit hook that intentionally performs no cleanup.
+        
+        Used to satisfy the context manager protocol (with statement). This implementation is a no-op and does not close connections or release resources; any required cleanup must be handled elsewhere.
+        """
         pass

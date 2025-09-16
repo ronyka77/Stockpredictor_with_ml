@@ -771,14 +771,25 @@ class MLPPredictor(PyTorchBasePredictor):
         self, X: pd.DataFrame, method: str = "variance"
     ) -> np.ndarray:
         """
-        Get prediction confidence scores.
-
+        Return normalized confidence scores for model predictions.
+        
+        This preprocesses input X (using the predictor's preprocessing and scaler), runs the model in evaluation mode,
+        and computes per-sample confidence values using one of three methods:
+        - "variance": absolute prediction values normalized by their maximum (range [0,1]).
+        - "simple": absolute prediction values passed through a sigmoid-like mapping (range (0,1)).
+        - "margin": absolute prediction values passed through tanh (range [0,1)).
+        
+        The returned array is 1-D, aligned with the input rows.
+        
         Args:
-            X: Input features DataFrame
-            method: Confidence calculation method ('variance', 'simple', 'margin')
-
+            X: Input features as a pandas DataFrame.
+            method: Confidence calculation method — one of "variance", "simple", or "margin".
+        
         Returns:
-            Confidence scores as numpy array
+            A 1-D numpy.ndarray of confidence scores (one value per input row).
+        
+        Raises:
+            ValueError: If the model has not been trained or if an unsupported method is provided.
         """
         if self.model is None:
             raise ValueError(

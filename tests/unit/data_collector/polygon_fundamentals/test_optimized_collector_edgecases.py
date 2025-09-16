@@ -9,6 +9,20 @@ from src.data_collector.polygon_fundamentals.optimized_collector import (
 
 
 def _make_stats_template():
+    """
+    Return a new statistics template dict used to track collection metrics.
+    
+    Returns:
+        dict: A dictionary initialized with counters and timestamps:
+            - total_processed (int): total items considered.
+            - successful (int): number of successful collections.
+            - failed (int): number of failed collections.
+            - skipped (int): number of skipped items.
+            - cache_hits (int): number of times cached data was used.
+            - api_calls (int): number of external API calls made.
+            - start_time (Optional[datetime]): collection start timestamp, or None.
+            - end_time (Optional[datetime]): collection end timestamp, or None.
+    """
     return {
         "total_processed": 0,
         "successful": 0,

@@ -35,9 +35,36 @@ def prepare_ml_data_for_training(
     filter_train_set: bool = True,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
-    Comprehensive data preparation function for ML training
-    This function loads all available data, prepares features and targets,
-    creates temporal train/test splits, and performs data cleaning.
+    Prepare and return cleaned, feature-engineered training and test datasets for a given prediction horizon.
+    
+    Loads raw data, converts absolute future prices to percentage returns for the specified prediction_horizon, filters extreme target values, builds feature matrix (including price-normalized, prediction-bound, and temporal features), cleans numeric issues (Inf/NaN), and performs a date-based train/test split (filtered to Fridays). The result includes original features, target column name, simple transformation manifest, and dataset metadata.
+    
+    Parameters:
+        prediction_horizon (int): Forecast horizon in days used to compute percentage-return targets.
+        split_date (str): ISO date string (YYYY-MM-DD) used to split data into training (< split_date) and test (>= split_date).
+        ticker (Optional[str]): If provided, data will be loaded/filtered for this ticker.
+        filter_train_set (bool): If True, the training set is filtered to the same weekday constraint (Fridays) as the test set.
+    
+    Returns:
+        dict: A dictionary containing:
+            - "X_train" (pd.DataFrame): Feature dataframe for training.
+            - "X_test" (pd.DataFrame): Feature dataframe for testing/prediction.
+            - "y_train" (pd.Series): Target series for training (percentage returns).
+            - "y_test" (pd.Series): Target series for testing (percentage returns).
+            - "X_original" (pd.DataFrame): Copy of the original feature matrix before final cleaning (for inverse transforms).
+            - "target_column" (str): Column name used as the target in the returned y_* series.
+            - "transformation_manifest" (dict): Lightweight record of applied transformations (may be empty).
+            - "train_date_range" (str): Human-readable date range for the final training set or "No training data".
+            - "test_date_range" (str): Human-readable date range for the final test set or "No test data".
+            - "feature_count" (int): Number of features in X_train.
+            - "train_samples" (int): Number of training samples.
+            - "test_samples" (int): Number of test samples.
+            - "prediction_horizon" (int): Echo of the input prediction_horizon.
+            - "split_date" (str): Echo of the input split_date.
+    
+    Raises:
+        ValueError: If no data is loaded, if the required 'date' column is missing, or if resulting train/test partitions are empty after splitting and weekday filtering.
+        Exception: Any unexpected error during preparation is logged and re-raised.
     """
     logger.info("=" * 80)
     logger.info("🎯 COMPREHENSIVE ML DATA PREPARATION")
@@ -275,18 +302,24 @@ def prepare_ml_data_for_prediction(
     prediction_horizon: int = 10,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
-    Comprehensive data preparation function for ML prediction
-    This function loads all available data, prepares features and targets,
-    creates temporal train/test splits, and performs data cleaning.
-    Args:
-        prediction_horizon: Days ahead for target prediction (default: 10)
-
+    Prepare features and targets for making ML predictions for a given horizon.
+    
+    Loads all available data, converts absolute targets to percentage returns for the specified prediction horizon, constructs feature columns (excluding metadata and future-leakage columns), generates price-normalized and date-derived features, cleans missing and infinite values, and returns the prediction (test) set filtered to dates on or after 2025-03-15 and restricted to Fridays.
+    
+    Parameters:
+        prediction_horizon (int): Forecast horizon in days used to compute the target percentage return (default: 10).
+    
     Returns:
-        Dictionary containing:
-        - 'X_test': Test features
-        - 'y_test': Test targets
-        - 'target_column': Name of target column used
-        - 'feature_count': Number of features
+        dict: A dictionary containing:
+            - X_test (pd.DataFrame): Feature matrix for the prediction set (rows aligned to y_test).
+            - y_test (pd.Series): Target percentage returns for the prediction set.
+            - target_column (str): Name of the target column created for the given horizon.
+            - test_date_range (str): Human-readable date range of the returned test set or "No test data".
+            - feature_count (int): Number of feature columns in X_test.
+            - prediction_horizon (int): Echoes the input horizon value.
+    
+    Raises:
+        ValueError: If no data could be loaded.
     """
     logger.info("=" * 80)
     logger.info("🎯 COMPREHENSIVE ML DATA PREPARATION FOR PREDICTION")

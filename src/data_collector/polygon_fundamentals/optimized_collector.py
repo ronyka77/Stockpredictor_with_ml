@@ -91,7 +91,13 @@ class OptimizedFundamentalCollector:
         }
 
     def _load_ticker_cache(self) -> Dict[str, int]:
-        """Load all ticker metadata into cache"""
+        """
+        Build and return an in-memory mapping of ticker symbol to ticker ID.
+        
+        Queries self.data_storage.get_tickers() and constructs a dict where keys are ticker symbols (str)
+        and values are integer ticker IDs. Entries missing a ticker or an ID are skipped. On error or if
+        no tickers are found, an empty dict is returned.
+        """
         try:
             logger.info("Loading ticker metadata into cache...")
 

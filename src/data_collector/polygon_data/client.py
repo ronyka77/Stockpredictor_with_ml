@@ -217,14 +217,22 @@ class PolygonDataClient:
         self, endpoint: str, params: Optional[Dict] = None
     ) -> List[Dict]:
         """
-        Fetch all data from a paginated endpoint
-
-        Args:
-            endpoint: API endpoint path
-            params: Query parameters
-
+        Aggregate and return all items from a paginated Polygon API endpoint.
+        
+        This method repeatedly requests pages from the given endpoint (first using
+        `endpoint` and `params`, thereafter following `next_url` values returned by
+        the API) until no further pages remain or a page returns no `results`. When a
+        subsequent page is requested, the `next_url` is parsed to extract the request
+        path and query parameters.
+        
+        Parameters:
+            endpoint (str): Initial API endpoint path (e.g. "/v3/reference/dividends").
+            params (Optional[Dict]): Initial query parameters for the first request.
+        
         Returns:
-            List of all results from all pages
+            List[Dict]: Concatenated list of result objects from all pages. Each page is
+            expected to include a `"results"` list and may include a `"next_url"` string
+            used to fetch the next page.
         """
         all_results = []
         next_url = None
@@ -283,17 +291,16 @@ class PolygonDataClient:
         sort: str = "ex_dividend_date",
     ) -> List[Dict]:
         """
-        Get dividends for a single ticker. Polygon's dividends endpoint only supports
-        querying one ticker at a time, so this method requires a ticker parameter.
-
-        Args:
-            ticker: Stock ticker symbol (required)
-            order: 'asc' or 'desc' ordering of results (default 'desc')
-            limit: Number of results per page (capped to API limits)
-            sort: Field to sort by (default 'ex_dividend_date')
-
+        Retrieve all dividend records for a single ticker from Polygon's dividends endpoint.
+        
+        The Polygon dividends endpoint accepts only one ticker, so a ticker value is required.
+        Parameters:
+            order: 'asc' or 'desc' ordering of results.
+            limit: Maximum results per page (capped to 1000).
+            sort: Field to sort by (default 'ex_dividend_date').
+        
         Returns:
-            List of dividend records as returned by Polygon
+            List[Dict]: Aggregated dividend records across all pages.
         """
         if not ticker:
             raise ValueError("ticker is required for get_dividends")
@@ -310,16 +317,18 @@ class PolygonDataClient:
         self, market: str = "stocks", active: bool = True, limit: int = 1000, **kwargs
     ) -> List[Dict]:
         """
-        Get list of tickers from Polygon.io
-
-        Args:
-            market: Market type (stocks, crypto, fx, etc.)
-            active: Whether to include only active tickers
-            limit: Number of results per page
-            **kwargs: Additional query parameters
-
+        Return a list of tickers from the Polygon.io reference tickers endpoint.
+        
+        Builds query parameters from the provided arguments (limit is capped at 1000) and fetches all pages, returning an aggregated list of ticker records. Any additional keyword arguments are passed through as extra query parameters to the API.
+        
+        Parameters:
+            market: Market to query (e.g., "stocks", "crypto", "fx").
+            active: If True, only include active tickers.
+            limit: Maximum number of results per page (will be capped to 1000).
+            **kwargs: Additional query parameters forwarded to the API.
+        
         Returns:
-            List of ticker information
+            List[Dict]: Aggregated list of ticker information dictionaries.
         """
         params = {
             "market": market,

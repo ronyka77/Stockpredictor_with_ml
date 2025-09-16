@@ -81,11 +81,30 @@ class PolygonFundamentalsConfig:
         return datetime.now().strftime("%Y-%m-%d")
 
     def get_financials_url(self, ticker: str) -> str:
-        """Get the full URL for financials endpoint"""
+        """
+        Return the full URL for the Polygon financials endpoint.
+        
+        The `ticker` parameter is accepted for compatibility but is not used when constructing the URL.
+        Returns the concatenation of the configured BASE_URL and FINANCIALS_ENDPOINT.
+        """
         return f"{self.BASE_URL}{self.FINANCIALS_ENDPOINT}"
 
     def get_request_params(self, ticker: str, **kwargs) -> Dict[str, Any]:
-        """Get standard request parameters for API calls"""
+        """
+        Builds the standard query parameters dictionary for Polygon fundamentals API requests.
+        
+        Parameters accepted via kwargs (all optional):
+        - timeframe: override for data cadence (e.g., "quarterly").
+        - start_date: ISO date or datetime for the earliest filing_date.gte value.
+        - end_date: ISO date or datetime for the latest filing_date.lte value.
+        - limit: maximum number of records to request (defaults to 100).
+        
+        Returns:
+        A dict of request parameters including:
+        - ticker, timeframe, filing_date.gte, filing_date.lte, include_sources (lowercase "true"/"false"),
+          limit, sort ("filing_date"), and apikey.
+        If FILING_TYPES is configured on the dataclass, adds "filing_date.filing_type" as a comma-separated string.
+        """
         params = {
             "ticker": ticker,
             "timeframe": kwargs.get("timeframe", self.TIMEFRAME),

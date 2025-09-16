@@ -17,7 +17,14 @@ def create_dataloader(X, y, batch_size=16):
 
 
 def test_basic_training():
-    """Train MLPPredictor on dummy data and assert prediction dimensionality."""
+    """
+    Train an MLPPredictor on synthetic data and assert that its predictions have an expected shape.
+    
+    Creates small synthetic training (100 samples) and validation (50 samples) datasets, instantiates
+    an MLPPredictor with a short config, trains it using DataLoader wrappers, then obtains predictions
+    from a Pandas DataFrame view of the training inputs. Asserts predictions are either a 1-D array
+    or a 2-D array with a single column.
+    """
     config = {
         "input_size": 10,
         "layer_sizes": [64, 32],

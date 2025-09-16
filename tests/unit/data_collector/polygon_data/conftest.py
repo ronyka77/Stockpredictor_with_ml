@@ -17,14 +17,28 @@ def polygon_client():
 # Simple helper to patch object methods with autospec in tests
 @pytest.fixture
 def patch_object_autospec():
-    """Yield a helper wrapper around unittest.mock.patch.object that sets autospec=True.
-
-    Usage in tests:
-    with patch_object_autospec(SomeClass, 'method', return_value=...):
-            ...
+    """
+    Pytest fixture that returns a helper wrapper around unittest.mock.patch.object which enforces autospec=True.
+    
+    The returned callable has the signature (target, attribute, **kwargs) and behaves like unittest.mock.patch.object,
+    automatically setting autospec=True. Use it as a context manager or decorator in tests, for example:
+    
+    with patch_object_autospec(SomeClass, "method", return_value=...):
+        ...
     """
 
     def _wrapper(target, attribute, **kwargs):
+        """
+        Create a unittest.mock.patch.object wrapper that enforces autospec=True.
+        
+        Parameters:
+            target: The object or module whose attribute will be patched.
+            attribute (str): Name of the attribute to patch on the target.
+            **kwargs: Any additional keyword arguments forwarded to unittest.mock.patch.object.
+        
+        Returns:
+            A patcher (as returned by unittest.mock.patch.object) configured with autospec=True.
+        """
         return patch.object(target, attribute, autospec=True, **kwargs)
 
     return _wrapper
@@ -45,8 +59,9 @@ class OHLCVRecordFactory(ModelFactory):
 
 @pytest.fixture
 def poly_ohlcv_factory():
-    """Return the OHLCVRecordFactory for use in tests: OHLCVRecordFactory.build()
-
-    If polyfactory is not available, tests can still use `ohlcv_record` above.
+    """
+    Return the OHLCVRecordFactory class for creating test OHLCVRecord instances.
+    
+    Use the returned factory to build records in tests, e.g. `OHLCVRecordFactory.build()` or `OHLCVRecordFactory.batch(n)`.
     """
     return OHLCVRecordFactory

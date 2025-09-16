@@ -33,6 +33,16 @@ def news_db_session():
 
 @pytest.fixture
 def sample_raw_article_full():
+    """
+    Return the parsed test fixture for a complete ("full") sample raw article.
+    
+    This fixture provides the deserialized contents of the `sample_article_full` test fixture
+    (as produced by `load_fixture`) — a representative raw article payload containing all
+    expected fields, intended for use in unit tests that verify full-article processing.
+    
+    Returns:
+        dict: Parsed fixture data for a complete sample raw article.
+    """
     return load_fixture("sample_article_full")
 
 

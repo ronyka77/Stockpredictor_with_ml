@@ -75,6 +75,17 @@ def predict_best_model(model_dir: str):
 
 
 def predict_all_model(model_dir: str):
+    """
+    Run the full prediction workflow for every model stored in the given AutoGluon model directory.
+    
+    Loads the AutoGluon model and its metadata, fetches recent data (last 30 days), then iterates over all available internal model names produced by the AutoGluon predictor. For each model it sets the predictor to use that model, generates predictions, and saves results to an Excel file (one file per model).
+    
+    Parameters:
+        model_dir (str): Path to the AutoGluon model directory.
+    
+    Returns:
+        None
+    """
     predictor = AutoGluonPredictor(model_dir=model_dir)
     predictor.load_model_from_mlflow()
     predictor._load_metadata()
@@ -95,7 +106,11 @@ def predict_all_model(model_dir: str):
 
 def predict_all_model_folders():
     """
-    Loops through all model folders in AutogluonModels directory and runs predictions for each.
+    Run predictions for every model folder found under the top-level "AutogluonModels" directory.
+    
+    Searches "AutogluonModels" for subdirectories and invokes predict_all_model(model_dir) for each. If the base directory is missing or contains no subfolders, the function returns without action. Exceptions raised while processing an individual model folder are caught, logged, and processing continues with the next folder.
+    
+    This function has no return value; its effects are side-effectful (logging and writing prediction outputs via predict_all_model).
     """
     base_dir = "AutogluonModels"
 
