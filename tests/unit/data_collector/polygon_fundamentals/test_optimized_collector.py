@@ -147,10 +147,8 @@ def test_store_statement_period_success_path_calls_execute():
 
     # Patch execute to ensure it's called and does not raise
     with patch(
-        "src.data_collector.polygon_fundamentals.optimized_collector.execute",
-        Mock()
+        "src.data_collector.polygon_fundamentals.optimized_collector.execute", Mock()
     ) as mock_exec:
-
         # Execution
         result = asyncio.run(
             collector._store_statement_period(1, income_stmt, response)
@@ -176,16 +174,26 @@ def test_find_matching_statement_with_dict_and_object_inputs():
     obj = ObjStmt()
 
     # Execution & Verification for dict match
-    assert collector._find_matching_statement([dict_stmt, obj], "2025-01-01", "Q1", 2025) == dict_stmt
+    assert (
+        collector._find_matching_statement([dict_stmt, obj], "2025-01-01", "Q1", 2025)
+        == dict_stmt
+    )
 
     # Execution & Verification for object match
-    assert collector._find_matching_statement([dict_stmt, obj], "2025-02-02", "Q2", 2025) is obj
+    assert (
+        collector._find_matching_statement([dict_stmt, obj], "2025-02-02", "Q2", 2025)
+        is obj
+    )
 
 
 def test_load_ticker_cache_and_existing_data_cache():
     # Setup
     collector = OptimizedFundamentalCollector.__new__(OptimizedFundamentalCollector)
-    collector.data_storage = Mock(get_tickers=Mock(return_value=[{"ticker": "MSFT", "id": 7}, {"ticker": None, "id": 8}]))
+    collector.data_storage = Mock(
+        get_tickers=Mock(
+            return_value=[{"ticker": "MSFT", "id": 7}, {"ticker": None, "id": 8}]
+        )
+    )
 
     # Execution for ticker cache
     ticker_cache = collector._load_ticker_cache()
@@ -196,9 +204,11 @@ def test_load_ticker_cache_and_existing_data_cache():
     # Setup for existing data cache using patch on fetch_all
     with patch(
         "src.data_collector.polygon_fundamentals.optimized_collector.fetch_all",
-        return_value=[{"ticker_id": 1, "date": "2025-01-01"}, {"ticker_id": 2, "date": "2025-02-01"}],
+        return_value=[
+            {"ticker_id": 1, "date": "2025-01-01"},
+            {"ticker_id": 2, "date": "2025-02-01"},
+        ],
     ):
-
         # Execution
         collector._load_existing_data_cache()
 

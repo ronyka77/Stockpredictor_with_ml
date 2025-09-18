@@ -22,10 +22,12 @@ def factory_seed():
 
     return seed
 
+
 # pytest fixtures exposing the canonical fakes
 @pytest.fixture
 def pool_fake():
     return PoolFake()
+
 
 @pytest.fixture
 def connection_fake():

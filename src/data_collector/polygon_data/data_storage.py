@@ -9,7 +9,6 @@ import pandas as pd
 from src.utils.logger import get_logger
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
 from src.database.connection import (
-    get_global_pool,
     init_global_pool,
     fetch_all,
     fetch_one,

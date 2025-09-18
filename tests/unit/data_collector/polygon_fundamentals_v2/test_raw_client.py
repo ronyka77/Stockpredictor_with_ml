@@ -62,11 +62,13 @@ def test_get_financials_raw_success():
 
     fake_session = _FakeSession([_FakeResp(200, payload)])
 
-    with patch("aiohttp.ClientSession", lambda *a, **k: fake_session), patch(
-        "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
-        _FakeRateLimiter,
+    with (
+        patch("aiohttp.ClientSession", lambda *a, **k: fake_session),
+        patch(
+            "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
+            _FakeRateLimiter,
+        ),
     ):
-
         # Execution
         async def _call():
             async with RawPolygonFundamentalsClient() as client:
@@ -93,11 +95,14 @@ def test_get_financials_raw_rate_limit_retry():
         ]
     )
 
-    with patch("aiohttp.ClientSession", lambda *a, **k: fake_session), patch(
-        "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
-        _FakeRateLimiter,
-    ), patch("asyncio.sleep", new=AsyncMock(return_value=None)):
-
+    with (
+        patch("aiohttp.ClientSession", lambda *a, **k: fake_session),
+        patch(
+            "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
+            _FakeRateLimiter,
+        ),
+        patch("asyncio.sleep", new=AsyncMock(return_value=None)),
+    ):
         # Execution
         async def _call():
             async with RawPolygonFundamentalsClient() as client:
@@ -107,6 +112,7 @@ def test_get_financials_raw_rate_limit_retry():
 
     # Verification
     assert res["status"] == "OK"
+
 
 def test_get_financials_raw_raises_on_no_session():
     """Internal _get should raise when no aiohttp session is available"""

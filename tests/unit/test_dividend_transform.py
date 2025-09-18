@@ -62,5 +62,3 @@ def test_transform_invalid_currency_raises():
     raw["currency"] = "US"
     with pytest.raises(TransformError):
         transform_dividend_record(raw, ticker_id=1)
-
-

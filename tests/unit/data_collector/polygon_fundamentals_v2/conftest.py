@@ -14,4 +14,3 @@ class FinancialValueFactory(ModelFactory[FinancialValue]):
 def fv_factory():
     if FinancialValueFactory:
         return FinancialValueFactory
-

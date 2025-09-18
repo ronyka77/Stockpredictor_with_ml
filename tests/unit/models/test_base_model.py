@@ -1,5 +1,4 @@
-import builtins
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pandas as pd
@@ -18,6 +17,7 @@ class DummyModel(BaseModel):
         # simple behavior: store feature names and mark trained
         self.feature_names = list(X.columns) if hasattr(X, "columns") else None
         self.model = Mock()
+
         # create predictable predict / predict_proba outputs based on X shape
         def predict_fn(inp):
             return np.zeros(len(inp), dtype=int)
@@ -47,7 +47,9 @@ def test_predict_raises_if_untrained(sample_dataframe):
     model = DummyModel("dummy")
 
     # Execution / Verification
-    with pytest.raises(ValueError, match="Model must be trained before making predictions"):
+    with pytest.raises(
+        ValueError, match="Model must be trained before making predictions"
+    ):
         model.predict(sample_dataframe)
 
 
@@ -115,12 +117,18 @@ def test_save_and_load_model_interacts_with_mlflow(sample_dataframe, sample_seri
     fake_mlflow.log_params = Mock()
     fake_mlflow.log_model = Mock()
     fake_mlflow.load_sklearn_model = Mock(return_value=Mock())
-    fake_mlflow.get_run = Mock(return_value=Mock(data=Mock(params={
-        "model_name": "dummy",
-        "config": "{}",
-        "feature_names": str(list(model.feature_names)),
-        "is_trained": "True",
-    })))
+    fake_mlflow.get_run = Mock(
+        return_value=Mock(
+            data=Mock(
+                params={
+                    "model_name": "dummy",
+                    "config": "{}",
+                    "feature_names": str(list(model.feature_names)),
+                    "is_trained": "True",
+                }
+            )
+        )
+    )
 
     model.mlflow_integration = fake_mlflow
 
@@ -142,14 +150,18 @@ def test_save_and_load_model_interacts_with_mlflow(sample_dataframe, sample_seri
     assert isinstance(loaded.feature_names, list)
 
 
-def test_predict_with_threshold_defaults_and_delegation(sample_dataframe, sample_series):
+def test_predict_with_threshold_defaults_and_delegation(
+    sample_dataframe, sample_series
+):
     # Setup
     model = DummyModel("dummy")
     model.fit(sample_dataframe, sample_series)
 
     # Replace threshold_evaluator with a mock to capture calls
     fake_evaluator = Mock()
-    fake_evaluator.predict_with_threshold = Mock(return_value={"preds": np.array([0, 0, 0])})
+    fake_evaluator.predict_with_threshold = Mock(
+        return_value={"preds": np.array([0, 0, 0])}
+    )
     model.threshold_evaluator = fake_evaluator
 
     # Execution
@@ -158,6 +170,3 @@ def test_predict_with_threshold_defaults_and_delegation(sample_dataframe, sample
     # Verification: ensure evaluator was called with the model and defaults
     fake_evaluator.predict_with_threshold.assert_called_once()
     assert "preds" in result
-
-
-

@@ -158,6 +158,7 @@ def test_save_features_pyarrow_raises_and_logged(tmp_path, mock_pipeline_logger)
     fs_logger.error.assert_called()
     assert write_table.called
 
+
 def test_parquet_roundtrip(tmp_path):
     """Save and load features via parquet round-trip preserving data and metadata."""
     # Prepare sample DataFrame with datetime index

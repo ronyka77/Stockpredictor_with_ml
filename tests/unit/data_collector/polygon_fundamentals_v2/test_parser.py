@@ -79,6 +79,7 @@ def test_parser_handles_nested_and_legacy_formats(
     assert latest_inc is not None
     assert latest_inc.revenues.value == expected_revenue
 
+
 def test_parser_handles_missing_results():
     """Return empty FundamentalDataResponse when results key is missing"""
     parser = FundamentalsParser()
@@ -104,6 +105,7 @@ def test_parser_prefers_nested_over_legacy_and_parses_values():
     resp = parser.parse(raw, "AAPL")
     assert resp.income_statements
     assert resp.income_statements[0].revenues.value == 100
+
 
 def test_parser_returns_empty_response_for_no_results():
     """Return empty DTO when parser receives no results in payload"""

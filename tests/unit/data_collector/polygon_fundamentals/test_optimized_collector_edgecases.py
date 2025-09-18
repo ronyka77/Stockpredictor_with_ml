@@ -1,7 +1,6 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
 
 from src.data_collector.polygon_fundamentals.optimized_collector import (
     OptimizedFundamentalCollector,
@@ -31,7 +30,9 @@ def test_rate_limiter_failure_causes_collect_to_fail():
 
     # Simulate rate limiter acquire raising an exception
     collector.rate_limiter = Mock()
-    collector.rate_limiter.acquire = AsyncMock(side_effect=Exception("rate limit error"))
+    collector.rate_limiter.acquire = AsyncMock(
+        side_effect=Exception("rate limit error")
+    )
 
     # Execution
     result = asyncio.run(collector.collect_fundamental_data("TICK"))
@@ -73,7 +74,6 @@ def test_db_execute_failure_on_cached_data():
         "src.data_collector.polygon_fundamentals.optimized_collector.execute",
         side_effect=Exception("db error"),
     ) as mock_exec:
-
         # Execution
         result = asyncio.run(collector.collect_fundamental_data("TICK"))
 
@@ -81,5 +81,3 @@ def test_db_execute_failure_on_cached_data():
         assert result is False
         assert collector.stats["failed"] >= 1
         mock_exec.assert_called()
-
-

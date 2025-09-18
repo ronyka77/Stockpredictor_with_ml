@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock, patch
 
 from src.data_collector.polygon_data.dividend_pipeline import (
@@ -46,5 +45,3 @@ def test_ingest_dividends_for_ticker_success(mock_transform):
     assert stats["upserted"] == 2
     assert stats["invalid"] == 0
     assert stats["skipped"] == 0
-
-

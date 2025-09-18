@@ -97,8 +97,13 @@ def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
         d.get("frequency", None),
         d.get("dividend_type", None),
         # Ensure raw_payload is JSON-serializable for DB insertion
-        (json.dumps(d.get("raw_payload", None), default=str) if d.get("raw_payload", None) is not None else None),
+        (
+            json.dumps(d.get("raw_payload", None), default=str)
+            if d.get("raw_payload", None) is not None
+            else None
+        ),
     )
+
 
 def _drop_dividend_duplicates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -120,7 +125,9 @@ def _drop_dividend_duplicates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, 
     return unique_rows
 
 
-def _upsert_dividends_batch(rows: Iterable[Dict[str, Any]], page_size: int = 500) -> int:
+def _upsert_dividends_batch(
+    rows: Iterable[Dict[str, Any]], page_size: int = 500
+) -> int:
     """Bulk upsert dividend rows into the `dividends` table.
 
     Args:

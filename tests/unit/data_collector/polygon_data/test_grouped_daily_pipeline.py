@@ -39,4 +39,3 @@ def test_run_grouped_daily_pipeline_mocks(api_results, expected_count, tmp_path)
 
                 # Assert - the pipeline tracked stored records correctly
                 assert stats.total_records_stored == expected_count
-

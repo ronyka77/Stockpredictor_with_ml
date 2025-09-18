@@ -33,11 +33,14 @@ def test_combine_ticker_data_and_year_partitioning(tmp_path):
     tdata = {"AAA": a, "BBB": b}
 
     # Patch pyarrow write to avoid real IO and Path.stat to avoid file existence checks
-    with patch("pyarrow.parquet.write_table", return_value=None), patch.object(
-        Path,
-        "stat",
-        return_value=SimpleNamespace(
-            st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0
+    with (
+        patch("pyarrow.parquet.write_table", return_value=None),
+        patch.object(
+            Path,
+            "stat",
+            return_value=SimpleNamespace(
+                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0
+            ),
         ),
     ):
         result = storage.save_multiple_tickers(tdata, metadata={})
@@ -183,16 +186,21 @@ def test_load_consolidated_features_reads_files_and_applies_filters(tmp_path):
     file_path.write_bytes(b"")
 
     # Build a dataframe that will be returned by read_parquet
-    df = pd.DataFrame({
-        "ticker": ["AAA", "BBB"],
-        "date": pd.to_datetime(["2025-01-01", "2025-01-02"]),
-        "feat1": [1, 2],
-    })
+    df = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB"],
+            "date": pd.to_datetime(["2025-01-01", "2025-01-02"]),
+            "feat1": [1, 2],
+        }
+    )
 
     # Patch pd.read_parquet to return our df and filter_columns_by_categories to return feat1
-    with patch.object(pd, "read_parquet", lambda *a, **k: df), patch(
-        "src.data_collector.indicator_pipeline.consolidated_storage.filter_columns_by_categories",
-        lambda cols, cats: [c for c in cols if c.startswith("feat")],
+    with (
+        patch.object(pd, "read_parquet", lambda *a, **k: df),
+        patch(
+            "src.data_collector.indicator_pipeline.consolidated_storage.filter_columns_by_categories",
+            lambda cols, cats: [c for c in cols if c.startswith("feat")],
+        ),
     ):
         # No filters -> should return combined data for all tickers
         res = storage.load_consolidated_features()
@@ -203,7 +211,9 @@ def test_load_consolidated_features_reads_files_and_applies_filters(tmp_path):
     assert isinstance(res, pd.DataFrame) and res.empty
 
 
-def test_consolidate_existing_features_handles_no_available_and_success(tmp_path, mock_pipeline_logger):
+def test_consolidate_existing_features_handles_no_available_and_success(
+    tmp_path, mock_pipeline_logger
+):
     # Patch FeatureStorage to simulate no available tickers
     class FakeStorageEmpty:
         def get_available_tickers(self):
@@ -213,7 +223,9 @@ def test_consolidate_existing_features_handles_no_available_and_success(tmp_path
         "src.data_collector.indicator_pipeline.consolidated_storage.FeatureStorage",
         FakeStorageEmpty,
     ):
-        from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
+        from src.data_collector.indicator_pipeline.consolidated_storage import (
+            consolidate_existing_features,
+        )
 
         with pytest.raises(ValueError):
             consolidate_existing_features()
@@ -244,16 +256,27 @@ def test_consolidate_existing_features_handles_no_available_and_success(tmp_path
             pass
 
         def save_multiple_tickers(self, ticker_data, metadata):
-            return {"files_created": 1, "total_size_mb": 0.1, "compression_ratio": 1.0, "files": []}
+            return {
+                "files_created": 1,
+                "total_size_mb": 0.1,
+                "compression_ratio": 1.0,
+                "files": [],
+            }
 
-    with patch(
-        "src.data_collector.indicator_pipeline.consolidated_storage.FeatureStorage",
-        FakeStorage,
-    ), patch(
-        "src.data_collector.indicator_pipeline.consolidated_storage.ConsolidatedFeatureStorage",
-        FakeConsolidated,
-    ), patch("pyarrow.parquet.write_table", lambda *a, **k: None):
-        from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
+    with (
+        patch(
+            "src.data_collector.indicator_pipeline.consolidated_storage.FeatureStorage",
+            FakeStorage,
+        ),
+        patch(
+            "src.data_collector.indicator_pipeline.consolidated_storage.ConsolidatedFeatureStorage",
+            FakeConsolidated,
+        ),
+        patch("pyarrow.parquet.write_table", lambda *a, **k: None),
+    ):
+        from src.data_collector.indicator_pipeline.consolidated_storage import (
+            consolidate_existing_features,
+        )
 
         res = consolidate_existing_features()
         assert "files_created" in res or "files" in res
@@ -272,7 +295,12 @@ def test_main_handles_failure_and_success():
     # Success path: patch consolidate_existing_features to return a minimal result
     with patch(
         "src.data_collector.indicator_pipeline.consolidated_storage.consolidate_existing_features",
-        lambda strategy="by_date": {"files_created": 1, "total_size_mb": 0.1, "compression_ratio": 1.0, "files": []},
+        lambda strategy="by_date": {
+            "files_created": 1,
+            "total_size_mb": 0.1,
+            "compression_ratio": 1.0,
+            "files": [],
+        },
     ):
         from src.data_collector.indicator_pipeline.consolidated_storage import main
 

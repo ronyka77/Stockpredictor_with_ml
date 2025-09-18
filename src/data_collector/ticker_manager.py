@@ -79,7 +79,6 @@ class TickerManager:
             return None
 
         try:
-            
             storage_tickers = self.storage.get_tickers(ticker)
 
             if storage_tickers:

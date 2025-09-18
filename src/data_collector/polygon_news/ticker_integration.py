@@ -127,9 +127,7 @@ class NewsTickerIntegration:
         """
         if self.ticker_manager:
             try:
-                return self._get_tickers_from_manager(
-                    max_tickers, include_etfs
-                )
+                return self._get_tickers_from_manager(max_tickers, include_etfs)
             except Exception as e:
                 self.logger.warning(f"Failed to get tickers from manager: {e}")
                 return self._get_fallback_tickers(max_tickers, include_etfs)
@@ -158,9 +156,7 @@ class NewsTickerIntegration:
                     continue
 
                 # Calculate priority score
-                priority_score = self._calculate_priority_score(
-                    market_cap, avg_volume
-                )
+                priority_score = self._calculate_priority_score(market_cap, avg_volume)
 
                 prioritized_tickers.append(
                     {
@@ -227,9 +223,7 @@ class NewsTickerIntegration:
 
         return fallback_tickers[:max_tickers]
 
-    def _calculate_priority_score(
-        self, market_cap: float, avg_volume: float
-    ) -> float:
+    def _calculate_priority_score(self, market_cap: float, avg_volume: float) -> float:
         """
         Calculate priority score for news collection
         Higher score = higher priority for news collection
@@ -268,9 +262,7 @@ class NewsTickerIntegration:
 
         return score
 
-    def _categorize_ticker(
-        self, ticker: str, market_cap: Optional[float]
-    ) -> str:
+    def _categorize_ticker(self, ticker: str, market_cap: Optional[float]) -> str:
         """Categorize ticker for news collection strategy"""
         if ticker in self.fallback_major_tickers:
             return "major"

@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from datetime import date
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 from src.feature_engineering.data_loader import StockDataLoader
 
@@ -20,7 +20,16 @@ def sample_rows():
 def build_df_from_rows(rows):
     df = pd.DataFrame(
         rows,
-        columns=["date", "open", "high", "low", "close", "volume", "adjusted_close", "vwap"],
+        columns=[
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "adjusted_close",
+            "vwap",
+        ],
     )
     df["date"] = pd.to_datetime(df["date"])
     df.set_index("date", inplace=True)
@@ -38,7 +47,9 @@ def test_load_stock_data_converts_and_cleans(sample_rows):
 
     loader = StockDataLoader()
 
-    with patch("src.feature_engineering.data_loader.fetch_all", return_value=sample_rows) as mock_fetch:
+    with patch(
+        "src.feature_engineering.data_loader.fetch_all", return_value=sample_rows
+    ) as mock_fetch:
         df = loader.load_stock_data("aapl", date(2025, 1, 1), date(2025, 1, 3))
 
     # Expect fetch_all called with uppercase ticker and string dates
@@ -54,10 +65,16 @@ def test_load_stock_data_converts_and_cleans(sample_rows):
     "rows, expected_len, expected_exception",
     [
         ([], 0, None),
-        ([("2025-01-01", None, None, None, None, None, None, None)], None, pd.errors.IntCastingNaNError),
+        (
+            [("2025-01-01", None, None, None, None, None, None, None)],
+            None,
+            pd.errors.IntCastingNaNError,
+        ),
     ],
 )
-def test_load_stock_data_handles_empty_and_missing(rows, expected_len, expected_exception):
+def test_load_stock_data_handles_empty_and_missing(
+    rows, expected_len, expected_exception
+):
     """
     Setup: mock fetch_all to return empty or rows with missing data
 
@@ -108,7 +125,9 @@ def test_get_available_tickers_uses_min_data_points_from_config():
     rows = [("AAPL", 100, "Apple Inc.", "stocks"), ("MSFT", 90, "Microsoft", "stocks")]
     loader = StockDataLoader()
 
-    with patch("src.feature_engineering.data_loader.fetch_all", return_value=rows) as mock_fetch:
+    with patch(
+        "src.feature_engineering.data_loader.fetch_all", return_value=rows
+    ) as mock_fetch:
         tickers = loader.get_available_tickers()
 
     mock_fetch.assert_called_once()
@@ -125,7 +144,15 @@ def test_get_ticker_metadata_returns_dict_and_dataframe():
     """
 
     # Build rows with the exact number of columns expected by the loader
-    def make_row(ticker, row_id=1, name=None, market="stocks", active=True, type_="CS", market_cap=1000):
+    def make_row(
+        ticker,
+        row_id=1,
+        name=None,
+        market="stocks",
+        active=True,
+        type_="CS",
+        market_cap=1000,
+    ):
         row = [None] * 22
         row[0] = row_id
         row[1] = ticker
@@ -152,5 +179,3 @@ def test_get_ticker_metadata_returns_dict_and_dataframe():
 
     assert isinstance(df, pd.DataFrame)
     assert "ticker" in df.columns
-
-

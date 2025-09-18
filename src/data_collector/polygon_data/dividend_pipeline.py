@@ -5,6 +5,7 @@ This module implements `transform_dividend_record` according to the
 `dividends_ingestion_plan.md` validation requirements and provides lightweight
 staging for bad records.
 """
+
 from decimal import Decimal, InvalidOperation
 from typing import Dict, Any, Optional
 from datetime import date
@@ -210,7 +211,9 @@ def ingest_dividends_for_all_tickers(batch_size: int = 500) -> Dict[str, int]:
     overall = {"tickers_processed": 0, "total_fetched": 0, "total_upserted": 0}
     for t in tickers:
         try:
-            stats = ingest_dividends_for_ticker(client, storage, t, batch_size=batch_size)
+            stats = ingest_dividends_for_ticker(
+                client, storage, t, batch_size=batch_size
+            )
             overall["tickers_processed"] += 1
             overall["total_fetched"] += stats.get("fetched", 0)
             overall["total_upserted"] += stats.get("upserted", 0)
@@ -220,6 +223,7 @@ def ingest_dividends_for_all_tickers(batch_size: int = 500) -> Dict[str, int]:
 
     logger.info(f"Dividend ingest for all tickers complete: {overall}")
     return overall
+
 
 if __name__ == "__main__":
     ingest_dividends_for_all_tickers(batch_size=500)

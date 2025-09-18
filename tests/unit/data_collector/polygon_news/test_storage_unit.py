@@ -155,12 +155,15 @@ def test_get_article_statistics_success_path():
             return publishers
         return []
 
-    with patch("src.data_collector.polygon_news.storage.fetch_one", fake_fetch_one), patch(
-        "src.data_collector.polygon_news.storage.fetch_all", fake_fetch_all
-    ), patch.object(
-        storage, "get_latest_date_overall", lambda: datetime(2025, 8, 1, tzinfo=timezone.utc)
+    with (
+        patch("src.data_collector.polygon_news.storage.fetch_one", fake_fetch_one),
+        patch("src.data_collector.polygon_news.storage.fetch_all", fake_fetch_all),
+        patch.object(
+            storage,
+            "get_latest_date_overall",
+            lambda: datetime(2025, 8, 1, tzinfo=timezone.utc),
+        ),
     ):
-
         stats = storage.get_article_statistics()
 
     assert stats["total_articles"] == 5
