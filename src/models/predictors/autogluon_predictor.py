@@ -126,6 +126,6 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore")
 
-    model_dir = "AutogluonModels/ag-20250914_172204"
-    predict_all_model(model_dir)
-    # predict_all_model_folders()
+    model_dir = "AutogluonModels/ag-20250920_160248"
+    # predict_all_model(model_dir)
+    predict_all_model_folders()

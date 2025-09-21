@@ -240,52 +240,51 @@ class FeatureCalculator:
             DataFrame with future price target features
         """
         try:
-            # Future high prices (targets for prediction)
-            features_df["Future_High_10D"] = (
-                price_data["high"]
-                .reindex(features_df.index + pd.Timedelta(days=14))
-                .values
-            )
-            features_df["Future_High_20D"] = (
-                price_data["high"]
-                .reindex(features_df.index + pd.Timedelta(days=28))
-                .values
-            )
-            features_df["Future_High_30D"] = (
-                price_data["high"]
-                .reindex(features_df.index + pd.Timedelta(days=42))
-                .values
-            )
+            # Add a new column for day of week as integer (Monday=0, Sunday=6)
+            if "date" in features_df.columns:
+                features_df["dayofweek"] = pd.to_datetime(
+                    features_df["date"]
+                ).dt.dayofweek
+                logger.info(f"features_df index name: {features_df.index.name}")
+            elif features_df.index.name == "date" or "date" in features_df.index.names:
+                features_df["dayofweek"] = pd.to_datetime(features_df.index).dayofweek
+            else:
+                logger.warning(
+                    "No 'date' column or index found to compute dayofweek feature."
+                )
+
+            # Future high/close prices (targets for prediction)
+            # shifting to get the price that occurs N trading-rows ahead (if present).
+            temp = features_df.copy()
+            # Determine a working datetime index for sorting
+            if "date" in temp.columns:
+                temp["_work_date"] = pd.to_datetime(temp["date"])
+            else:
+                temp["_work_date"] = pd.to_datetime(temp.index)
+
+            # Sort by the working date and align price data to that order
+            temp = temp.sort_values("_work_date")
+            temp.index = temp["_work_date"]
+
+            price_aligned = price_data.reindex(temp.index)
+
+            for shift_days in (4, 9, 19, 29):
+                column_shift_days = shift_days + 1
+                temp[f"Future_High_{column_shift_days}D"] = price_aligned["high"].shift(-shift_days).values
+                temp[f"Future_Close_{column_shift_days}D"] = price_aligned["close"].shift(-shift_days).values
+                temp[f"Target_Date_{column_shift_days}D"] = temp["_work_date"].shift(-shift_days).values
+
+            # Reindex back to the original features_df ordering and copy the new columns across
+            temp = temp.reindex(features_df.index)
+            for col in temp.columns:
+                if col.startswith("Future_") or col.startswith("Target_Date_"):
+                    features_df[col] = temp[col].values
+            # Clean up any helper column if it was added to features_df
+            if "_work_date" in features_df.columns:
+                features_df.drop(columns=["_work_date"], inplace=True)
         except Exception as e:
             logger.error(f"Error adding future price targets: {str(e)}")
             raise
-
-        # # Log where Future_High_10D targets are missing
-        # missing_targets = features_df[features_df["Future_High_10D"].isna()]
-        # if not missing_targets.empty:
-        #     logger.warning(
-        #         f"Missing Future_High_10D targets for {len(missing_targets)} rows"
-        #     )
-
-        # Future close prices (alternative targets)
-        features_df["Future_Close_10D"] = (
-            price_data["close"]
-            .reindex(features_df.index + pd.Timedelta(days=14))
-            .values
-        )
-        features_df["Future_Close_20D"] = (
-            price_data["close"]
-            .reindex(features_df.index + pd.Timedelta(days=28))
-            .values
-        )
-        features_df["Future_Close_30D"] = (
-            price_data["close"]
-            .reindex(features_df.index + pd.Timedelta(days=42))
-            .values
-        )
-        logger.info(
-            f"Added {len([col for col in features_df.columns if 'Future_' in col])} future price target features"
-        )
 
         return features_df
 
@@ -327,25 +326,11 @@ class FeatureCalculator:
         features_df["Lower_Shadow"] = lower_shadow
         features_df["Body_Shadow_Ratio"] = body / (upper_shadow + lower_shadow + 1e-8)
 
-        # Returns
-        features_df["Return_1D"] = price_data["close"].pct_change()
-        features_df["Return_5D"] = price_data["close"].pct_change(5)
-        features_df["Return_10D"] = price_data["close"].pct_change(10)
-        features_df["Return_20D"] = price_data["close"].pct_change(20)
 
-        # Log returns
-        features_df["Log_Return_1D"] = np.log(
-            price_data["close"] / price_data["close"].shift(1)
-        )
-        features_df["Log_Return_5D"] = np.log(
-            price_data["close"] / price_data["close"].shift(5)
-        )
-        features_df["Log_Return_10D"] = np.log(
-            price_data["close"] / price_data["close"].shift(10)
-        )
-        features_df["Log_Return_20D"] = np.log(
-            price_data["close"] / price_data["close"].shift(20)
-        )
+        for shift_days in (1, 4, 9, 19, 29):
+                column_shift_days = shift_days + 1 if shift_days > 1 else shift_days
+                features_df[f"Return_{column_shift_days}D"] = price_data["close"].pct_change(shift_days)
+                features_df[f"Log_Return_{column_shift_days}D"] = np.log(price_data["close"] / price_data["close"].shift(shift_days))
 
         # Volume features
         if "volume" in price_data.columns:
@@ -415,8 +400,8 @@ class FeatureCalculator:
             100 * (1 - missing_pct) * (1 - infinite_pct) * (1 - min(outlier_pct, 0.5))
         )
 
-        logger.info(
-            f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}"
-        )
+        # logger.info(
+        #     f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}"
+        # )
 
         return max(0.0, min(100.0, quality_score))

@@ -124,14 +124,6 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
             "ATR_Percent"
         ] * np.sqrt(10)
 
-    # 2. Price momentum context
-    if "Return_5D" in features_enhanced.columns:
-        # Momentum acceleration
-        if "Return_1D" in features_enhanced.columns:
-            features_enhanced["Momentum_Acceleration"] = (
-                features_enhanced["Return_1D"] - features_enhanced["Return_5D"] / 5
-            )
-
     # 3. Current volatility regime helps set expectation bounds
     if (
         "Vol_Regime_High" in features_enhanced.columns

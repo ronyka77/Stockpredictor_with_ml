@@ -60,6 +60,14 @@ def convert_absolute_to_percentage_returns(
     current_prices = combined_data["close"]
     percentage_returns = (future_prices - current_prices) / current_prices
     combined_data[new_target_column] = percentage_returns
+    # Drop rows where the new target column > 1 or < -0.7 (i.e., >100% or <-70% return)
+    outlier_mask = (combined_data[new_target_column] > 1) | (combined_data[new_target_column] < -0.7)
+    outlier_count = outlier_mask.sum()
+    if outlier_count > 0:
+        logger.warning(
+            f"⚠ Dropping {outlier_count} rows with extreme percentage returns (>100% or <-70%) in '{new_target_column}'"
+        )
+        combined_data = combined_data.loc[~outlier_mask].copy()
 
     # Log transformation statistics
     valid_returns = percentage_returns.dropna()
@@ -69,22 +77,14 @@ def convert_absolute_to_percentage_returns(
             f"   Original target range: ${current_prices.min():.2f} - ${future_prices.max():.2f}"
         )
         logger.info(
-            f"   New percentage returns: {valid_returns.min():.4f} to {valid_returns.max():.4f} (decimal format)"
+            f"   New percentage returns: {combined_data[new_target_column].min():.4f} to {combined_data[new_target_column].max():.4f} (decimal format)"
         )
         logger.info(
-            f"   Mean return: {valid_returns.mean():.4f} ({valid_returns.mean() * 100:.2f}%)"
+            f"   Mean return: {combined_data[new_target_column].mean():.4f} ({combined_data[new_target_column].mean() * 100:.2f}%)"
         )
         logger.info(
-            f"   Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)"
+            f"   Std return: {combined_data[new_target_column].std():.4f} ({combined_data[new_target_column].std() * 100:.2f}%)"
         )
-
-        # Sanity check - warn if returns are too extreme (in decimal format)
-        extreme_positive = (valid_returns > 0.7).sum()  # >70% return
-        extreme_negative = (valid_returns < -0.7).sum()  # <-70% return
-        if extreme_positive > 0 or extreme_negative > 0:
-            logger.warning(
-                f"⚠ Found extreme returns: {extreme_positive} > +70%, {extreme_negative} < -70%"
-            )
 
     return combined_data, new_target_column
 
@@ -92,7 +92,7 @@ def convert_absolute_to_percentage_returns(
 def convert_percentage_predictions_to_prices(
     predictions: np.ndarray,
     current_prices: np.ndarray,
-    apply_bounds: bool = True,
+    apply_bounds: bool = False,
     max_daily_move: float = 10.0,
 ) -> np.ndarray:
     """
@@ -132,6 +132,7 @@ def convert_percentage_predictions_to_prices(
 
         if capped_high > 0 or capped_low > 0:
             logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
+            logger.info(f"   Capped high: {capped_high} times and capped low: {capped_low} times")
 
         return bounded_predictions
     else:

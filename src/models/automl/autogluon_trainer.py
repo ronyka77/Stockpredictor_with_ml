@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 
 def train_autogluon(
-    *, prediction_horizon: int = 10, presets: str = "best_quality"
+    *, prediction_horizon: int = 5, presets: str = "best_quality"
 ) -> Dict[str, Any]:
     # Use centralized common training data preparation
     data = prepare_common_training_data(
@@ -41,7 +41,7 @@ def train_autogluon(
 
     # Build model
     config = {
-        "label": "Future_Return_10D",
+        "label": "Future_Return_5D",
         "presets": presets,
         "groups": "year",
     }
@@ -60,7 +60,7 @@ def train_autogluon(
 
 def main():
     train_autogluon(
-        prediction_horizon=10,
+        prediction_horizon=5,
         presets="best_quality",
     )
 

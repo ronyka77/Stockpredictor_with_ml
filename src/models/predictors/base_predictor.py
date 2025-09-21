@@ -15,7 +15,10 @@ from abc import ABC, abstractmethod
 
 from src.data_utils.target_engineering import convert_percentage_predictions_to_prices
 from src.feature_engineering.data_loader import StockDataLoader
-from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
+from src.data_utils.ml_data_pipeline import (
+    prepare_ml_data_for_prediction_with_cleaning,
+    filter_dates_to_weekdays,
+)
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -36,8 +39,9 @@ class BasePredictor(ABC):
         self.run_id = run_id
         self.model_type = model_type
         self.model = None
-        self.prediction_horizon = 10
+        self.prediction_horizon = 5
         self.optimal_threshold = None
+        self.model_dir = None
 
     @abstractmethod
     def load_model_from_mlflow(self) -> None:
@@ -224,17 +228,19 @@ class BasePredictor(ABC):
         """
         Save predictions to an Excel file.
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        model_dir = self.model_dir.split('\\')[-1]
+        logger.info(f"Model directory: {model_dir}")
         if model_name is not None:
-            file_name = f"predictions_{model_name}_{timestamp}.xlsx"
+            file_name = f"predictions_{model_name}_{model_dir[:11]}_{timestamp}.xlsx"
         else:
-            file_name = f"predictions_{self.run_id[:8]}_{timestamp}.xlsx"
+            file_name = f"predictions_{self.run_id[:8]}_{model_dir[:11]}_{timestamp}.xlsx"
 
         output_dir = os.path.join("predictions", self.model_type)
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, file_name)
 
-        logger.info(f"💾 Saving predictions to: {output_path}")
+        logger.info("💾 Validating and saving predictions")
 
         results_df = self._build_results_dataframe_and_profit(
             features_df=features_df,
@@ -309,7 +315,7 @@ class BasePredictor(ABC):
         current_prices = features_df["close"].values
         results_df["predicted_return"] = predictions
         results_df["predicted_price"] = convert_percentage_predictions_to_prices(
-            predictions, current_prices, apply_bounds=True
+            predictions, current_prices, apply_bounds=False
         )
         results_df["current_price"] = current_prices
         results_df.rename(columns={"target_values": "actual_return"}, inplace=True)
@@ -390,34 +396,51 @@ class BasePredictor(ABC):
         logger.info(
             f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
         )
-
+        dates_series = results_df["date"].copy()
+        dates_series = pd.to_datetime(dates_series)
         # 4a) Weekday-specific profit aggregates (Friday and Monday)
         if not valid_profit_df.empty:
-            friday_mask = results_df["day_of_week"] == "Friday"
-            # monday_mask = results_df["day_of_week"] == "Monday"
-            # monday_df = valid_profit_df[monday_mask]
-            # monday_avg_profit = (
-            #     float(monday_df["profit_100_investment"].mean())
-            #     if not monday_df.empty
-            #     else 0
-            # )
+            check_monday = False
+            check_friday = True
 
-            friday_df = valid_profit_df[friday_mask]
-
-            friday_avg_profit = (
+            if check_friday:
+                # Get boolean mask and filtered date Series for Friday
+                friday_keep, friday_dates = filter_dates_to_weekdays(
+                    dates_series, (4,)
+                )
+                logger.info(f"   🗓️ Friday dates: {len(friday_dates)}")
+                friday_df = results_df[friday_keep & valid_mask].copy()
+                friday_avg_profit = (
                 float(friday_df["profit_100_investment"].mean())
                 if not friday_df.empty
                 else 0
-            )
+                )
+                logger.info(
+                    f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
+                )
+            if check_monday:
+                # Get boolean mask and filtered date Series for Monday
+                monday_keep, monday_dates = filter_dates_to_weekdays(
+                    dates_series, (0,)
+                )
+                logger.info(f"   🗓️ Monday dates: {len(monday_dates)}")
+                monday_df = results_df[monday_keep & valid_mask].copy()
 
-            logger.info(
-                f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
-            )
-            # logger.info(
-            #     f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
-            # )
-            if friday_avg_profit > 10:
-                return results_df
+                monday_avg_profit = (
+                    float(monday_df["profit_100_investment"].mean())
+                    if not monday_df.empty
+                    else 0
+                )
+                logger.info(
+                    f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
+                )
+            if (check_friday and friday_avg_profit > 5) or (check_monday and monday_avg_profit > 5):
+                if not check_monday:
+                    results_df = results_df[results_df["day_of_week"] == "Friday"]
+                elif not check_friday:
+                    results_df = results_df[results_df["day_of_week"] == "Monday"]
+                
+                return results_df if len(results_df) > 5 else pd.DataFrame()
             else:
                 logger.warning("   ⚠️  WARNING: No predictions should be exported!")
                 return pd.DataFrame()

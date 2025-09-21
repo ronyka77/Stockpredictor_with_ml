@@ -429,7 +429,6 @@ class BatchFeatureProcessor:
         try:
             # Choose executor based on config flag. For process-based parallelism on
             # Windows, ProcessPoolExecutor requires module-level callables and
-            # picklable arguments.
             if config.use_processes:
                 executor_cls = ProcessPoolExecutor
             else:
@@ -490,7 +489,6 @@ class BatchFeatureProcessor:
                             self.stats.failed_tickers += 1
 
             self.stats.end_time = datetime.now()
-
             # Prepare summary
             summary = {
                 "job_id": job_id,
@@ -731,9 +729,6 @@ def run_production_batch():
                 )
                 logger.info(
                     f"   Consolidated size: {consolidation_result['total_size_mb']:.2f} MB"
-                )
-                logger.info(
-                    f"   Compression ratio: {consolidation_result['compression_ratio']:.1f}x"
                 )
 
                 # Show date breakdown

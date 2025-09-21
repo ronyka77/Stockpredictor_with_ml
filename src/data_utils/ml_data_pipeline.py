@@ -8,7 +8,7 @@ target transformation, and data cleaning operations.
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Union, Optional
+from typing import Dict, Union, Optional, Tuple
 from src.utils.logger import get_logger
 from src.data_utils.ml_feature_loader import load_all_data
 from src.data_utils.target_engineering import convert_absolute_to_percentage_returns
@@ -26,6 +26,31 @@ logger = get_logger(__name__)
 
 # Global cache instance
 _cleaned_data_cache = CleanedDataCache()
+
+
+def filter_dates_to_weekdays(
+    dates: pd.Series, weekdays: Tuple[int, ...]
+) -> Tuple[pd.Series, pd.Series]:
+    """Filter a date Series to the provided weekdays.
+
+    Args:
+        dates: a pandas Series of datetimes (can be full or already subsetted)
+        weekdays: tuple of pandas weekday integers (0=Mon .. 6=Sun)
+
+    Returns:
+        filtered_mask: boolean Series aligned to `dates` indicating which rows to keep
+        filtered_dates: the `dates` Series after filtering (subset)
+    """
+
+    if dates.empty:
+        return pd.Series(dtype=bool), dates
+
+    # boolean Series aligned to `dates`
+    keep = dates.dt.dayofweek.isin(weekdays)
+
+    filtered_dates = dates[keep]
+
+    return keep, filtered_dates
 
 
 def prepare_ml_data_for_training(
@@ -68,18 +93,6 @@ def prepare_ml_data_for_training(
         combined_data, target_column = convert_absolute_to_percentage_returns(
             combined_data, prediction_horizon
         )
-        # Filter out extreme target values
-        valid_mask = (combined_data[target_column] <= 2.0) & (
-            combined_data[target_column] >= -0.7
-        )
-        original_rows = len(combined_data)
-        combined_data = combined_data[valid_mask]
-        filtered_rows = len(combined_data)
-
-        logger.info("🔍 Filtered extreme target values (>200% or <-70%)")
-        logger.info(
-            f"   Removed {original_rows - filtered_rows:,} rows ({((original_rows - filtered_rows) / original_rows) * 100:.1f}% of data)"
-        )
 
         # Extract percentage return targets (instead of absolute prices)
         y = combined_data[target_column].copy()
@@ -88,7 +101,7 @@ def prepare_ml_data_for_training(
         exclude_cols = [
             "ticker",
             "date",
-            "data_year",  # Metadata
+            "data_year",
             "feature_version",
             "calculation_date",
             "start_date",
@@ -182,30 +195,21 @@ def prepare_ml_data_for_training(
         test_dates = dates_clean[test_mask]
         train_dates = dates_clean[train_mask]
 
-        # Filter test set to include only Fridays
-        if not test_dates.empty:
-            logger.info("📅 Filtering test set to include only Fridays.")
-            is_monday_or_friday = test_dates.dt.dayofweek == 4
-
-            X_test = X_test[is_monday_or_friday]
-            y_test = y_test[is_monday_or_friday]
-
-            # Update test_dates to reflect the change for logging and further processing
-            test_dates = test_dates[is_monday_or_friday]
+        # Filter test set to include only Mondays and Fridays
+        filtered_mask, test_dates = filter_dates_to_weekdays(test_dates, (0, 4))
+        X_test = X_test[filtered_mask]
+        y_test = y_test[filtered_mask]
 
         if not train_dates.empty and filter_train_set:
-            logger.info("📅 Filtering train set to include only Fridays.")
-            is_monday_or_friday = train_dates.dt.dayofweek == 4
+            logger.info("📅 Filtering train set to include only Mondays and Fridays.")
+            filtered_mask, train_dates = filter_dates_to_weekdays(train_dates, (0, 4))
 
-            X_train = X_train[is_monday_or_friday]
-            y_train = y_train[is_monday_or_friday]
-
-            # Update train_dates to reflect the change for logging and further processing
-            train_dates = train_dates[is_monday_or_friday]
+            X_train = X_train[filtered_mask]
+            y_train = y_train[filtered_mask]
 
         # Get date ranges for logging
         train_date_range = (
-            f"{dates_clean[train_mask].min().strftime('%Y-%m-%d')} to {dates_clean[train_mask].max().strftime('%Y-%m-%d')}"
+            f"{train_dates.min().strftime('%Y-%m-%d')} to {train_dates.max().strftime('%Y-%m-%d')}"
             if train_mask.any()
             else "No training data"
         )
@@ -213,11 +217,6 @@ def prepare_ml_data_for_training(
             f"{test_dates.min().strftime('%Y-%m-%d')} to {test_dates.max().strftime('%Y-%m-%d')}"
             if not test_dates.empty
             else "No test data"
-        )
-        train_date_range = (
-            f"{train_dates.min().strftime('%Y-%m-%d')} to {train_dates.max().strftime('%Y-%m-%d')}"
-            if not train_dates.empty
-            else "No training data"
         )
 
         logger.info(f"✅ Train set: {len(X_train)} samples ({train_date_range})")
@@ -322,6 +321,7 @@ def prepare_ml_data_for_prediction(
             "total_features",
             "file_size_mb",  # Data quality metrics
         ]
+
         # Also exclude all Future_* columns to avoid data leakage
         future_cols = [
             col for col in combined_data.columns if col.startswith("Future_")
@@ -353,19 +353,18 @@ def prepare_ml_data_for_prediction(
         X_test = X[test_mask].copy()
         y_test = y[test_mask].copy()
 
-        # Filter prediction set to include only Fridays
-        test_dates_for_pred = date_col[test_mask]
-        if not test_dates_for_pred.empty:
+        # keep Mondays and Fridays only (0, 4)
+        filtered_mask, filtered_dates = filter_dates_to_weekdays(
+            date_col, (0, 4)
+        )
+
+        if not filtered_dates.empty:
             logger.info("📅 Filtering prediction set to include only Fridays.")
-            is_monday_or_friday_pred = test_dates_for_pred.dt.dayofweek == 4
+            X_test = X_test[filtered_mask]
+            y_test = y_test[filtered_mask]
 
-            X_test = X_test[is_monday_or_friday_pred]
-            y_test = y_test[is_monday_or_friday_pred]
-
-            # Get the original indices that correspond to fridays
-            true_indices = test_dates_for_pred[is_monday_or_friday_pred].index
-            final_mask = date_col.index.isin(true_indices)
-            test_mask = test_mask & final_mask
+            # update test_mask to reflect original indices kept
+            test_mask = test_mask
 
         test_date_range = (
             f"{date_col[test_mask].min().strftime('%Y-%m-%d')} to {date_col[test_mask].max().strftime('%Y-%m-%d')}"

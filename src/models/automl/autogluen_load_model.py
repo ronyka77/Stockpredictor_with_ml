@@ -101,7 +101,6 @@ def run_model_evaluation(
         # 3) Generate and log leaderboard
         model_names = predictor.model_names()
         predictor.persist(models=model_names)
-        # generate_and_log_leaderboard(predictor, valid_df, model_names)
 
         best_score = 0
         optimal_threshold = None
@@ -142,8 +141,8 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
     try:
-        model_dir = "AutogluonModels/ag-20250909_181529"
-        prediction_horizon = 10
+        model_dir = "AutogluonModels/ag-20250920_160248"
+        prediction_horizon = 5
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:
         logger.error(f"Script failed: {e}")
