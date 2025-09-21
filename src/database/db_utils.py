@@ -104,27 +104,6 @@ def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
         ),
     )
 
-
-def _drop_dividend_duplicates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Remove duplicate dividend records based on ticker_id, cash_amount, ex_dividend_date, pay_date.
-    Keeps the first occurrence of each unique combination.
-    """
-    seen = set()
-    unique_rows = []
-    for row in rows:
-        key = (
-            row.get("ticker_id"),
-            row.get("cash_amount"),
-            row.get("ex_dividend_date"),
-            row.get("pay_date"),
-        )
-        if key not in seen:
-            seen.add(key)
-            unique_rows.append(row)
-    return unique_rows
-
-
 def _upsert_dividends_batch(
     rows: Iterable[Dict[str, Any]], page_size: int = 500
 ) -> int:
@@ -141,7 +120,6 @@ def _upsert_dividends_batch(
     rows = list(rows)
     if not rows:
         return 0
-    rows = _drop_dividend_duplicates(rows)
     insert_sql = (
         "INSERT INTO dividends "
         "(id, ticker_id, cash_amount, currency, declaration_date, ex_dividend_date, pay_date, record_date, frequency, dividend_type, raw_payload) "

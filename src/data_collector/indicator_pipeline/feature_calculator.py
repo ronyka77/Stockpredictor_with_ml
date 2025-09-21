@@ -270,9 +270,15 @@ class FeatureCalculator:
 
             for shift_days in (4, 9, 19, 29):
                 column_shift_days = shift_days + 1
-                temp[f"Future_High_{column_shift_days}D"] = price_aligned["high"].shift(-shift_days).values
-                temp[f"Future_Close_{column_shift_days}D"] = price_aligned["close"].shift(-shift_days).values
-                temp[f"Target_Date_{column_shift_days}D"] = temp["_work_date"].shift(-shift_days).values
+                temp[f"Future_High_{column_shift_days}D"] = (
+                    price_aligned["high"].shift(-shift_days).values
+                )
+                temp[f"Future_Close_{column_shift_days}D"] = (
+                    price_aligned["close"].shift(-shift_days).values
+                )
+                temp[f"Target_Date_{column_shift_days}D"] = (
+                    temp["_work_date"].shift(-shift_days).values
+                )
 
             # Reindex back to the original features_df ordering and copy the new columns across
             temp = temp.reindex(features_df.index)
@@ -326,11 +332,14 @@ class FeatureCalculator:
         features_df["Lower_Shadow"] = lower_shadow
         features_df["Body_Shadow_Ratio"] = body / (upper_shadow + lower_shadow + 1e-8)
 
-
         for shift_days in (1, 4, 9, 19, 29):
-                column_shift_days = shift_days + 1 if shift_days > 1 else shift_days
-                features_df[f"Return_{column_shift_days}D"] = price_data["close"].pct_change(shift_days)
-                features_df[f"Log_Return_{column_shift_days}D"] = np.log(price_data["close"] / price_data["close"].shift(shift_days))
+            column_shift_days = shift_days + 1 if shift_days > 1 else shift_days
+            features_df[f"Return_{column_shift_days}D"] = price_data[
+                "close"
+            ].pct_change(shift_days)
+            features_df[f"Log_Return_{column_shift_days}D"] = np.log(
+                price_data["close"] / price_data["close"].shift(shift_days)
+            )
 
         # Volume features
         if "volume" in price_data.columns:

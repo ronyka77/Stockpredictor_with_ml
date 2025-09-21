@@ -75,7 +75,7 @@ class MLFeatureLoader:
             if target_column in features.columns:
                 # Use pre-calculated future high prices as targets
                 targets = features[target_column].copy()
-                targets.name = f"Future_Close_{prediction_horizon}d"
+                targets.name = f"Future_Close_{prediction_horizon}D"
 
                 # Remove target column from features to avoid data leakage
                 features_clean = features.drop(

@@ -10,12 +10,16 @@ Also exposes fit with (X, y, X_val, y_val) by reconstructing label columns
 for AutoGluon training.
 """
 
+import gc
+import os
+import psutil
 from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
 from autogluon.tabular import TabularPredictor
 from autogluon.core.metrics import make_scorer
+
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ModelProtocol, ThresholdEvaluator
@@ -110,7 +114,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
 
         hyperparams = {
             "FASTAI": {},
-            "GBM": {},
+            # "GBM": {},
             "XGB": {},
             # "TABM": {},
             "RF": {},
@@ -125,6 +129,10 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             problem_type="regression",
             verbosity=2,
         )
+        collected = gc.collect()
+        logger.info(f"Garbage collected: {collected}")
+        proc = psutil.Process(os.getpid())
+        print("RSS MB:", proc.memory_info().rss / 1024**2)
 
         self.predictor.fit(
             time_limit=39600,
@@ -211,43 +219,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             return np.tanh(base)
 
         raise ValueError(f"Unsupported confidence method: {method}")
-
-    # MLflow logging helper
-    def save_to_mlflow(
-        self,
-        params: Dict[str, Any],
-        metrics: Dict[str, float],
-        *,
-        experiment_name: Optional[str] = None,
-    ) -> str:
-        self.start_mlflow_run(experiment_name or f"stock_prediction_{self.model_name}")
-        try:
-            self.log_params(params)
-            self.log_metrics(metrics)
-            # Log leaderboard
-            try:
-                leaderboard = self.predictor.leaderboard(silent=True)
-                leaderboard_path = "leaderboard.csv"
-                leaderboard.to_csv(leaderboard_path, index=False)
-                self.mlflow_integration.log_artifact(leaderboard_path)
-            except Exception as e:
-                logger.warning(f"Failed to log leaderboard: {e}")
-
-            # Persist full AutoGluon predictor as artifact for downstream loading
-            try:
-                save_dir = "autogluon_model"
-                self.predictor.save(save_dir)
-                import mlflow as _mlflow
-
-                _mlflow.log_artifacts(save_dir, artifact_path="autogluon_model")
-                logger.info(
-                    "Logged AutoGluon predictor artifacts under autogluon_model/"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to log AutoGluon model artifacts: {e}")
-        finally:
-            self.end_mlflow_run()
-        return self.run_id or ""
 
     def run_threshold_evaluation(
         self,

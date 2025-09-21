@@ -6,6 +6,9 @@ and prediction, including the comprehensive data loading, feature engineering,
 target transformation, and data cleaning operations.
 """
 
+import gc
+import psutil
+import os
 import pandas as pd
 import numpy as np
 from typing import Dict, Union, Optional, Tuple
@@ -21,6 +24,7 @@ from src.data_utils.feature_engineering import (
     add_date_features,
 )
 from src.utils.cleaned_data_cache import CleanedDataCache
+
 
 logger = get_logger(__name__)
 
@@ -52,6 +56,11 @@ def filter_dates_to_weekdays(
 
     return keep, filtered_dates
 
+def collect_garbage():
+    collected = gc.collect()
+    logger.info(f"Garbage collected: {collected}")
+    proc = psutil.Process(os.getpid())
+    logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
 
 def prepare_ml_data_for_training(
     prediction_horizon: int = 10,
@@ -140,7 +149,6 @@ def prepare_ml_data_for_training(
         X = add_date_features(X, "date")
 
         # Remove the date column after temporal features are created
-        X = X.drop(columns=["date"])
         logger.info(f"📋 Total features: {len(X.columns)}")
 
         # 5. Clean data
@@ -166,17 +174,22 @@ def prepare_ml_data_for_training(
         logger.info("6. Creating date-based train/test split...")
 
         # Check if date column exists
-        if "date" not in combined_data.columns:
+        if "date" not in X.columns:
             raise ValueError(
                 "'date' column not found in data. Cannot perform date-based split."
             )
 
         # Apply the same valid_mask to get corresponding dates
-        dates_clean = combined_data["date"][valid_mask].copy()
+        dates_clean = X["date"][valid_mask].copy()
+        X = X.drop(columns=["date"])
 
         # Convert to datetime if not already
         if not pd.api.types.is_datetime64_any_dtype(dates_clean):
             dates_clean = pd.to_datetime(dates_clean)
+        
+        filtered_mask, dates_clean = filter_dates_to_weekdays(dates_clean, (0, 4))
+        X_clean = X_clean[filtered_mask]
+        y_clean = y_clean[filtered_mask]
 
         # Define split date
         split_date_dt = pd.to_datetime(split_date)
@@ -202,8 +215,7 @@ def prepare_ml_data_for_training(
 
         if not train_dates.empty and filter_train_set:
             logger.info("📅 Filtering train set to include only Mondays and Fridays.")
-            filtered_mask, train_dates = filter_dates_to_weekdays(train_dates, (0, 4))
-
+            
             X_train = X_train[filtered_mask]
             y_train = y_train[filtered_mask]
 
@@ -259,7 +271,7 @@ def prepare_ml_data_for_training(
         logger.info(f"📊 Features: {result['feature_count']} total")
         logger.info(f"📏 Split date: {split_date}")
         logger.info("=" * 80)
-
+        collect_garbage()
         return result
 
     except Exception as e:
@@ -300,6 +312,10 @@ def prepare_ml_data_for_prediction(
         combined_data, target_column = convert_absolute_to_percentage_returns(
             combined_data, prediction_horizon
         )
+        date_col = combined_data["date"].copy()
+        # keep Mondays and Fridays only (0, 4)
+        filtered_mask, filtered_dates = filter_dates_to_weekdays(date_col, (0, 4))
+        combined_data = combined_data[filtered_mask]
 
         # Extract percentage return targets (instead of absolute prices)
         y = combined_data[target_column].copy()
@@ -307,7 +323,6 @@ def prepare_ml_data_for_prediction(
         # Prepare features (exclude metadata and target columns)
         exclude_cols = [
             "ticker",
-            "date",
             "data_year",  # Metadata
             "feature_version",
             "calculation_date",
@@ -333,35 +348,22 @@ def prepare_ml_data_for_prediction(
 
         X = add_price_normalized_features(X)
         X = add_prediction_bounds_features(X)
-
         X["date"] = combined_data["date"].copy()
         X = add_date_features(X, "date")
+        
 
         # Remove the date column after temporal features are created
-        X = X.drop(columns=["date"])
         X = X.replace([np.inf, -np.inf], np.nan)
         X = X.fillna(X.median())
         X = X.replace([np.nan, np.inf, -np.inf], 0)
 
-        date_col = combined_data["date"].copy()
-        if not pd.api.types.is_datetime64_any_dtype(date_col):
-            date_col = pd.to_datetime(date_col)
-
-        split_date_dt = pd.to_datetime("2025-03-15")
-
-        test_mask = date_col >= split_date_dt
-        X_test = X[test_mask].copy()
-        y_test = y[test_mask].copy()
-
-        # keep Mondays and Fridays only (0, 4)
-        filtered_mask, filtered_dates = filter_dates_to_weekdays(
-            date_col, (0, 4)
-        )
-
         if not filtered_dates.empty:
             logger.info("📅 Filtering prediction set to include only Fridays.")
-            X_test = X_test[filtered_mask]
-            y_test = y_test[filtered_mask]
+            X = X[filtered_mask]
+            split_date_dt = pd.to_datetime("2025-03-15")
+            test_mask = date_col >= split_date_dt
+            X_test = X[test_mask].copy()
+            y_test = y[test_mask].copy()
 
             # update test_mask to reflect original indices kept
             test_mask = test_mask
@@ -391,7 +393,7 @@ def prepare_ml_data_for_prediction(
         logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
         logger.info(f"📊 Features: {result['feature_count']} total")
         logger.info("=" * 80)
-
+        collect_garbage()
         return result
 
     except Exception as e:
@@ -515,6 +517,7 @@ def prepare_ml_data_for_training_with_cleaning(
     logger.info(
         f"✅ [END] Enhanced data preparation completed: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features"
     )
+    collect_garbage()
     return data_result
 
 
@@ -599,5 +602,5 @@ def prepare_ml_data_for_prediction_with_cleaning(
     logger.info(
         f"   Prediction data: {len(data_result['X_test'])} samples, {len(data_result['X_test'].columns)} features"
     )
-
+    collect_garbage()
     return data_result

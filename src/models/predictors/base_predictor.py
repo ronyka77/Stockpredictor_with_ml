@@ -173,7 +173,6 @@ class BasePredictor(ABC):
             prediction_features = prediction_features[self.model.feature_names]
 
         predictions = self.model.predict(prediction_features)
-        logger.info(f"   Predictions generated: {len(predictions)}")
         return predictions
 
     def get_confidence_scores(self, features_df: pd.DataFrame) -> np.ndarray:
@@ -229,12 +228,13 @@ class BasePredictor(ABC):
         Save predictions to an Excel file.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        model_dir = self.model_dir.split('\\')[-1]
-        logger.info(f"Model directory: {model_dir}")
+        model_dir = self.model_dir.split("\\")[-1]
         if model_name is not None:
             file_name = f"predictions_{model_name}_{model_dir[:11]}_{timestamp}.xlsx"
         else:
-            file_name = f"predictions_{self.run_id[:8]}_{model_dir[:11]}_{timestamp}.xlsx"
+            file_name = (
+                f"predictions_{self.run_id[:8]}_{model_dir[:11]}_{timestamp}.xlsx"
+            )
 
         output_dir = os.path.join("predictions", self.model_type)
         os.makedirs(output_dir, exist_ok=True)
@@ -256,7 +256,6 @@ class BasePredictor(ABC):
             logger.info(f"   Saved {len(results_df)} predictions.")
             return output_path
         else:
-            logger.info("No predictions to save")
             return None
 
     def _merge_ticker_metadata(self, results_df: pd.DataFrame) -> pd.DataFrame:
@@ -392,9 +391,9 @@ class BasePredictor(ABC):
             if not valid_profit_df.empty
             else 0
         )
-        valid_profit_count = valid_profit_df.shape[0]
+        valid_profit_df.shape[0]
         logger.info(
-            f"   💰 Average profit per $100 investment: ${avg_profit_per_investment:.2f} (based on {valid_profit_count} valid predictions)"
+            f"   💰 ${avg_profit_per_investment:.2f} Average profit per $100 investment"
         )
         dates_series = results_df["date"].copy()
         dates_series = pd.to_datetime(dates_series)
@@ -405,25 +404,19 @@ class BasePredictor(ABC):
 
             if check_friday:
                 # Get boolean mask and filtered date Series for Friday
-                friday_keep, friday_dates = filter_dates_to_weekdays(
-                    dates_series, (4,)
-                )
-                logger.info(f"   🗓️ Friday dates: {len(friday_dates)}")
+                friday_keep, friday_dates = filter_dates_to_weekdays(dates_series, (4,))
                 friday_df = results_df[friday_keep & valid_mask].copy()
                 friday_avg_profit = (
-                float(friday_df["profit_100_investment"].mean())
-                if not friday_df.empty
-                else 0
+                    float(friday_df["profit_100_investment"].mean())
+                    if not friday_df.empty
+                    else 0
                 )
                 logger.info(
-                    f"   🗓️ Friday average profit per $100 investment: ${friday_avg_profit:.2f} (based on {len(friday_df)} predictions)"
+                    f"   🗓️ ${friday_avg_profit:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
                 )
             if check_monday:
                 # Get boolean mask and filtered date Series for Monday
-                monday_keep, monday_dates = filter_dates_to_weekdays(
-                    dates_series, (0,)
-                )
-                logger.info(f"   🗓️ Monday dates: {len(monday_dates)}")
+                monday_keep, monday_dates = filter_dates_to_weekdays(dates_series, (0,))
                 monday_df = results_df[monday_keep & valid_mask].copy()
 
                 monday_avg_profit = (
@@ -432,14 +425,16 @@ class BasePredictor(ABC):
                     else 0
                 )
                 logger.info(
-                    f"   🗓️ Monday average profit per $100 investment: ${monday_avg_profit:.2f} (based on {len(monday_df)} predictions)"
+                    f"   🗓️ ${monday_avg_profit:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
                 )
-            if (check_friday and friday_avg_profit > 5) or (check_monday and monday_avg_profit > 5):
+            if (check_friday and friday_avg_profit > 10) or (
+                check_monday and monday_avg_profit > 10
+            ):
                 if not check_monday:
                     results_df = results_df[results_df["day_of_week"] == "Friday"]
                 elif not check_friday:
                     results_df = results_df[results_df["day_of_week"] == "Monday"]
-                
+
                 return results_df if len(results_df) > 5 else pd.DataFrame()
             else:
                 logger.warning("   ⚠️  WARNING: No predictions should be exported!")

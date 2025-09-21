@@ -34,7 +34,7 @@ def convert_absolute_to_percentage_returns(
     new_target_column = f"Future_Return_{prediction_horizon}D"
 
     logger.info(
-        f"🎯 Converting absolute targets to percentage returns (horizon: {prediction_horizon}d)"
+        f"🎯 Converting absolute targets to percentage returns (horizon: {prediction_horizon}D)"
     )
     # Look for any Future_High_XD column as fallback
     if target_column not in combined_data.columns:
@@ -61,7 +61,9 @@ def convert_absolute_to_percentage_returns(
     percentage_returns = (future_prices - current_prices) / current_prices
     combined_data[new_target_column] = percentage_returns
     # Drop rows where the new target column > 1 or < -0.7 (i.e., >100% or <-70% return)
-    outlier_mask = (combined_data[new_target_column] > 1) | (combined_data[new_target_column] < -0.7)
+    outlier_mask = (combined_data[new_target_column] > 1) | (
+        combined_data[new_target_column] < -0.7
+    )
     outlier_count = outlier_mask.sum()
     if outlier_count > 0:
         logger.warning(
@@ -132,7 +134,9 @@ def convert_percentage_predictions_to_prices(
 
         if capped_high > 0 or capped_low > 0:
             logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
-            logger.info(f"   Capped high: {capped_high} times and capped low: {capped_low} times")
+            logger.info(
+                f"   Capped high: {capped_high} times and capped low: {capped_low} times"
+            )
 
         return bounded_predictions
     else:

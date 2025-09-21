@@ -60,8 +60,6 @@ def calculate_sma(
             sma_values = ta.trend.sma_indicator(data["close"], window=period)
             result_data[f"SMA_{period}"] = sma_values
 
-            # logger.info(f"Calculated SMA_{period}: {sma_values.notna().sum()} valid values")
-
         if result_data.empty:
             raise ValueError("No SMA indicators could be calculated")
 
@@ -106,8 +104,6 @@ def calculate_ema(
     if periods is None:
         periods = feature_config.EMA_PERIODS
 
-    # logger.info(f"Calculating EMA for periods: {periods}")
-
     try:
         result_data = pd.DataFrame(index=data.index)
 
@@ -120,8 +116,6 @@ def calculate_ema(
 
             ema_values = ta.trend.ema_indicator(data["close"], window=period)
             result_data[f"EMA_{period}"] = ema_values
-
-            # logger.info(f"Calculated EMA_{period}: {ema_values.notna().sum()} valid values")
 
         if result_data.empty:
             raise ValueError("No EMA indicators could be calculated")
@@ -177,8 +171,6 @@ def calculate_macd(
     if signal is None:
         signal = feature_config.MACD_PARAMS["signal"]
 
-    # logger.info(f"Calculating MACD with parameters: fast={fast}, slow={slow}, signal={signal}")
-
     try:
         # Check minimum data requirements
         min_required = slow + signal
@@ -208,8 +200,6 @@ def calculate_macd(
         result_data["MACD_Crossover"] = (
             (result_data["MACD"] > result_data["MACD_Signal"]).astype(int).diff()
         )
-
-        # logger.info(f"Calculated MACD: {result_data['MACD'].notna().sum()} valid values")
 
         metadata = {
             "indicator_type": "trend",
@@ -332,8 +322,6 @@ def calculate_ichimoku(
             result_data["Ichimoku_Senkou_A"] - result_data["Ichimoku_Senkou_B"]
         )
 
-        # logger.info(f"Calculated Ichimoku: {result_data['Ichimoku_Tenkan'].notna().sum()} valid values")
-
         metadata = {
             "indicator_type": "trend",
             "indicator_name": "Ichimoku Cloud",
@@ -386,7 +374,6 @@ class TrendIndicatorCalculator(BaseIndicator):
             IndicatorResult containing all trend indicators
         """
         start_time = time.time()
-        # logger.info("Calculating all trend indicators")
 
         try:
             # Calculate individual indicators
