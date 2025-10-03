@@ -5,8 +5,8 @@ Contains bulk upsert helpers used by feature engineering and other modules.
 
 from typing import Dict, Any, Iterable, Tuple, List
 import json
-from psycopg2.extras import execute_values
-from src.database.connection import get_global_pool
+from src.database.connection import get_global_pool,execute_values
+
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="database")
@@ -62,11 +62,17 @@ def bulk_upsert_technical_features(
     tuples = [_row_tuple_from_dict(r) for r in rows]
 
     pool = get_global_pool()
-    # Use the pool's connection context to acquire a raw psycopg2 connection
     with pool.connection() as conn:
         cur = conn.cursor()
         try:
-            execute_values(cur, insert_sql, tuples, page_size=page_size)
+            # Use the connection's cursor.mogrify to construct VALUES pages
+            num_cols = len(tuples[0])
+            value_template = "(" + ",".join(["%s"] * num_cols) + ")"
+            for i in range(0, len(tuples), page_size):
+                page = tuples[i : i + page_size]
+                values = ",".join(cur.mogrify(value_template, r).decode("utf-8") for r in page)
+                sql = insert_sql % values
+                cur.execute(sql)
             try:
                 rowcount = cur.rowcount
             except Exception:
@@ -138,7 +144,13 @@ def _upsert_dividends_batch(
     with pool.connection() as conn:
         cur = conn.cursor()
         try:
-            execute_values(cur, insert_sql, tuples, page_size=page_size)
+            num_cols = len(tuples[0])
+            value_template = "(" + ",".join(["%s"] * num_cols) + ")"
+            for i in range(0, len(tuples), page_size):
+                page = tuples[i : i + page_size]
+                values = ",".join(cur.mogrify(value_template, r).decode("utf-8") for r in page)
+                sql = insert_sql % values
+                cur.execute(sql)
             try:
                 rowcount = cur.rowcount
             except Exception:

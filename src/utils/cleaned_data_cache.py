@@ -12,10 +12,19 @@ from pathlib import Path
 import json
 from datetime import datetime
 
+import psutil
+import os
+import gc
+
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="cleaned_data_cache")
 
+def collect_garbage():
+    collected = gc.collect()
+    logger.info(f"Garbage collected: {collected}")
+    proc = psutil.Process(os.getpid())
+    logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
 
 class CleanedDataCache:
     """
@@ -245,6 +254,7 @@ class CleanedDataCache:
             logger.info(
                 f"   Test data: {len(result['X_test'])} samples, {len(result['X_test'].columns)} features"
             )
+            collect_garbage()
             return result
 
         except Exception as e:
@@ -267,12 +277,14 @@ class CleanedDataCache:
             for path in paths.values():
                 if path.exists():
                     path.unlink()
+            collect_garbage()
             logger.info(f"Cleared cache for key: {cache_key}, type: {data_type}")
         else:
             # Clear all cache files
             for file in self.cache_dir.glob("*"):
                 if file.is_file():
                     file.unlink()
+            collect_garbage()
             logger.info("Cleared all cached data")
 
     def list_cached_data(self) -> List[Dict]:
@@ -291,7 +303,6 @@ class CleanedDataCache:
                 cached_entries.append(info)
             except Exception as e:
                 logger.warning(f"Could not read cache info file {info_file}: {str(e)}")
-
         return cached_entries
 
     # Compatibility convenience methods

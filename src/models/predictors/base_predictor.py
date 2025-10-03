@@ -228,12 +228,15 @@ class BasePredictor(ABC):
         Save predictions to an Excel file.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        model_dir = self.model_dir.split("\\")[-1]
+        if self.model_dir is not None:
+            model_dir = self.model_dir.split("\\")[-1]
+        else:
+            model_dir = ""
         if model_name is not None:
-            file_name = f"predictions_{model_name}_{model_dir[:11]}_{timestamp}.xlsx"
+            file_name = f"predictions_{model_name}_{model_dir[:11] if model_dir else ""}_{timestamp}.xlsx"
         else:
             file_name = (
-                f"predictions_{self.run_id[:8]}_{model_dir[:11]}_{timestamp}.xlsx"
+                f"predictions_{self.run_id[:8]}_{model_dir[:11] if model_dir else ""}_{timestamp}.xlsx"
             )
 
         output_dir = os.path.join("predictions", self.model_type)
@@ -399,7 +402,7 @@ class BasePredictor(ABC):
         dates_series = pd.to_datetime(dates_series)
         # 4a) Weekday-specific profit aggregates (Friday and Monday)
         if not valid_profit_df.empty:
-            check_monday = False
+            check_monday = True
             check_friday = True
 
             if check_friday:

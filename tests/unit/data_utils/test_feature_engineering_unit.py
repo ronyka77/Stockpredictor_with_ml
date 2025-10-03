@@ -121,7 +121,7 @@ def test_clean_data_for_training_handles_infinite_and_nan_and_types():
 
 def test_add_date_features_creates_temporal_columns():
     """Extract temporal features from date strings including year/month/quarter indicators."""
-    df = pd.DataFrame({"date": ["2020-01-01", "2020-03-15"]})
+    df = pd.DataFrame({"date": ["2020-01-01", "2020-06-15"]})
     out = add_date_features(df, "date")
     expected = {
         "date_int",

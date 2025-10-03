@@ -64,7 +64,7 @@ def collect_garbage():
 
 def prepare_ml_data_for_training(
     prediction_horizon: int = 10,
-    split_date: str = "2025-03-15",
+    split_date: str = "2025-06-15",
     ticker: Optional[str] = None,
     filter_train_set: bool = True,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
@@ -179,24 +179,17 @@ def prepare_ml_data_for_training(
                 "'date' column not found in data. Cannot perform date-based split."
             )
 
-        # Apply the same valid_mask to get corresponding dates
-        dates_clean = X["date"][valid_mask].copy()
-        X = X.drop(columns=["date"])
-
+        dates_all = X["date"][valid_mask].copy()
         # Convert to datetime if not already
-        if not pd.api.types.is_datetime64_any_dtype(dates_clean):
-            dates_clean = pd.to_datetime(dates_clean)
-        
-        filtered_mask, dates_clean = filter_dates_to_weekdays(dates_clean, (0, 4))
-        X_clean = X_clean[filtered_mask]
-        y_clean = y_clean[filtered_mask]
+        if not pd.api.types.is_datetime64_any_dtype(dates_all):
+            dates_all = pd.to_datetime(dates_all)
 
         # Define split date
         split_date_dt = pd.to_datetime(split_date)
 
         # Create train/test masks based on date
-        train_mask = dates_clean < split_date_dt
-        test_mask = dates_clean >= split_date_dt
+        train_mask = dates_all < split_date_dt
+        test_mask = dates_all >= split_date_dt
 
         # Split the data
         X_train = X_clean[train_mask].copy()
@@ -204,20 +197,16 @@ def prepare_ml_data_for_training(
         y_train = y_clean[train_mask].copy()
         y_test = y_clean[test_mask].copy()
 
-        # Get test dates for modification and logging
-        test_dates = dates_clean[test_mask]
-        train_dates = dates_clean[train_mask]
+        # Apply the same valid_mask to get corresponding dates
+        test_dates = dates_all[test_mask].copy()
 
-        # Filter test set to include only Mondays and Fridays
-        filtered_mask, test_dates = filter_dates_to_weekdays(test_dates, (0, 4))
+        filtered_mask, dates_clean = filter_dates_to_weekdays(test_dates, (0,4))
+
+        # Get test dates for modification and logging
+        test_dates = dates_clean
+        train_dates = dates_all[train_mask]
         X_test = X_test[filtered_mask]
         y_test = y_test[filtered_mask]
-
-        if not train_dates.empty and filter_train_set:
-            logger.info("📅 Filtering train set to include only Mondays and Fridays.")
-            
-            X_train = X_train[filtered_mask]
-            y_train = y_train[filtered_mask]
 
         # Get date ranges for logging
         train_date_range = (
@@ -314,7 +303,7 @@ def prepare_ml_data_for_prediction(
         )
         date_col = combined_data["date"].copy()
         # keep Mondays and Fridays only (0, 4)
-        filtered_mask, filtered_dates = filter_dates_to_weekdays(date_col, (0, 4))
+        filtered_mask, filtered_dates = filter_dates_to_weekdays(date_col, (0,4))
         combined_data = combined_data[filtered_mask]
 
         # Extract percentage return targets (instead of absolute prices)
@@ -360,7 +349,7 @@ def prepare_ml_data_for_prediction(
         if not filtered_dates.empty:
             logger.info("📅 Filtering prediction set to include only Fridays.")
             X = X[filtered_mask]
-            split_date_dt = pd.to_datetime("2025-03-15")
+            split_date_dt = pd.to_datetime("2025-06-15")
             test_mask = date_col >= split_date_dt
             X_test = X[test_mask].copy()
             y_test = y[test_mask].copy()
@@ -406,7 +395,7 @@ def prepare_ml_data_for_prediction(
 
 def prepare_ml_data_for_training_with_cleaning(
     prediction_horizon: int = 10,
-    split_date: str = "2025-03-15",
+    split_date: str = "2025-06-15",
     ticker: str = None,
     clean_features: bool = True,
     filter_train_set: bool = True,
@@ -456,7 +445,7 @@ def prepare_ml_data_for_training_with_cleaning(
         f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features"
     )
     # 2. Apply data cleaning (always performed)
-    logger.info("Step 2: Applying XGBoost data cleaning to combined train/test set...")
+    logger.info("Step 2: Applying data cleaning to combined train/test set...")
     combined_X = pd.concat(
         [data_result["X_train"], data_result["X_test"]], ignore_index=True
     )

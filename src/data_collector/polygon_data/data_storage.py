@@ -117,7 +117,7 @@ class DataStorage:
         Returns:
             Tuple of (inserted_count, updated_count)
         """
-        # Use psycopg2.execute_values for performant batched upserts
+        # Use execute_values for performant batched upserts
         cols = [
             "ticker",
             "date",

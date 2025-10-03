@@ -3,7 +3,7 @@ Target Engineering Module
 
 This module provides functions for transforming prediction targets,
 including the critical Phase 1 fix that converts absolute price targets
-to percentage return targets for realistic XGBoost predictions.
+to percentage return targets for realistic predictions.
 """
 
 import pandas as pd
@@ -20,7 +20,7 @@ def convert_absolute_to_percentage_returns(
     """
     Convert absolute future price targets to percentage returns
 
-    This is the CRITICAL fix for XGBoost unrealistic predictions.
+    This is the CRITICAL fix for unrealistic predictions.
     Instead of predicting absolute prices ($254.75), we predict percentage returns (+5.2%).
 
     Args:

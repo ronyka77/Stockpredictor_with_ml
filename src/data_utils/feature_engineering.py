@@ -3,7 +3,7 @@ Feature Engineering Module
 
 This module provides functions for transforming and enhancing features,
 including the Phase 2 fixes that add price-normalized features and
-prediction bounds features for better XGBoost performance.
+prediction bounds features for better performance.
 """
 
 import pandas as pd
@@ -146,18 +146,18 @@ def add_prediction_bounds_features(features_df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean data specifically for XGBoost training/prediction
+    Clean data specifically for training/prediction
 
     This function implements the critical data cleaning transformations
-    that were proven to fix the broken XGBoost model.
+    that were proven to fix the broken model.
 
     Args:
         df: Input DataFrame with mixed data types
 
     Returns:
-        Cleaned DataFrame ready for XGBoost
+        Cleaned DataFrame ready for training
     """
-    logger.info(f"🧹 Starting XGBoost data cleaning on {len(df)} samples...")
+    logger.info(f"🧹 Starting data cleaning on {len(df)} samples...")
 
     # 1. Handle infinite and extremely large values
     df_clean = df.copy()

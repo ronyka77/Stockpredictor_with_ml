@@ -55,7 +55,7 @@ class LightGBMModel(BaseModel):
         super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
 
         # Initialize LightGBM-specific parameters
-        self.prediction_horizon = self.config.get("prediction_horizon", 10)
+        self.prediction_horizon = self.config.get("prediction_horizon", 5)
         self.model = None
         self.feature_names = None
         self.categorical_features = None
@@ -66,7 +66,7 @@ class LightGBMModel(BaseModel):
 
         # Calculate CPU usage limit (75% of available cores by default)
         total_cores = os.cpu_count() or 4
-        self.max_cpu_cores = max(1, int(total_cores * 0.75))
+        self.max_cpu_cores = max(1, int(total_cores * 0.85))
         logger.info(
             f"🔧 CPU Usage Limit: {self.max_cpu_cores}/{total_cores} cores (75%)"
         )
@@ -1197,14 +1197,14 @@ def main():
         logger.info(f"✅ MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
         # Define prediction horizon
-        prediction_horizon = 10
-        number_of_trials = 200
-        n_features_to_select = 100
+        prediction_horizon = 5
+        number_of_trials = 100
+        n_features_to_select = 80
 
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
-            split_date="2025-03-15",
+            split_date="2025-06-15",
             ticker=None,
             clean_features=True,
         )

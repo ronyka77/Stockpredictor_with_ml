@@ -52,7 +52,7 @@ class ThresholdEvaluator:
         self.investment_amount = investment_amount
         self.custom_metrics = CustomMetrics()
         self.min_samples_percentage = 0.002
-        self.max_samples_percentage = 0.10
+        self.max_samples_percentage = 0.30
 
     def _vectorized_profit_calculation(
         self,
