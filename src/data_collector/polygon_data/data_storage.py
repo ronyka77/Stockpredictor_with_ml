@@ -37,7 +37,7 @@ class DataStorage:
     def store_historical_data(
         self,
         records: List[OHLCVRecord],
-        batch_size: int = 1000,
+        batch_size: int = 5000,
     ) -> Dict[str, Any]:
         """
         Store validated OHLCV data to PostgreSQL database
@@ -516,12 +516,11 @@ class DataStorage:
         query += " ORDER BY ticker"
 
         try:
-            result = fetch_all(query, None, dict_cursor=False)
+            result = fetch_all(query, None, dict_cursor=True)
             tickers = []
 
             for row in result:
-                ticker_dict = dict(row)
-                tickers.append(ticker_dict)
+                tickers.append(row)
 
             logger.info(f"Retrieved {len(tickers)} tickers from database")
             return tickers

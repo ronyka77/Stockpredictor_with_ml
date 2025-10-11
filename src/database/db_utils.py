@@ -5,7 +5,7 @@ Contains bulk upsert helpers used by feature engineering and other modules.
 
 from typing import Dict, Any, Iterable, Tuple, List
 import json
-from src.database.connection import get_global_pool,execute_values
+from src.database.connection import execute_values
 
 from src.utils.logger import get_logger
 
@@ -61,33 +61,12 @@ def bulk_upsert_technical_features(
 
     tuples = [_row_tuple_from_dict(r) for r in rows]
 
-    pool = get_global_pool()
-    with pool.connection() as conn:
-        cur = conn.cursor()
-        try:
-            # Use the connection's cursor.mogrify to construct VALUES pages
-            num_cols = len(tuples[0])
-            value_template = "(" + ",".join(["%s"] * num_cols) + ")"
-            for i in range(0, len(tuples), page_size):
-                page = tuples[i : i + page_size]
-                values = ",".join(cur.mogrify(value_template, r).decode("utf-8") for r in page)
-                sql = insert_sql % values
-                cur.execute(sql)
-            try:
-                rowcount = cur.rowcount
-            except Exception:
-                rowcount = None
-            conn.commit()
-            return rowcount or len(tuples)
-        except Exception:
-            conn.rollback()
-            logger.exception("bulk_upsert_technical_features failed")
-            raise
-        finally:
-            try:
-                cur.close()
-            except Exception:
-                pass
+    try:
+        execute_values(insert_sql, tuples, page_size=page_size)
+        return len(tuples)
+    except Exception:
+        logger.exception("bulk_upsert_technical_features failed")
+        raise
 
 
 def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
@@ -140,29 +119,9 @@ def _upsert_dividends_batch(
 
     tuples: List[Tuple] = [_dividend_row_tuple_from_dict(r) for r in rows]
 
-    pool = get_global_pool()
-    with pool.connection() as conn:
-        cur = conn.cursor()
-        try:
-            num_cols = len(tuples[0])
-            value_template = "(" + ",".join(["%s"] * num_cols) + ")"
-            for i in range(0, len(tuples), page_size):
-                page = tuples[i : i + page_size]
-                values = ",".join(cur.mogrify(value_template, r).decode("utf-8") for r in page)
-                sql = insert_sql % values
-                cur.execute(sql)
-            try:
-                rowcount = cur.rowcount
-            except Exception:
-                rowcount = None
-            conn.commit()
-            return rowcount or len(tuples)
-        except Exception:
-            conn.rollback()
-            logger.exception("_upsert_dividends_batch failed")
-            raise
-        finally:
-            try:
-                cur.close()
-            except Exception:
-                pass
+    try:
+        execute_values(insert_sql, tuples, page_size=page_size)
+        return len(tuples)
+    except Exception:
+        logger.exception("_upsert_dividends_batch failed")
+        raise

@@ -1197,14 +1197,14 @@ def main():
         logger.info(f"✅ MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
         # Define prediction horizon
-        prediction_horizon = 5
-        number_of_trials = 100
-        n_features_to_select = 80
+        prediction_horizon = 20
+        number_of_trials = 50
+        n_features_to_select = 100
 
         # OPTION 1: Use the enhanced data preparation function with cleaning (direct import)
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
-            split_date="2025-06-15",
+            split_date="2025-05-01",
             ticker=None,
             clean_features=True,
         )

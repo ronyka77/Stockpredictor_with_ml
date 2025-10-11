@@ -78,7 +78,7 @@ def predict_all_model(model_dir: str):
     predictor = AutoGluonPredictor(model_dir=model_dir)
     predictor.load_model_from_mlflow()
     predictor._load_metadata()
-    features_df_base, metadata_df_base = predictor.load_recent_data(days_back=30)
+    features_df_base, metadata_df_base = predictor.load_recent_data(days_back=45)
     model_names = predictor.model.predictor.model_names()
     for model_name in model_names:
         logger.info(
@@ -126,6 +126,6 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore")
 
-    model_dir = "AutogluonModels/ag-20250920_160248"
+    model_dir = "AutogluonModels/ag-20251005_014406"
     # predict_all_model(model_dir)
     predict_all_model_folders()

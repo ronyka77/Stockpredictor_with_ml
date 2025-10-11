@@ -39,7 +39,7 @@ class BasePredictor(ABC):
         self.run_id = run_id
         self.model_type = model_type
         self.model = None
-        self.prediction_horizon = 5
+        self.prediction_horizon = 20
         self.optimal_threshold = None
         self.model_dir = None
 
@@ -245,7 +245,7 @@ class BasePredictor(ABC):
 
         logger.info("💾 Validating and saving predictions")
 
-        results_df = self._build_results_dataframe_and_profit(
+        results_df, avg_profit = self._build_results_dataframe_and_profit(
             features_df=features_df,
             metadata_df=metadata_df,
             predictions=predictions,
@@ -300,6 +300,9 @@ class BasePredictor(ABC):
         without writing to disk.
         Returns a tuple of (results_df, avg_profit_per_investment).
         """
+        # Initialize avg_profit_per_investment
+        avg_profit_per_investment = 0.0
+
         # 1) Minimal result skeleton from predictions and metadata
         results_df = metadata_df.copy()
         threshold_filtered_count = 0
@@ -341,7 +344,7 @@ class BasePredictor(ABC):
 
         if threshold_filtered_count == 0:
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-            return pd.DataFrame()
+            return pd.DataFrame(), avg_profit_per_investment
         else:
             results_df = (
                 results_df[results_df["predicted_return"] > 0]
@@ -353,6 +356,9 @@ class BasePredictor(ABC):
             results_df["day_of_week"] = pd.to_datetime(results_df["date"]).dt.day_name()
             top_10_count = len(results_df)
             logger.info(f"   📈 Top 10 final count: {top_10_count}")
+            if top_10_count == 0:
+                logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+                return pd.DataFrame(), avg_profit_per_investment
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df["actual_return"].notna()
@@ -398,11 +404,20 @@ class BasePredictor(ABC):
         logger.info(
             f"   💰 ${avg_profit_per_investment:.2f} Average profit per $100 investment"
         )
+
+        # New validation: Check for at least 1 not closed prediction (actual_price is empty)
+        not_closed_predictions = results_df["actual_price"].isna().sum()
+        logger.info(f"   🔮 Not closed predictions: {not_closed_predictions}")
+
+        if not_closed_predictions == 0:
+            logger.warning("   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!")
+            return pd.DataFrame(), avg_profit_per_investment
+
         dates_series = results_df["date"].copy()
         dates_series = pd.to_datetime(dates_series)
         # 4a) Weekday-specific profit aggregates (Friday and Monday)
         if not valid_profit_df.empty:
-            check_monday = True
+            check_monday = False
             check_friday = True
 
             if check_friday:
@@ -438,13 +453,13 @@ class BasePredictor(ABC):
                 elif not check_friday:
                     results_df = results_df[results_df["day_of_week"] == "Monday"]
 
-                return results_df if len(results_df) > 5 else pd.DataFrame()
+                return results_df if len(results_df) > 5 else pd.DataFrame(), avg_profit_per_investment
             else:
                 logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-                return pd.DataFrame()
+                return pd.DataFrame(), avg_profit_per_investment
 
         logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-        return pd.DataFrame()
+        return pd.DataFrame(), avg_profit_per_investment
 
     def evaluate_on_recent_data(
         self, days_back: int = 30

@@ -82,7 +82,7 @@ def train_autogluon(
 
 def main():
     train_autogluon(
-        prediction_horizon=5,
+        prediction_horizon=20,
         presets="best_quality",
     )
 

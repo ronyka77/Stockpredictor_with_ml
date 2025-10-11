@@ -112,7 +112,7 @@ def run_all_and_export_best(
 def main():
     # Default experiment name used by LightGBM training
     experiment_name = "lightgbm_stock_predictor"
-    days_back = 30
+    days_back = 60
     result = run_all_and_export_best(
         experiment_name=experiment_name, days_back=days_back
     )

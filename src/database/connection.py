@@ -4,7 +4,6 @@ Database Connection Module
 This module provides database connection functionality for the StockPredictor V1 system.
 """
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -156,8 +155,8 @@ class PostgresConnection:
                 # Fallback: some pool versions provide `closeall()`
                 try:
                     self._pool.closeall()
-                except Exception as exc:
-                    raise
+                except Exception:
+                    pass
             # logger.info("PostgresConnection closed")
         except Exception as exc:
             logger.error(f"Error closing pooled connections: {exc}")
@@ -261,7 +260,7 @@ def execute(query: str, params: Optional[Tuple] = None, commit: bool = True) -> 
 def execute_values(
     insert_sql: str, rows: Iterable[Tuple], page_size: int = 1000, commit: bool = True
 ) -> None:
-    """Efficiently insert many rows in pages without relying on cursor.mogrify.
+    """Efficiently insert many rows in pages.
 
     The `insert_sql` argument is expected to contain a single ``%s`` placeholder
     where the expanded VALUES list will be inserted. Rows are passed as an
