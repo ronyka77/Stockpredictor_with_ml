@@ -25,7 +25,7 @@ def _make_features_and_targets(n=5):
 def test_load_recent_data_calls_pipeline_and_returns_dfs():
     """Call prediction pipeline to load recent data and return features and metadata DataFrames."""
     features, targets = _make_features_and_targets(6)
-    fake_result = {"X_test": features, "y_test": targets}
+    fake_result = {"x_test": features, "y_test": targets}
 
     dp = DummyPredictor(run_id="r1", model_type="test")
     with patch(

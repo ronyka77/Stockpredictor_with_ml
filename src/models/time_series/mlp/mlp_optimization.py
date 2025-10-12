@@ -25,10 +25,10 @@ class MLPOptimizationMixin:
 
     def objective(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
-        X_test_scaled: Optional[pd.DataFrame],
+        x_test: pd.DataFrame,
+        x_test_scaled: Optional[pd.DataFrame],
         y_test: pd.Series,
         fitted_scaler=StandardScaler,
     ) -> callable:
@@ -36,9 +36,9 @@ class MLPOptimizationMixin:
         Create Optuna objective function for hyperparameter optimization with threshold optimization
 
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
             fitted_scaler: Pre-fitted StandardScaler instance (optional)
 
@@ -50,7 +50,7 @@ class MLPOptimizationMixin:
         self.best_trial_model = None
         self.best_trial_params = None
         self.best_threshold_info = None
-        self.feature_names = X_train.columns
+        self.feature_names = x_train.columns
 
         # Store the fitted scaler for use in trials
         if fitted_scaler is not None:
@@ -78,7 +78,7 @@ class MLPOptimizationMixin:
 
             # Model creation parameters (relevant for _create_model)
             model_params = {
-                "input_size": len(X_train.columns),  # Add input_size from training data
+                "input_size": len(x_train.columns),  # Add input_size from training data
                 "layer_sizes": layer_sizes,
                 "learning_rate": trial.suggest_float(
                     "learning_rate", 1e-4, 5e-2, log=True
@@ -139,7 +139,7 @@ class MLPOptimizationMixin:
 
                 # Create DataLoaders using the cleaned and scaled data
                 train_loader = MLPDataUtils.create_dataloader_from_dataframe(
-                    X_train,
+                    x_train,
                     y_train,
                     data_params["batch_size"],
                     shuffle=True,
@@ -147,7 +147,7 @@ class MLPOptimizationMixin:
                     pin_memory=pin_memory,
                 )
                 val_loader = MLPDataUtils.create_dataloader_from_dataframe(
-                    X_test_scaled,
+                    x_test_scaled,
                     y_test,
                     data_params["batch_size"],
                     shuffle=False,
@@ -165,16 +165,16 @@ class MLPOptimizationMixin:
 
                 # Extract current prices for test sets
                 test_current_prices = (
-                    X_test["close"].values
-                    if "close" in X_test.columns
-                    else np.ones(len(X_test))
+                    x_test["close"].values
+                    if "close" in x_test.columns
+                    else np.ones(len(x_test))
                 )
 
                 # Run threshold optimization for this trial
                 logger.info(f"Running threshold optimization for trial {trial.number}")
 
                 threshold_results = trial_model.optimize_prediction_threshold(
-                    X_test=X_test,
+                    x_test=x_test,
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method="variance",

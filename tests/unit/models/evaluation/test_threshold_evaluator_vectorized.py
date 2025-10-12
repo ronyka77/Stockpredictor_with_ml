@@ -48,7 +48,7 @@ def test_vectorized_threshold_testing_monotonic_mask():
 
     res = te.optimize_prediction_threshold(
         model=model,
-        X_test=X,
+        x_test=X,
         y_test=pd.Series(y),
         current_prices_test=prices,
         confidence_method="simple",

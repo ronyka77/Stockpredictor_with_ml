@@ -121,7 +121,7 @@ def test_get_prediction_confidence_various_methods(
 def test_log_model_to_mlflow_calls_helper(lgb_model_instance, sample_tabular_data):
     """Setup: patch the module-level logging helper to avoid real MLflow calls and verify run id is returned."""
 
-    X_eval = sample_tabular_data["X"].iloc[:5]
+    x_eval = sample_tabular_data["X"].iloc[:5]
     metrics = {"mse": 0.1}
     params = {"param": 1}
 
@@ -133,7 +133,7 @@ def test_log_model_to_mlflow_calls_helper(lgb_model_instance, sample_tabular_dat
         # Ensure a model object exists to satisfy precondition
         lgb_model_instance.model = Mock()
         run_id = lgb_model_instance.log_model_to_mlflow(
-            metrics=metrics, params=params, X_eval=X_eval, experiment_name="exp"
+            metrics=metrics, params=params, x_eval=x_eval, experiment_name="exp"
         )
 
         # Verification

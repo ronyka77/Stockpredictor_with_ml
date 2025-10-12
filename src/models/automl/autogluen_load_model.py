@@ -68,9 +68,9 @@ def run_model_evaluation(
         data = prepare_ml_data_for_prediction_with_cleaning(
             prediction_horizon=prediction_horizon, days_back=60
         )
-        X_test = data.get("X_test")
+        x_test = data.get("x_test")
         y_test = data.get("y_test")
-        valid_df = pd.concat([X_test, pd.Series(y_test, name=label_name)], axis=1)
+        valid_df = pd.concat([x_test, pd.Series(y_test, name=label_name)], axis=1)
         valid_df = valid_df.reset_index(drop=True)
         initial_rows = len(valid_df)
         valid_df = valid_df.dropna(subset=[label_name])
@@ -78,7 +78,7 @@ def run_model_evaluation(
         logger.info(
             f"Dropped {dropped_rows} rows with missing values in {label_name} and length: {len(valid_df)}"
         )
-        X_test_valid = valid_df.copy()
+        x_test_valid = valid_df.copy()
         y_test_valid = valid_df[label_name]
         # 2) Load predictor
         model = predictor_class.model
@@ -91,9 +91,9 @@ def run_model_evaluation(
             raise ValueError("Predictor not found")
         feature_names = model.feature_names
         logger.info(f"feature_names: {len(feature_names)}")
-        X_test_valid = X_test_valid[feature_names]
-        close_price_min = X_test_valid["close"].min()
-        close_price_max = X_test_valid["close"].max()
+        x_test_valid = x_test_valid[feature_names]
+        close_price_min = x_test_valid["close"].min()
+        close_price_max = x_test_valid["close"].max()
         logger.info(
             f"close_price_min: {close_price_min}, close_price_max: {close_price_max}"
         )
@@ -107,7 +107,7 @@ def run_model_evaluation(
         for model_name in model_names:
             logger.info(f"Running threshold evaluation for model: {model_name}")
             model.selected_model_name = model_name
-            results = model.run_threshold_evaluation(X_test_valid, y_test_valid)
+            results = model.run_threshold_evaluation(x_test_valid, y_test_valid)
             if results["status"] == "success":
                 score = results["best_result"]["test_profit_per_investment"]
                 if score > best_score:
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
     try:
-        model_dir = "AutogluonModels/ag-20250921_221257"
+        model_dir = "AutogluonModels/ag-20251003_214902"
         prediction_horizon = 5
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

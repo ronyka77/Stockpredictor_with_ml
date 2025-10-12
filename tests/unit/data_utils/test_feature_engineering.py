@@ -117,15 +117,15 @@ def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves
     )
     y = pd.Series([0.1, 0.2, 0.3, 0.4])
 
-    X_clean, y_clean, removed = fe.clean_features_for_training(
+    x_clean, y_clean, removed = fe.clean_features_for_training(
         df, y, correlation_threshold=0.9
     )
-    if "cat" in X_clean.columns:
+    if "cat" in x_clean.columns:
         raise AssertionError("Non-numeric column not removed")
-    if not ("const" not in X_clean.columns or "const" in removed["constant"]):
+    if not ("const" not in x_clean.columns or "const" in removed["constant"]):
         raise AssertionError("Constant column removal mismatch")
     # keep1 or keep2 should remain but one of them likely removed due to high correlation (preserve essentials)
-    if "close" not in X_clean.columns:
+    if "close" not in x_clean.columns:
         raise AssertionError("Essential 'close' was removed unexpectedly")
-    if len(X_clean) != len(y_clean):
+    if len(x_clean) != len(y_clean):
         raise AssertionError("X and y lengths differ after cleaning")

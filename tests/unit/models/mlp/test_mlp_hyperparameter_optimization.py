@@ -25,22 +25,22 @@ def create_test_data(n_samples=1000, n_features=20):
 
 def test_mlp_hyperparameter_objective_callable():
     """Construct hyperparameter objective callable for MLP optimization."""
-    X_train, y_train, X_test, y_test = create_test_data(n_samples=200, n_features=10)
+    x_train, y_train, x_test, y_test = create_test_data(n_samples=200, n_features=10)
     threshold_evaluator = ThresholdEvaluator()
 
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-    cleaned_train = MLPDataUtils.validate_and_clean_data(X_train)
-    X_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-    cleaned_test = MLPDataUtils.validate_and_clean_data(X_test)
-    X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+    cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
+    x_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
+    x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
     from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
 
     opt_mixin = MLPPredictorWithOptimization(
         model_name="test_mlp",
         config={
-            "input_size": X_train.shape[1],
+            "input_size": x_train.shape[1],
             "output_size": 1,
             "task": "classification",
         },
@@ -48,7 +48,7 @@ def test_mlp_hyperparameter_objective_callable():
     )
 
     objective = opt_mixin.objective(
-        X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler
+        x_train, y_train, x_test, x_test_scaled, y_test, fitted_scaler=scaler
     )
     if not callable(objective):
         raise AssertionError("Objective should be callable")
@@ -57,26 +57,26 @@ def test_mlp_hyperparameter_objective_callable():
 @pytest.mark.slow
 def test_mlp_hyperparameter_optimization_integration():
     """Run a short hyperparameter optimization integration to validate study flow."""
-    X_train, y_train, X_test, y_test = create_test_data(n_samples=400, n_features=12)
+    x_train, y_train, x_test, y_test = create_test_data(n_samples=400, n_features=12)
     threshold_evaluator = ThresholdEvaluator()
 
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-    cleaned_train = MLPDataUtils.validate_and_clean_data(X_train)
-    X_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-    cleaned_test = MLPDataUtils.validate_and_clean_data(X_test)
-    X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+    cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
+    x_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
+    x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
     from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
 
     opt_mixin = MLPPredictorWithOptimization(
         model_name="test_mlp",
-        config={"input_size": X_train.shape[1]},
+        config={"input_size": x_train.shape[1]},
         threshold_evaluator=threshold_evaluator,
     )
 
     objective = opt_mixin.objective(
-        X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler
+        x_train, y_train, x_test, x_test_scaled, y_test, fitted_scaler=scaler
     )
     sampler = optuna.samplers.RandomSampler(seed=42)
     study = optuna.create_study(direction="maximize", sampler=sampler)

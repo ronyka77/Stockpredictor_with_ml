@@ -298,7 +298,7 @@ class BaseModel(ABC):
                 threshold_results = (
                     self.threshold_evaluator.optimize_prediction_threshold(
                         model=self,
-                        X_test=X,
+                        x_test=X,
                         y_test=y,
                         current_prices_test=current_prices,
                         confidence_method=confidence_method,
@@ -336,7 +336,7 @@ class BaseModel(ABC):
 
     def optimize_prediction_threshold(
         self,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         confidence_method: str = "leaf_depth",
@@ -348,7 +348,7 @@ class BaseModel(ABC):
         """
         results = self.threshold_evaluator.optimize_prediction_threshold(
             model=self,
-            X_test=X_test,
+            x_test=x_test,
             y_test=y_test,
             current_prices_test=current_prices_test,
             confidence_method=confidence_method,

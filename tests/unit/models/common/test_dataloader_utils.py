@@ -11,7 +11,7 @@ def test_create_dataloader_without_cat_idx():
     # Use sentinel category indices instead of None so default_collate can stack
     cat = np.full(10, -1, dtype=np.int64)
     dl = create_dataloader_from_numpy(
-        X_num=X, y=y, cat_idx=cat, batch_size=3, shuffle=False, num_workers=0
+        x_num=X, y=y, cat_idx=cat, batch_size=3, shuffle=False, num_workers=0
     )
     batches = list(dl)
     # expect 4 batches: 3,3,3,1
@@ -31,7 +31,7 @@ def test_create_dataloader_with_cat_idx():
     y = np.ones(8).astype(np.float32)
     cat = np.arange(8).astype(np.int64)
     dl = create_dataloader_from_numpy(
-        X_num=X, y=y, cat_idx=cat, batch_size=4, shuffle=False, num_workers=0
+        x_num=X, y=y, cat_idx=cat, batch_size=4, shuffle=False, num_workers=0
     )
     batches = list(dl)
     assert len(batches) == 2

@@ -493,10 +493,10 @@ class MLPModelWrapper(nn.Module):
         self.model.eval()
 
         # Apply preprocessing
-        X_scaled, _ = MLPDataUtils.scale_data(X, self.scaler, False)
+        x_scaled, _ = MLPDataUtils.scale_data(X, self.scaler, False)
 
         # Convert to tensor
-        X_tensor = torch.FloatTensor(X_scaled.values)
+        X_tensor = torch.FloatTensor(x_scaled.values)
 
         # Make prediction
         with torch.no_grad():

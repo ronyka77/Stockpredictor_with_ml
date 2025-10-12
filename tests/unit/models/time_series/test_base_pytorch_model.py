@@ -14,9 +14,9 @@ class MinimalPytorchPredictor(PyTorchBasePredictor):
 def _make_loader(n=20, batch_size=8):
     X = np.linspace(0, 1, n).reshape(-1, 1).astype(np.float32)
     y = (2 * X).reshape(-1).astype(np.float32)
-    tensor_X = torch.tensor(X)
+    tensor_x = torch.tensor(X)
     tensor_y = torch.tensor(y)
-    dataset = torch.utils.data.TensorDataset(tensor_X, tensor_y)
+    dataset = torch.utils.data.TensorDataset(tensor_x, tensor_y)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
 

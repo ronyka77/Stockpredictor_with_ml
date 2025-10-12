@@ -25,16 +25,16 @@ logger = get_logger(__name__)
 experiment_name = "xgboost_stock_predictor"
 
 
-def log_to_mlflow(model, metrics, params, experiment_name, X_eval):
+def log_to_mlflow(model, metrics, params, experiment_name, x_eval):
     """
     Log trained model, metrics, and parameters to MLflow.
-    Requires X_eval DataFrame for signature generation.
+    Requires x_eval DataFrame for signature generation.
     Args:
         model: Trained XGBoost model
         metrics: Model evaluation metrics
         params: Model parameters
         experiment_name: Experiment name
-        X_eval (pd.DataFrame): Evaluation features for signature generation
+        x_eval (pd.DataFrame): Evaluation features for signature generation
     Returns:
         str: Run ID
     """
@@ -79,8 +79,8 @@ def log_to_mlflow(model, metrics, params, experiment_name, X_eval):
             mlflow.log_params(params_to_log)
             mlflow.log_metrics(metrics)
 
-            # Create input example using the DataFrame X_eval
-            input_example = X_eval.iloc[:5].copy()
+            # Create input example using the DataFrame x_eval
+            input_example = x_eval.iloc[:5].copy()
 
             # Identify and convert integer columns to float64
             if hasattr(input_example, "dtypes"):
@@ -203,37 +203,37 @@ class XGBoostModel(BaseModel):
 
     def _prepare_data(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
     ) -> Tuple[xgb.DMatrix, xgb.DMatrix]:
         """
         Prepare data for XGBoost training using pre-split train/test data
 
         Args:
-            X_train: Training feature matrix
+            x_train: Training feature matrix
             y_train: Training target values
-            X_test: Test feature matrix (used for validation during training)
+            x_test: Test feature matrix (used for validation during training)
             y_test: Test target values (used for validation during training)
 
         Returns:
             Training and test DMatrix objects
         """
         # Store feature names for later use
-        self.feature_names = list(X_train.columns)
+        self.feature_names = list(x_train.columns)
 
         # Create DMatrix objects directly from the pre-split data
-        dtrain = xgb.DMatrix(X_train, label=y_train, feature_names=self.feature_names)
-        dtest = xgb.DMatrix(X_test, label=y_test, feature_names=self.feature_names)
+        dtrain = xgb.DMatrix(x_train, label=y_train, feature_names=self.feature_names)
+        dtest = xgb.DMatrix(x_test, label=y_test, feature_names=self.feature_names)
 
         return dtrain, dtest
 
     def fit(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: Optional[pd.DataFrame] = None,
+        x_test: Optional[pd.DataFrame] = None,
         y_test: Optional[pd.Series] = None,
         params: Optional[Dict[str, Any]] = None,
         validation_split: Optional[float] = None,
@@ -242,43 +242,43 @@ class XGBoostModel(BaseModel):
         Train the XGBoost model using pre-split train/test data
 
         Args:
-            X_train: Training feature matrix
+            x_train: Training feature matrix
             y_train: Training target values
-            X_test: Test/validation feature matrix (optional if validation_split provided)
+            x_test: Test/validation feature matrix (optional if validation_split provided)
             y_test: Test/validation target values (optional if validation_split provided)
             params: Custom parameters (overrides defaults)
-            validation_split: Optional fraction (0,1) to split from provided X_train/y_train for validation
+            validation_split: Optional fraction (0,1) to split from provided x_train/y_train for validation
 
         Returns:
             Self for method chaining
         """
-        # logger.info(f"Training XGBoost model with {len(X_train)} samples, {len(X_train.columns)} features")
+        # logger.info(f"Training XGBoost model with {len(x_train)} samples, {len(x_train.columns)} features")
 
-        # Handle optional validation split when X_test/y_test not provided
-        if (X_test is None or y_test is None) and validation_split is not None:
+        # Handle optional validation split when x_test/y_test not provided
+        if (x_test is None or y_test is None) and validation_split is not None:
             if not (0.0 < validation_split < 1.0):
                 raise ValueError("validation_split must be in (0,1)")
-            n_samples = len(X_train)
+            n_samples = len(x_train)
             val_size = max(1, int(n_samples * validation_split))
             split_idx = n_samples - val_size
             if split_idx <= 0:
                 split_idx = n_samples - 1
-            X_test = X_train.iloc[split_idx:].copy()
+            x_test = x_train.iloc[split_idx:].copy()
             y_test = y_train.iloc[split_idx:].copy()
-            X_train = X_train.iloc[:split_idx].copy()
+            x_train = x_train.iloc[:split_idx].copy()
             y_train = y_train.iloc[:split_idx].copy()
 
-        if X_test is None or y_test is None:
+        if x_test is None or y_test is None:
             # If still None (no split requested), create a tiny holdout from tail to satisfy API
-            n_samples = len(X_train)
+            n_samples = len(x_train)
             val_size = max(1, int(n_samples * 0.2))
             split_idx = n_samples - val_size
-            X_test = X_train.iloc[split_idx:].copy()
+            x_test = x_train.iloc[split_idx:].copy()
             y_test = y_train.iloc[split_idx:].copy()
-            X_train = X_train.iloc[:split_idx].copy()
+            x_train = x_train.iloc[:split_idx].copy()
 
         # Prepare data
-        dtrain, dtest = self._prepare_data(X_train, y_train, X_test, y_test)
+        dtrain, dtest = self._prepare_data(x_train, y_train, x_test, y_test)
 
         # Use provided parameters or defaults
         if params is None:
@@ -406,7 +406,7 @@ class XGBoostModel(BaseModel):
         self,
         metrics: Dict[str, float],
         params: Dict[str, Any],
-        X_eval: pd.DataFrame,
+        x_eval: pd.DataFrame,
         experiment_name: str = None,
     ) -> str:
         """
@@ -415,7 +415,7 @@ class XGBoostModel(BaseModel):
         Args:
             metrics: Model evaluation metrics to log
             params: Model parameters to log
-            X_eval: Evaluation features for signature generation
+            x_eval: Evaluation features for signature generation
             experiment_name: Experiment name (uses default if None)
 
         Returns:
@@ -428,7 +428,7 @@ class XGBoostModel(BaseModel):
         run_id = self.log_model_to_mlflow(
             metrics=metrics,
             params=params,
-            X_eval=X_eval,
+            x_eval=x_eval,
             experiment_name=experiment_name,
         )
 
@@ -724,9 +724,9 @@ class XGBoostModel(BaseModel):
 
     def objective(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         objective_column: str = "test_profit_per_investment",
     ) -> callable:
@@ -734,9 +734,9 @@ class XGBoostModel(BaseModel):
         Create Optuna objective function for hyperparameter optimization with threshold optimization
 
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
 
         Returns:
@@ -784,16 +784,16 @@ class XGBoostModel(BaseModel):
                 # Disable MLflow for trial models to avoid clutter
                 trial_model.disable_mlflow = True
 
-                trial_model.fit(X_train, y_train, X_test, y_test, params=params)
+                trial_model.fit(x_train, y_train, x_test, y_test, params=params)
 
                 # Extract current prices for test sets
-                test_current_prices = X_test["close"].values
+                test_current_prices = x_test["close"].values
 
                 # Run threshold optimization for this trial
                 logger.info(f"Running threshold optimization for trial {trial.number}")
 
                 threshold_results = trial_model.optimize_prediction_threshold(
-                    X_test=X_test,
+                    x_test=x_test,
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method="leaf_depth",
@@ -1044,7 +1044,7 @@ class XGBoostModel(BaseModel):
         self,
         metrics: Dict[str, float],
         params: Dict[str, Any],
-        X_eval: pd.DataFrame,
+        x_eval: pd.DataFrame,
         experiment_name: str = None,
     ) -> str:
         """
@@ -1053,7 +1053,7 @@ class XGBoostModel(BaseModel):
         Args:
             metrics: Model evaluation metrics
             params: Model parameters
-            X_eval: Evaluation features for signature generation
+            x_eval: Evaluation features for signature generation
             experiment_name: Experiment name (uses default if None)
 
         Returns:
@@ -1071,7 +1071,7 @@ class XGBoostModel(BaseModel):
             metrics=metrics,
             params=params,
             experiment_name=experiment_name,
-            X_eval=X_eval,
+            x_eval=x_eval,
         )
 
         logger.info(
@@ -1111,8 +1111,8 @@ def main():
         )
 
         # Extract prepared data
-        X_train = data_result["X_train"]
-        X_test = data_result["X_test"]
+        x_train = data_result["x_train"]
+        x_test = data_result["x_test"]
         y_train = data_result["y_train"]
         y_test = data_result["y_test"]
         target_column = data_result["target_column"]
@@ -1134,7 +1134,7 @@ def main():
 
         # Create objective function using the XGBoost model class method
         objective_function = xgb_model.objective(
-            X_train, y_train, X_test, y_test, objective_column
+            x_train, y_train, x_test, y_test, objective_column
         )
 
         # Run optimization
@@ -1181,10 +1181,10 @@ def main():
             logger.info("✅ Best model includes threshold optimization results")
 
             # Extract current prices for evaluation
-            if "close" in X_test.columns:
-                final_current_prices = X_test["close"].values
-            elif "Close" in X_test.columns:
-                final_current_prices = X_test["Close"].values
+            if "close" in x_test.columns:
+                final_current_prices = x_test["close"].values
+            elif "Close" in x_test.columns:
+                final_current_prices = x_test["Close"].values
             else:
                 final_current_prices = y_test.values * 0.95  # Fallback
 
@@ -1196,7 +1196,7 @@ def main():
             threshold_performance = (
                 final_model.threshold_evaluator.evaluate_threshold_performance(
                     model=final_model,
-                    X_test=X_test,
+                    x_test=x_test,
                     y_test=y_test,
                     current_prices_test=final_current_prices,
                     threshold=optimal_threshold,
@@ -1205,7 +1205,7 @@ def main():
             )
 
             # Also get unfiltered baseline for comparison
-            baseline_predictions = final_model.predict(X_test)
+            baseline_predictions = final_model.predict(x_test)
             baseline_profit = final_model.threshold_evaluator.calculate_profit_score(
                 y_test.values, baseline_predictions, final_current_prices
             )
@@ -1222,7 +1222,7 @@ def main():
                 f"   Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
             )
             logger.info(
-                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(X_test)} ({threshold_performance['samples_kept_ratio']:.1%})"
+                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test)} ({threshold_performance['samples_kept_ratio']:.1%})"
             )
             logger.info(
                 f"   Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
@@ -1262,13 +1262,13 @@ def main():
             )
 
             # Standard evaluation without threshold optimization
-            final_predictions = final_model.predict(X_test)
+            final_predictions = final_model.predict(x_test)
 
             # Extract current prices for final profit calculation
-            if "close" in X_test.columns:
-                final_current_prices = X_test["close"].values
-            elif "Close" in X_test.columns:
-                final_current_prices = X_test["Close"].values
+            if "close" in x_test.columns:
+                final_current_prices = x_test["close"].values
+            elif "Close" in x_test.columns:
+                final_current_prices = x_test["Close"].values
             else:
                 final_current_prices = y_test.values * 0.95  # Fallback
 
@@ -1376,7 +1376,7 @@ def main():
         saved_run_id = final_model.save_model(
             metrics=final_metrics,
             params=final_params,
-            X_eval=X_test,
+            x_eval=x_test,
             experiment_name=experiment_name,
         )
 

@@ -35,7 +35,7 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(
     lgb_model_instance.objective(X, y, X, y)
 
     # Patch the model's _create_model and fit to avoid heavy training; use small side effects
-    def fake_fit(X_train, y_train, X_test, y_test, params=None):
+    def fake_fit(x_train, y_train, x_test, y_test, params=None):
         # Create a tiny model-like object with predictable best_iteration and best_score
         m = Mock()
         m.best_iteration = 1
@@ -47,14 +47,14 @@ def test_lightgbm_objective_selects_best_trial_and_finalize(
     )
     # Use the real fit but patch internal training to set model
 
-    def patched_fit(X_train, y_train, X_test, y_test, params=None):
+    def patched_fit(x_train, y_train, x_test, y_test, params=None):
         # set a fake model with different scores depending on a param value
         fake_model = Mock()
         fake_model.best_iteration = 1
         score = params.get("_score", 0)
         fake_model.best_score = {"test": {lgb_model_instance.eval_metric: score}}
         lgb_model_instance.model = fake_model
-        lgb_model_instance.feature_names = list(X_train.columns)
+        lgb_model_instance.feature_names = list(x_train.columns)
         return lgb_model_instance
 
     lgb_model_instance.fit = patched_fit
@@ -102,12 +102,12 @@ def test_xgboost_objective_tracks_best_trial_and_finalize(small_dataset):
     xgb_model = XGBoostModel(model_name="xgb_ht", prediction_horizon=10)
 
     # Patch fit to set a fake model with varying score depending on params
-    def patched_fit(X_train, y_train, X_test, y_test, params=None):
+    def patched_fit(x_train, y_train, x_test, y_test, params=None):
         fake_model = Mock()
         fake_model.best_iteration = 1
         params.get("_score", 0)
         xgb_model.model = fake_model
-        xgb_model.feature_names = list(X_train.columns)
+        xgb_model.feature_names = list(x_train.columns)
         return xgb_model
 
     xgb_model.fit = patched_fit

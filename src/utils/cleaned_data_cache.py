@@ -75,18 +75,18 @@ class CleanedDataCache:
         base_path = self.cache_dir / f"{data_type}_{cache_key}"
 
         paths = {
-            "X_train": base_path.with_suffix(".X_train.parquet"),
-            "X_test": base_path.with_suffix(".X_test.parquet"),
+            "x_train": base_path.with_suffix(".x_train.parquet"),
+            "x_test": base_path.with_suffix(".x_test.parquet"),
             "y_train": base_path.with_suffix(".y_train.parquet"),
             "y_test": base_path.with_suffix(".y_test.parquet"),
             "metadata": base_path.with_suffix(".metadata.parquet"),
             "info": base_path.with_suffix(".info.json"),
         }
 
-        # For prediction data, we only need X_test and y_test
+        # For prediction data, we only need x_test and y_test
         if data_type == "prediction":
             paths = {
-                "X_test": base_path.with_suffix(".X_test.parquet"),
+                "x_test": base_path.with_suffix(".x_test.parquet"),
                 "y_test": base_path.with_suffix(".y_test.parquet"),
                 "metadata": base_path.with_suffix(".metadata.parquet"),
                 "info": base_path.with_suffix(".info.json"),
@@ -108,9 +108,9 @@ class CleanedDataCache:
         paths = self._get_cache_paths(cache_key, data_type)
 
         # Check if all required files exist
-        required_files = ["X_test", "y_test", "metadata", "info"]
+        required_files = ["x_test", "y_test", "metadata", "info"]
         if data_type == "training":
-            required_files.extend(["X_train", "y_train"])
+            required_files.extend(["x_train", "y_train"])
 
         return all(paths[file].exists() for file in required_files)
 
@@ -130,13 +130,13 @@ class CleanedDataCache:
         try:
             # Save DataFrames to parquet
             if data_type == "training":
-                data_result["X_train"].to_parquet(paths["X_train"])
+                data_result["x_train"].to_parquet(paths["x_train"])
                 data_result["y_train"].to_frame().to_parquet(paths["y_train"])
                 logger.info(
-                    f"   Saved training data: {len(data_result['X_train'])} samples"
+                    f"   Saved training data: {len(data_result['x_train'])} samples"
                 )
 
-            data_result["X_test"].to_parquet(paths["X_test"])
+            data_result["x_test"].to_parquet(paths["x_test"])
             data_result["y_test"].to_frame().to_parquet(paths["y_test"])
 
             # Save metadata
@@ -213,13 +213,13 @@ class CleanedDataCache:
             result = {}
 
             if data_type == "training":
-                result["X_train"] = pd.read_parquet(paths["X_train"])
+                result["x_train"] = pd.read_parquet(paths["x_train"])
                 result["y_train"] = pd.read_parquet(paths["y_train"]).squeeze()
                 logger.info(
-                    f"   Loaded training data: {len(result['X_train'])} samples"
+                    f"   Loaded training data: {len(result['x_train'])} samples"
                 )
 
-            result["X_test"] = pd.read_parquet(paths["X_test"])
+            result["x_test"] = pd.read_parquet(paths["x_test"])
             result["y_test"] = pd.read_parquet(paths["y_test"]).squeeze()
 
             # Load metadata
@@ -254,7 +254,7 @@ class CleanedDataCache:
                 f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}"
             )
             logger.info(
-                f"   Test data: {len(result['X_test'])} samples, {len(result['X_test'].columns)} features"
+                f"   Test data: {len(result['x_test'])} samples, {len(result['x_test'].columns)} features"
             )
             collect_garbage()
             return result
@@ -309,12 +309,12 @@ class CleanedDataCache:
 
     # Compatibility convenience methods
     def set(self, cache_key: str, df: pd.DataFrame) -> None:
-        """Compatibility wrapper: save a single DataFrame as prediction X_test cache.
+        """Compatibility wrapper: save a single DataFrame as prediction x_test cache.
 
         Creates a minimal data_result and stores it as a 'prediction' cache entry.
         """
         data_result = {
-            "X_test": df,
+            "x_test": df,
             "y_test": pd.Series([]),
             "target_column": "",
             "feature_count": df.shape[1] if hasattr(df, "shape") else 0,
@@ -328,12 +328,12 @@ class CleanedDataCache:
         self.save_cleaned_data(data_result, cache_key=cache_key, data_type="prediction")
 
     def get(self, cache_key: str) -> pd.DataFrame:
-        """Compatibility wrapper: load cached prediction X_test for given key."""
+        """Compatibility wrapper: load cached prediction x_test for given key."""
         result = self.load_cleaned_data(cache_key=cache_key, data_type="prediction")
-        # Expect X_test in result
-        if "X_test" not in result:
-            raise KeyError(f"Cached X_test not found for key: {cache_key}")
-        return result["X_test"]
+        # Expect x_test in result
+        if "x_test" not in result:
+            raise KeyError(f"Cached x_test not found for key: {cache_key}")
+        return result["x_test"]
 
     # Start Generation Here
     def get_cache_age_hours(

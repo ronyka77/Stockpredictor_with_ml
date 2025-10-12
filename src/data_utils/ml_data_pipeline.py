@@ -193,8 +193,8 @@ def prepare_ml_data_for_training(
         test_mask = dates_all >= split_date_dt
 
         # Split the data
-        X_train = x_clean[train_mask].copy()
-        X_test = x_clean[test_mask].copy()
+        x_train = x_clean[train_mask].copy()
+        x_test = x_clean[test_mask].copy()
         y_train = y_clean[train_mask].copy()
         y_test = y_clean[test_mask].copy()
 
@@ -206,7 +206,7 @@ def prepare_ml_data_for_training(
         # Get test dates for modification and logging
         test_dates = dates_clean
         train_dates = dates_all[train_mask]
-        X_test = X_test[filtered_mask]
+        x_test = x_test[filtered_mask]
         y_test = y_test[filtered_mask]
 
         # Get date ranges for logging
@@ -221,24 +221,24 @@ def prepare_ml_data_for_training(
             else "No test data"
         )
 
-        logger.info(f"✅ Train set: {len(X_train)} samples ({train_date_range})")
-        logger.info(f"✅ Test set: {len(X_test)} samples ({test_date_range})")
+        logger.info(f"✅ Train set: {len(x_train)} samples ({train_date_range})")
+        logger.info(f"✅ Test set: {len(x_test)} samples ({test_date_range})")
 
         # Validation checks
-        if len(X_test) == 0:
+        if len(x_test) == 0:
             raise ValueError(
                 f"No test data found after {split_date}. Check your data date range."
             )
 
-        if len(X_train) == 0:
+        if len(x_train) == 0:
             raise ValueError(
                 f"No training data found before {split_date}. Check your data date range."
             )
 
         # 7. Prepare return dictionary
         result = {
-            "X_train": X_train,
-            "X_test": X_test,
+            "x_train": x_train,
+            "x_test": x_test,
             "y_train": y_train,
             "y_test": y_test,
             "X_original": x_original,  # For inverse transformations
@@ -246,9 +246,9 @@ def prepare_ml_data_for_training(
             "transformation_manifest": transformation_manifest,
             "train_date_range": train_date_range,
             "test_date_range": test_date_range,
-            "feature_count": len(X_train.columns),
-            "train_samples": len(X_train),
-            "test_samples": len(X_test),
+            "feature_count": len(x_train.columns),
+            "train_samples": len(x_train),
+            "test_samples": len(x_test),
             "prediction_horizon": prediction_horizon,
             "split_date": split_date,
         }
@@ -284,7 +284,7 @@ def prepare_ml_data_for_prediction(
 
     Returns:
         Dictionary containing:
-        - 'X_test': Test features
+        - 'x_test': Test features
         - 'y_test': Test targets
         - 'target_column': Name of target column used
         - 'feature_count': Number of features
@@ -351,7 +351,7 @@ def prepare_ml_data_for_prediction(
             X = X[filtered_mask]
             split_date_dt = pd.to_datetime("2025-06-15")
             test_mask = date_col >= split_date_dt
-            X_test = X[test_mask].copy()
+            x_test = X[test_mask].copy()
             y_test = y[test_mask].copy()
 
         test_date_range = (
@@ -360,15 +360,15 @@ def prepare_ml_data_for_prediction(
             else "No test data"
         )
 
-        logger.info(f"✅ Test set: {len(X_test)} samples ({test_date_range})")
+        logger.info(f"✅ Test set: {len(x_test)} samples ({test_date_range})")
 
         # 6. Prepare return dictionary
         result = {
-            "X_test": X_test,
+            "x_test": x_test,
             "y_test": y_test,
             "target_column": target_column,
             "test_date_range": test_date_range,
-            "feature_count": len(X_test.columns),
+            "feature_count": len(x_test.columns),
             "prediction_horizon": prediction_horizon,
         }
 
@@ -438,12 +438,12 @@ def prepare_ml_data_for_training_with_cleaning(
         ticker=ticker,
     )
     logger.info(
-        f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features"
+        f"   Loaded: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
     )
     # 2. Apply data cleaning (always performed)
     logger.info("Step 2: Applying data cleaning to combined train/test set...")
     combined_x = pd.concat(
-        [data_result["X_train"], data_result["X_test"]], ignore_index=True
+        [data_result["x_train"], data_result["x_test"]], ignore_index=True
     )
     combined_y = pd.concat(
         [data_result["y_train"], data_result["y_test"]], ignore_index=True
@@ -453,32 +453,32 @@ def prepare_ml_data_for_training_with_cleaning(
         f"   After cleaning: {len(combined_x_clean)} samples, {combined_x_clean.shape[1]} features"
     )
     # Split back into train/test
-    train_size = len(data_result["X_train"])
-    data_result["X_train"] = combined_x_clean.iloc[:train_size]
-    data_result["X_test"] = combined_x_clean.iloc[train_size:]
+    train_size = len(data_result["x_train"])
+    data_result["x_train"] = combined_x_clean.iloc[:train_size]
+    data_result["x_test"] = combined_x_clean.iloc[train_size:]
     data_result["y_train"] = combined_y.iloc[:train_size]
     data_result["y_test"] = combined_y.iloc[train_size:]
     # 3. Apply feature cleaning if requested
     if clean_features:
         logger.info("Step 3: Applying feature cleaning to training set...")
         x_train_clean, y_train_clean, removed_features = clean_features_for_training(
-            data_result["X_train"], data_result["y_train"]
+            data_result["x_train"], data_result["y_train"]
         )
         features_to_keep = x_train_clean.columns
-        x_test_clean = data_result["X_test"][features_to_keep]
+        x_test_clean = data_result["x_test"][features_to_keep]
         y_test_clean = data_result["y_test"]
         logger.info(
             f"   After feature cleaning: {len(x_train_clean)} train, {len(x_test_clean)} test samples, {len(features_to_keep)} features"
         )
-        data_result["X_train"] = x_train_clean
+        data_result["x_train"] = x_train_clean
         data_result["y_train"] = y_train_clean
-        data_result["X_test"] = x_test_clean
+        data_result["x_test"] = x_test_clean
         data_result["y_test"] = y_test_clean
         data_result["removed_features"] = removed_features
         data_result["feature_count"] = len(features_to_keep)
     # 4. Analyze final feature diversity (always performed after cleaning)
     logger.info("Step 4: Analyzing feature diversity in training set...")
-    diversity_analysis = analyze_feature_diversity(data_result["X_train"])
+    diversity_analysis = analyze_feature_diversity(data_result["x_train"])
     data_result["diversity_analysis"] = diversity_analysis
     logger.info(
         f"   Diversity: {diversity_analysis['useful_feature_count']} useful, {diversity_analysis['constant_feature_count']} constant, {diversity_analysis['zero_variance_count']} zero-variance features"
@@ -500,7 +500,7 @@ def prepare_ml_data_for_training_with_cleaning(
     except Exception as e:
         logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
     logger.info(
-        f"✅ [END] Enhanced data preparation completed: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features"
+        f"✅ [END] Enhanced data preparation completed: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
     )
     collect_garbage()
     return data_result
@@ -554,18 +554,18 @@ def prepare_ml_data_for_prediction_with_cleaning(
     data_result = prepare_ml_data_for_prediction(prediction_horizon=prediction_horizon)
 
     # 2. Filter to recent data if days_back is specified
-    if days_back and "date_int" in data_result["X_test"].columns:
-        max_date_int = data_result["X_test"]["date_int"].max()
+    if days_back and "date_int" in data_result["x_test"].columns:
+        max_date_int = data_result["x_test"]["date_int"].max()
         cutoff_date_int = max_date_int - days_back
 
-        recent_mask = data_result["X_test"]["date_int"] >= cutoff_date_int
-        data_result["X_test"] = data_result["X_test"][recent_mask]
+        recent_mask = data_result["x_test"]["date_int"] >= cutoff_date_int
+        data_result["x_test"] = data_result["x_test"][recent_mask]
         data_result["y_test"] = data_result["y_test"][recent_mask]
 
-    data_result["X_test"] = clean_data_for_training(data_result["X_test"])
+    data_result["x_test"] = clean_data_for_training(data_result["x_test"])
 
     # Analyze feature diversity for prediction data
-    diversity_analysis = analyze_feature_diversity(data_result["X_test"])
+    diversity_analysis = analyze_feature_diversity(data_result["x_test"])
     data_result["diversity_analysis"] = diversity_analysis
 
     # Warning if too many constant features (common in prediction with narrow date range)
@@ -585,7 +585,7 @@ def prepare_ml_data_for_prediction_with_cleaning(
         logger.warning(f"⚠️ Failed to cache cleaned data: {str(e)}")
 
     logger.info(
-        f"   Prediction data: {len(data_result['X_test'])} samples, {len(data_result['X_test'].columns)} features"
+        f"   Prediction data: {len(data_result['x_test'])} samples, {len(data_result['x_test'].columns)} features"
     )
     collect_garbage()
     return data_result

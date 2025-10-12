@@ -286,7 +286,7 @@ def clean_features_for_training(
         f"🔧 Cleaning features for training: {X.shape[0]} samples, {X.shape[1]} features"
     )
 
-    X_clean = X.copy()
+    x_clean = X.copy()
     y_clean = y.copy()
     removed_features = {
         "constant": [],
@@ -298,7 +298,7 @@ def clean_features_for_training(
     # 1. Remove non-numeric columns but preserve essential price columns
     essential_columns = ["close", "ticker_id", "date_int"]
 
-    non_numeric_cols = X_clean.select_dtypes(exclude=[np.number]).columns.tolist()
+    non_numeric_cols = x_clean.select_dtypes(exclude=[np.number]).columns.tolist()
     non_numeric_to_remove = [
         col for col in non_numeric_cols if col not in essential_columns
     ]
@@ -308,13 +308,13 @@ def clean_features_for_training(
             f"   Removing {len(non_numeric_to_remove)} non-numeric columns (preserving essential price columns)"
         )
         removed_features["non_numeric"] = non_numeric_to_remove
-        X_clean = X_clean.drop(columns=non_numeric_to_remove)
+        x_clean = x_clean.drop(columns=non_numeric_to_remove)
 
     # Ensure essential numeric columns are properly typed
     for col in essential_columns:
-        if col in X_clean.columns and X_clean[col].dtype == "object":
+        if col in x_clean.columns and x_clean[col].dtype == "object":
             try:
-                X_clean[col] = pd.to_numeric(X_clean[col], errors="coerce")
+                x_clean[col] = pd.to_numeric(x_clean[col], errors="coerce")
                 logger.info(f"   Converted essential column '{col}' to numeric")
             except Exception as e:
                 logger.error(
@@ -324,9 +324,9 @@ def clean_features_for_training(
     # 2. Remove constant features
     if remove_constants:
         constant_features = []
-        numeric_cols = X_clean.select_dtypes(include=[np.number]).columns
+        numeric_cols = x_clean.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
-            if X_clean[col].nunique() <= 1 and col not in essential_columns:
+            if x_clean[col].nunique() <= 1 and col not in essential_columns:
                 constant_features.append(col)
 
         if constant_features:
@@ -334,13 +334,13 @@ def clean_features_for_training(
                 f"   Removing {len(constant_features)} constant features (preserving essential columns)"
             )
             removed_features["constant"] = constant_features
-            X_clean = X_clean.drop(columns=constant_features)
+            x_clean = x_clean.drop(columns=constant_features)
 
     # 3. Remove zero variance features
     if remove_zero_variance:
-        numeric_X = X_clean.select_dtypes(include=[np.number])
-        if not numeric_X.empty:
-            variances = numeric_X.var()
+        numeric_x = x_clean.select_dtypes(include=[np.number])
+        if not numeric_x.empty:
+            variances = numeric_x.var()
             zero_var_features = [
                 col
                 for col in variances[variances == 0].index.tolist()
@@ -354,13 +354,13 @@ def clean_features_for_training(
                 f"   Removing {len(zero_var_features)} zero variance features (preserving essential columns)"
             )
             removed_features["zero_variance"] = zero_var_features
-            X_clean = X_clean.drop(columns=zero_var_features)
+            x_clean = x_clean.drop(columns=zero_var_features)
 
     # 4. Remove highly correlated features (> correlation_threshold)
     if remove_high_correlation:
-        numeric_X_remaining = X_clean.select_dtypes(include=[np.number])
-        if not numeric_X_remaining.empty and len(numeric_X_remaining.columns) > 1:
-            corr_matrix = numeric_X_remaining.corr().abs()
+        numeric_x_remaining = x_clean.select_dtypes(include=[np.number])
+        if not numeric_x_remaining.empty and len(numeric_x_remaining.columns) > 1:
+            corr_matrix = numeric_x_remaining.corr().abs()
             upper_triangle = corr_matrix.where(
                 np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
             )
@@ -378,29 +378,29 @@ def clean_features_for_training(
                 f"   Removing {len(high_corr_features)} highly correlated features (>{correlation_threshold}, preserving essential columns)"
             )
             removed_features["high_correlation"] = high_corr_features
-            X_clean = X_clean.drop(columns=high_corr_features)
+            x_clean = x_clean.drop(columns=high_corr_features)
 
     # 5. Remove rows with remaining NaN values in target
     nan_mask = y_clean.notna()
     if not nan_mask.all():
         nan_count = (~nan_mask).sum()
         logger.info(f"   Removing {nan_count} samples with NaN targets")
-        X_clean = X_clean[nan_mask]
+        x_clean = x_clean[nan_mask]
         y_clean = y_clean[nan_mask]
 
     # 6. Ensure X and y have same length
-    min_length = min(len(X_clean), len(y_clean))
-    X_clean = X_clean.iloc[:min_length]
+    min_length = min(len(x_clean), len(y_clean))
+    x_clean = x_clean.iloc[:min_length]
     y_clean = y_clean.iloc[:min_length]
 
     logger.info(
-        f"✅ Feature cleaning completed: {X_clean.shape[0]} samples, {X_clean.shape[1]} features"
+        f"✅ Feature cleaning completed: {x_clean.shape[0]} samples, {x_clean.shape[1]} features"
     )
     logger.info(
         f"   Removed: {sum(len(v) for v in removed_features.values())} features total"
     )
 
-    return X_clean, y_clean, removed_features
+    return x_clean, y_clean, removed_features
 
 
 def add_date_features(

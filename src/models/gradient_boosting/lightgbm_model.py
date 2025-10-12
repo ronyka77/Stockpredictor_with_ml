@@ -182,37 +182,37 @@ class LightGBMModel(BaseModel):
 
     def _prepare_data(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
     ) -> Tuple[lgb.Dataset, lgb.Dataset]:
         """
         Prepare data for LightGBM training using pre-split train/test data
 
         Args:
-            X_train: Training feature matrix
+            x_train: Training feature matrix
             y_train: Training target values
-            X_test: Test feature matrix (used for validation during training)
+            x_test: Test feature matrix (used for validation during training)
             y_test: Test target values (used for validation during training)
 
         Returns:
             Training and test Dataset objects
         """
         # Store feature names and identify categorical features
-        self.feature_names = list(X_train.columns)
-        self.categorical_features = self._identify_categorical_features(X_train)
+        self.feature_names = list(x_train.columns)
+        self.categorical_features = self._identify_categorical_features(x_train)
 
         # Create LightGBM datasets directly from the pre-split data
         train_data = lgb.Dataset(
-            X_train,
+            x_train,
             label=y_train,
             feature_name=self.feature_names,
             categorical_feature=self.categorical_features,
         )
 
         test_data = lgb.Dataset(
-            X_test,
+            x_test,
             label=y_test,
             feature_name=self.feature_names,
             categorical_feature=self.categorical_features,
@@ -223,9 +223,9 @@ class LightGBMModel(BaseModel):
 
     def fit(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         params: Optional[Dict[str, Any]] = None,
     ) -> "LightGBMModel":
@@ -233,9 +233,9 @@ class LightGBMModel(BaseModel):
         Train the LightGBM model using pre-split train/test data
 
         Args:
-            X_train: Training feature matrix
+            x_train: Training feature matrix
             y_train: Training target values
-            X_test: Test feature matrix (used for validation during training)
+            x_test: Test feature matrix (used for validation during training)
             y_test: Test target values (used for validation during training)
             params: Custom parameters (overrides defaults)
 
@@ -243,10 +243,10 @@ class LightGBMModel(BaseModel):
             Self for method chaining
         """
         # Validate training data before proceeding
-        self._validate_training_data(X_train)
+        self._validate_training_data(x_train)
 
         # Prepare data
-        train_data, test_data = self._prepare_data(X_train, y_train, X_test, y_test)
+        train_data, test_data = self._prepare_data(x_train, y_train, x_test, y_test)
 
         # Use provided parameters or defaults
         if params is None:
@@ -349,18 +349,18 @@ class LightGBMModel(BaseModel):
 
     def objective(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
     ) -> callable:
         """
         Create Optuna objective function for hyperparameter optimization with threshold optimization
 
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
 
         Returns:
@@ -401,16 +401,16 @@ class LightGBMModel(BaseModel):
                 # Disable MLflow for trial models to avoid clutter
                 trial_model.disable_mlflow = True
 
-                trial_model.fit(X_train, y_train, X_test, y_test, params=params)
+                trial_model.fit(x_train, y_train, x_test, y_test, params=params)
 
                 # Extract current prices for test sets
-                test_current_prices = X_test["close"].values
+                test_current_prices = x_test["close"].values
 
                 # Run threshold optimization for this trial
                 logger.info(f"Running threshold optimization for trial {trial.number}")
 
                 threshold_results = trial_model.optimize_prediction_threshold(
-                    X_test=X_test,
+                    x_test=x_test,
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method="leaf_depth",
@@ -677,7 +677,7 @@ class LightGBMModel(BaseModel):
         self,
         metrics: Dict[str, float],
         params: Dict[str, Any],
-        X_eval: pd.DataFrame,
+        x_eval: pd.DataFrame,
         experiment_name: str = None,
     ) -> str:
         """
@@ -686,7 +686,7 @@ class LightGBMModel(BaseModel):
         Args:
             metrics: Model evaluation metrics to log
             params: Model parameters to log
-            X_eval: Evaluation features for signature generation
+            x_eval: Evaluation features for signature generation
             experiment_name: Experiment name (uses default if None)
 
         Returns:
@@ -699,7 +699,7 @@ class LightGBMModel(BaseModel):
         run_id = self.log_model_to_mlflow(
             metrics=metrics,
             params=params,
-            X_eval=X_eval,
+            x_eval=x_eval,
             experiment_name=experiment_name,
         )
 
@@ -889,7 +889,7 @@ class LightGBMModel(BaseModel):
         self,
         metrics: Dict[str, float],
         params: Dict[str, Any],
-        X_eval: pd.DataFrame,
+        x_eval: pd.DataFrame,
         experiment_name: str = None,
     ) -> str:
         """
@@ -898,7 +898,7 @@ class LightGBMModel(BaseModel):
         Args:
             metrics: Model evaluation metrics
             params: Model parameters
-            X_eval: Evaluation features for signature generation
+            x_eval: Evaluation features for signature generation
             experiment_name: Experiment name (uses default if None)
 
         Returns:
@@ -916,7 +916,7 @@ class LightGBMModel(BaseModel):
             metrics=metrics,
             params=params,
             experiment_name=experiment_name,
-            X_eval=X_eval,
+            x_eval=x_eval,
         )
 
         logger.info(
@@ -1074,16 +1074,16 @@ class LightGBMModel(BaseModel):
         return selected_features
 
 
-def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, X_eval):
+def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, x_eval):
     """
     Log trained LightGBM model, metrics, and parameters to MLflow.
-    Requires X_eval DataFrame for signature generation.
+    Requires x_eval DataFrame for signature generation.
     Args:
         model: Trained LightGBM model
         metrics: Model evaluation metrics
         params: Model parameters
         experiment_name: Experiment name
-        X_eval (pd.DataFrame): Evaluation features for signature generation
+        x_eval (pd.DataFrame): Evaluation features for signature generation
     Returns:
         str: Run ID
     """
@@ -1128,8 +1128,8 @@ def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, X_eval):
             mlflow.log_params(params_to_log)
             mlflow.log_metrics(metrics)
 
-            # Create input example using the DataFrame X_eval
-            input_example = X_eval.iloc[:5].copy()
+            # Create input example using the DataFrame x_eval
+            input_example = x_eval.iloc[:5].copy()
 
             # Identify and convert integer columns to float64
             if hasattr(input_example, "dtypes"):
@@ -1210,8 +1210,8 @@ def main():
         )
 
         # Extract prepared data
-        X_train = data_result["X_train"]
-        X_test = data_result["X_test"]
+        x_train = data_result["x_train"]
+        x_test = data_result["x_test"]
         y_train = data_result["y_train"]
         y_test = data_result["y_test"]
         target_column = data_result["target_column"]
@@ -1225,25 +1225,25 @@ def main():
 
         # 2. Perform feature selection
         selected_features = lgb_model.select_features(
-            X_train, y_train, n_features_to_select
+            x_train, y_train, n_features_to_select
         )
 
         # Create new DataFrames with only the selected features
-        X_train_selected = X_train[selected_features]
-        X_test_selected = X_test[selected_features]
+        x_train_selected = x_train[selected_features]
+        x_test_selected = x_test[selected_features]
         logger.info(
             f"   DataFrames updated with {len(selected_features)} selected features."
         )
 
         # Remove rows with the highest 15 date_int values
-        if "date_int" in X_test_selected.columns:
-            threshold = X_test_selected["date_int"].copy()
+        if "date_int" in x_test_selected.columns:
+            threshold = x_test_selected["date_int"].copy()
             threshold = threshold.drop_duplicates().max() - 15
             logger.info(f"📅 Threshold: {threshold}")
-            mask = X_test_selected["date_int"] < threshold
-            X_test_selected, y_test = X_test_selected[mask], y_test[mask]
+            mask = x_test_selected["date_int"] < threshold
+            x_test_selected, y_test = x_test_selected[mask], y_test[mask]
             logger.info(
-                f"📅 Removed rows with date_int >= {threshold} (kept {len(X_test_selected)} samples)"
+                f"📅 Removed rows with date_int >= {threshold} (kept {len(x_test_selected)} samples)"
             )
         else:
             logger.warning("⚠️ 'date_int' column not found - skipping date filtering")
@@ -1255,7 +1255,7 @@ def main():
 
         # Create objective function using the LightGBM model class method with selected features
         objective_function = lgb_model.objective(
-            X_train_selected, y_train, X_test_selected, y_test
+            x_train_selected, y_train, x_test_selected, y_test
         )
         sampler = optuna.samplers.TPESampler(seed=42)
         # Run optimization with CPU limit
@@ -1295,8 +1295,8 @@ def main():
 
         if has_threshold_optimization:
             # Extract current prices for evaluation
-            if "close" in X_test_selected.columns:
-                final_current_prices = X_test_selected["close"].values
+            if "close" in x_test_selected.columns:
+                final_current_prices = x_test_selected["close"].values
             else:
                 final_current_prices = y_test.values * 0.95  # Fallback
 
@@ -1308,7 +1308,7 @@ def main():
             threshold_performance = (
                 final_model.threshold_evaluator.evaluate_threshold_performance(
                     model=final_model,
-                    X_test=X_test_selected,
+                    x_test=x_test_selected,
                     y_test=y_test,
                     current_prices_test=final_current_prices,
                     threshold=optimal_threshold,
@@ -1317,7 +1317,7 @@ def main():
             )
 
             # Also get unfiltered baseline for comparison
-            baseline_predictions = final_model.predict(X_test_selected)
+            baseline_predictions = final_model.predict(x_test_selected)
             baseline_profit = final_model.threshold_evaluator.calculate_profit_score(
                 y_test.values, baseline_predictions, final_current_prices
             )
@@ -1334,7 +1334,7 @@ def main():
                 f"   Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
             )
             logger.info(
-                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(X_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
+                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
             )
             logger.info(
                 f"   Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
@@ -1374,11 +1374,11 @@ def main():
         logger.info(f"   Profit per Investment: ${final_profit_per_investment:.2f}")
         if has_threshold_optimization:
             logger.info(
-                f"   Samples Used: {final_samples_kept}/{len(X_test_selected)} (threshold-filtered)"
+                f"   Samples Used: {final_samples_kept}/{len(x_test_selected)} (threshold-filtered)"
             )
         else:
             logger.info(
-                f"   Samples Used: {final_samples_kept}/{len(X_test_selected)} (all samples)"
+                f"   Samples Used: {final_samples_kept}/{len(x_test_selected)} (all samples)"
             )
         logger.info(f"   Traditional MSE: {final_mse:.4f}")
         logger.info(f"   Traditional MAE: {final_mae:.4f}")
@@ -1444,7 +1444,7 @@ def main():
         saved_run_id = final_model.save_model(
             metrics=final_metrics,
             params=final_params,
-            X_eval=X_test_selected,
+            x_eval=x_test_selected,
             experiment_name=experiment_name,
         )
 

@@ -137,7 +137,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
         self,
         metrics: Dict[str, float],
         params: Dict[str, Any],
-        X_eval: pd.DataFrame,
+        x_eval: pd.DataFrame,
         experiment_name: str = None,
         scaler=None,
     ) -> str:
@@ -147,7 +147,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
         Args:
             metrics: Model evaluation metrics to log
             params: Model parameters to log
-            X_eval: Evaluation features for signature generation
+            x_eval: Evaluation features for signature generation
             experiment_name: Experiment name (uses default if None)
             scaler: Fitted StandardScaler instance to save with model
 
@@ -214,8 +214,8 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
                         "ℹ️ No scaler provided - model will use raw features for prediction"
                     )
 
-                # Create input example using the DataFrame X_eval
-                input_example = X_eval.iloc[:5].copy()
+                # Create input example using the DataFrame x_eval
+                input_example = x_eval.iloc[:5].copy()
 
                 # Identify and convert integer columns to float64
                 if hasattr(input_example, "dtypes"):
@@ -252,7 +252,7 @@ class MLPPredictorWithMLflow(MLPPredictor, MLPEvaluationMixin, MLPOptimizationMi
 
                 # Persist feature names explicitly for robust loading
                 try:
-                    feature_names = list(X_eval.columns)
+                    feature_names = list(x_eval.columns)
                     mlflow.log_dict(
                         {"feature_names": feature_names},
                         "preprocessor/feature_names.json",
@@ -513,8 +513,8 @@ def main():
         )
 
         # Extract prepared data
-        X_train = data_result["X_train"]
-        X_test = data_result["X_test"]
+        x_train = data_result["x_train"]
+        x_test = data_result["x_test"]
         y_train = data_result["y_train"]
         y_test = data_result["y_test"]
         target_column = data_result["target_column"]
@@ -536,7 +536,7 @@ def main():
         y_train_outlier_mask = (y_train >= y_train_lower) & (y_train <= y_train_upper)
 
         # Apply outlier removal
-        X_train_clean_outliers = X_train[y_train_outlier_mask]
+        x_train_clean_outliers = x_train[y_train_outlier_mask]
         y_train_clean = y_train[y_train_outlier_mask]
 
         # Log outlier removal results
@@ -549,28 +549,28 @@ def main():
         )
 
         # Update data with cleaned versions
-        X_train = X_train_clean_outliers
+        x_train = x_train_clean_outliers
         y_train = y_train_clean
 
         # Validate and clean the data
-        X_train_clean = MLPDataUtils.validate_and_clean_data(X_train)
-        X_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
+        x_train_clean = MLPDataUtils.validate_and_clean_data(x_train)
+        x_test_clean = MLPDataUtils.validate_and_clean_data(x_test)
 
         # Extract cleaned data
-        X_train = X_train_clean
-        X_test = X_test_clean
+        x_train = x_train_clean
+        x_test = x_test_clean
 
         # Create SINGLE MLPPredictorWithMLflow instance for entire pipeline
         mlp_model = MLPPredictorWithMLflow(
             model_name="mlp_complete_pipeline",
-            config={"input_size": len(X_train.columns)},
+            config={"input_size": len(x_train.columns)},
         )
 
         # 2. Perform feature selection using the same instance
-        # selected_features = mlp_model.select_features(X_train_scaled, y_train, n_features_to_select)
+        # selected_features = mlp_model.select_features(x_train_scaled, y_train, n_features_to_select)
         numerical_features = []
-        for col in X_train.columns:
-            if X_train[col].dtype in [
+        for col in x_train.columns:
+            if x_train[col].dtype in [
                 "float64",
                 "float32",
                 "int64",
@@ -585,8 +585,8 @@ def main():
             f"✅ Using {len(selected_features)} numerical features - no feature selection applied"
         )
         # Create new DataFrames with only the selected features
-        X_train_selected = X_train[selected_features]
-        X_test_selected = X_test[selected_features]
+        x_train_selected = x_train[selected_features]
+        x_test_selected = x_test[selected_features]
         logger.info(
             f"   DataFrames updated with {len(selected_features)} selected features."
         )
@@ -595,30 +595,30 @@ def main():
         mlp_model.config["input_size"] = len(selected_features)
 
         # Fit a single StandardScaler on training data only to prevent data leakage
-        X_train_selected, scaler = MLPDataUtils.scale_data(X_train_selected, None, True)
+        x_train_selected, scaler = MLPDataUtils.scale_data(x_train_selected, None, True)
         # Remove rows with the highest 50 date_int values
-        if "date_int" in X_test_selected.columns:
-            threshold = X_test_selected["date_int"].copy()
+        if "date_int" in x_test_selected.columns:
+            threshold = x_test_selected["date_int"].copy()
             threshold = threshold.drop_duplicates().max() - 15
             logger.info(f"📅 Threshold: {threshold}")
-            mask = X_test_selected["date_int"] < threshold
-            X_test_selected, y_test = X_test_selected[mask], y_test[mask]
+            mask = x_test_selected["date_int"] < threshold
+            x_test_selected, y_test = x_test_selected[mask], y_test[mask]
             logger.info(
-                f"📅 Removed rows with date_int >= {threshold} (kept {len(X_test_selected)} samples)"
+                f"📅 Removed rows with date_int >= {threshold} (kept {len(x_test_selected)} samples)"
             )
         else:
             logger.warning("⚠️ 'date_int' column not found - skipping date filtering")
 
-        X_test_scaled, _ = MLPDataUtils.scale_data(X_test_selected, scaler, False)
+        x_test_scaled, _ = MLPDataUtils.scale_data(x_test_selected, scaler, False)
         # Store the fitted scaler in the SAME model instance
         mlp_model.scaler = scaler
 
         # Create objective function using the SAME MLP model instance with selected features
         objective_function = mlp_model.objective(
-            X_train_selected,
+            x_train_selected,
             y_train,
-            X_test_selected,
-            X_test_scaled,
+            x_test_selected,
+            x_test_scaled,
             y_test,
             fitted_scaler=scaler,
         )
@@ -653,7 +653,7 @@ def main():
         final_model = mlp_model
 
         # Extract current prices for evaluation
-        final_current_prices = X_test_selected["close"].values
+        final_current_prices = x_test_selected["close"].values
 
         # Evaluate with the optimal threshold from hyperparameter optimization
         optimal_threshold = getattr(final_model, "optimal_threshold", 0.5)
@@ -662,7 +662,7 @@ def main():
         threshold_performance = (
             final_model.threshold_evaluator.evaluate_threshold_performance(
                 model=final_model,
-                X_test=X_test_selected,
+                x_test=x_test_selected,
                 y_test=y_test,
                 current_prices_test=final_current_prices,
                 threshold=optimal_threshold,
@@ -671,7 +671,7 @@ def main():
         )
 
         # Also get unfiltered baseline for comparison
-        baseline_predictions = final_model.predict(X_test_selected)
+        baseline_predictions = final_model.predict(x_test_selected)
         baseline_profit = final_model.threshold_evaluator.calculate_profit_score(
             y_test.values, baseline_predictions, final_current_prices
         )
@@ -688,7 +688,7 @@ def main():
             f"   Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
         )
         logger.info(
-            f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(X_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
+            f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
         )
         logger.info(
             f"   Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
@@ -723,7 +723,7 @@ def main():
         logger.info(f"   Total Profit: ${final_total_profit:.2f}")
         logger.info(f"   Profit per Investment: ${final_profit_per_investment:.2f}")
         logger.info(
-            f"   Samples Used: {final_samples_kept}/{len(X_test_selected)} (threshold-filtered)"
+            f"   Samples Used: {final_samples_kept}/{len(x_test_selected)} (threshold-filtered)"
         )
         logger.info(f"   Traditional MSE: {final_mse:.4f}")
         logger.info(f"   Traditional MAE: {final_mae:.4f}")
@@ -768,7 +768,7 @@ def main():
         saved_run_id = final_model.save_model(
             metrics=final_metrics,
             params=final_params,
-            X_eval=X_test_selected,
+            x_eval=x_test_selected,
             experiment_name=experiment_name,
             scaler=scaler,
         )
@@ -821,7 +821,7 @@ def smoke_test_save_and_load():
     feature_names = ["f1", "f2", "f3", "f4"]
     import numpy as _np
 
-    X_eval = pd.DataFrame(_np.random.RandomState(42).rand(16, 4), columns=feature_names)
+    x_eval = pd.DataFrame(_np.random.RandomState(42).rand(16, 4), columns=feature_names)
 
     # Minimal model
     model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 1))
@@ -829,7 +829,7 @@ def smoke_test_save_and_load():
     # Fitted scaler (for artifact check)
     from sklearn.preprocessing import StandardScaler as _Std
 
-    scaler = _Std().fit(X_eval.to_numpy())
+    scaler = _Std().fit(x_eval.to_numpy())
 
     # Create predictor instance
     predictor = MLPPredictorWithMLflow(
@@ -843,7 +843,7 @@ def smoke_test_save_and_load():
     run_id = predictor.save_model(
         metrics={"mse": 0.0},
         params={"layers": "4-8-1"},
-        X_eval=X_eval,
+        x_eval=x_eval,
         experiment_name=experiment,
         scaler=scaler,
     )

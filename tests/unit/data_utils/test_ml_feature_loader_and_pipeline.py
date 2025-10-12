@@ -74,8 +74,8 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache_when_available(mo
     """Return cached cleaned training payload when cache exists and is fresh."""
     # patch cache to simulate existing valid cache
     fake_cached = {
-        "X_train": pd.DataFrame([[1.0]]),
-        "X_test": pd.DataFrame([[2.0]]),
+        "x_train": pd.DataFrame([[1.0]]),
+        "x_test": pd.DataFrame([[2.0]]),
         "y_train": pd.Series([0.1]),
         "y_test": pd.Series([0.2]),
         "feature_count": 1,

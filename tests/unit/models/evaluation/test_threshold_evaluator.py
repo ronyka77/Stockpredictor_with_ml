@@ -72,14 +72,14 @@ def test_optimize_prediction_threshold_success():
     conf = np.array([0.95] * 5 + [0.01] * (n - 5))
     # y_test: actual returns - make first 5 profitable
     y_test = pd.Series([0.06] * 5 + [0.0] * (n - 5))
-    X_test = pd.DataFrame({"f": range(n)})
+    x_test = pd.DataFrame({"f": range(n)})
     current_prices = np.array([10.0] * n)
 
     model = MockModel(preds, conf)
 
     res = te.optimize_prediction_threshold(
         model,
-        X_test,
+        x_test,
         y_test,
         current_prices,
         confidence_method="simple",

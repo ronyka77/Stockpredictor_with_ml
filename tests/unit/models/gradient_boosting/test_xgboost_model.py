@@ -127,7 +127,7 @@ def test_predict_uses_dmatrix_and_returns_array(
 def test_log_model_to_mlflow_calls_helper(xgb_model_instance, sample_tabular_data):
     """Setup: patch module-level log_to_mlflow helper to avoid real MLflow calls."""
 
-    X_eval = sample_tabular_data["X"].iloc[:4]
+    x_eval = sample_tabular_data["X"].iloc[:4]
     metrics = {"mse": 0.2}
     params = {"param": 2}
 
@@ -139,7 +139,7 @@ def test_log_model_to_mlflow_calls_helper(xgb_model_instance, sample_tabular_dat
 
         # Execution
         run_id = xgb_model_instance.log_model_to_mlflow(
-            metrics=metrics, params=params, X_eval=X_eval, experiment_name="exp"
+            metrics=metrics, params=params, x_eval=x_eval, experiment_name="exp"
         )
 
         # Verification

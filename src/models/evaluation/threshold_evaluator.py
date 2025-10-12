@@ -342,7 +342,7 @@ class ThresholdEvaluator:
     def optimize_prediction_threshold(
         self,
         model: ModelProtocol,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         confidence_method: str = "simple",
@@ -354,7 +354,7 @@ class ThresholdEvaluator:
 
         Args:
             model: Model instance with predict and get_prediction_confidence methods
-            X_test: Test features (unseen data)
+            x_test: Test features (unseen data)
             y_test: Test targets
             current_prices_test: Current prices for test set
             confidence_method: Method for calculating confidence scores
@@ -372,7 +372,7 @@ class ThresholdEvaluator:
         )
 
         try:
-            test_predictions = model.predict(X_test)
+            test_predictions = model.predict(x_test)
             logger.info(f"Predictions shape: {test_predictions.shape}")
             logger.info(
                 f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]"
@@ -403,7 +403,7 @@ class ThresholdEvaluator:
         # Phase 2: Get confidence scores
         try:
             test_confidence = model.get_prediction_confidence(
-                X_test, method=confidence_method
+                x_test, method=confidence_method
             )
             logger.info(f"Confidence shape: {test_confidence.shape}")
             logger.info(
@@ -605,7 +605,7 @@ class ThresholdEvaluator:
     def evaluate_threshold_performance(
         self,
         model: ModelProtocol,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         threshold: float,
@@ -616,7 +616,7 @@ class ThresholdEvaluator:
 
         Args:
             model: Model instance with predict and get_prediction_confidence methods
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
             current_prices_test: Current prices for test set
             threshold: Confidence threshold
@@ -627,7 +627,7 @@ class ThresholdEvaluator:
         """
         # Get filtered predictions
         prediction_result = self.predict_with_threshold(
-            model, X_test, threshold, confidence_method, return_confidence=True
+            model, x_test, threshold, confidence_method, return_confidence=True
         )
 
         # Extract filtered data
@@ -685,7 +685,7 @@ class ThresholdEvaluator:
             "investment_success_rate": investment_metrics["investment_success_rate"],
             "profitable_investments": investment_metrics["profitable_investments"],
             # Detailed breakdown
-            "total_test_samples": len(X_test),
+            "total_test_samples": len(x_test),
             "filtered_samples": len(filtered_predictions),
             "avg_confidence_all": prediction_result["all_confidence"].mean(),
             "avg_confidence_filtered": prediction_result["filtered_confidence"].mean(),

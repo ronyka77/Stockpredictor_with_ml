@@ -38,7 +38,7 @@ def _compute_returns_in_chunks(
 ) -> pd.DataFrame:
     """Compute percentage returns in row-wise chunks and filter outliers."""
     n_rows = df.shape[0]
-    df[dst_col] = pd.Series(np.nan, index=df.index, dtype="float32")
+    df[dst_col] = np.full(len(df), np.nan, dtype="float32")
     outlier_mask = np.zeros(n_rows, dtype=bool)
     for start in range(0, n_rows, chunk_size):
         end = min(n_rows, start + chunk_size)

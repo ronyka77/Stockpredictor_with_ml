@@ -20,7 +20,7 @@ class TestMLPPredictorRefactored:
         # inject NaN and inf deterministically
         arr[3, 0] = np.nan
         arr[2, 1] = np.inf
-        self.X_test = pd.DataFrame(arr, columns=["feature1", "feature2", "feature3"])
+        self.x_test = pd.DataFrame(arr, columns=["feature1", "feature2", "feature3"])
         self.predictor = MLPPredictor(model_name="test_mlp")
         self.predictor.model = stub_model = MagicMock()
         stub_model.return_value = torch.tensor([[0.1], [0.2], [0.3], [0.4], [0.5]])
@@ -37,8 +37,8 @@ class TestMLPPredictorRefactored:
                     "feature3": [10, 20, 30, 40, 50],
                 }
             )
-            result = self.predictor.predict(self.X_test)
-            mock_validate.assert_called_once_with(self.X_test)
+            result = self.predictor.predict(self.x_test)
+            mock_validate.assert_called_once_with(self.x_test)
             if not isinstance(result, np.ndarray):
                 raise AssertionError("Predictor result is not numpy ndarray")
             if len(result) != 5:

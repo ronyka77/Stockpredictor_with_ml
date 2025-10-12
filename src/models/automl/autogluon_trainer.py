@@ -1,8 +1,8 @@
 """
 AutoGluon training entrypoint
 
-Uses prepare_ml_data_for_training_with_cleaning to obtain X_train/y_train and
-X_test/y_test, constructs train_df/valid_df with `Future_Return_XD`, trains an
+Uses prepare_ml_data_for_training_with_cleaning to obtain x_train/y_train and
+x_test/y_test, constructs train_df/valid_df with `Future_Return_XD`, trains an
 AutoGluonModel, and logs artifacts/metrics to MLflow.
 
 Run:
@@ -51,12 +51,12 @@ def train_autogluon(
         recent_date_int_cut=25,
     )
     logger.info(f"target_column: {data.get('target_column')}")
-    X_train: pd.DataFrame = data["X_train"]
-    logger.info(f"X_train: {X_train.columns.tolist()}")
+    x_train: pd.DataFrame = data["x_train"]
+    logger.info(f"x_train: {x_train.columns.tolist()}")
     y_train: pd.Series = data["y_train"]
-    X_test: pd.DataFrame = data["X_test"]
+    x_test: pd.DataFrame = data["x_test"]
     y_test: pd.Series = data["y_test"]
-    valid_df: pd.DataFrame = pd.concat([X_test, y_test], axis=1)
+    valid_df: pd.DataFrame = pd.concat([x_test, y_test], axis=1)
     valid_df.reset_index(drop=True, inplace=True)
 
     collected = gc.collect()
@@ -71,7 +71,7 @@ def train_autogluon(
         "groups": "year",
     }
     model = AutoGluonModel(model_name="autogluon", config=config)
-    model.fit(X_train, y_train, X_val=X_test, y_val=y_test)
+    model.fit(x_train, y_train, X_val=x_test, y_val=y_test)
 
     model_dir = model.predictor.path
     logger.info(f"Model directory: {model_dir}")

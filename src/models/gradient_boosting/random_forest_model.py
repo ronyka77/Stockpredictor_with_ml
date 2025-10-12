@@ -188,7 +188,7 @@ class RandomForestModel(BaseModel):
                 threshold_results = (
                     self.threshold_evaluator.optimize_prediction_threshold(
                         model=self,
-                        X_test=X,
+                        x_test=X,
                         y_test=y,
                         current_prices_test=current_prices,
                         confidence_method=confidence_method,
@@ -397,7 +397,7 @@ class RandomForestModel(BaseModel):
         if current_prices_local is not None:
             results = model_instance.threshold_evaluator.optimize_prediction_threshold(
                 model=model_instance,
-                X_test=x_test_df,
+                x_test=x_test_df,
                 y_test=y_true,
                 current_prices_test=current_prices_local,
                 confidence_method="variance",
@@ -447,9 +447,9 @@ class RandomForestModel(BaseModel):
         """
         Create Optuna objective function for RandomForestRegressor hypertuning with optional threshold optimization.
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
         Returns:
             Objective function for Optuna optimization
@@ -518,7 +518,7 @@ class RandomForestModel(BaseModel):
             clean_features: Whether to clean features
             **kwargs: Additional arguments for data preparation
         Returns:
-            dict: Contains X_train, X_test, y_train, y_test, and metadata
+            dict: Contains x_train, x_test, y_train, y_test, and metadata
         Note:
             If categorical features are present, ensure they are encoded (e.g., one-hot or ordinal) as required by sklearn.
             This method does not perform encoding itself but expects the pipeline or user to handle it per project convention.
@@ -547,8 +547,8 @@ def main():
         ticker=None,
         clean_features=True,
     )
-    x_train = data_result["X_train"]
-    x_test = data_result["X_test"]
+    x_train = data_result["x_train"]
+    x_test = data_result["x_test"]
     y_train = data_result["y_train"]
     y_test = data_result["y_test"]
     target_column = data_result.get("target_column", "target")

@@ -88,11 +88,11 @@ class PyTorchBasePredictor(BaseModel):
         for epoch in range(epochs):
             self.model.train()
             total_train_loss = 0
-            for batch_X, batch_y in train_loader:
-                batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
+            for batch_x, batch_y in train_loader:
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
 
                 optimizer.zero_grad()
-                outputs = self.model(batch_X)
+                outputs = self.model(batch_x)
                 loss = criterion(outputs.squeeze(), batch_y)
                 loss.backward()
                 optimizer.step()
@@ -105,12 +105,12 @@ class PyTorchBasePredictor(BaseModel):
                 self.model.eval()
                 total_val_loss = 0
                 with torch.no_grad():
-                    for batch_X_val, batch_y_val in val_loader:
-                        batch_X_val, batch_y_val = (
-                            batch_X_val.to(self.device),
+                    for batch_x_val, batch_y_val in val_loader:
+                        batch_x_val, batch_y_val = (
+                            batch_x_val.to(self.device),
                             batch_y_val.to(self.device),
                         )
-                        val_outputs = self.model(batch_X_val)
+                        val_outputs = self.model(batch_x_val)
                         val_loss = criterion(val_outputs.squeeze(), batch_y_val)
                         total_val_loss += val_loss.item()
 
@@ -137,17 +137,17 @@ class PyTorchBasePredictor(BaseModel):
         self.model.eval()
         self.model.to(self.device)
 
-        X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-        dataset = TensorDataset(X_tensor)
+        x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
+        dataset = TensorDataset(x_tensor)
         loader = DataLoader(
             dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
         )
 
         predictions = []
         with torch.no_grad():
-            for (batch_X,) in loader:
-                batch_X = batch_X.to(self.device)
-                outputs = self.model(batch_X)
+            for (batch_x,) in loader:
+                batch_x = batch_x.to(self.device)
+                outputs = self.model(batch_x)
                 predictions.append(outputs.cpu().numpy())
 
         return np.concatenate(predictions).squeeze()
@@ -178,10 +178,10 @@ class PyTorchBasePredictor(BaseModel):
                 predictions = []
                 n_passes = 5  # Reduced from 10 for efficiency
 
-                X_tensor = torch.tensor(
+                x_tensor = torch.tensor(
                     X[self.feature_names].values, dtype=torch.float32
                 )
-                dataset = TensorDataset(X_tensor)
+                dataset = TensorDataset(x_tensor)
                 loader = DataLoader(
                     dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
                 )
@@ -189,9 +189,9 @@ class PyTorchBasePredictor(BaseModel):
                 for _ in range(n_passes):
                     pass_predictions = []
                     with torch.no_grad():
-                        for (batch_X,) in loader:
-                            batch_X = batch_X.to(self.device)
-                            outputs = self.model(batch_X)
+                        for (batch_x,) in loader:
+                            batch_x = batch_x.to(self.device)
+                            outputs = self.model(batch_x)
                             pass_predictions.append(outputs.cpu().numpy())
                     predictions.append(np.concatenate(pass_predictions).squeeze())
 
@@ -230,10 +230,10 @@ class PyTorchBasePredictor(BaseModel):
             predictions = self.predict(X)
 
             # Create slightly perturbed inputs
-            X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
+            x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
             noise_scale = 0.01  # Small perturbation
-            noise = torch.randn_like(X_tensor) * noise_scale
-            X_perturbed = X_tensor + noise
+            noise = torch.randn_like(x_tensor) * noise_scale
+            X_perturbed = x_tensor + noise
 
             # Get predictions on perturbed data
             dataset = TensorDataset(X_perturbed)
@@ -243,9 +243,9 @@ class PyTorchBasePredictor(BaseModel):
 
             perturbed_predictions = []
             with torch.no_grad():
-                for (batch_X,) in loader:
-                    batch_X = batch_X.to(self.device)
-                    outputs = self.model(batch_X)
+                for (batch_x,) in loader:
+                    batch_x = batch_x.to(self.device)
+                    outputs = self.model(batch_x)
                     perturbed_predictions.append(outputs.cpu().numpy())
 
             perturbed_predictions = np.concatenate(perturbed_predictions).squeeze()

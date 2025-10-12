@@ -11,7 +11,7 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 class TestMLPOptimizationScalerIntegration:
     def setup_method(self):
         rng = np.random.RandomState(42)
-        self.X_train = pd.DataFrame(
+        self.x_train = pd.DataFrame(
             {
                 "feature1": rng.randn(200),
                 "feature2": rng.randn(200),
@@ -20,7 +20,7 @@ class TestMLPOptimizationScalerIntegration:
             }
         )
         self.y_train = pd.Series(rng.randn(200))
-        self.X_test = pd.DataFrame(
+        self.x_test = pd.DataFrame(
             {
                 "feature1": rng.randn(50),
                 "feature2": rng.randn(50),
@@ -47,7 +47,7 @@ class TestMLPOptimizationScalerIntegration:
 
     def test_prepare_data_for_training_with_scaler(self):
         """Prepare and scale training data, ensuring a StandardScaler is produced for trials."""
-        cleaned = MLPDataUtils.validate_and_clean_data(self.X_train)
+        cleaned = MLPDataUtils.validate_and_clean_data(self.x_train)
         X_clean, scaler = MLPDataUtils.scale_data(cleaned, None, True)
         self.optimization_mixin.current_trial_scaler = scaler
         if not isinstance(self.optimization_mixin.current_trial_scaler, StandardScaler):
@@ -65,16 +65,16 @@ class TestMLPOptimizationScalerIntegration:
 
     def test_objective_function_scaler_integration(self):
         """Objective callable should integrate with provided fitted scaler for trial evaluation."""
-        cleaned_train = MLPDataUtils.validate_and_clean_data(self.X_train)
-        X_train_clean, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-        cleaned_test = MLPDataUtils.validate_and_clean_data(self.X_test)
-        X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+        cleaned_train = MLPDataUtils.validate_and_clean_data(self.x_train)
+        x_train_clean, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+        cleaned_test = MLPDataUtils.validate_and_clean_data(self.x_test)
+        x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
         objective_func = self.optimization_mixin.objective(
-            X_train=self.X_train,
+            x_train=self.x_train,
             y_train=self.y_train,
-            X_test=self.X_test,
-            X_test_scaled=X_test_scaled,
+            x_test=self.x_test,
+            x_test_scaled=x_test_scaled,
             y_test=self.y_test,
             fitted_scaler=scaler,
         )

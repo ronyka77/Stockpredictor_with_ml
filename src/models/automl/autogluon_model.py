@@ -230,7 +230,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
 
     def run_threshold_evaluation(
         self,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         confidence_method: str = "margin",
         threshold_range: tuple = (0.01, 0.99),
@@ -247,12 +247,12 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         evaluator = ThresholdEvaluator(investment_amount=investment_amount)
 
         # Determine current prices
-        if "close" in X_test.columns:
-            current_prices = X_test["close"].to_numpy()
-        elif "current_price" in X_test.columns:
-            current_prices = X_test["current_price"].to_numpy()
+        if "close" in x_test.columns:
+            current_prices = x_test["close"].to_numpy()
+        elif "current_price" in x_test.columns:
+            current_prices = x_test["current_price"].to_numpy()
         else:
-            current_prices = np.ones(len(X_test))
+            current_prices = np.ones(len(x_test))
 
         logger.info(
             f"Running threshold evaluation: method={confidence_method}, thresholds={str(threshold_range)}, n={n_thresholds}"
@@ -260,7 +260,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         try:
             results = evaluator.optimize_prediction_threshold(
                 model=self,
-                X_test=X_test,
+                x_test=x_test,
                 y_test=y_test,
                 current_prices_test=current_prices,
                 confidence_method=confidence_method,

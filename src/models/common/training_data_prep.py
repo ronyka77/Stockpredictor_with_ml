@@ -26,7 +26,7 @@ def prepare_common_training_data(
     3) Validate & clean features (basic sanitization)
     4) Optionally remove most recent date_int rows (default last 15 unique values)
 
-    Returns a dict with cleaned X_train, X_test, y_train, y_test and metadata
+    Returns a dict with cleaned x_train, x_test, y_train, y_test and metadata
     from the source loader (target_column, train/test date ranges, etc.).
     """
 
@@ -36,8 +36,8 @@ def prepare_common_training_data(
         clean_features=True,
     )
 
-    X_train: pd.DataFrame = data_result["X_train"]
-    X_test: pd.DataFrame = data_result["X_test"]
+    x_train: pd.DataFrame = data_result["x_train"]
+    x_test: pd.DataFrame = data_result["x_test"]
     y_train: pd.Series = data_result["y_train"]
     y_test: pd.Series = data_result["y_test"]
 
@@ -48,7 +48,7 @@ def prepare_common_training_data(
         y_lo = y_train.quantile(q_low)
         y_hi = y_train.quantile(q_high)
         keep_mask = (y_train >= y_lo) & (y_train <= y_hi)
-        X_train = X_train[keep_mask]
+        x_train = x_train[keep_mask]
         y_train = y_train[keep_mask]
         logger.info(
             "Target outlier removal: %d \u2192 %d samples (%d removed)",
@@ -66,8 +66,8 @@ def prepare_common_training_data(
         logger.warning(f"Outlier removal skipped due to error: {e}")
 
     # 3) Basic validation and cleaning
-    x_train_clean = MLPDataUtils.validate_and_clean_data(X_train)
-    x_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
+    x_train_clean = MLPDataUtils.validate_and_clean_data(x_train)
+    x_test_clean = MLPDataUtils.validate_and_clean_data(x_test)
 
     # 4) Optional date_int trimming on test set
     try:
@@ -93,8 +93,8 @@ def prepare_common_training_data(
 
     # Bundle results
     result: Dict[str, Any] = {
-        "X_train": x_train_clean,
-        "X_test": x_test_clean,
+        "x_train": x_train_clean,
+        "x_test": x_test_clean,
         "y_train": y_train,
         "y_test": y_test,
         "target_column": data_result.get("target_column"),

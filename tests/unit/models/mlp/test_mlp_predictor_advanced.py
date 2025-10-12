@@ -28,13 +28,13 @@ def test_basic_training():
         "learning_rate": 1e-3,
     }
     predictor = MLPPredictor(model_name="test_mlp", config=config)
-    X_train, y_train = create_dummy_data(100, 10)
+    x_train, y_train = create_dummy_data(100, 10)
     X_val, y_val = create_dummy_data(50, 10)
-    train_loader = create_dataloader(X_train, y_train, batch_size=16)
+    train_loader = create_dataloader(x_train, y_train, batch_size=16)
     val_loader = create_dataloader(X_val, y_val, batch_size=16)
     predictor.fit(train_loader, val_loader)
-    X_test = pd.DataFrame(X_train.numpy())
-    predictions = predictor.predict(X_test)
+    x_test = pd.DataFrame(x_train.numpy())
+    predictions = predictor.predict(x_test)
     if not (
         predictions.ndim == 1 or (predictions.ndim == 2 and predictions.shape[1] == 1)
     ):

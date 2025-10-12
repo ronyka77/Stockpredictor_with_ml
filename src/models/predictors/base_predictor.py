@@ -84,9 +84,9 @@ class BasePredictor(ABC):
             prediction_horizon=self.prediction_horizon,
             days_back=days_back,
         )
-        logger.info(f"Data shape after cleaning: {data_result['X_test'].shape}")
+        logger.info(f"Data shape after cleaning: {data_result['x_test'].shape}")
 
-        recent_features = data_result["X_test"].copy()
+        recent_features = data_result["x_test"].copy()
         recent_targets = data_result["y_test"].copy()
 
         if "ticker_id" in recent_features.columns:

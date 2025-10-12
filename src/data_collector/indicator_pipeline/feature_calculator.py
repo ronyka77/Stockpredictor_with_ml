@@ -317,7 +317,7 @@ class FeatureCalculator:
         features_df["Body_Shadow_Ratio"] = body / (upper_shadow + lower_shadow + 1e-8)
 
         # explicit forward/backward return periods with clear naming
-        horizon_shifts = [1, 10, 20, 30]
+        horizon_shifts = [1, 5, 10, 20, 30]
         for h in horizon_shifts:
             features_df[f"Return_{h}D"] = price_data["close"].pct_change(h)
             features_df[f"Log_Return_{h}D"] = np.log(price_data["close"] / price_data["close"].shift(h))

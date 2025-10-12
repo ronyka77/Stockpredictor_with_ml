@@ -93,11 +93,11 @@ def test_prepare_ml_data_for_training_splits_and_filters(
 
     # Assert
     assert isinstance(result, dict)
-    assert "X_train" in result and "X_test" in result
-    assert result["feature_count"] == result["X_train"].shape[1]
+    assert "x_train" in result and "x_test" in result
+    assert result["feature_count"] == result["x_train"].shape[1]
 
     # Verify we have test data
-    assert len(result["X_test"]) > 0, "Should have test data after split date"
+    assert len(result["x_test"]) > 0, "Should have test data after split date"
 
 
 @patch("src.data_utils.ml_data_pipeline.prepare_ml_data_for_training")
@@ -111,8 +111,8 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
     # Arrange: set cache to return quickly
     fake_cached = {
         "cached": True,
-        "X_train": sample_combined_data.iloc[:1],
-        "X_test": sample_combined_data.iloc[1:2],
+        "x_train": sample_combined_data.iloc[:1],
+        "x_test": sample_combined_data.iloc[1:2],
         "feature_count": 3,
     }
 
@@ -148,8 +148,8 @@ def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
             pipeline,
             "prepare_ml_data_for_training",
             return_value={
-                "X_train": sample_combined_data.iloc[:10].reset_index(drop=True),
-                "X_test": sample_combined_data.iloc[10:20].reset_index(drop=True),
+                "x_train": sample_combined_data.iloc[:10].reset_index(drop=True),
+                "x_test": sample_combined_data.iloc[10:20].reset_index(drop=True),
                 "y_train": pd.Series(np.arange(10.0)),
                 "y_test": pd.Series(np.arange(10.0, 20.0)),
                 "feature_count": 6,
@@ -179,7 +179,7 @@ def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
 
     # Assert
     mock_save.assert_called_once()
-    assert "X_train" in out and "X_test" in out
+    assert "x_train" in out and "x_test" in out
     assert out["feature_count"] >= 0
 
 
@@ -219,7 +219,7 @@ def test_prepare_ml_data_for_training_missing_date_raises(sample_combined_data):
 def test_prepare_ml_data_for_prediction_filters_days(
     mock_load, _conv, sample_combined_data
 ):
-    """Ensure prediction path filters X_test to Mondays and Fridays."""
+    """Ensure prediction path filters x_test to Mondays and Fridays."""
 
     mock_load.return_value = sample_combined_data
 
@@ -227,11 +227,11 @@ def test_prepare_ml_data_for_prediction_filters_days(
 
     out = pipeline.prepare_ml_data_for_prediction(prediction_horizon=10)
 
-    assert "X_test" in out and "y_test" in out
+    assert "x_test" in out and "y_test" in out
 
-    if len(out["X_test"]) > 0:
+    if len(out["x_test"]) > 0:
         # recover dates for asserted indices
-        dates = pd.to_datetime(sample_combined_data.loc[out["X_test"].index, "date"])
+        dates = pd.to_datetime(sample_combined_data.loc[out["x_test"].index, "date"])
         assert set(dates.dt.dayofweek.unique()).issubset({4})
 
 
@@ -241,7 +241,7 @@ def test_prepare_ml_data_for_prediction_with_cleaning_cache_old_triggers_clear_a
     from src.data_utils import ml_data_pipeline as pipeline
 
     fake_pred_result = {
-        "X_test": _make_sample_df(num_days=10),
+        "x_test": _make_sample_df(num_days=10),
         "y_test": pd.Series(np.arange(10.0)),
     }
 
@@ -276,4 +276,4 @@ def test_prepare_ml_data_for_prediction_with_cleaning_cache_old_triggers_clear_a
 
     mock_clear.assert_called_once()
     mock_save.assert_called_once()
-    assert "X_test" in out and isinstance(out["X_test"], pd.DataFrame)
+    assert "x_test" in out and isinstance(out["x_test"], pd.DataFrame)
