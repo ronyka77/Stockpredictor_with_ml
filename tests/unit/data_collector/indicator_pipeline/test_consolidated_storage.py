@@ -26,20 +26,25 @@ def test_combine_ticker_data_and_year_partitioning(tmp_path):
     storage.version_path = tmp_path / storage.config.version
     storage.consolidated_path = storage.version_path / "consolidated"
     storage.consolidated_path.mkdir(parents=True, exist_ok=True)
+    # Create data directory that the code expects
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
 
     # Ensure dataframes have a date column after reset_index in combine
     a = make_sample_ticker_df()
     b = make_sample_ticker_df()
     tdata = {"AAA": a, "BBB": b}
 
-    # Patch pyarrow write to avoid real IO and Path.stat to avoid file existence checks
+    # Patch pyarrow write, to_excel, Path.mkdir, and Path.stat to avoid real IO and file operations
     with (
         patch("pyarrow.parquet.write_table", return_value=None),
+        patch("pandas.DataFrame.to_excel", return_value=None),
+        patch.object(Path, "mkdir", return_value=None),
         patch.object(
             Path,
             "stat",
             return_value=SimpleNamespace(
-                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0
+                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0, st_mode=0o755
             ),
         ),
     ):
@@ -62,13 +67,15 @@ def test_save_multiple_tickers_creates_files_and_returns_summary(
     b = make_sample_ticker_df()
     tdata = {"AAA": a, "BBB": b}
 
-    # Patch pyarrow write and Path.stat
+    # Patch pyarrow write, to_excel, Path.mkdir, and Path.stat
     with (
         patch("pyarrow.parquet.write_table", return_value=None) as write_table,
+        patch("pandas.DataFrame.to_excel", return_value=None),
+        patch.object(Path, "mkdir", return_value=None),
         patch(  # pyright: ignore[reportUndefinedVariable]
             "pathlib.Path.stat",
             return_value=SimpleNamespace(
-                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0
+                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0, st_mode=0o755
             ),
         ),
     ):
@@ -92,9 +99,13 @@ def test_save_multiple_tickers_handles_small_files(tmp_path, mock_pipeline_logge
 
     with (
         patch("pyarrow.parquet.write_table", return_value=None) as write_table,
+        patch("pandas.DataFrame.to_excel", return_value=None),
+        patch.object(Path, "mkdir", return_value=None),
         patch(
             "pathlib.Path.stat",
-            return_value=SimpleNamespace(st_size=10, st_ctime=0, st_mtime=0),
+            return_value=SimpleNamespace(
+                st_size=10, st_ctime=0, st_mtime=0, st_mode=0o755
+            ),
         ),
     ):
         result = storage.save_multiple_tickers(tdata, metadata={})

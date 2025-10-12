@@ -102,19 +102,27 @@ class PolygonFundamentalsClient:
         """Load data from cache file"""
         try:
             if self._is_cache_valid(cache_path):
-                with open(cache_path, "r") as f:
-                    return json.load(f)
+                return await asyncio.to_thread(self._sync_load_json, cache_path)
         except Exception as e:
             logger.warning(f"Failed to load cache from {cache_path}: {e}")
         return None
 
+    def _sync_load_json(self, cache_path: Path) -> Dict[str, Any]:
+        """Synchronous JSON loading"""
+        with open(cache_path, "r") as f:
+            return json.load(f)
+
     async def _save_to_cache(self, cache_path: Path, data: Dict[str, Any]):
         """Save data to cache file"""
         try:
-            with open(cache_path, "w") as f:
-                json.dump(data, f, default=str)
+            await asyncio.to_thread(self._sync_save_json, cache_path, data)
         except Exception as e:
             logger.warning(f"Failed to save cache to {cache_path}: {e}")
+
+    def _sync_save_json(self, cache_path: Path, data: Dict[str, Any]):
+        """Synchronous JSON saving"""
+        with open(cache_path, "w") as f:
+            json.dump(data, f, default=str)
 
     async def _make_request(
         self, url: str, params: Dict[str, Any]

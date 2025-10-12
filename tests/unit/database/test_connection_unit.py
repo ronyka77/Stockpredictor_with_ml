@@ -222,7 +222,9 @@ def test_bulk_upsert_technical_features_success():
 
     with (
         patch("src.database.connection.get_global_pool", return_value=DummyPool()),
-        patch("src.database.connection.execute_values", side_effect=fake_execute_values),
+        patch(
+            "src.database.connection.execute_values", side_effect=fake_execute_values
+        ),
     ):
         res = db_utils.bulk_upsert_technical_features(rows)
         assert res == 1
@@ -264,7 +266,9 @@ def test_bulk_upsert_technical_features_rollback_on_exception():
 
     with (
         patch("src.database.connection.get_global_pool", return_value=DummyPool()),
-        patch("src.database.db_utils.execute_values", side_effect=raising_execute_values),
+        patch(
+            "src.database.db_utils.execute_values", side_effect=raising_execute_values
+        ),
     ):
         with pytest.raises(RuntimeError):
             db_utils.bulk_upsert_technical_features(rows)

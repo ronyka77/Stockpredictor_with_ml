@@ -214,7 +214,7 @@ class BasePredictor(ABC):
                     len(predictions), dtype=bool
                 )
             threshold_mask = confidence_scores >= self.optimal_threshold
-            filtered_indices = np.where(threshold_mask)[0]
+            filtered_indices = np.nonzero(threshold_mask)[0]
             return filtered_indices, threshold_mask
 
     def save_predictions_to_excel(
@@ -233,11 +233,9 @@ class BasePredictor(ABC):
         else:
             model_dir = ""
         if model_name is not None:
-            file_name = f"predictions_{model_name}_{model_dir[:11] if model_dir else ""}_{timestamp}.xlsx"
+            file_name = f"predictions_{model_name}_{model_dir[:11] if model_dir else ''}_{timestamp}.xlsx"
         else:
-            file_name = (
-                f"predictions_{self.run_id[:8]}_{model_dir[:11] if model_dir else ""}_{timestamp}.xlsx"
-            )
+            file_name = f"predictions_{self.run_id[:8]}_{model_dir[:11] if model_dir else ''}_{timestamp}.xlsx"
 
         output_dir = os.path.join("predictions", self.model_type)
         os.makedirs(output_dir, exist_ok=True)
@@ -410,7 +408,9 @@ class BasePredictor(ABC):
         logger.info(f"   🔮 Not closed predictions: {not_closed_predictions}")
 
         if not_closed_predictions == 0:
-            logger.warning("   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!")
+            logger.warning(
+                "   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!"
+            )
             return pd.DataFrame(), avg_profit_per_investment
 
         dates_series = results_df["date"].copy()
@@ -453,7 +453,9 @@ class BasePredictor(ABC):
                 elif not check_friday:
                     results_df = results_df[results_df["day_of_week"] == "Monday"]
 
-                return results_df if len(results_df) > 5 else pd.DataFrame(), avg_profit_per_investment
+                return results_df if len(
+                    results_df
+                ) > 5 else pd.DataFrame(), avg_profit_per_investment
             else:
                 logger.warning("   ⚠️  WARNING: No predictions should be exported!")
                 return pd.DataFrame(), avg_profit_per_investment

@@ -529,6 +529,79 @@ class DataStorage:
             logger.error(f"Error retrieving tickers: {e}")
             raise
 
-    def __exit__(self):
+    def load_dividends_for_ticker(
+        self,
+        ticker: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> pd.DataFrame:
+        """
+        Load dividend data for a specific ticker within a date range.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date filter (ex_dividend_date >= start_date)
+            end_date: End date filter (ex_dividend_date <= end_date)
+
+        Returns:
+            DataFrame with columns: ex_dividend_date, cash_amount, pay_date, record_date, id, currency
+        """
+        query = """
+            SELECT
+                d.ex_dividend_date,
+                d.cash_amount,
+                d.pay_date,
+                d.record_date,
+                d.id,
+                d.currency
+            FROM dividends d
+            JOIN tickers t ON d.ticker_id = t.id
+            WHERE t.ticker = %s
+        """
+        params = [ticker.upper()]
+
+        if start_date:
+            query += " AND d.ex_dividend_date >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND d.ex_dividend_date <= %s"
+            params.append(end_date)
+
+        query += " ORDER BY d.ex_dividend_date ASC"
+
+        try:
+            rows = fetch_all(query, tuple(params), dict_cursor=True)
+            if not rows:
+                logger.info(f"No dividend data found for {ticker}")
+                return pd.DataFrame(
+                    columns=[
+                        "ex_dividend_date",
+                        "cash_amount",
+                        "pay_date",
+                        "record_date",
+                        "id",
+                        "currency",
+                    ]
+                )
+
+            df = pd.DataFrame(rows)
+
+            # Ensure proper data types
+            df["ex_dividend_date"] = pd.to_datetime(df["ex_dividend_date"]).dt.date
+            df["cash_amount"] = df["cash_amount"].astype(float)
+            if "pay_date" in df.columns and df["pay_date"].notna().any():
+                df["pay_date"] = pd.to_datetime(df["pay_date"]).dt.date
+            if "record_date" in df.columns and df["record_date"].notna().any():
+                df["record_date"] = pd.to_datetime(df["record_date"]).dt.date
+
+            logger.info(f"Loaded {len(df)} dividend records for {ticker}")
+            return df
+
+        except Exception as e:
+            logger.error(f"Error loading dividend data for {ticker}: {e}")
+            raise
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""
         pass

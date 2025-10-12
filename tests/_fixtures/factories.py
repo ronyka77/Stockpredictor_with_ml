@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from faker import Faker
@@ -145,7 +145,7 @@ class OHLCVRecordFactory(ModelFactory[OHLCVRecord]):
         timestamp = (
             overrides.get("timestamp")
             or (
-                datetime.utcnow().date()
+                datetime.now(timezone.utc).date()
                 - timedelta(days=faker.pyint(min_value=0, max_value=365))
             ).isoformat()
         )
@@ -232,18 +232,18 @@ def polygon_payload_dict(**overrides) -> Dict[str, Any]:
 
             ts_dt = datetime.fromisoformat(ts)
         except Exception:
-            ts_dt = datetime.utcnow()
+            ts_dt = datetime.now(timezone.utc)
     elif hasattr(ts, "timestamp"):
         ts_dt = ts
     else:
         from datetime import datetime
 
-        ts_dt = datetime.utcnow()
+        ts_dt = datetime.now(timezone.utc)
 
     try:
         millis = int(ts_dt.timestamp() * 1000)
     except Exception:
-        millis = int(datetime.utcnow().timestamp() * 1000)
+        millis = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     poly = {
         "T": payload.get("ticker") or payload.get("ticker", "TST"),

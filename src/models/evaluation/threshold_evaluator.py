@@ -566,6 +566,8 @@ class ThresholdEvaluator:
         policy = ThresholdPolicy()
         cfg = ThresholdConfig(method="ge", value=float(threshold))
         policy_result = policy.compute_mask(all_confidence, X, cfg)
+        if policy_result is None:
+            raise ValueError("ThresholdPolicy.compute_mask returned None")
         high_confidence_mask = policy_result.mask
 
         # Filter predictions

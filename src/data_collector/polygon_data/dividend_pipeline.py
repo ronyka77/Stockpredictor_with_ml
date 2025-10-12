@@ -25,10 +25,10 @@ logger = get_logger(__name__, utility="data_collector")
 
 # Configuration variables for dividend ingestion
 DIVIDEND_INGESTION_CONFIG = {
-    "concurrent": False,        # Enable concurrent processing
-    "max_workers": 4,          # Number of worker threads (only used if concurrent=True)
-    "requests_per_minute": 5,  # API requests per minute per worker
-    "batch_size": 100,         # Database batch size for upserts
+    "concurrent": True,  # Enable concurrent processing
+    "max_workers": 32,  # Number of worker threads (only used if concurrent=True)
+    "requests_per_minute": 100,  # API requests per minute per worker
+    "batch_size": 100,  # Database batch size for upserts
 }
 
 
@@ -217,7 +217,7 @@ def ingest_dividends_for_all_tickers(
     batch_size: int = 100,
     concurrent: bool = False,
     max_workers: int = 4,
-    requests_per_minute: int = 5
+    requests_per_minute: int = 5,
 ) -> Dict[str, int]:
     """
     Orchestrator over all tickers in storage.get_available_tickers().
@@ -239,16 +239,15 @@ def ingest_dividends_for_all_tickers(
             tickers=tickers,
             batch_size=batch_size,
             max_workers=max_workers,
-            requests_per_minute=requests_per_minute
+            requests_per_minute=requests_per_minute,
         )
     else:
-        return _ingest_dividends_sequential(
-            tickers=tickers,
-            batch_size=batch_size
-        )
+        return _ingest_dividends_sequential(tickers=tickers, batch_size=batch_size)
 
 
-def _ingest_dividends_sequential(tickers: List[Dict[str, Any]], batch_size: int) -> Dict[str, int]:
+def _ingest_dividends_sequential(
+    tickers: List[Dict[str, Any]], batch_size: int
+) -> Dict[str, int]:
     """Sequential processing of dividend ingestion."""
     client = PolygonDataClient()
     storage = DataStorage()
@@ -274,7 +273,7 @@ def _ingest_dividends_concurrent(
     tickers: List[Dict[str, Any]],
     batch_size: int,
     max_workers: int,
-    requests_per_minute: int
+    requests_per_minute: int,
 ) -> Dict[str, int]:
     """Concurrent processing of dividend ingestion using ThreadPoolExecutor."""
     logger.info(f"Starting concurrent dividend ingestion with {max_workers} workers")
@@ -285,7 +284,7 @@ def _ingest_dividends_concurrent(
         "tickers_processed": 0,
         "total_fetched": 0,
         "total_upserted": 0,
-        "errors": 0
+        "errors": 0,
     }
 
     def process_ticker_with_lock(ticker: Dict[str, Any]) -> Dict[str, int]:
@@ -307,7 +306,9 @@ def _ingest_dividends_concurrent(
                 overall_stats["total_fetched"] += stats.get("fetched", 0)
                 overall_stats["total_upserted"] += stats.get("upserted", 0)
 
-            logger.debug(f"Thread {thread_id}: Completed ticker {ticker['ticker']}: {stats}")
+            logger.debug(
+                f"Thread {thread_id}: Completed ticker {ticker['ticker']}: {stats}"
+            )
             return stats
 
         except Exception as e:
@@ -330,7 +331,9 @@ def _ingest_dividends_concurrent(
             try:
                 future.result()  # This will raise any exception that occurred
             except Exception as e:
-                logger.error(f"Ticker {ticker['ticker']} failed in concurrent processing: {e}")
+                logger.error(
+                    f"Ticker {ticker['ticker']} failed in concurrent processing: {e}"
+                )
 
     logger.info(f"Concurrent dividend ingestion complete: {overall_stats}")
     return overall_stats
@@ -350,13 +353,14 @@ if __name__ == "__main__":
 
     try:
         result = ingest_dividends_for_all_tickers(
-            batch_size=config['batch_size'],
-            concurrent=config['concurrent'],
-            max_workers=config['max_workers'],
-            requests_per_minute=config['requests_per_minute']
+            batch_size=config["batch_size"],
+            concurrent=config["concurrent"],
+            max_workers=config["max_workers"],
+            requests_per_minute=config["requests_per_minute"],
         )
         logger.info(f"Dividend ingestion completed successfully: {result}")
     except Exception as e:
         logger.error(f"Dividend ingestion failed: {e}")
         import sys
+
         sys.exit(1)

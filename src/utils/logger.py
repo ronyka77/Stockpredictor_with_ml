@@ -59,7 +59,7 @@ def get_logger(name: str, utility: Optional[str] = None):
             utility = "polygon"
         elif "predictor" in lower_name:
             utility = "predictor"
-        elif "data_collector" in lower_name or "data_collector" in lower_name:
+        elif "data_collector" in lower_name:
             utility = "data_collector"
         elif "feature_engineering" in lower_name:
             utility = "feature_engineering"

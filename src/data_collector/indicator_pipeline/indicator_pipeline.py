@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, date
+from src.data_collector.polygon_data.data_storage import DataStorage
 from src.feature_engineering.config import config
 import time
 import uuid
@@ -50,15 +51,6 @@ def _process_ticker_worker(
     }
 
     try:
-        # Local imports to keep worker lightweight and avoid top-level state
-        from src.feature_engineering.data_loader import StockDataLoader
-        from src.data_collector.indicator_pipeline.feature_calculator import (
-            FeatureCalculator,
-        )
-        from src.data_collector.indicator_pipeline.feature_storage import (
-            FeatureStorage,
-        )
-
         loader = StockDataLoader()
         calculator = FeatureCalculator()
         storage = FeatureStorage()
@@ -89,6 +81,40 @@ def _process_ticker_worker(
             stock_data, include_categories=config_dict.get("feature_categories")
         )
 
+        # Load and compute dividend features
+        try:
+            dividends_df = DataStorage().load_dividends_for_ticker(
+                ticker, start_date, end_date
+            )
+
+            if not dividends_df.empty:
+                from src.data_collector.indicator_pipeline.dividend_features import (
+                    compute_dividend_features,
+                )
+
+                dividend_features = compute_dividend_features(stock_data, dividends_df)
+
+                # Merge dividend features into main feature DataFrame
+                feature_result.data = feature_result.data.combine_first(
+                    dividend_features
+                )
+
+                # Add dividend feature metadata
+                if hasattr(feature_result, "metadata") and feature_result.metadata:
+                    feature_result.metadata["dividend_features_included"] = True
+                    feature_result.metadata["dividend_records_count"] = len(
+                        dividends_df
+                    )
+                else:
+                    feature_result.metadata = {
+                        "dividend_features_included": True,
+                        "dividend_records_count": len(dividends_df),
+                    }
+
+        except Exception as e:
+            warning_msg = f"Failed to compute dividend features for {ticker}: {str(e)}"
+            feature_result.warnings.append(warning_msg)
+
         result["features_calculated"] = len(feature_result.data.columns)
         result["warnings"] = len(feature_result.warnings)
         result["quality_score"] = feature_result.quality_score
@@ -100,6 +126,18 @@ def _process_ticker_worker(
                 "quality_score": feature_result.quality_score,
                 "warnings": feature_result.warnings,
                 "job_id": job_id,
+                "dividend_features": feature_result.metadata.get(
+                    "dividend_features_included", False
+                )
+                if hasattr(feature_result, "metadata") and feature_result.metadata
+                else False,
+                "dividend_source": "polygon"
+                if (
+                    hasattr(feature_result, "metadata")
+                    and feature_result.metadata
+                    and feature_result.metadata.get("dividend_features_included")
+                )
+                else None,
             }
             storage.save_features(ticker, feature_result.data, storage_metadata)
 
@@ -244,6 +282,7 @@ class BatchFeatureProcessor:
         self.feature_calculator = FeatureCalculator()
         self.feature_storage = FeatureStorage()
         self.consolidated_storage = ConsolidatedFeatureStorage()
+        self.data_storage = DataStorage()
         self.stats = ProcessingStats()
         self._lock = threading.Lock()
 
@@ -329,6 +368,54 @@ class BatchFeatureProcessor:
                 stock_data, include_categories=config.feature_categories
             )
 
+            # Load and compute dividend features
+            try:
+                dividends_df = self.data_storage.load_dividends_for_ticker(
+                    ticker,
+                    config.start_date or "2022-01-01",
+                    config.end_date or datetime.now().strftime("%Y-%m-%d"),
+                )
+
+                if not dividends_df.empty:
+                    from src.data_collector.indicator_pipeline.dividend_features import (
+                        compute_dividend_features,
+                    )
+
+                    dividend_features = compute_dividend_features(
+                        stock_data, dividends_df
+                    )
+
+                    # Merge dividend features into main feature DataFrame
+                    # Use combine_first to preserve existing values and add new ones
+                    feature_result.data = feature_result.data.combine_first(
+                        dividend_features
+                    )
+
+                    # Add dividend feature metadata
+                    if hasattr(feature_result, "metadata") and feature_result.metadata:
+                        feature_result.metadata["dividend_features_included"] = True
+                        feature_result.metadata["dividend_records_count"] = len(
+                            dividends_df
+                        )
+                    else:
+                        feature_result.metadata = {
+                            "dividend_features_included": True,
+                            "dividend_records_count": len(dividends_df),
+                        }
+
+                    logger.info(
+                        f"Added {len(dividend_features.columns)} dividend features for {ticker}"
+                    )
+                else:
+                    logger.info(f"No dividend data available for {ticker}")
+
+            except Exception as e:
+                warning_msg = (
+                    f"Failed to compute dividend features for {ticker}: {str(e)}"
+                )
+                feature_result.warnings.append(warning_msg)
+                logger.warning(warning_msg)
+
             result["features_calculated"] = len(feature_result.data.columns)
             result["warnings"] = len(feature_result.warnings)
             result["quality_score"] = feature_result.quality_score
@@ -342,6 +429,18 @@ class BatchFeatureProcessor:
                     "quality_score": feature_result.quality_score,
                     "warnings": feature_result.warnings,
                     "job_id": job_id,
+                    "dividend_features": feature_result.metadata.get(
+                        "dividend_features_included", False
+                    )
+                    if hasattr(feature_result, "metadata") and feature_result.metadata
+                    else False,
+                    "dividend_source": "polygon"
+                    if (
+                        hasattr(feature_result, "metadata")
+                        and feature_result.metadata
+                        and feature_result.metadata.get("dividend_features_included")
+                    )
+                    else None,
                 }
                 self.feature_storage.save_features(
                     ticker, feature_result.data, storage_metadata

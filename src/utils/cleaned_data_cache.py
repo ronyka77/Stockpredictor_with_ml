@@ -20,11 +20,13 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="cleaned_data_cache")
 
+
 def collect_garbage():
     collected = gc.collect()
     logger.info(f"Garbage collected: {collected}")
     proc = psutil.Process(os.getpid())
     logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
+
 
 class CleanedDataCache:
     """

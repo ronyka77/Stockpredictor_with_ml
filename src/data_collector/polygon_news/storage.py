@@ -498,7 +498,7 @@ class PolygonNewsStorage:
         """Context manager entry"""
         return self
 
-    def __exit__(self, exc_type):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit with cleanup (no-op for pool-based storage)"""
         if exc_type:
             self.logger.warning("Exiting PolygonNewsStorage context with exception")

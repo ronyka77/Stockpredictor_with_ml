@@ -89,6 +89,7 @@ def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
         ),
     )
 
+
 def _upsert_dividends_batch(
     rows: Iterable[Dict[str, Any]], page_size: int = 500
 ) -> int:

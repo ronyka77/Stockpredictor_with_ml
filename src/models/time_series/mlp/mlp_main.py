@@ -829,7 +829,7 @@ def smoke_test_save_and_load():
     # Fitted scaler (for artifact check)
     from sklearn.preprocessing import StandardScaler as _Std
 
-    scaler = _Std().fit(X_eval.values)
+    scaler = _Std().fit(X_eval.to_numpy())
 
     # Create predictor instance
     predictor = MLPPredictorWithMLflow(

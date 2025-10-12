@@ -5,6 +5,7 @@ This module handles fundamental data collection with complete pipeline execution
 per ticker and simplified rate limiting.
 """
 
+import asyncio
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
@@ -42,8 +43,8 @@ class FundamentalRateLimiter:
     async def acquire(self):
         """Acquire rate limit using existing framework (skip if disabled)"""
         if not getattr(config, "DISABLE_RATE_LIMITING", False):
-            # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so we just call it
-            self.rate_limiter.wait_if_needed()
+            # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so run in thread
+            await asyncio.to_thread(self.rate_limiter.wait_if_needed)
 
     def release(self):
         """Release rate limit using existing framework"""
@@ -308,7 +309,8 @@ class OptimizedFundamentalCollector:
 
             # Store to database using connection pool
             # Use centralized execute helper for single-statement upsert
-            execute(
+            await asyncio.to_thread(
+                execute,
                 """
                 INSERT INTO raw_fundamental_data (
                     ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
@@ -400,12 +402,8 @@ class OptimizedFundamentalCollector:
         # Helper function to get attribute safely
         def get_attr(obj, attr_name, default=None):
             if isinstance(obj, dict):
-                # Check if this is a cached data structure with nested financials
-                if "financials" in obj:
-                    # For cached data, metadata fields are at the top level
-                    return obj.get(attr_name, default)
-                else:
-                    return obj.get(attr_name, default)
+                # For cached data, metadata fields are at the top level
+                return obj.get(attr_name, default)
             else:
                 return getattr(obj, attr_name, default)
 

@@ -141,7 +141,7 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore", category=UserWarning, module=r"autogluon.*")
     try:
-        model_dir = "AutogluonModels/ag-20250920_160248"
+        model_dir = "AutogluonModels/ag-20250921_221257"
         prediction_horizon = 5
         run_model_evaluation(model_dir, prediction_horizon)
     except Exception as e:

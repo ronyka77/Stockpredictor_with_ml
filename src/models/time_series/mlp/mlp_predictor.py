@@ -276,11 +276,11 @@ class MLPPredictor(PyTorchBasePredictor):
             )
         elif optimizer_name == "rmsprop":
             return torch.optim.RMSprop(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay
+                model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.9
             )
         elif optimizer_name == "sgd":
             return torch.optim.SGD(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay
+                model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.9
             )
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_name}")

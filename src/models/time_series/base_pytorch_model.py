@@ -81,7 +81,7 @@ class PyTorchBasePredictor(BaseModel):
             criterion = nn.HuberLoss(delta=delta)
         else:
             criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
         logger.info(f"Starting training for {epochs} epochs...")
 
@@ -140,7 +140,7 @@ class PyTorchBasePredictor(BaseModel):
         X_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
         dataset = TensorDataset(X_tensor)
         loader = DataLoader(
-            dataset, batch_size=self.config.get("batch_size", 32), shuffle=False
+            dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
         )
 
         predictions = []
@@ -183,7 +183,7 @@ class PyTorchBasePredictor(BaseModel):
                 )
                 dataset = TensorDataset(X_tensor)
                 loader = DataLoader(
-                    dataset, batch_size=self.config.get("batch_size", 32), shuffle=False
+                    dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
                 )
 
                 for _ in range(n_passes):
@@ -238,7 +238,7 @@ class PyTorchBasePredictor(BaseModel):
             # Get predictions on perturbed data
             dataset = TensorDataset(X_perturbed)
             loader = DataLoader(
-                dataset, batch_size=self.config.get("batch_size", 32), shuffle=False
+                dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
             )
 
             perturbed_predictions = []

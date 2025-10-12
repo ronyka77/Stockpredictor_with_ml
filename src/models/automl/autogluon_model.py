@@ -114,7 +114,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
 
         hyperparams = {
             "FASTAI": {},
-            # "GBM": {},
+            "GBM": {},
             "XGB": {},
             # "TABM": {},
             "RF": {},

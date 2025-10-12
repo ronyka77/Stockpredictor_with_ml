@@ -49,14 +49,14 @@ class PostgresConnection:
         dsn = " ".join(dsn_parts)
         # Use the alias (ThreadedConnectionPool) so unit tests that patch that
         # symbol receive the fake pool instead of creating a real ConnectionPool.
-        self._pool = ThreadedConnectionPool(conninfo=dsn, min_size=minconn, max_size=maxconn)
+        self._pool = ThreadedConnectionPool(
+            conninfo=dsn, min_size=minconn, max_size=maxconn
+        )
         self._sem = Semaphore(maxconn)
         self._closed = False
 
     @contextmanager
-    def connection(
-        self, timeout: float = 5.0
-    ) -> Generator[Any, None, None]:
+    def connection(self, timeout: float = 5.0) -> Generator[Any, None, None]:
         """Acquire a connection from the pool with a timeout.
 
         Raises:
@@ -307,10 +307,9 @@ def run_in_transaction(fn: Callable[[Any, Any], Any]) -> Any:
             conn.rollback()
             raise
 
+
 # Expose the old symbol name so external patches continue to work.
 ThreadedConnectionPool = ConnectionPool
 
 # Ensure the pool is closed on normal interpreter exit
 atexit.register(close_global_pool)
-
-

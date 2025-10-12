@@ -36,8 +36,11 @@ def top_dataframes(top_n: int = 10):
             continue
     dfs.sort(reverse=True, key=lambda x: x[0])
     for size, df in dfs[:top_n]:
-        logger.info(f"{size/1024**2:8.2f} MB | shape={df.shape} | columns={len(df.columns)}")
+        logger.info(
+            f"{size / 1024**2:8.2f} MB | shape={df.shape} | columns={len(df.columns)}"
+        )
     return dfs
+
 
 def train_autogluon(
     *, prediction_horizon: int = 5, presets: str = "best_quality"

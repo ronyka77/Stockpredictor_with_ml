@@ -31,9 +31,6 @@ class RateLimiter:
     def __post_init__(self):
         """Initialize the rate limiter"""
         self.window_start = time.time()
-        logger.info(
-            f"Rate limiter initialized: {self.requests_per_minute} requests/minute"
-        )
 
     def wait_if_needed(self) -> None:
         """
@@ -216,6 +213,5 @@ def get_rate_limiter(requests_per_minute: int) -> RateLimiter:
     Factory to return the appropriate rate limiter depending on configuration.
     """
     if getattr(config, "DISABLE_RATE_LIMITING", False):
-        logger.info("Rate limiting disabled via config. Using NoOpRateLimiter.")
         return NoOpRateLimiter()
     return AdaptiveRateLimiter(requests_per_minute=requests_per_minute)

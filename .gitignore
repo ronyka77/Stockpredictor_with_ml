@@ -39,3 +39,4 @@ docs/external/
 src/intentgraph.py
 cluster_analysis/
 /.idea/
+.sonarlint/connectedMode.json

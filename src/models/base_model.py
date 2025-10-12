@@ -96,7 +96,7 @@ class BaseModel(ABC):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        X_val: Optional[pd.DataFrame] = None,
+        x_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
         **kwargs,
     ) -> "BaseModel":
@@ -106,7 +106,7 @@ class BaseModel(ABC):
         Args:
             X: Training features
             y: Training targets
-            X_val: Validation features (optional)
+            x_val: Validation features (optional)
             y_val: Validation targets (optional)
             **kwargs: Additional training parameters
 

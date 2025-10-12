@@ -56,11 +56,13 @@ def filter_dates_to_weekdays(
 
     return keep, filtered_dates
 
+
 def collect_garbage():
     collected = gc.collect()
     logger.info(f"Garbage collected: {collected}")
     proc = psutil.Process(os.getpid())
     logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
+
 
 def prepare_ml_data_for_training(
     prediction_horizon: int = 10,
@@ -200,7 +202,7 @@ def prepare_ml_data_for_training(
         # Apply the same valid_mask to get corresponding dates
         test_dates = dates_all[test_mask].copy()
 
-        filtered_mask, dates_clean = filter_dates_to_weekdays(test_dates, (0,4))
+        filtered_mask, dates_clean = filter_dates_to_weekdays(test_dates, (0, 4))
 
         # Get test dates for modification and logging
         test_dates = dates_clean
@@ -303,7 +305,7 @@ def prepare_ml_data_for_prediction(
         )
         date_col = combined_data["date"].copy()
         # keep Mondays and Fridays only (0, 4)
-        filtered_mask, filtered_dates = filter_dates_to_weekdays(date_col, (0,4))
+        filtered_mask, filtered_dates = filter_dates_to_weekdays(date_col, (0, 4))
         combined_data = combined_data[filtered_mask]
 
         # Extract percentage return targets (instead of absolute prices)
@@ -339,7 +341,6 @@ def prepare_ml_data_for_prediction(
         X = add_prediction_bounds_features(X)
         X["date"] = combined_data["date"].copy()
         X = add_date_features(X, "date")
-        
 
         # Remove the date column after temporal features are created
         X = X.replace([np.inf, -np.inf], np.nan)
