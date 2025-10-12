@@ -298,12 +298,29 @@ class BasePredictor(ABC):
         without writing to disk.
         Returns a tuple of (results_df, avg_profit_per_investment).
         """
-        # Initialize avg_profit_per_investment
-        avg_profit_per_investment = 0.0
+        # Split logic into small helpers for readability and lower cognitive complexity
+        results_df = self._init_results_df(features_df, metadata_df, predictions)
+        if results_df is None:
+            return pd.DataFrame()
 
-        # 1) Minimal result skeleton from predictions and metadata
+        results_df = self._apply_threshold_and_top10(results_df, features_df)
+        if results_df is None or results_df.empty:
+            return pd.DataFrame()
+
+        results_df = self._compute_derived_metrics(results_df)
+        if results_df is None or results_df.empty:
+            return pd.DataFrame()
+
+        avg_profit_per_investment = self._aggregate_profit_and_filter_by_weekday(
+            results_df
+        )
+        if avg_profit_per_investment is None:
+            return pd.DataFrame()
+
+        return results_df, avg_profit_per_investment
+
+    def _init_results_df(self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray) -> pd.DataFrame | None:
         results_df = metadata_df.copy()
-        threshold_filtered_count = 0
         try:
             results_df["ticker_id"] = features_df["ticker_id"].values
         except KeyError:
@@ -312,22 +329,35 @@ class BasePredictor(ABC):
             )
             logger.warning(f"   ⚠️  Features_df columns: {features_df.columns.tolist()}")
 
-        results_df["date_int"] = features_df["date_int"].values
+        try:
+            results_df["date_int"] = features_df["date_int"].values
+        except KeyError:
+            logger.warning("   ⚠️  Missing date_int in features_df; aborting build")
+            return None
+
         results_df = self._merge_ticker_metadata(results_df)
 
-        current_prices = features_df["close"].values
+        # Attach prediction fields
+        try:
+            current_prices = features_df["close"].values
+        except KeyError:
+            logger.warning("   ⚠️  Missing close prices in features_df; aborting build")
+            return None
+
         results_df["predicted_return"] = predictions
         results_df["predicted_price"] = convert_percentage_predictions_to_prices(
             predictions, current_prices, apply_bounds=False
         )
         results_df["current_price"] = current_prices
         results_df.rename(columns={"target_values": "actual_return"}, inplace=True)
+        return results_df
 
-        # 2) Apply threshold filtering and immediately top-10 per date on the filtered set
+    def _apply_threshold_and_top10(self, results_df: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame | None:
+        threshold_filtered_count = 0
         if self.optimal_threshold is not None:
             confidence_scores = self.get_confidence_scores(features_df)
             _, threshold_mask = self.apply_threshold_filter(
-                predictions, confidence_scores
+                results_df["predicted_return"].values, confidence_scores
             )
             results_df["confidence_score"] = confidence_scores
             results_df["passes_threshold"] = threshold_mask
@@ -342,126 +372,118 @@ class BasePredictor(ABC):
 
         if threshold_filtered_count == 0:
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-            return pd.DataFrame()
-        else:
-            results_df = (
-                results_df[results_df["predicted_return"] > 0]
-                .sort_values(["date", "confidence_score"], ascending=[True, False])
-                .groupby("date")
-                .head(10)
-                .reset_index(drop=True)
-            )
-            results_df["day_of_week"] = pd.to_datetime(results_df["date"]).dt.day_name()
-            top_10_count = len(results_df)
-            logger.info(f"   📈 Top 10 final count: {top_10_count}")
-            if top_10_count == 0:
-                logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-                return pd.DataFrame()
+            return None
 
-        # 3) Compute derived evaluation fields AFTER filtering/top-10
+        results_df = (
+            results_df[results_df["predicted_return"] > 0]
+            .sort_values(["date", "confidence_score"], ascending=[True, False])
+            .groupby("date")
+            .head(10)
+            .reset_index(drop=True)
+        )
+        results_df["day_of_week"] = pd.to_datetime(results_df["date"]).dt.day_name()
+        top_10_count = len(results_df)
+        logger.info(f"   📈 Top 10 final count: {top_10_count}")
+        if top_10_count == 0:
+            logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+            return None
+        return results_df
+
+    def _compute_derived_metrics(self, results_df: pd.DataFrame) -> pd.DataFrame | None:
         non_nan_mask = results_df["actual_return"].notna()
-        if non_nan_mask.any():
-            # Map indices from filtered results back to current_prices by positional alignment
-            filtered_prices = results_df.loc[non_nan_mask, "current_price"].values
-            filtered_returns = results_df.loc[non_nan_mask, "actual_return"]
+        if not non_nan_mask.any():
+            return results_df
 
-            results_df.loc[non_nan_mask, "actual_price"] = (
-                convert_percentage_predictions_to_prices(
-                    filtered_returns, filtered_prices, apply_bounds=False
-                )
+        filtered_prices = results_df.loc[non_nan_mask, "current_price"].values
+        filtered_returns = results_df.loc[non_nan_mask, "actual_return"]
+
+        results_df.loc[non_nan_mask, "actual_price"] = (
+            convert_percentage_predictions_to_prices(
+                filtered_returns, filtered_prices, apply_bounds=False
             )
-
-            ap = results_df.loc[non_nan_mask, "actual_price"]
-            cp = results_df.loc[non_nan_mask, "current_price"]
-
-            # profit per $100 = (100 / current_price) * (actual_price - current_price)
-            results_df.loc[non_nan_mask, "profit_100_investment"] = (100.0 / cp) * (
-                ap - cp
-            )
-            results_df.loc[non_nan_mask, "price_prediction_error"] = (
-                results_df.loc[non_nan_mask, "predicted_price"]
-                - results_df.loc[non_nan_mask, "actual_price"]
-            )
-            results_df.loc[non_nan_mask, "prediction_successful"] = (
-                results_df.loc[non_nan_mask, "actual_price"]
-                > results_df.loc[non_nan_mask, "predicted_price"]
-            ).astype(int)
-
-        # 4) Aggregate profit metric on the final DataFrame
-        if "actual_price" in results_df.columns:
-            valid_mask = results_df["actual_price"] > 0
-        else:
-            valid_mask = pd.Series([False] * len(results_df), index=results_df.index)
-        valid_profit_df = results_df[valid_mask].copy()
-        avg_profit_per_investment = (
-            float(valid_profit_df["profit_100_investment"].mean())
-            if not valid_profit_df.empty
-            else 0
         )
-        valid_profit_df.shape[0]
+
+        ap = results_df.loc[non_nan_mask, "actual_price"]
+        cp = results_df.loc[non_nan_mask, "current_price"]
+
+        results_df.loc[non_nan_mask, "profit_100_investment"] = (100.0 / cp) * (
+            ap - cp
+        )
+        results_df.loc[non_nan_mask, "price_prediction_error"] = (
+            results_df.loc[non_nan_mask, "predicted_price"]
+            - results_df.loc[non_nan_mask, "actual_price"]
+        )
+        results_df.loc[non_nan_mask, "prediction_successful"] = (
+            results_df.loc[non_nan_mask, "actual_price"]
+            > results_df.loc[non_nan_mask, "predicted_price"]
+        ).astype(int)
+
         logger.info(
-            f"   💰 ${avg_profit_per_investment:.2f} Average profit per $100 investment"
+            f"   💰 ${float(results_df.loc[non_nan_mask, 'profit_100_investment'].mean()):.2f} Average profit per $100 investment"
         )
 
-        # New validation: Check for at least 1 not closed prediction (actual_price is empty)
-        not_closed_predictions = results_df["actual_price"].isna().sum()
-        logger.info(f"   🔮 Not closed predictions: {not_closed_predictions}")
+        return results_df
 
-        if not_closed_predictions == 0:
+    def _aggregate_profit_and_filter_by_weekday(self, results_df: pd.DataFrame) -> float | None:  # NOSONAR
+        valid_profit_df = self._get_valid_profit_df(results_df)
+        avg_profit_per_investment = self._calc_avg_profit(valid_profit_df)
+
+        not_closed = self._count_not_closed_predictions(results_df)
+        logger.info(f"   🔮 Not closed predictions: {not_closed}")
+        if not_closed == 0:
             logger.warning(
                 "   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!"
             )
-            return pd.DataFrame()
+            return None
 
-        dates_series = results_df["date"].copy()
-        dates_series = pd.to_datetime(dates_series)
-        # 4a) Weekday-specific profit aggregates (Friday and Monday)
-        if not valid_profit_df.empty:
-            check_monday = False
-            check_friday = True
+        dates_series = pd.to_datetime(results_df["date"].copy())
+        friday_avg, monday_avg = self._compute_weekday_avgs(results_df, dates_series, valid_profit_df)
 
-            if check_friday:
-                # Get boolean mask and filtered date Series for Friday
-                friday_keep, _friday_dates = filter_dates_to_weekdays(dates_series, (4,))
-                friday_df = results_df[friday_keep & valid_mask].copy()
-                friday_avg_profit = (
-                    float(friday_df["profit_100_investment"].mean())
-                    if not friday_df.empty
-                    else 0
-                )
-                logger.info(
-                    f"   🗓️ ${friday_avg_profit:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
-                )
-            if check_monday:
-                # Get boolean mask and filtered date Series for Monday
-                monday_keep, _monday_dates = filter_dates_to_weekdays(dates_series, (0,))
-                monday_df = results_df[monday_keep & valid_mask].copy()
+        return self._decide_export_and_return_avg(results_df, avg_profit_per_investment, friday_avg, monday_avg)
 
-                monday_avg_profit = (
-                    float(monday_df["profit_100_investment"].mean())
-                    if not monday_df.empty
-                    else 0
-                )
-                logger.info(
-                    f"   🗓️ ${monday_avg_profit:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
-                )
-            if (check_friday and friday_avg_profit > 10) or (
-                check_monday and monday_avg_profit > 10
-            ):
-                if not check_monday:
-                    results_df = results_df[results_df["day_of_week"] == "Friday"]
-                elif not check_friday:
-                    results_df = results_df[results_df["day_of_week"] == "Monday"]
+    def _get_valid_profit_df(self, results_df: pd.DataFrame) -> pd.DataFrame:
+        if "actual_price" in results_df.columns:
+            valid_mask = results_df["actual_price"] > 0
+        else:
+            valid_mask = pd.Series(False, index=results_df.index)
+        return results_df[valid_mask].copy()
 
-                return results_df if len(
-                    results_df
-                ) > 5 else pd.DataFrame()
-            else:
-                logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-                return pd.DataFrame()
+    def _calc_avg_profit(self, valid_profit_df: pd.DataFrame) -> float:
+        return float(valid_profit_df["profit_100_investment"].mean()) if not valid_profit_df.empty else 0.0
 
-        logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-        return pd.DataFrame()
+    def _count_not_closed_predictions(self, results_df: pd.DataFrame) -> int:
+        if "actual_price" in results_df.columns:
+            return int(results_df["actual_price"].isna().sum())
+        return 0
+
+    def _compute_weekday_avgs(self, results_df: pd.DataFrame, dates_series: pd.Series, valid_profit_df: pd.DataFrame) -> tuple[float, float]:
+        friday_keep, _ = filter_dates_to_weekdays(dates_series, (4,))
+        friday_df = results_df[friday_keep & (results_df.index.isin(valid_profit_df.index))]
+        friday_avg = float(friday_df["profit_100_investment"].mean()) if not friday_df.empty else 0.0
+
+        monday_keep, _ = filter_dates_to_weekdays(dates_series, (0,))
+        monday_df = results_df[monday_keep & (results_df.index.isin(valid_profit_df.index))]
+        monday_avg = float(monday_df["profit_100_investment"].mean()) if not monday_df.empty else 0.0
+
+        logger.info(f"   🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)")
+        logger.info(f"   🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)")
+        return friday_avg, monday_avg
+
+    def _decide_export_and_return_avg(self, results_df: pd.DataFrame, avg_profit: float, friday_avg: float, monday_avg: float) -> float | None:  # NOSONAR
+        # Decide whether to export and which weekday filter to apply
+        filtered = None
+        if friday_avg > 10 and monday_avg > 10:
+            filtered = results_df
+        elif friday_avg > 10:
+            filtered = results_df[results_df["day_of_week"] == "Friday"]
+        elif monday_avg > 10:
+            filtered = results_df[results_df["day_of_week"] == "Monday"]
+
+        if filtered is None:
+            logger.warning("   ⚠️  WARNING: No predictions should be exported!")
+            return None
+
+        return avg_profit if len(filtered) > 5 else None
 
     def evaluate_on_recent_data(
         self, days_back: int = 30

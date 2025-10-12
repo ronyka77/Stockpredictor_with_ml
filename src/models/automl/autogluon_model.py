@@ -28,6 +28,9 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Standardized error messages
+PREDICTOR_NOT_TRAINED = "Predictor not trained/loaded"
+
 
 def default_mean_diff(y_true, y_pred, *args, **kwargs):
     """Top-level default metric function to compute mean(y_true - y_pred).
@@ -97,7 +100,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        X_val: Optional[pd.DataFrame] = None,
+        x_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
         **kwargs,
     ) -> "AutoGluonModel":
@@ -107,19 +110,25 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         train_df = X.copy()
 
         train_df[label] = y.values
+        # Backwards-compatible handling for callers using the old keyword name `X_val`
+        if x_val is None and "X_val" in kwargs:
+            x_val = kwargs.pop("X_val")
+        if y_val is None and "y_val" in kwargs:
+            y_val = kwargs.pop("y_val")
+
         valid_df = None
-        if X_val is not None and y_val is not None:
-            valid_df = X_val.copy()
+        if x_val is not None and y_val is not None:
+            valid_df = x_val.copy()
             valid_df[label] = y_val.values
 
         hyperparams = {
             "FASTAI": {},
             "GBM": {},
             "XGB": {},
-            # "TABM": {},
-            "RF": {},
-            # "CAT": {'task_type': 'GPU'}
-            # "REALMLP": {},
+            # "TABM": {}, # noqa: E501
+            # "RF": {}, # noqa: E501
+            # "CAT": {'task_type': 'GPU'} # noqa: E501
+            # "REALMLP": {}, # noqa: E501
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
@@ -132,7 +141,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         collected = gc.collect()
         logger.info(f"Garbage collected: {collected}")
         proc = psutil.Process(os.getpid())
-        print("RSS MB:", proc.memory_info().rss / 1024**2)
+        logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
 
         self.predictor.fit(
             time_limit=39600,
@@ -142,7 +151,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             hyperparameters=hyperparams,
             dynamic_stacking=False,
             num_gpus=1,
-            # auto_stack=True,
             num_stack_levels=2,
             num_bag_folds=4,
             use_bag_holdout=True,
@@ -162,7 +170,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
     # ModelProtocol requirement
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
         if self.feature_names is not None:
             X = X[self.feature_names]
 
@@ -178,7 +186,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         self, X: pd.DataFrame, method: str = "margin"
     ) -> np.ndarray:
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
 
         if self.feature_names is not None:
             X = X[self.feature_names]
@@ -234,7 +242,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         Returns the evaluator results dict.
         """
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
 
         evaluator = ThresholdEvaluator(investment_amount=investment_amount)
 

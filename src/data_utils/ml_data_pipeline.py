@@ -134,7 +134,7 @@ def prepare_ml_data_for_training(
         X = combined_data[feature_cols].copy()
 
         # Keep original X for inverse transformations later
-        X_original = X.copy()
+        x_original = X.copy()
         transformation_manifest = {}
 
         # PHASE 2 FIX: Add price-normalized features
@@ -157,19 +157,19 @@ def prepare_ml_data_for_training(
 
         # Remove rows with NaN targets
         valid_mask = y.notna()
-        X_clean = X[valid_mask].copy()
+        x_clean = X[valid_mask].copy()
         y_clean = y[valid_mask].copy()
 
-        logger.info(f"✅ After target cleaning: {len(X_clean)} valid samples")
+        logger.info(f"✅ After target cleaning: {len(x_clean)} valid samples")
 
         # Replace infinite values with NaN first
-        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        x_clean = x_clean.replace([np.inf, -np.inf], np.nan)
 
         # Fill NaN with median (more robust than mean)
-        X_clean = X_clean.fillna(X_clean.median())
+        x_clean = x_clean.fillna(x_clean.median())
 
         # Final safety check - replace any remaining problematic values
-        X_clean = X_clean.replace([np.nan, np.inf, -np.inf], 0)
+        x_clean = x_clean.replace([np.nan, np.inf, -np.inf], 0)
 
         # 6. Date-based train/test split
         logger.info("6. Creating date-based train/test split...")
@@ -193,8 +193,8 @@ def prepare_ml_data_for_training(
         test_mask = dates_all >= split_date_dt
 
         # Split the data
-        X_train = X_clean[train_mask].copy()
-        X_test = X_clean[test_mask].copy()
+        X_train = x_clean[train_mask].copy()
+        X_test = x_clean[test_mask].copy()
         y_train = y_clean[train_mask].copy()
         y_test = y_clean[test_mask].copy()
 
@@ -241,7 +241,7 @@ def prepare_ml_data_for_training(
             "X_test": X_test,
             "y_train": y_train,
             "y_test": y_test,
-            "X_original": X_original,  # For inverse transformations
+            "X_original": x_original,  # For inverse transformations
             "target_column": target_column,
             "transformation_manifest": transformation_manifest,
             "train_date_range": train_date_range,
@@ -354,9 +354,6 @@ def prepare_ml_data_for_prediction(
             X_test = X[test_mask].copy()
             y_test = y[test_mask].copy()
 
-            # update test_mask to reflect original indices kept
-            test_mask = test_mask
-
         test_date_range = (
             f"{date_col[test_mask].min().strftime('%Y-%m-%d')} to {date_col[test_mask].max().strftime('%Y-%m-%d')}"
             if test_mask.any()
@@ -398,7 +395,7 @@ def prepare_ml_data_for_training_with_cleaning(
     split_date: str = "2025-06-15",
     ticker: str = None,
     clean_features: bool = True,
-    filter_train_set: bool = True,
+    _filter_train_set: bool = True,
 ) -> dict:
     """
     Enhanced version of prepare_ml_data_for_training with integrated data cleaning and caching
@@ -439,44 +436,43 @@ def prepare_ml_data_for_training_with_cleaning(
         prediction_horizon=prediction_horizon,
         split_date=split_date,
         ticker=ticker,
-        filter_train_set=filter_train_set,
     )
     logger.info(
         f"   Loaded: {len(data_result['X_train'])} train, {len(data_result['X_test'])} test samples, {data_result['feature_count']} features"
     )
     # 2. Apply data cleaning (always performed)
     logger.info("Step 2: Applying data cleaning to combined train/test set...")
-    combined_X = pd.concat(
+    combined_x = pd.concat(
         [data_result["X_train"], data_result["X_test"]], ignore_index=True
     )
     combined_y = pd.concat(
         [data_result["y_train"], data_result["y_test"]], ignore_index=True
     )
-    combined_X_clean = clean_data_for_training(combined_X)
+    combined_x_clean = clean_data_for_training(combined_x)
     logger.info(
-        f"   After cleaning: {len(combined_X_clean)} samples, {combined_X_clean.shape[1]} features"
+        f"   After cleaning: {len(combined_x_clean)} samples, {combined_x_clean.shape[1]} features"
     )
     # Split back into train/test
     train_size = len(data_result["X_train"])
-    data_result["X_train"] = combined_X_clean.iloc[:train_size]
-    data_result["X_test"] = combined_X_clean.iloc[train_size:]
+    data_result["X_train"] = combined_x_clean.iloc[:train_size]
+    data_result["X_test"] = combined_x_clean.iloc[train_size:]
     data_result["y_train"] = combined_y.iloc[:train_size]
     data_result["y_test"] = combined_y.iloc[train_size:]
     # 3. Apply feature cleaning if requested
     if clean_features:
         logger.info("Step 3: Applying feature cleaning to training set...")
-        X_train_clean, y_train_clean, removed_features = clean_features_for_training(
+        x_train_clean, y_train_clean, removed_features = clean_features_for_training(
             data_result["X_train"], data_result["y_train"]
         )
-        features_to_keep = X_train_clean.columns
-        X_test_clean = data_result["X_test"][features_to_keep]
+        features_to_keep = x_train_clean.columns
+        x_test_clean = data_result["X_test"][features_to_keep]
         y_test_clean = data_result["y_test"]
         logger.info(
-            f"   After feature cleaning: {len(X_train_clean)} train, {len(X_test_clean)} test samples, {len(features_to_keep)} features"
+            f"   After feature cleaning: {len(x_train_clean)} train, {len(x_test_clean)} test samples, {len(features_to_keep)} features"
         )
-        data_result["X_train"] = X_train_clean
+        data_result["X_train"] = x_train_clean
         data_result["y_train"] = y_train_clean
-        data_result["X_test"] = X_test_clean
+        data_result["X_test"] = x_test_clean
         data_result["y_test"] = y_test_clean
         data_result["removed_features"] = removed_features
         data_result["feature_count"] = len(features_to_keep)

@@ -33,9 +33,7 @@ def prepare_common_training_data(
     # 1) Load base dataset
     data_result = prepare_ml_data_for_training_with_cleaning(
         prediction_horizon=prediction_horizon,
-        ticker=None,
         clean_features=True,
-        filter_train_set=False,
     )
 
     X_train: pd.DataFrame = data_result["X_train"]
@@ -68,35 +66,35 @@ def prepare_common_training_data(
         logger.warning(f"Outlier removal skipped due to error: {e}")
 
     # 3) Basic validation and cleaning
-    X_train_clean = MLPDataUtils.validate_and_clean_data(X_train)
-    X_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
+    x_train_clean = MLPDataUtils.validate_and_clean_data(X_train)
+    x_test_clean = MLPDataUtils.validate_and_clean_data(X_test)
 
     # 4) Optional date_int trimming on test set
     try:
         if (
-            "date_int" in X_test_clean.columns
+            "date_int" in x_test_clean.columns
             and recent_date_int_cut
             and recent_date_int_cut > 0
         ):
-            uniq = X_test_clean["date_int"].drop_duplicates().sort_values()
+            uniq = x_test_clean["date_int"].drop_duplicates().sort_values()
             if len(uniq) > recent_date_int_cut:
                 threshold = uniq.iloc[-recent_date_int_cut - 1]
                 logger.info(f"date_int threshold: {threshold}")
-                mask = X_test_clean["date_int"] < threshold
-                X_test_clean = X_test_clean[mask]
+                mask = x_test_clean["date_int"] < threshold
+                x_test_clean = x_test_clean[mask]
                 y_test = y_test[mask]
                 logger.info(
-                    f"Removed rows with date_int >= {threshold} (kept {len(X_test_clean)} samples)"
+                    f"Removed rows with date_int >= {threshold} (kept {len(x_test_clean)} samples)"
                 )
-        elif "date_int" not in X_test_clean.columns:
+        elif "date_int" not in x_test_clean.columns:
             logger.warning("'date_int' column not found - skipping date filtering")
     except Exception as e:
         logger.warning(f"Date filtering skipped due to error: {e}")
 
     # Bundle results
     result: Dict[str, Any] = {
-        "X_train": X_train_clean,
-        "X_test": X_test_clean,
+        "X_train": x_train_clean,
+        "X_test": x_test_clean,
         "y_train": y_train,
         "y_test": y_test,
         "target_column": data_result.get("target_column"),
