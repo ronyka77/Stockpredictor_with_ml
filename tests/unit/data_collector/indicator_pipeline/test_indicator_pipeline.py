@@ -231,7 +231,7 @@ def test__save_features_to_database_filters_and_returns_count(mocker, processor)
     )
 
     saved = processor._save_features_to_database(
-        "TICK", feature_result, job_id="j", overwrite=True
+        "TICK", feature_result, overwrite=True
     )
     assert saved == 7
     # ensure rows passed do not contain NaN or inf or huge values

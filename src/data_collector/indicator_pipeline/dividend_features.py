@@ -7,7 +7,6 @@ from price data and dividend records, with proper alignment to trading dates.
 
 import pandas as pd
 import numpy as np
-from datetime import timedelta
 
 from src.utils.logger import get_logger
 
@@ -71,73 +70,44 @@ def compute_dividend_features(
         },
     )
 
-    # Get unique ex-dividend dates and map to trading dates
-    ex_dates = dividends_df["ex_dividend_date"].dropna().unique()
-    trading_dates = price_df.index
-
-    # Convert trading dates to date objects for comparison
-    trading_date_objects = set(trading_dates.date)
+    ex_dates = pd.to_datetime(dividends_df["ex_dividend_date"].dropna()).dt.normalize().unique()
+    trading_index = pd.to_datetime(price_df.index).normalize()
 
     mapped_dates = {}
     warnings = []
 
-    for ex_date in ex_dates:
-        if isinstance(ex_date, str):
-            ex_date = pd.to_datetime(ex_date).date()
-
-        # Find exact match first
-        if ex_date in trading_date_objects:
-            mapped_dates[ex_date] = ex_date
-        else:
-            # Find nearest prior trading date within 3 days
-            candidates = []
-            for i in range(1, 4):  # 1, 2, 3 days prior
-                candidate = ex_date - timedelta(days=i)
-                if candidate in trading_date_objects:
-                    candidates.append(candidate)
-
-            if candidates:
-                # Use the closest (most recent) candidate
-                mapped_dates[ex_date] = min(
-                    candidates, key=lambda x: abs((x - ex_date).days)
-                )
-            else:
-                warnings.append(
-                    f"Could not map ex-dividend date {ex_date} to any trading date within 3 days"
-                )
-                continue
+    for ex_dt in ex_dates:
+        window_mask = (trading_index >= ex_dt - pd.Timedelta(days=3)) & (trading_index <= ex_dt + pd.Timedelta(days=3))
+        candidates = trading_index[window_mask]
+        if len(candidates) == 0:
+            warnings.append(f"Could not map ex-dividend date {ex_dt.date()} to any trading date within ±3 days")
+            continue
+        nearest = candidates[np.argmin(abs(candidates - ex_dt))]
+        mapped_dates[pd.Timestamp(ex_dt).date()] = pd.Timestamp(nearest)
 
     # Log warnings for unmapped dates
     for warning in warnings:
         logger.warning(warning)
 
-    # Process each mapped ex-dividend date
-    for ex_date, trade_date in mapped_dates.items():
-        # Convert trade_date back to Timestamp for DataFrame indexing
-        trade_timestamp = pd.Timestamp(trade_date)
-
-        # Get dividend amount (sum if multiple dividends on same ex-date)
-        dividend_rows = dividends_df[dividends_df["ex_dividend_date"] == ex_date]
+    for ex_date_key, trade_timestamp in mapped_dates.items():
+        dividend_rows = dividends_df[pd.to_datetime(dividends_df["ex_dividend_date"]).dt.normalize() == pd.to_datetime(ex_date_key)]
         total_amount = dividend_rows["cash_amount"].sum()
 
-        # Set dividend_amount
-        result.loc[trade_timestamp, "dividend_amount"] = total_amount
+        if trade_timestamp not in price_df.index:
+            matched_idx = price_df.index.normalize() == trade_timestamp.normalize()
+            if not matched_idx.any():
+                logger.warning(f"Mapped trade date {trade_timestamp} not found in price index for ex-date {ex_date_key}")
+                continue
+            trade_timestamp = price_df.index[matched_idx.argmax()]
 
-        # Set is_ex_dividend
+        result.loc[trade_timestamp, "dividend_amount"] = total_amount
         result.loc[trade_timestamp, "is_ex_dividend"] = 1
 
-        # Calculate dividend_yield if close price is available
-        if (
-            pd.notna(price_df.loc[trade_timestamp, "close"])
-            and price_df.loc[trade_timestamp, "close"] != 0
-        ):
-            result.loc[trade_timestamp, "dividend_yield"] = (
-                total_amount / price_df.loc[trade_timestamp, "close"]
-            )
+        close_val = price_df.reindex([trade_timestamp])["close"].iloc[0]
+        if pd.notna(close_val) and close_val != 0:
+            result.loc[trade_timestamp, "dividend_yield"] = total_amount / close_val
         else:
-            logger.warning(
-                f"Missing or zero close price for {trade_date}, cannot calculate dividend_yield"
-            )
+            logger.warning(f"Missing or zero close price for {trade_timestamp}, cannot calculate dividend_yield")
 
     # Calculate days_since_last_dividend and days_to_next_dividend
     ex_timestamps_mapped = sorted(

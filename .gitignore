@@ -40,3 +40,4 @@ src/intentgraph.py
 cluster_analysis/
 /.idea/
 .sonarlint/connectedMode.json
+check_coverage.py

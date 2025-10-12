@@ -68,7 +68,6 @@ def prepare_ml_data_for_training(
     prediction_horizon: int = 10,
     split_date: str = "2025-06-15",
     ticker: Optional[str] = None,
-    filter_train_set: bool = True,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
     Comprehensive data preparation function for ML training

@@ -203,7 +203,7 @@ class BatchJobConfig:
     use_processes: bool = True
     start_date: Optional[Union[str, date]] = None
     end_date: Optional[Union[str, date]] = None
-    feature_categories: List[str] = None
+    feature_categories: Optional[List[str]] = None
     min_data_points: int = config.data_quality.MIN_DATA_POINTS
     save_to_database: bool = config.storage.SAVE_TO_DATABASE
     save_to_parquet: bool = config.storage.SAVE_TO_PARQUET
@@ -253,8 +253,8 @@ class ProcessingStats:
     failed_tickers: int = 0
     total_features: int = 0
     total_warnings: int = 0
-    start_time: datetime = None
-    end_time: datetime = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
 
     @property
     def success_rate(self) -> float:
@@ -690,7 +690,7 @@ class BatchFeatureProcessor:
         return summary
 
     def _save_features_to_database(
-        self, ticker: str, feature_result, job_id: str, overwrite: bool = False
+        self, ticker: str, feature_result, overwrite: bool = False
     ) -> int:
         """
         Save calculated features to the database

@@ -32,10 +32,10 @@ def patch_execute_values_to_fake_pool(mocker):
     fake_pool = _FakePool()
 
     def _execute_values_wrapper(
-        insert_sql, rows, template=None, page_size=1000, commit=True
+        insert_sql, rows, **kwargs
     ):
         fake_pool.execute_values(
-            insert_sql, rows, template=template, page_size=page_size
+            insert_sql, rows
         )
 
     mocker.patch(

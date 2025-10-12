@@ -64,7 +64,7 @@ class OptimizedFundamentalCollector:
         cfg = getattr(self.db_pool, "config", {})
         database_url = f"postgresql://{cfg.get('user', '')}:{cfg.get('password', '')}@{cfg.get('host', 'localhost')}:{cfg.get('port', 5432)}/{cfg.get('database', '')}"
         self.engine = create_engine(database_url)
-        self.SessionLocal = sessionmaker(
+        self.session_local = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
         )
 
@@ -123,7 +123,7 @@ class OptimizedFundamentalCollector:
             logger.info("Loading existing data cache...")
 
             rows = fetch_all("SELECT ticker_id, date FROM raw_fundamental_data")
-            existing_data = set((r["ticker_id"], r["date"]) for r in (rows or []))
+            existing_data = {(r["ticker_id"], r["date"]) for r in (rows or [])}
             self.existing_data_cache = existing_data
             logger.info(f"Loaded {len(existing_data)} existing data points")
 
@@ -486,72 +486,45 @@ class OptimizedFundamentalCollector:
         values = {}
         confidences = []
 
-        # Helper function to get field value safely
-        def get_field_value(stmt, field_name):
-            if isinstance(stmt, dict):
-                return stmt.get(field_name)
-            else:
-                return getattr(stmt, field_name, None)
-
-        # Helper function to get nested financial value
-        def get_nested_financial_value(stmt, field_name):
-            if isinstance(stmt, dict):
-                # Check if this is a cached data structure with nested financials
-                if "financials" in stmt:
-                    financials = stmt["financials"]
-                    # Check each statement type for the field
-                    for stmt_type in [
-                        "income_statement",
-                        "balance_sheet",
-                        "cash_flow_statement",
-                    ]:
-                        if (
-                            stmt_type in financials
-                            and field_name in financials[stmt_type]
-                        ):
-                            return financials[stmt_type][field_name]
-                    return None
-                else:
-                    # Direct field access (legacy format)
-                    return stmt.get(field_name)
-            else:
-                # Object format (from API)
-                return getattr(stmt, field_name, None)
-
+        # Delegate nested value resolution and confidence extraction to class helpers
         for field in fields:
-            value = get_nested_financial_value(stmt, field)
-            if value is not None:
-                # Handle both dictionary and object formats for financial data
-                if isinstance(value, dict):
-                    # Dictionary format (from cache)
-                    if "value" in value:
-                        values[field] = value["value"]
-                        # Collect confidence if source is present
-                        if "source" in value and value["source"]:
-                            confidences.append(
-                                calculate_source_confidence(value["source"])
-                            )
-                    else:
-                        values[field] = value
-                else:
-                    # Object format (from API)
-                    if hasattr(value, "value"):
-                        values[field] = value.value
-                        # Collect confidence if source is present
-                        if hasattr(value, "source") and value.source:
-                            confidences.append(
-                                calculate_source_confidence(value.source)
-                            )
-                    else:
-                        values[field] = value
-            else:
-                values[field] = None
+            raw_val = self._get_nested_financial_value(stmt, field)
+            resolved, conf = self._resolve_value_and_confidence(raw_val)
+            values[field] = resolved
+            if conf is not None:
+                confidences.append(conf)
 
         # Set average confidence
         values["data_source_confidence"] = (
             sum(confidences) / len(confidences) if confidences else None
         )
         return values
+
+    def _resolve_value_and_confidence(self, value: Any):
+        """Class-level helper used by _extract_financial_values to reduce complexity."""
+        if value is None:
+            return None, None
+        if isinstance(value, dict):
+            if "value" in value:
+                conf = calculate_source_confidence(value["source"]) if value.get("source") else None
+                return value["value"], conf
+            return value, None
+        if hasattr(value, "value"):
+            conf = calculate_source_confidence(getattr(value, "source", None)) if getattr(value, "source", None) else None
+            return value.value, conf
+        return value, None
+
+    def _get_nested_financial_value(self, stmt_obj: Any, f_name: str):
+        """Class-level helper used by _extract_financial_values to reduce complexity."""
+        if isinstance(stmt_obj, dict):
+            financials = stmt_obj.get("financials")
+            if financials:
+                for stmt_type in ("income_statement", "balance_sheet", "cash_flow_statement"):
+                    if stmt_type in financials and f_name in financials[stmt_type]:
+                        return financials[stmt_type][f_name]
+                return None
+            return stmt_obj.get(f_name)
+        return getattr(stmt_obj, f_name, None)
 
     async def collect_with_progress(
         self, tickers: List[str]

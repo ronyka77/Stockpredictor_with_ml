@@ -240,54 +240,38 @@ class FeatureCalculator:
             DataFrame with future price target features
         """
         try:
-            # Add a new column for day of week as integer (Monday=0, Sunday=6)
+            # compute a working datetime series for alignment (preserves original index)
             if "date" in features_df.columns:
-                features_df["dayofweek"] = pd.to_datetime(
-                    features_df["date"]
-                ).dt.dayofweek
-                logger.info(f"features_df index name: {features_df.index.name}")
-            elif features_df.index.name == "date" or "date" in features_df.index.names:
-                features_df["dayofweek"] = pd.to_datetime(features_df.index).dayofweek
+                work_dates = pd.to_datetime(features_df["date"])
             else:
-                logger.warning(
-                    "No 'date' column or index found to compute dayofweek feature."
-                )
+                work_dates = pd.to_datetime(features_df.index)
 
-            # Future high/close prices (targets for prediction)
-            # shifting to get the price that occurs N trading-rows ahead (if present).
+            # safe dayofweek assignment (index-aligned)
+            features_df["dayofweek"] = work_dates.dayofweek
+
+            # Create a temp frame keyed by the working dates to compute forward targets
             temp = features_df.copy()
-            # Determine a working datetime index for sorting
-            if "date" in temp.columns:
-                temp["_work_date"] = pd.to_datetime(temp["date"])
-            else:
-                temp["_work_date"] = pd.to_datetime(temp.index)
-
-            # Sort by the working date and align price data to that order
+            temp["_work_date"] = work_dates
             temp = temp.sort_values("_work_date")
-            temp.index = temp["_work_date"]
 
-            price_aligned = price_data.reindex(temp.index)
+            # Align price_data to the sorted working dates (index-aware)
+            price_aligned = price_data.reindex(pd.DatetimeIndex(temp["_work_date"]))
 
-            for shift_days in (4, 9, 19, 29):
-                column_shift_days = shift_days + 1
-                temp[f"Future_High_{column_shift_days}D"] = (
-                    price_aligned["high"].shift(-shift_days).values
-                )
-                temp[f"Future_Close_{column_shift_days}D"] = (
-                    price_aligned["close"].shift(-shift_days).values
-                )
-                temp[f"Target_Date_{column_shift_days}D"] = (
-                    temp["_work_date"].shift(-shift_days).values
-                )
+            # Explicit horizons (trading rows ahead) — use exact trading-row shifts
+            horizons = [10, 20]  # add others if needed e.g., 5, 30
+            for h in horizons:
+                temp[f"Future_High_{h}D"] = price_aligned["high"].shift(-h)
+                temp[f"Future_Close_{h}D"] = price_aligned["close"].shift(-h)
+                temp[f"Target_Date_{h}D"] = temp["_work_date"].shift(-h)
 
-            # Reindex back to the original features_df ordering and copy the new columns across
+            # Reindex temp back to original features_df index and copy columns with alignment
             temp = temp.reindex(features_df.index)
-            for col in temp.columns:
-                if col.startswith("Future_") or col.startswith("Target_Date_"):
-                    features_df[col] = temp[col].values
-            # Clean up any helper column if it was added to features_df
-            if "_work_date" in features_df.columns:
-                features_df.drop(columns=["_work_date"], inplace=True)
+            for col in [c for c in temp.columns if c.startswith("Future_") or c.startswith("Target_Date_")]:
+                features_df[col] = temp[col]
+
+            # cleanup helper
+            if "_work_date" in temp.columns:
+                temp.drop(columns=["_work_date"], inplace=True)
         except Exception as e:
             logger.error(f"Error adding future price targets: {str(e)}")
             raise
@@ -314,9 +298,9 @@ class FeatureCalculator:
 
         # Price ranges
         features_df["Price_Range"] = price_data["high"] - price_data["low"]
-        features_df["Price_Range_Pct"] = (
-            price_data["high"] - price_data["low"]
-        ) / price_data["close"]
+        # safe percent range (avoid division by zero)
+        price_close = price_data["close"].replace({0: np.nan})
+        features_df["Price_Range_Pct"] = (price_data["high"] - price_data["low"]) / price_close
 
         # Body and shadow ratios (candlestick analysis)
         body = abs(price_data["close"] - price_data["open"])
@@ -332,23 +316,18 @@ class FeatureCalculator:
         features_df["Lower_Shadow"] = lower_shadow
         features_df["Body_Shadow_Ratio"] = body / (upper_shadow + lower_shadow + 1e-8)
 
-        for shift_days in (1, 4, 9, 19, 29):
-            column_shift_days = shift_days + 1 if shift_days > 1 else shift_days
-            features_df[f"Return_{column_shift_days}D"] = price_data[
-                "close"
-            ].pct_change(shift_days)
-            features_df[f"Log_Return_{column_shift_days}D"] = np.log(
-                price_data["close"] / price_data["close"].shift(shift_days)
-            )
+        # explicit forward/backward return periods with clear naming
+        horizon_shifts = [1, 10, 20, 30]
+        for h in horizon_shifts:
+            features_df[f"Return_{h}D"] = price_data["close"].pct_change(h)
+            features_df[f"Log_Return_{h}D"] = np.log(price_data["close"] / price_data["close"].shift(h))
 
         # Volume features
         if "volume" in price_data.columns:
             features_df["Volume_Price_Ratio"] = (
                 price_data["volume"] / price_data["close"]
             )
-            features_df["Volume_Range_Ratio"] = (
-                price_data["volume"] / features_df["Price_Range"]
-            )
+            features_df["Volume_Range_Ratio"] = price_data["volume"] / features_df["Price_Range"].replace({0: np.nan})
 
         # Gap analysis
         features_df["Gap_Up"] = (

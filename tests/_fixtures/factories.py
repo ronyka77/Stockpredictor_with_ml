@@ -16,6 +16,7 @@ def set_factory_seed(seed: int = 42) -> None:
     try:
         faker.seed_instance(seed)
     except Exception:
+        # tolerate older Faker versions without seed_instance
         pass
     import random
 
@@ -25,6 +26,7 @@ def set_factory_seed(seed: int = 42) -> None:
 
         np.random.seed(seed)
     except Exception:
+        # numpy not available in some constrained test environments
         pass
 
 

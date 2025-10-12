@@ -14,6 +14,49 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _maybe_downcast_numeric(df: pd.DataFrame) -> None:
+    """Downcast numeric columns to reduce memory on large DataFrames."""
+    try:
+        n_rows = df.shape[0]
+        if n_rows <= 250_000:
+            return
+        num_cols = df.select_dtypes(include=["float64", "int64"]).columns
+        for c in num_cols:
+            try:
+                if pd.api.types.is_float_dtype(df[c].dtype):
+                    df[c] = df[c].astype("float32")
+                else:
+                    df[c] = pd.to_numeric(df[c], downcast="integer")
+            except Exception:
+                continue
+    except Exception:
+        return
+
+
+def _compute_returns_in_chunks(
+    df: pd.DataFrame, src_col: str, dst_col: str, chunk_size: int = 100_000
+) -> pd.DataFrame:
+    """Compute percentage returns in row-wise chunks and filter outliers."""
+    n_rows = df.shape[0]
+    df[dst_col] = pd.Series(np.nan, index=df.index, dtype="float32")
+    outlier_mask = np.zeros(n_rows, dtype=bool)
+    for start in range(0, n_rows, chunk_size):
+        end = min(n_rows, start + chunk_size)
+        fut = df[src_col].iloc[start:end].to_numpy(dtype="float32")
+        cur = df["close"].iloc[start:end].to_numpy(dtype="float32")
+        with np.errstate(divide="ignore", invalid="ignore"):
+            # Avoid exact float equality by using a small tolerance for zero
+            tol = 1e-12
+            returns = np.where(np.abs(cur) > tol, (fut - cur) / cur, np.nan).astype("float32")
+        df.iloc[start:end, df.columns.get_loc(dst_col)] = returns
+        # Use tolerances for boundary comparisons to avoid strict float equality
+        outlier_mask[start:end] = (returns > (1.0 + 1e-9)) | (returns < (-0.7 - 1e-9))
+    if outlier_mask.any():
+        keep_idx = np.nonzero(~outlier_mask)[0]
+        return df.iloc[keep_idx]
+    return df
+
+
 def convert_absolute_to_percentage_returns(
     combined_data: pd.DataFrame, prediction_horizon: int = 10
 ) -> Tuple[pd.DataFrame, str]:
@@ -54,38 +97,28 @@ def convert_absolute_to_percentage_returns(
             "'close' column not found. Required for percentage return calculation."
         )
 
-    # Create percentage return target
-    # Formula: (Future_Close - Current_Close) / Current_Close * 100
-    future_prices = combined_data[target_column]
-    current_prices = combined_data["close"]
-    percentage_returns = (future_prices - current_prices) / current_prices
-    combined_data[new_target_column] = percentage_returns
-    # Drop rows where the new target column > 1 or < -0.7 (i.e., >100% or <-70% return)
-    outlier_mask = (combined_data[new_target_column] > 1) | (
-        combined_data[new_target_column] < -0.7
+    # Perform memory-optimized numeric downcast and chunked return computation
+    _maybe_downcast_numeric(combined_data)
+    combined_data = _compute_returns_in_chunks(
+        combined_data, target_column, new_target_column, chunk_size=100_000
     )
-    outlier_count = outlier_mask.sum()
-    if outlier_count > 0:
-        logger.warning(
-            f"⚠ Dropping {outlier_count} rows with extreme percentage returns (>100% or <-70%) in '{new_target_column}'"
-        )
-        combined_data = combined_data.loc[~outlier_mask].copy()
 
-    # Log transformation statistics
-    valid_returns = percentage_returns.dropna()
+    # Log transformation statistics using the newly created column
+    valid_returns = combined_data[new_target_column].dropna()
     if not valid_returns.empty:
         logger.info("✅ Target transformation completed:")
+        # Use safe aggregations on the DataFrame to avoid creating large temporaries
+        orig_min = combined_data["close"].min()
+        fut_max = combined_data[target_column].max()
+        logger.info(f"   Original target range: ${orig_min:.2f} - ${fut_max:.2f}")
         logger.info(
-            f"   Original target range: ${current_prices.min():.2f} - ${future_prices.max():.2f}"
+            f"   New percentage returns: {valid_returns.min():.4f} to {valid_returns.max():.4f} (decimal format)"
         )
         logger.info(
-            f"   New percentage returns: {combined_data[new_target_column].min():.4f} to {combined_data[new_target_column].max():.4f} (decimal format)"
+            f"   Mean return: {valid_returns.mean():.4f} ({valid_returns.mean() * 100:.2f}%)"
         )
         logger.info(
-            f"   Mean return: {combined_data[new_target_column].mean():.4f} ({combined_data[new_target_column].mean() * 100:.2f}%)"
-        )
-        logger.info(
-            f"   Std return: {combined_data[new_target_column].std():.4f} ({combined_data[new_target_column].std() * 100:.2f}%)"
+            f"   Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)"
         )
 
     return combined_data, new_target_column

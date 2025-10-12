@@ -72,9 +72,7 @@ class ConnectionFake:
     def execute_values(
         self,
         query: str,
-        rows: Iterable,
-        template: Optional[str] = None,
-        page_size: int = 1000,
+        rows: Iterable
     ):
         # Accept dict-like values or tuples. Attempt to map to columns if tuples.
         rows = list(rows)
@@ -83,29 +81,44 @@ class ConnectionFake:
 
         first = rows[0]
         if isinstance(first, (list, tuple)):
-            # naive parsing: find parentheses and split columns
-            cols = []
-            try:
-                start = query.index("(") + 1
-                end = query.index(")", start)
-                cols = [c.strip() for c in query[start:end].split(",")]
-            except Exception:
-                # fallback: store tuples under synthetic keys
-                for v in rows:
-                    key = (v[0] if len(v) > 0 else None, v[1] if len(v) > 1 else None)
-                    self._store[key] = {f"col_{i}": val for i, val in enumerate(v)}
+            cols = self._parse_columns_from_query(query)
+            if cols is None:
+                self._store_tuple_fallback(rows)
                 return
 
-            for v in rows:
-                mapped = {col: val for col, val in zip(cols, v)}
-                key = (mapped.get("ticker"), mapped.get("date"))
-                self._store[key] = mapped
+            self._store_tuple_rows(rows, cols)
             return
 
         # assume dict-like
         for v in rows:
             key = (v.get("ticker"), v.get("date"))
             self._store[key] = v
+
+    def _parse_columns_from_query(self, query: str) -> Optional[List[str]]:
+        """Attempt to parse column names from an INSERT query string.
+
+        Returns a list of column names or None if parsing fails.
+        """
+        try:
+            start = query.index("(") + 1
+            end = query.index(")", start)
+            cols = [c.strip() for c in query[start:end].split(",")]
+            return cols
+        except Exception:
+            return None
+
+    def _store_tuple_rows(self, rows: List[tuple], cols: List[str]) -> None:
+        """Store tuple rows by zipping with parsed column names."""
+        for v in rows:
+            mapped = dict(zip(cols, v))
+            key = (mapped.get("ticker"), mapped.get("date"))
+            self._store[key] = mapped
+
+    def _store_tuple_fallback(self, rows: List[tuple]) -> None:
+        """Fallback storage when column parsing fails: store tuples under synthetic keys."""
+        for v in rows:
+            key = (v[0] if len(v) > 0 else None, v[1] if len(v) > 1 else None)
+            self._store[key] = {f"col_{i}": val for i, val in enumerate(v)}
 
 
 class PoolFake:
@@ -140,6 +153,7 @@ class PoolFake:
             try:
                 conn.rollback()
             except Exception:
+                # ignore rollback failures in tests
                 pass
 
     def getconn(self):
@@ -166,12 +180,10 @@ class PoolFake:
         self,
         insert_sql: str,
         rows: Iterable[Tuple],
-        template: Optional[str] = None,
-        page_size: int = 1000,
     ):
         # Convenience proxy: use a transient connection to perform execute_values
         conn = ConnectionFake()
-        conn.execute_values(insert_sql, rows, template=template, page_size=page_size)
+        conn.execute_values(insert_sql, rows)
         return None
 
 

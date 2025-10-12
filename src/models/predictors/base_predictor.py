@@ -223,7 +223,7 @@ class BasePredictor(ABC):
         metadata_df: pd.DataFrame,
         predictions: np.ndarray,
         model_name=None,
-    ) -> str:
+    ) -> str | None:
         """
         Save predictions to an Excel file.
         """
@@ -243,7 +243,7 @@ class BasePredictor(ABC):
 
         logger.info("💾 Validating and saving predictions")
 
-        results_df, avg_profit = self._build_results_dataframe_and_profit(
+        results_df = self._build_results_dataframe_and_profit(
             features_df=features_df,
             metadata_df=metadata_df,
             predictions=predictions,
@@ -342,7 +342,7 @@ class BasePredictor(ABC):
 
         if threshold_filtered_count == 0:
             logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-            return pd.DataFrame(), avg_profit_per_investment
+            return pd.DataFrame()
         else:
             results_df = (
                 results_df[results_df["predicted_return"] > 0]
@@ -356,7 +356,7 @@ class BasePredictor(ABC):
             logger.info(f"   📈 Top 10 final count: {top_10_count}")
             if top_10_count == 0:
                 logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
-                return pd.DataFrame(), avg_profit_per_investment
+                return pd.DataFrame()
 
         # 3) Compute derived evaluation fields AFTER filtering/top-10
         non_nan_mask = results_df["actual_return"].notna()
@@ -411,7 +411,7 @@ class BasePredictor(ABC):
             logger.warning(
                 "   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!"
             )
-            return pd.DataFrame(), avg_profit_per_investment
+            return pd.DataFrame()
 
         dates_series = results_df["date"].copy()
         dates_series = pd.to_datetime(dates_series)
@@ -422,7 +422,7 @@ class BasePredictor(ABC):
 
             if check_friday:
                 # Get boolean mask and filtered date Series for Friday
-                friday_keep, friday_dates = filter_dates_to_weekdays(dates_series, (4,))
+                friday_keep, _friday_dates = filter_dates_to_weekdays(dates_series, (4,))
                 friday_df = results_df[friday_keep & valid_mask].copy()
                 friday_avg_profit = (
                     float(friday_df["profit_100_investment"].mean())
@@ -434,7 +434,7 @@ class BasePredictor(ABC):
                 )
             if check_monday:
                 # Get boolean mask and filtered date Series for Monday
-                monday_keep, monday_dates = filter_dates_to_weekdays(dates_series, (0,))
+                monday_keep, _monday_dates = filter_dates_to_weekdays(dates_series, (0,))
                 monday_df = results_df[monday_keep & valid_mask].copy()
 
                 monday_avg_profit = (
@@ -455,21 +455,20 @@ class BasePredictor(ABC):
 
                 return results_df if len(
                     results_df
-                ) > 5 else pd.DataFrame(), avg_profit_per_investment
+                ) > 5 else pd.DataFrame()
             else:
                 logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-                return pd.DataFrame(), avg_profit_per_investment
+                return pd.DataFrame()
 
         logger.warning("   ⚠️  WARNING: No predictions should be exported!")
-        return pd.DataFrame(), avg_profit_per_investment
+        return pd.DataFrame()
 
     def evaluate_on_recent_data(
         self, days_back: int = 30
-    ) -> Tuple[pd.DataFrame, float, pd.DataFrame, pd.DataFrame, np.ndarray]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
         Run the prediction pipeline without writing to disk and return:
         - results_df
-        - avg_profit_per_investment
         - features_df
         - metadata_df
         - predictions
@@ -482,10 +481,10 @@ class BasePredictor(ABC):
             self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
-        results_df, avg_profit = self._build_results_dataframe_and_profit(
+        results_df = self._build_results_dataframe_and_profit(
             features_df=features_df, metadata_df=metadata_df, predictions=predictions
         )
-        return results_df, avg_profit, features_df, metadata_df, predictions
+        return results_df, features_df, metadata_df, predictions
 
     def run_prediction_pipeline(self, days_back: int = 30) -> str:
         """
