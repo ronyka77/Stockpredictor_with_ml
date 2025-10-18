@@ -12,5 +12,4 @@ class FinancialValueFactory(ModelFactory[FinancialValue]):
 
 @pytest.fixture
 def fv_factory():
-    if FinancialValueFactory:
-        return FinancialValueFactory
+    return FinancialValueFactory

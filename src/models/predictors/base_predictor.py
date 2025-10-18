@@ -317,7 +317,7 @@ class BasePredictor(ABC):
         if avg_profit_per_investment is None:
             return pd.DataFrame()
 
-        return results_df, avg_profit_per_investment
+        return results_df
 
     def _init_results_df(self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray) -> pd.DataFrame | None:
         results_df = metadata_df.copy()

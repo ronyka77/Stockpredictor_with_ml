@@ -190,9 +190,12 @@ def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
                 else:
                     df_clean[col].fillna(median_val, inplace=True)
 
-    # 3. Ensure all numeric columns are float64 for consistency
+    # 3. Keep numeric columns as float32 to reduce memory usage (float64 not required)
     for col in numeric_cols:
-        df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").astype(np.float64)
+        try:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").astype(np.float32)
+        except Exception:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0).astype(np.float32)
 
     logger.info(f"✅ Training data cleaning completed: {len(df_clean)} samples ready")
 

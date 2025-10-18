@@ -21,15 +21,15 @@ def make_raw(id_suffix: int):
     }
 
 
+@patch("src.database.db_utils._upsert_dividends_batch")
 @patch("src.data_collector.polygon_data.dividend_pipeline.transform_dividend_record")
-def test_ingest_dividends_for_ticker_success(mock_transform):
+def test_ingest_dividends_for_ticker_success(mock_transform, mock_upsert):
     client = MagicMock()
-    storage = MagicMock()
 
     # Mock client.get_dividends to return two records
     client.get_dividends.return_value = [make_raw(1), make_raw(2)]
 
-    # storage.get_tickers should return a list with a dict containing id
+    # ticker dict
     ticker_dict = {"id": 99, "ticker": "AAPL"}
 
     # Mock transform to return transformed dicts
@@ -38,10 +38,10 @@ def test_ingest_dividends_for_ticker_success(mock_transform):
         {"id": "poly-2", "ticker_id": 99, "cash_amount": 1, "raw_payload": {}},
     ]
 
-    # Mock storage._upsert_dividends_batch to return number of rows
-    storage._upsert_dividends_batch.return_value = 2
+    # Mock _upsert_dividends_batch to return number of rows
+    mock_upsert.return_value = 2
 
-    stats = ingest_dividends_for_ticker(client, storage, ticker_dict, batch_size=2)
+    stats = ingest_dividends_for_ticker(client, ticker_dict, batch_size=2)
 
     assert stats["fetched"] == 2
     assert stats["upserted"] == 2

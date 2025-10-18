@@ -91,7 +91,7 @@ def test_save_features_success_calls_parquet_and_returns_metadata(
 
     assert isinstance(feat_meta, FeatureMetadata)
     assert feat_meta.ticker == "TICK"
-    assert feat_meta.quality_score == 95.0
+    assert abs(feat_meta.quality_score - 95.0) < 1e-10
     assert write_table.called
 
 

@@ -509,14 +509,17 @@ class DataStorage:
     def get_tickers(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get tickers from database"""
 
-        query = "SELECT * FROM tickers WHERE 1=1"
-        query += " AND active = true"
+        query = "SELECT * FROM tickers WHERE active = true"
+        params = []
+
         if ticker:
-            query += f" AND ticker = '{ticker}'"
+            query += " AND ticker = %s"
+            params.append(ticker)
+
         query += " ORDER BY ticker"
 
         try:
-            result = fetch_all(query, None, dict_cursor=True)
+            result = fetch_all(query, tuple(params) if params else None, dict_cursor=True)
             tickers = []
 
             for row in result:

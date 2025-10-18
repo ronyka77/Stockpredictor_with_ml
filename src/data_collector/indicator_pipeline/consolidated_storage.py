@@ -229,12 +229,6 @@ class ConsolidatedFeatureStorage:
         # Export combined result to XLSX in the data folder
         data_folder = self.base_path / "data"
         data_folder.mkdir(parents=True, exist_ok=True)
-        xlsx_path = (
-            data_folder
-            / f"consolidated_features{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        )
-        result.head(1000).to_excel(xlsx_path, index=False)
-        logger.info(f"Exported combined data to {xlsx_path}")
         return result
 
     def _save_by_year(

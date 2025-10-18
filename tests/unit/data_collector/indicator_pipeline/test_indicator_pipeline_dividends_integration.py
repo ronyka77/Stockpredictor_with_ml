@@ -3,6 +3,7 @@ Integration tests for dividend features in indicator pipeline.
 """
 
 import pandas as pd
+import numpy as np
 from datetime import date
 from unittest.mock import patch, MagicMock
 
@@ -106,8 +107,8 @@ class TestDividendIntegration:
 
         # Check dividend values
         jan_5_idx = pd.Timestamp(date(2023, 1, 5))
-        assert saved_data.loc[jan_5_idx, "dividend_amount"] == 2.0
-        assert saved_data.loc[jan_5_idx, "dividend_yield"] == 0.02  # 2.0 / 100.0
+        assert np.isclose(saved_data.loc[jan_5_idx, "dividend_amount"], 2.0)
+        assert np.isclose(saved_data.loc[jan_5_idx, "dividend_yield"], 0.02)  # 2.0 / 100.0
         assert saved_data.loc[jan_5_idx, "is_ex_dividend"] == 1
 
         # Verify metadata includes dividend info

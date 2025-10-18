@@ -1,5 +1,6 @@
 from datetime import date
 import pytest
+import numpy as np
 
 from src.data_collector.polygon_fundamentals import data_models as dm
 
@@ -13,9 +14,9 @@ def make_financial_value(v=100.0):
 def test_extract_financial_value_dict_and_numeric_and_missing():
     """Extract numeric values from nested dicts and handle missing keys"""
     data = {"revenues": {"value": 123.0}, "net": 50}
-    if dm.extract_financial_value(data, "revenues") != 123.0:
+    if not np.isclose(dm.extract_financial_value(data, "revenues"), 123.0):
         raise AssertionError("extract_financial_value failed for revenues")
-    if dm.extract_financial_value(data, "net") != 50.0:
+    if not np.isclose(dm.extract_financial_value(data, "net"), 50.0):
         raise AssertionError("extract_financial_value failed for net")
     if dm.extract_financial_value(data, "missing") is not None:
         raise AssertionError(

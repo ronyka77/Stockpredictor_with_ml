@@ -200,7 +200,7 @@ def main():
         ticker_manager = TickerManager(client, storage)
 
         ticker_manager.refresh_ticker_details(
-            tickers=ticker_manager.storage.get_tickers(),
+            tickers=[t["ticker"] for t in ticker_manager.storage.get_tickers()],
             batch_size=50,
         )
 

@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
 from src.data_collector.polygon_fundamentals.data_models import (
@@ -117,7 +118,7 @@ def test_parser_returns_empty_response_for_no_results():
     assert dto.income_statements == []
     assert dto.balance_sheets == []
     assert dto.cash_flow_statements == []
-    assert dto.calculate_data_quality() == 0.0
+    assert np.isclose(dto.calculate_data_quality(), 0.0)
 
 
 def test_parser_handles_partial_missing_fields():

@@ -161,14 +161,13 @@ def transform_dividend_record(raw: Dict[str, Any], ticker_id: int) -> Dict[str, 
 
 
 def ingest_dividends_for_ticker(
-    client, storage, ticker: Dict[str, Any], batch_size: int = 100
+    client, ticker: Dict[str, Any], batch_size: int = 100
 ) -> Dict[str, int]:
     """
     Fetch, transform and upsert dividends for a single ticker.
 
     Args:
         client: PolygonDataClient instance
-        storage: DataStorage-like with `_upsert_dividends_batch` available (db_utils helper)
         ticker: ticker dictionary
         batch_size: batch size for DB upsert
 
@@ -256,7 +255,7 @@ def _ingest_dividends_sequential(
     for t in tickers:
         try:
             stats = ingest_dividends_for_ticker(
-                client, storage, t, batch_size=batch_size
+                client, t, batch_size=batch_size
             )
             overall["tickers_processed"] += 1
             overall["total_fetched"] += stats.get("fetched", 0)
@@ -298,7 +297,7 @@ def _ingest_dividends_concurrent(
             storage = DataStorage()
 
             stats = ingest_dividends_for_ticker(
-                client, storage, ticker, batch_size=batch_size
+                client, ticker, batch_size=batch_size
             )
 
             with results_lock:

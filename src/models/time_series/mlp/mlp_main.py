@@ -508,7 +508,6 @@ def main():
         data_result = prepare_ml_data_for_training_with_cleaning(
             prediction_horizon=prediction_horizon,
             split_date="2025-06-15",
-            ticker=None,
             clean_features=True,
         )
 

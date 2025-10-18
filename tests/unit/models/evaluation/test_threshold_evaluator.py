@@ -196,5 +196,5 @@ def test_calculate_investment_metrics():
 
     # Should have made investments for positive predictions (3 out of 4)
     assert metrics["investments_made"] == 3
-    assert metrics["investment_rate"] == 0.75  # 3/4
+    assert np.isclose(metrics["investment_rate"], 0.75)  # 3/4
     assert metrics["total_samples"] == 4

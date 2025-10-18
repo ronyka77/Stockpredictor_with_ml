@@ -124,11 +124,11 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         hyperparams = {
             "FASTAI": {},
             "GBM": {},
-            "XGB": {},
-            # "TABM": {}, # noqa: E501
-            # "RF": {}, # noqa: E501
-            # "CAT": {'task_type': 'GPU'} # noqa: E501
-            # "REALMLP": {}, # noqa: E501
+            # "XGB": {},
+            # "TABM": {}, 
+            "RF": {}, 
+            # "CAT": {'task_type': 'GPU'} 
+            # "REALMLP": {}, 
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
@@ -154,7 +154,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             num_stack_levels=2,
             num_bag_folds=4,
             use_bag_holdout=True,
-            fit_strategy="parallel",
             ag_args_ensemble={"fold_fitting_strategy": "parallel_local"},
         )
         summary = self.predictor.fit_summary(show_plot=True)

@@ -40,10 +40,10 @@ def test_extract_financial_values_handles_cached_nested_structure():
     result = collector._extract_financial_values(cached_stmt, ["revenues", "assets"])
 
     # Verification
-    assert result["revenues"] == 123.45
-    assert result["assets"] == 1000.0
+    assert result["revenues"] == pytest.approx(123.45)
+    assert result["assets"] == pytest.approx(1000.0)
     # Average of confidences: direct_report->1.0, intra_report_impute->0.8 => (1.0+0.8)/2
-    assert pytest.approx(result["data_source_confidence"], rel=1e-3) == 0.9
+    assert result["data_source_confidence"] == pytest.approx(0.9, rel=1e-3)
 
 
 def test_extract_financial_values_handles_object_format_and_missing_fields():

@@ -6,15 +6,15 @@ and prediction, including the comprehensive data loading, feature engineering,
 target transformation, and data cleaning operations.
 """
 
-import gc
-import psutil
-import os
+
 import pandas as pd
 import numpy as np
+from pathlib import Path
+import time
 from typing import Dict, Union, Optional, Tuple
 from src.utils.logger import get_logger
 from src.data_utils.ml_feature_loader import load_all_data
-from src.data_utils.target_engineering import convert_absolute_to_percentage_returns
+from src.data_utils.target_engineering import convert_absolute_to_percentage_returns, _maybe_downcast_numeric
 from src.data_utils.feature_engineering import (
     add_price_normalized_features,
     add_prediction_bounds_features,
@@ -23,7 +23,7 @@ from src.data_utils.feature_engineering import (
     clean_features_for_training,
     add_date_features,
 )
-from src.utils.cleaned_data_cache import CleanedDataCache
+from src.utils.cleaned_data_cache import CleanedDataCache, collect_garbage
 
 
 logger = get_logger(__name__)
@@ -57,11 +57,8 @@ def filter_dates_to_weekdays(
     return keep, filtered_dates
 
 
-def collect_garbage():
-    collected = gc.collect()
-    logger.info(f"Garbage collected: {collected}")
-    proc = psutil.Process(os.getpid())
-    logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
+
+
 
 
 def prepare_ml_data_for_training(
@@ -99,6 +96,13 @@ def prepare_ml_data_for_training(
         # 2. Prepare features and targets
         logger.info("2. Preparing features and targets...")
 
+        # Early numeric downcast to reduce peak memory usage on large datasets
+        try:
+            _maybe_downcast_numeric(combined_data)
+            logger.info("✅ Applied early numeric downcast to reduce memory usage")
+        except Exception as e:
+            logger.warning(f"Early downcast skipped: {e}")
+
         # PHASE 1 FIX: Convert absolute targets to percentage returns
         combined_data, target_column = convert_absolute_to_percentage_returns(
             combined_data, prediction_horizon
@@ -133,9 +137,18 @@ def prepare_ml_data_for_training(
         feature_cols = [col for col in combined_data.columns if col not in exclude_cols]
         X = combined_data[feature_cols].copy()
 
-        # Keep original X for inverse transformations later
-        x_original = X.copy()
+        # Persist original X to disk (parquet) instead of keeping full in-memory copy
         transformation_manifest = {}
+        try:
+            data_folder = Path("checkpoints")
+            data_folder.mkdir(parents=True, exist_ok=True)
+            x_original_path = data_folder / f"x_original_h{prediction_horizon}_{int(time.time())}.parquet"
+            X.to_parquet(x_original_path, index=False)
+            transformation_manifest["x_original_path"] = str(x_original_path)
+            logger.info(f"Persisted x_original to {x_original_path} to reduce memory")
+        except Exception as e:
+            logger.warning(f"Failed to persist x_original to disk: {e}")
+            transformation_manifest["x_original_path"] = None
 
         # PHASE 2 FIX: Add price-normalized features
         X = add_price_normalized_features(X)
@@ -165,8 +178,15 @@ def prepare_ml_data_for_training(
         # Replace infinite values with NaN first
         x_clean = x_clean.replace([np.inf, -np.inf], np.nan)
 
-        # Fill NaN with median (more robust than mean)
-        x_clean = x_clean.fillna(x_clean.median())
+        # Fill NaN with median (more robust than mean) but do it per-column in-place to avoid large temporaries
+        numeric_cols = x_clean.select_dtypes(include=[np.number]).columns.tolist()
+        for col in numeric_cols:
+            try:
+                med = x_clean[col].median()
+                x_clean[col].fillna(med, inplace=True)
+            except Exception:
+                # fallback to column-wise fillna without raising
+                x_clean[col] = x_clean[col].fillna(0)
 
         # Final safety check - replace any remaining problematic values
         x_clean = x_clean.replace([np.nan, np.inf, -np.inf], 0)
@@ -241,7 +261,8 @@ def prepare_ml_data_for_training(
             "x_test": x_test,
             "y_train": y_train,
             "y_test": y_test,
-            "X_original": x_original,  # For inverse transformations
+            # Persisted path to original features instead of full in-memory copy
+            "X_original_path": transformation_manifest.get("x_original_path"),
             "target_column": target_column,
             "transformation_manifest": transformation_manifest,
             "train_date_range": train_date_range,
@@ -347,7 +368,7 @@ def prepare_ml_data_for_prediction(
         X = X.replace([np.nan, np.inf, -np.inf], 0)
 
         if not filtered_dates.empty:
-            logger.info("📅 Filtering prediction set to include only Fridays.")
+            logger.info("📅 Filtering prediction set to include only Fridays/Mondays.")
             X = X[filtered_mask]
             split_date_dt = pd.to_datetime("2025-06-15")
             test_mask = date_col >= split_date_dt

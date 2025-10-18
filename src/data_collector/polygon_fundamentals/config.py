@@ -7,7 +7,7 @@ from the Polygon API.
 
 import os
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -33,7 +33,7 @@ class PolygonFundamentalsConfig:
 
     # Data Collection Parameters
     HISTORICAL_YEARS: int = 3
-    FILING_TYPES: List[str] = None  # Will default to ['10-K', '10-Q']
+    FILING_TYPES: Optional[List[str]] = None  # Will default to ['10-K', '10-Q']
     TIMEFRAME: str = "quarterly"  # quarterly or annual
     INCLUDE_SOURCES: bool = True
 
@@ -80,7 +80,7 @@ class PolygonFundamentalsConfig:
         """Get end date for data collection (today)"""
         return datetime.now().strftime("%Y-%m-%d")
 
-    def get_financials_url(self, ticker: str) -> str:
+    def get_financials_url(self) -> str:
         """Get the full URL for financials endpoint"""
         return f"{self.BASE_URL}{self.FINANCIALS_ENDPOINT}"
 

@@ -357,14 +357,21 @@ class MLPDataUtils:
 
             scaler = StandardScaler()
             # Fit using DataFrame to preserve feature names and avoid transform warnings
-            scaled_array = scaler.fit_transform(tmp)
+            # Fit scaler on a float32 view to reduce memory
+            tmp32 = tmp.astype(np.float32)
+            scaled_array = scaler.fit_transform(tmp32)
             logger.info("✅ Fitted new StandardScaler on training data")
         else:
             # Use existing scaler (for prediction)
             if scaler is None:
                 raise ValueError("scaler must be provided when fit_scaler=False")
 
-            scaled_array = scaler.transform(tmp)
+            # Transform using float32 to reduce temporary memory
+            try:
+                tmp32 = tmp.astype(np.float32)
+                scaled_array = scaler.transform(tmp32)
+            except Exception:
+                scaled_array = scaler.transform(tmp)
             logger.info("✅ Applied existing StandardScaler to prediction data")
 
         # Convert back to DataFrame with original column names

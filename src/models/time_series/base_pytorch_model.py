@@ -233,10 +233,10 @@ class PyTorchBasePredictor(BaseModel):
             x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
             noise_scale = 0.01  # Small perturbation
             noise = torch.randn_like(x_tensor) * noise_scale
-            X_perturbed = x_tensor + noise
+            x_perturbed = x_tensor + noise
 
             # Get predictions on perturbed data
-            dataset = TensorDataset(X_perturbed)
+            dataset = TensorDataset(x_perturbed)
             loader = DataLoader(
                 dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
             )

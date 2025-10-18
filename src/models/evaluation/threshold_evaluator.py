@@ -568,6 +568,9 @@ class ThresholdEvaluator:
         policy_result = policy.compute_mask(all_confidence, X, cfg)
         if policy_result is None:
             raise ValueError("ThresholdPolicy.compute_mask returned None")
+        from typing import cast
+        from src.models.evaluation.threshold_policy import ThresholdResult
+        policy_result = cast(ThresholdResult, policy_result)
         high_confidence_mask = policy_result.mask
 
         # Filter predictions

@@ -10,10 +10,11 @@ uv run python -m src.models.automl.autogluon_trainer --preset high_quality
 """
 
 import os
+import json
 import psutil
 import gc
 import pandas as pd
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from src.utils.logger import get_logger
 from src.models.common.training_data_prep import prepare_common_training_data
@@ -22,6 +23,51 @@ from src.models.automl.autogluen_load_model import run_model_evaluation
 
 
 logger = get_logger(__name__)
+
+
+def filter_to_selected_features(
+    x_train: pd.DataFrame, x_test: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """
+    Filter training and test datasets to only include features selected by AutoGluon.
+
+    Args:
+        x_train: Training feature DataFrame
+        x_test: Test feature DataFrame
+
+    Returns:
+        Tuple of (filtered_x_train, filtered_x_test, metadata_dict)
+    """
+    selected_features_path = "predictions/selected_features_autogluon.json"
+
+    if os.path.exists(selected_features_path):
+        try:
+            with open(selected_features_path, 'r') as f:
+                selected_features_data = json.load(f)
+                selected_features = selected_features_data["selected_features"]
+
+
+            # Filter to only include selected features that exist in the dataset
+            available_features = [col for col in selected_features if col in x_train.columns]
+            features = available_features
+
+            if len(available_features) != len(selected_features):
+                missing_features = [col for col in selected_features if col not in x_train.columns]
+                logger.warning(f"Missing features in dataset: {missing_features}")
+
+            x_train_filtered = x_train[available_features]
+            x_test_filtered = x_test[available_features]
+
+            logger.info(f"Filtered to {len(available_features)} selected features")
+
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Error loading selected features file: {e}. Using all features.")
+            x_train_filtered, x_test_filtered = x_train, x_test
+    else:
+        logger.warning(f"Selected features file not found: {selected_features_path}. Using all features.")
+        x_train_filtered, x_test_filtered = x_train, x_test
+
+    return x_train_filtered, x_test_filtered
 
 
 def top_dataframes(top_n: int = 10):
@@ -43,7 +89,7 @@ def top_dataframes(top_n: int = 10):
 
 
 def train_autogluon(
-    *, prediction_horizon: int = 5, presets: str = "best_quality"
+    *, prediction_horizon: int = 20, presets: str = "best_quality"
 ) -> Dict[str, Any]:
     # Use centralized common training data preparation
     data = prepare_common_training_data(
@@ -56,6 +102,9 @@ def train_autogluon(
     y_train: pd.Series = data["y_train"]
     x_test: pd.DataFrame = data["x_test"]
     y_test: pd.Series = data["y_test"]
+
+    # Filter datasets to only include selected features
+    x_train, x_test = filter_to_selected_features(x_train, x_test)
     valid_df: pd.DataFrame = pd.concat([x_test, y_test], axis=1)
     valid_df.reset_index(drop=True, inplace=True)
 
@@ -66,7 +115,7 @@ def train_autogluon(
     top_dataframes(10)
     # Build model
     config = {
-        "label": "Future_Return_5D",
+        "label": f"Future_Return_{prediction_horizon}D",
         "presets": presets,
         "groups": "year",
     }
@@ -84,8 +133,9 @@ def train_autogluon(
 
 
 def main():
+    prediction_horizon = 20
     train_autogluon(
-        prediction_horizon=20,
+        prediction_horizon=prediction_horizon,
         presets="best_quality",
     )
 

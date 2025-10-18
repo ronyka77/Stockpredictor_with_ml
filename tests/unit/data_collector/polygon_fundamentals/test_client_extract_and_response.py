@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.data_collector.polygon_fundamentals.client import (
     PolygonFundamentalsClient,
 )
@@ -17,7 +19,7 @@ def test_extract_financial_value_nested_dict():
     )
 
     assert isinstance(fv, FinancialValue)
-    assert fv.value == 123.45
+    assert np.isclose(fv.value, 123.45)
 
 
 def test_extract_financial_value_legacy_numeric():
@@ -27,7 +29,7 @@ def test_extract_financial_value_legacy_numeric():
         data, "revenues", "income_statement"
     )
     assert isinstance(fv, FinancialValue)
-    assert fv.value == 200.0
+    assert np.isclose(fv.value, 200.0)
 
 
 def test_extract_financial_value_bad_cast_returns_none():

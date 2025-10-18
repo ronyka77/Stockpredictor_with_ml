@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 import pandas as pd
+import math
 from pathlib import Path
 from unittest.mock import patch
 import pytest
@@ -163,7 +164,7 @@ def test_calculate_compression_ratio_zero_and_positive():
     df = pd.DataFrame({"a": [1, 2], "date": pd.date_range("2025-01-01", periods=2)})
 
     # zero compressed size -> return 1.0
-    assert storage._calculate_compression_ratio(df, 0) == 1.0
+    assert math.isclose(storage._calculate_compression_ratio(df, 0), 1.0)
 
     # positive compressed size should return float > 0
     ratio = storage._calculate_compression_ratio(df, 0.01)

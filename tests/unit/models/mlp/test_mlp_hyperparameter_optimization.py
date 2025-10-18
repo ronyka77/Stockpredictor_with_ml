@@ -7,13 +7,13 @@ from src.models.evaluation import ThresholdEvaluator
 
 
 def create_test_data(n_samples=1000, n_features=20):
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     X = pd.DataFrame(
-        np.random.randn(n_samples, n_features),
+        rng.standard_normal((n_samples, n_features)),
         columns=[f"feature_{i}" for i in range(n_features)],
     )
-    X["close"] = np.random.uniform(100, 200, n_samples)
-    y = pd.Series(np.random.binomial(1, 0.3, n_samples), name="target")
+    X["close"] = rng.uniform(100, 200, n_samples)
+    y = pd.Series(rng.binomial(1, 0.3, n_samples), name="target")
     train_size = int(0.8 * n_samples)
     return (
         X.iloc[:train_size],
@@ -31,7 +31,7 @@ def test_mlp_hyperparameter_objective_callable():
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
     cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
-    x_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    _, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
     cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
     x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
@@ -63,7 +63,7 @@ def test_mlp_hyperparameter_optimization_integration():
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
     cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
-    x_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    _, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
     cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
     x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 

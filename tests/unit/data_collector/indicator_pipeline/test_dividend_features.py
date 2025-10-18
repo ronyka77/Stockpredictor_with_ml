@@ -49,8 +49,8 @@ class TestComputeDividendFeatures:
         assert list(result.index) == list(price_df.index)
 
         # Check dividend features
-        assert result.loc[dates[4], "dividend_amount"] == 2.0  # Jan 5
-        assert result.loc[dates[4], "dividend_yield"] == 0.02  # 2.0 / 100.0
+        assert np.isclose(result.loc[dates[4], "dividend_amount"], 2.0)  # Jan 5
+        assert np.isclose(result.loc[dates[4], "dividend_yield"], 0.02)  # 2.0 / 100.0
         assert result.loc[dates[4], "is_ex_dividend"] == 1
 
         # Check non-ex-dividend dates
@@ -78,8 +78,8 @@ class TestComputeDividendFeatures:
         result = compute_dividend_features(price_df, dividends_df)
 
         # Should sum the amounts
-        assert result.loc[dates[2], "dividend_amount"] == 2.5  # 1.0 + 1.5
-        assert result.loc[dates[2], "dividend_yield"] == 0.025  # 2.5 / 100.0
+        assert np.isclose(result.loc[dates[2], "dividend_amount"], 2.5)  # 1.0 + 1.5
+        assert np.isclose(result.loc[dates[2], "dividend_yield"], 0.025)  # 2.5 / 100.0
 
     def test_ex_date_alignment_prior_day(self):
         """Test ex-dividend date mapping to nearest prior trading day."""
@@ -103,7 +103,7 @@ class TestComputeDividendFeatures:
 
         # Should map to Friday (nearest prior trading day)
         friday_idx = pd.Timestamp(date(2023, 1, 6))
-        assert result.loc[friday_idx, "dividend_amount"] == 1.0
+        assert np.isclose(result.loc[friday_idx, "dividend_amount"], 1.0)
         assert result.loc[friday_idx, "is_ex_dividend"] == 1
 
     def test_missing_close_price(self):
@@ -128,7 +128,7 @@ class TestComputeDividendFeatures:
         result = compute_dividend_features(price_df, dividends_df)
 
         # Should set dividend_amount but NaN yield due to missing close
-        assert result.loc[dates[1], "dividend_amount"] == 1.0
+        assert np.isclose(result.loc[dates[1], "dividend_amount"], 1.0)
         assert pd.isna(result.loc[dates[1], "dividend_yield"])
         assert result.loc[dates[1], "is_ex_dividend"] == 1
 
