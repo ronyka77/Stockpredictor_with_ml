@@ -63,7 +63,7 @@ def filter_dates_to_weekdays(
 
 def prepare_ml_data_for_training(
     prediction_horizon: int = 10,
-    split_date: str = "2025-06-15",
+    split_date: str = "2025-05-01",
     ticker: Optional[str] = None,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
@@ -183,7 +183,7 @@ def prepare_ml_data_for_training(
         for col in numeric_cols:
             try:
                 med = x_clean[col].median()
-                x_clean[col].fillna(med, inplace=True)
+                x_clean[col] = x_clean[col].fillna(med)
             except Exception:
                 # fallback to column-wise fillna without raising
                 x_clean[col] = x_clean[col].fillna(0)
@@ -261,8 +261,7 @@ def prepare_ml_data_for_training(
             "x_test": x_test,
             "y_train": y_train,
             "y_test": y_test,
-            # Persisted path to original features instead of full in-memory copy
-            "X_original_path": transformation_manifest.get("x_original_path"),
+            "x_original_path": transformation_manifest.get("x_original_path"),
             "target_column": target_column,
             "transformation_manifest": transformation_manifest,
             "train_date_range": train_date_range,
@@ -280,6 +279,7 @@ def prepare_ml_data_for_training(
         logger.info("=" * 80)
         logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
         logger.info(f"📊 Features: {result['feature_count']} total")
+        logger.info(f"📏 Train date range: {test_date_range}")
         logger.info(f"📏 Split date: {split_date}")
         logger.info("=" * 80)
         collect_garbage()
@@ -413,7 +413,7 @@ def prepare_ml_data_for_prediction(
 
 def prepare_ml_data_for_training_with_cleaning(
     prediction_horizon: int = 10,
-    split_date: str = "2025-06-15",
+    split_date: str = "2025-05-01",
     ticker: str = None,
     clean_features: bool = True,
     _filter_train_set: bool = True,

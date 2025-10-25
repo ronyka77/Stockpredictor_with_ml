@@ -191,11 +191,10 @@ def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
                     df_clean[col].fillna(median_val, inplace=True)
 
     # 3. Keep numeric columns as float32 to reduce memory usage (float64 not required)
-    for col in numeric_cols:
-        try:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").astype(np.float32)
-        except Exception:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0).astype(np.float32)
+
+    df_clean[numeric_cols] = (  
+        df_clean[numeric_cols].apply(pd.to_numeric, errors="coerce").astype(np.float32)  
+    )  
 
     logger.info(f"✅ Training data cleaning completed: {len(df_clean)} samples ready")
 
@@ -308,7 +307,7 @@ def clean_features_for_training(
 
     if non_numeric_to_remove:
         logger.info(
-            f"   Removing {len(non_numeric_to_remove)} non-numeric columns (preserving essential price columns)"
+            f"   Removing {len(non_numeric_to_remove)} non-numeric columns"
         )
         removed_features["non_numeric"] = non_numeric_to_remove
         x_clean = x_clean.drop(columns=non_numeric_to_remove)

@@ -105,7 +105,7 @@ def select_features(
             logger.warning(f"conditional_mean_absolute_error failed inside LGB eval: {exc}")
             val = float("inf")
 
-        # return (name, value, is_higher_better)
+        # (name, value, is_higher_better) format for LightGBM
         return "cond_mae", float(val), False
 
     try:

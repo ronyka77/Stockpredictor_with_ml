@@ -472,11 +472,11 @@ class BasePredictor(ABC):
     def _decide_export_and_return_avg(self, results_df: pd.DataFrame, avg_profit: float, friday_avg: float, monday_avg: float) -> float | None:  # NOSONAR
         # Decide whether to export and which weekday filter to apply
         filtered = None
-        if friday_avg > 10 and monday_avg > 10:
+        if friday_avg > 8 and monday_avg > 8:
             filtered = results_df
-        elif friday_avg > 10:
+        elif friday_avg > 8:
             filtered = results_df[results_df["day_of_week"] == "Friday"]
-        elif monday_avg > 10:
+        elif monday_avg > 8:
             filtered = results_df[results_df["day_of_week"] == "Monday"]
 
         if filtered is None:
