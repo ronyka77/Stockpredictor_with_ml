@@ -13,7 +13,7 @@ import pandas as pd
 from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.skforecast.ensemble_forecaster import EnsembleForecaster
 from src.models.skforecast.utils import build_last_window_from_series, cast_numeric_columns_to_float32
-from src.utils.mlflow_utils import MLFlowManager
+from src.utils.mlops.mlflow_utils import MLFlowManager
 from mlflow.models.signature import infer_signature
 from datetime import datetime, timezone
 

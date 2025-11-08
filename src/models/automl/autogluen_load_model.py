@@ -8,7 +8,7 @@ import logging
 
 from autogluon.tabular import TabularPredictor
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 

@@ -21,7 +21,7 @@ from datetime import datetime
 from enum import Enum
 from dotenv import load_dotenv
 
-from src.utils.logger import get_logger
+from ..core.logger import get_logger
 
 # Load environment variables
 load_dotenv()

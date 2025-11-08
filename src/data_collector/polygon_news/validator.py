@@ -5,7 +5,7 @@ News content validator for quality assessment
 from typing import Dict, List, Tuple, Any
 from datetime import datetime, timedelta, timezone
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 

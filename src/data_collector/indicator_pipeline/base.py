@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Any
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
 
 logger = get_logger(__name__, utility="feature_engineering")

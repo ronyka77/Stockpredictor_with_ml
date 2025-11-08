@@ -16,7 +16,7 @@ import mlflow
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from sklearn.ensemble import RandomForestRegressor
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 

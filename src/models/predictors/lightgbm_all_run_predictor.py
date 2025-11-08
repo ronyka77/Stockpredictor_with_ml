@@ -12,7 +12,7 @@ from mlflow.tracking import MlflowClient
 
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

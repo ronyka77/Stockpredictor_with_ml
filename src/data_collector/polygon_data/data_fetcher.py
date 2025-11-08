@@ -6,7 +6,7 @@ from datetime import datetime, date
 from typing import List, Dict, Optional, Any, Union
 import time
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.polygon_data.data_validator import (
     DataValidator,

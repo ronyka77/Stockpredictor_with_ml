@@ -9,7 +9,7 @@ from collections import defaultdict
 import pytest
 import networkx as nx
 
-from src.utils.architecture_assessment import (
+from src.utils.qa.architecture_assessment import (
     ArchitectureAnalyzer,
     ModuleInfo,
     DependencyIssue,
@@ -478,7 +478,7 @@ from collections import defaultdict as dd
 class TestMainFunction:
     """Test cases for main assessment function."""
 
-    @patch('src.utils.architecture_assessment.logger')
+    @patch('src.utils.qa.architecture_assessment.logger')
     def test_assess_data_collector_architecture(self, mock_logger, temp_dir, sample_python_file):
         """Test the main assessment function."""
         # Create one more Python file
@@ -496,7 +496,7 @@ class TestMainFunction:
         # Verify logging calls
         mock_logger.info.assert_any_call(f"Starting architecture assessment of {temp_dir}")
 
-    @patch('src.utils.architecture_assessment.logger')
+    @patch('src.utils.qa.architecture_assessment.logger')
     def test_assess_data_collector_architecture_empty_directory(self, mock_logger, temp_dir):
         """Test assessment of empty directory."""
         assessment = assess_data_collector_architecture(temp_dir)

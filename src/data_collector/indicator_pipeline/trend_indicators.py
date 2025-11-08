@@ -20,7 +20,7 @@ from src.data_collector.indicator_pipeline.base import (
     IndicatorResult,
     create_indicator_result,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
 
 logger = get_logger(__name__, utility="feature_engineering")

@@ -14,7 +14,7 @@ import os
 
 from src.models.time_series.base_pytorch_model import PyTorchBasePredictor
 from src.models.evaluation import ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

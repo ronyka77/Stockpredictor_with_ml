@@ -19,7 +19,7 @@ from src.data_utils.ml_data_pipeline import (
     prepare_ml_data_for_prediction_with_cleaning,
     filter_dates_to_weekdays,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

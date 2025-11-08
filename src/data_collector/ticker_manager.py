@@ -4,7 +4,7 @@ Ticker management and discovery functionality for Polygon.io data
 
 from typing import List, Dict, Optional
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.polygon_data.data_validator import DataValidator
 from src.data_collector.polygon_data.data_storage import DataStorage
@@ -152,7 +152,7 @@ def main():
     """
     Main function to refresh ticker data in database
     """
-    from src.utils.logger import get_general_logger
+    from src.utils.core.logger import get_general_logger
 
     logger = get_general_logger(__name__)
 

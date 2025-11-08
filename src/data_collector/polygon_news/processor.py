@@ -6,7 +6,7 @@ Handles content cleaning and metadata extraction
 from typing import Dict, List, Any
 import re
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 

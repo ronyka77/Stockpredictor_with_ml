@@ -2,14 +2,14 @@ from unittest.mock import Mock, patch
 
 import yaml
 
-from src.utils.mlflow_utils import MLFlowManager, MLFlowConfig
+from src.utils.mlops.mlflow_utils import MLFlowManager, MLFlowConfig
 
 
 def test_mlflow_config_paths(tmp_mlruns_dir):
     """Construct MLFlowConfig and ensure paths and tracking URI are set."""
     mlruns_path = tmp_mlruns_dir
 
-    with patch("src.utils.mlflow_utils.Path.resolve", return_value=mlruns_path):
+    with patch("src.utils.mlops.mlflow_utils.Path.resolve", return_value=mlruns_path):
         cfg = MLFlowConfig()
 
     assert str(cfg.local_path).endswith("mlruns")

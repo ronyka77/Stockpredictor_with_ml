@@ -5,7 +5,7 @@ Rate limiting functionality for Polygon.io API requests
 import time
 from dataclasses import dataclass
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="data_collector")
@@ -184,19 +184,40 @@ class NoOpRateLimiter(RateLimiter):
         super().__init__(requests_per_minute=10_000_000)
 
     def wait_if_needed(self) -> None:
+        """
+        No-op implementation - performs no waiting or rate limiting.
+        """
         # Do nothing
         return
 
     def get_remaining_requests(self) -> int:
+        """
+        Return a very high number to indicate unlimited requests available.
+
+        Returns:
+            int: A large number indicating unlimited remaining requests
+        """
         return 10_000_000
 
     def get_time_until_reset(self) -> float:
+        """
+        Return 0.0 since rate limiting is disabled.
+
+        Returns:
+            float: Always returns 0.0 indicating no waiting needed
+        """
         return 0.0
 
     def handle_successful_request(self) -> None:
+        """
+        No-op implementation - no rate limit tracking needed.
+        """
         return
 
     def reset(self) -> None:
+        """
+        No-op implementation - no rate limit state to reset.
+        """
         return
 
 

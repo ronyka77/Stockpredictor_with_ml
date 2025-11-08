@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 

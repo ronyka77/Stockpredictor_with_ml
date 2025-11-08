@@ -10,7 +10,7 @@ import numpy as np
 from typing import Tuple, List
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

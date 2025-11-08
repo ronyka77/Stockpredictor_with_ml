@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -18,7 +18,12 @@ logger = get_logger(__name__)
 class FundamentalCacheManager:
     """Manages cached fundamental data from JSON files"""
 
-    def __init__(self, cache_dir: str = "data/cache/fundamentals"):
+    def __init__(self, cache_dir: str = "data/cache/fundamentals") -> None:
+        """Initialize cache manager
+
+        Args:
+            cache_dir: Directory path for cache files
+        """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -142,7 +147,7 @@ class FundamentalCacheManager:
 
             # Write JSON with UTF-8 encoding and readable formatting
             # Use centralized fallback serializer to ensure consistent formatting
-            from src.utils.serialization import json_fallback_serializer
+            from src.utils.core.serialization import json_fallback_serializer
 
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2, default=json_fallback_serializer)

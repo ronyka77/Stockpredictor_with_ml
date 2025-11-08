@@ -23,7 +23,7 @@ from autogluon.core.metrics import make_scorer
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ModelProtocol, ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

@@ -500,7 +500,7 @@ def test_main_invokes_cache_clear(mocker):
     """Main should clear cleaned data cache after running production batch"""
     # Patch run_production_batch and CleanedDataCache
     mocker.patch("src.data_collector.indicator_pipeline.indicator_pipeline.run_production_batch")
-    cache_cls = mocker.patch("src.utils.cleaned_data_cache.CleanedDataCache")
+    cache_cls = mocker.patch("src.utils.data.cleaned_data_cache.CleanedDataCache")
     inst = cache_cls.return_value
     inst.clear_cache = mocker.Mock()
 

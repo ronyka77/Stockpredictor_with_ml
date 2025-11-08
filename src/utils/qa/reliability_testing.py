@@ -20,8 +20,8 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
-from src.utils.logger import get_logger
-from src.utils.evaluation_orchestrator import EvaluationConfig
+from ..core.logger import get_logger
+from .evaluation_orchestrator import EvaluationConfig
 
 logger = get_logger(__name__)
 

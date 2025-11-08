@@ -10,7 +10,7 @@ import json
 import yaml
 from mlflow.tracking import MlflowClient
 
-from src.utils.logger import get_logger
+from ..core.logger import get_logger
 
 logger = get_logger(__name__)
 

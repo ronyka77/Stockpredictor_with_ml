@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import date
 from src.database.connection import fetch_all
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.feature_engineering.config import config
 
 logger = get_logger(__name__, utility="feature_engineering")

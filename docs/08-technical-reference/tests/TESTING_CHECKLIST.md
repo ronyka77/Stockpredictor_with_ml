@@ -19,7 +19,7 @@ Checklist (use when reviewing test PRs)
 - **Resource cleanup**: Tests clean up or use temporary paths (`tmp_path`) and close DB sessions or files.
 - **Runtime expectation**: Unit tests should generally be fast (<10s/test). Mark long tests `@pytest.mark.slow` and exclude from fast runs.
 - **Golden/guideline data**: Golden files under `tests/_fixtures/data/` are small and include README; any updates include rationale in PR.
-- **No prints; use logger**: Avoid `print()` output in tests; use `src/utils/logger.py` if needed.
+- **No prints; use logger**: Avoid `print()` output in tests; use `src/utils/core/logger.py` if needed.
 - **Coverage note**: New tests include a coverage note where relevant and reference requirement IDs for traceability.
 - **Parametrization**: Use `@pytest.mark.parametrize` for systematic coverage rather than many repeated tests.
 - **Hypothesis**: If using property tests, include `@settings(max_examples=...)` to keep test time bounded.

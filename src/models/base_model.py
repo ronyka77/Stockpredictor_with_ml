@@ -14,8 +14,8 @@ import ast
 from datetime import datetime
 
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
-from src.utils.logger import get_logger
-from src.utils.mlflow_integration import MLflowIntegration
+from src.utils.core.logger import get_logger
+from src.utils.mlops.mlflow_integration import MLflowIntegration
 
 logger = get_logger(__name__)
 

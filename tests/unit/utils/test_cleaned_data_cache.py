@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import pytest
 from pathlib import Path
-from src.utils.cleaned_data_cache import CleanedDataCache
+from src.utils.data.cleaned_data_cache import CleanedDataCache
 
 
 def test_cleaned_data_cache_basic(tmp_path):

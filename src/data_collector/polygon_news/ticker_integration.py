@@ -5,7 +5,7 @@ Provides intelligent ticker selection based on market cap and trading volume
 
 from typing import List, Dict, Optional, Tuple, Any
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.ticker_manager import TickerManager
 
 logger = get_logger(__name__, utility="data_collector")

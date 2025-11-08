@@ -7,7 +7,7 @@ on the most recent data, saving results to Excel files.
 
 from src.models.gradient_boosting.xgboost_model import XGBoostModel
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

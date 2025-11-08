@@ -8,7 +8,7 @@ import time
 import json
 from pathlib import Path
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.ticker_manager import TickerManager
 from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
@@ -295,7 +295,7 @@ if __name__ == "__main__":
 
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = datetime.now() - timedelta(days=720)
+    start_date = datetime.now() - timedelta(days=30)
 
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

@@ -13,7 +13,7 @@ from src.data_collector.polygon_news.storage import PolygonNewsStorage
 from src.data_collector.polygon_news.ticker_integration import NewsTickerIntegration
 from src.data_collector.polygon_news.processor import NewsProcessor
 from src.data_collector.polygon_news.validator import NewsValidator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 

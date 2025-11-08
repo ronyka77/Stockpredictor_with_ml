@@ -18,7 +18,7 @@ from mlflow.models.signature import ModelSignature
 from mlflow.tracking import MlflowClient
 
 # Local imports
-from src.utils.logger import get_logger
+from ..core.logger import get_logger
 
 # Initialize logger
 logger = get_logger(__name__)

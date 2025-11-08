@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 
 from src.data_collector.config import config
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.database.connection import execute
 
 logger = get_logger(__name__, utility="data_collector")

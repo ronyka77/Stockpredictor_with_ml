@@ -9,7 +9,7 @@ for optimal ML performance and time-series analysis.
 from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 import time
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

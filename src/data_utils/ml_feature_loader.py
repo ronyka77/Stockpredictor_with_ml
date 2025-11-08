@@ -12,7 +12,7 @@ from datetime import date
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 from src.feature_engineering.data_loader import StockDataLoader
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="feature_engineering")
 

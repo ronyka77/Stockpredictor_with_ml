@@ -15,8 +15,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from dataclasses import dataclass, asdict
 
-from src.utils.logger import get_logger
-from src.utils.feature_categories import filter_columns_by_categories
+from src.utils.core.logger import get_logger
+from src.utils.data.feature_categories import filter_columns_by_categories
 from src.feature_engineering.config import config
 
 logger = get_logger(__name__, utility="feature_engineering")
