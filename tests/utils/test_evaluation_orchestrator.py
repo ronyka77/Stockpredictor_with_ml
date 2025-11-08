@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 from typing import Dict, Any
 
-from src.utils.evaluation_orchestrator import (
+from src.utils.qa.evaluation_orchestrator import (
     EvaluationOrchestrator,
     EvaluationConfig,
     EvaluationResult,
@@ -195,8 +195,8 @@ class TestEvaluationOrchestrator:
 
     def test_initialization_with_default_config(self):
         """Test orchestrator initialization with default config."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator()
 
             assert orchestrator.config is not None
@@ -206,8 +206,8 @@ class TestEvaluationOrchestrator:
 
     def test_initialization_with_custom_config(self, sample_config):
         """Test orchestrator initialization with custom config."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
 
             assert orchestrator.config == sample_config
@@ -220,7 +220,7 @@ class TestEvaluationOrchestrator:
         with pytest.raises(ValueError, match="Configuration validation failed"):
             EvaluationOrchestrator(invalid_config)
 
-    @patch('src.utils.evaluation_orchestrator.get_logger')
+    @patch('src.utils.qa.evaluation_orchestrator.get_logger')
     def test_dry_run_mode(self, mock_get_logger, temp_dir):
         """Test orchestrator in dry run mode."""
         mock_logger = Mock()
@@ -247,7 +247,7 @@ class TestEvaluationOrchestrator:
         assert result["evaluation_metadata"]["config"]["dry_run"] is True
         mock_logger.info.assert_any_call("DRY RUN MODE: Validation only, no evaluations will be executed")
 
-    @patch('src.utils.evaluation_orchestrator.get_logger')
+    @patch('src.utils.qa.evaluation_orchestrator.get_logger')
     def test_run_evaluation_success(self, mock_get_logger, sample_config, mock_evaluation_module):
         """Test successful evaluation run."""
         # Setup mocks
@@ -257,8 +257,8 @@ class TestEvaluationOrchestrator:
         # Disable report generation to simplify test
         sample_config.generate_reports = False
 
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'), \
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'), \
              patch.object(EvaluationOrchestrator, '_import_evaluation_module', return_value=mock_evaluation_module):
             orchestrator = EvaluationOrchestrator(sample_config)
             result = orchestrator.run_evaluation()
@@ -270,14 +270,14 @@ class TestEvaluationOrchestrator:
             assert "evaluation_metadata" in result
             assert "component_results" in result
 
-    @patch('src.utils.evaluation_orchestrator.get_logger')
+    @patch('src.utils.qa.evaluation_orchestrator.get_logger')
     def test_run_evaluation_with_component_failure(self, mock_get_logger, sample_config):
         """Test evaluation run with component failure."""
         mock_logger = Mock()
         mock_get_logger.return_value = mock_logger
 
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'), \
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'), \
              patch('importlib.import_module', side_effect=ImportError("Module not found")):
             orchestrator = EvaluationOrchestrator(sample_config)
             result = orchestrator.run_evaluation()
@@ -286,8 +286,8 @@ class TestEvaluationOrchestrator:
             assert result["overall_statistics"]["completed_components"] == 0
             assert all(r["status"] == "skipped" for r in result["component_results"].values())
 
-    @patch('src.utils.evaluation_orchestrator.datetime')
-    @patch('src.utils.evaluation_orchestrator.get_logger')
+    @patch('src.utils.qa.evaluation_orchestrator.datetime')
+    @patch('src.utils.qa.evaluation_orchestrator.get_logger')
     def test_run_component_success(self, mock_get_logger, mock_datetime, sample_config, mock_evaluation_module):
         """Test running individual component successfully."""
         mock_logger = Mock()
@@ -297,8 +297,8 @@ class TestEvaluationOrchestrator:
             datetime(2023, 1, 1, 10, 0, 5)
         ]
 
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
             orchestrator.results[EvaluationComponent.ARCHITECTURE_ASSESSMENT] = EvaluationResult(
                 component=EvaluationComponent.ARCHITECTURE_ASSESSMENT,
@@ -315,15 +315,15 @@ class TestEvaluationOrchestrator:
                 assert len(result.recommendations) == 1
                 assert result.execution_time == 5.0
 
-    @patch('src.utils.evaluation_orchestrator.get_logger')
+    @patch('src.utils.qa.evaluation_orchestrator.get_logger')
     def test_run_component_failure(self, mock_get_logger, sample_config, mock_evaluation_module):
         """Test running component with evaluator failure."""
         mock_logger = Mock()
         mock_get_logger.return_value = mock_logger
         mock_evaluation_module.Evaluator.side_effect = Exception("Evaluator crashed")
 
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
             orchestrator.results[EvaluationComponent.ARCHITECTURE_ASSESSMENT] = EvaluationResult(
                 component=EvaluationComponent.ARCHITECTURE_ASSESSMENT,
@@ -340,8 +340,8 @@ class TestEvaluationOrchestrator:
 
     def test_import_evaluation_module_success(self, sample_config):
         """Test importing evaluation module successfully."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
 
             with patch('importlib.import_module') as mock_import:
@@ -355,8 +355,8 @@ class TestEvaluationOrchestrator:
 
     def test_import_evaluation_module_not_found(self, sample_config):
         """Test importing non-existent evaluation module."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
 
             with patch('importlib.import_module', side_effect=ImportError("No module")):
@@ -366,8 +366,8 @@ class TestEvaluationOrchestrator:
 
     def test_generate_summary(self, sample_config):
         """Test generating evaluation summary."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
 
             # Setup sample results
@@ -433,8 +433,8 @@ class TestEvaluationOrchestrator:
 
     def test_generate_markdown_report(self, sample_config):
         """Test generating markdown formatted report."""
-        with patch('src.utils.evaluation_orchestrator.Path.exists', return_value=True), \
-             patch('src.utils.evaluation_orchestrator.Path.mkdir'):
+        with patch('src.utils.qa.evaluation_orchestrator.Path.exists', return_value=True), \
+             patch('src.utils.qa.evaluation_orchestrator.Path.mkdir'):
             orchestrator = EvaluationOrchestrator(sample_config)
 
             summary = {
@@ -476,7 +476,7 @@ class TestEvaluationOrchestrator:
 class TestConvenienceFunctions:
     """Test cases for convenience functions."""
 
-    @patch('src.utils.evaluation_orchestrator.EvaluationOrchestrator')
+    @patch('src.utils.qa.evaluation_orchestrator.EvaluationOrchestrator')
     def test_run_evaluation_function(self, mock_orchestrator_class):
         """Test run_evaluation convenience function."""
         mock_orchestrator = Mock()
@@ -490,7 +490,7 @@ class TestConvenienceFunctions:
         mock_orchestrator_class.assert_called_once_with(config)
         mock_orchestrator.run_evaluation.assert_called_once()
 
-    @patch('src.utils.evaluation_orchestrator.run_evaluation')
+    @patch('src.utils.qa.evaluation_orchestrator.run_evaluation')
     @patch('builtins.print')
     def test_run_evaluation_cli_success(self, mock_print, mock_run_eval):
         """Test run_evaluation_cli function success."""
@@ -526,7 +526,7 @@ class TestConvenienceFunctions:
         mock_print.assert_any_call("- Failed: 1")
         mock_print.assert_any_call("- Average Score: 87.50/100")
 
-    @patch('src.utils.evaluation_orchestrator.run_evaluation')
+    @patch('src.utils.qa.evaluation_orchestrator.run_evaluation')
     @patch('builtins.print')
     def test_run_evaluation_cli_failure(self, mock_print, mock_run_eval):
         """Test run_evaluation_cli function with failure."""

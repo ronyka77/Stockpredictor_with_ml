@@ -24,8 +24,8 @@ from src.data_collector.polygon_fundamentals.data_models import (
     CashFlowStatement,
     FinancialValue,
 )
-from src.utils.logger import get_logger
-from src.utils.retry import (
+from src.utils.core.logger import get_logger
+from src.utils.core.retry import (
     retry,
     API_RETRY_CONFIG,
     RetryError,

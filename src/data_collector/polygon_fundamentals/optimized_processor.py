@@ -11,8 +11,8 @@ from src.data_collector.polygon_fundamentals.optimized_collector import (
     OptimizedFundamentalCollector,
 )
 from src.data_collector.polygon_data.data_storage import DataStorage
-from src.utils.logger import get_logger
-from src.utils.retry import (
+from src.utils.core.logger import get_logger
+from src.utils.core.retry import (
     async_retry,
     API_RETRY_CONFIG,
     RetryError,
@@ -164,7 +164,7 @@ class OptimizedFundamentalProcessor:
         logger.info(f"Callback processing complete. Total tickers processed: {total_processed}")
         return total_processed
 
-    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)
+    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # Circuit breaker handled at collector level
     async def _process_ticker_with_retry(self, ticker: str) -> bool:
         """
         Process a single ticker with retry logic

@@ -15,13 +15,13 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 try:
-    from .logger import get_logger
+    from src.utils.core.logger import get_logger
 except ImportError:
     # Allow running as standalone script
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.logger import get_logger
+    from src.utils.core.logger import get_logger
 
 # Initialize security logger
 security_logger = get_logger(__name__, "security")

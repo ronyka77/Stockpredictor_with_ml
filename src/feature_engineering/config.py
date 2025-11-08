@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Tuple
 import dotenv
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

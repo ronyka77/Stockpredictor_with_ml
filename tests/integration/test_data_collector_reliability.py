@@ -176,10 +176,11 @@ class TestPolygonDataClientReliability:
                 raise ConnectionError("Async network failure")
             return {"results": []}
 
-        with patch.object(fundamentals_client, '_make_single_request', side_effect=mock_async_request):
-            result = await fundamentals_client._make_request("test_url", {})
-            assert result == {"results": []}
-            assert call_count == 3  # 2 failures + 1 success
+        async with fundamentals_client:  # Use async context manager to initialize session
+            with patch.object(fundamentals_client, '_make_single_request', side_effect=mock_async_request):
+                result = await fundamentals_client._make_request("test_url", {})
+                assert result == {"results": []}
+                assert call_count == 3  # 2 failures + 1 success
 
 
 @pytest.mark.integration
@@ -199,15 +200,24 @@ class TestOptimizedFundamentalCollectorReliability:
         """Test API retry mechanism with circuit breaker integration."""
         call_count = 0
 
-        async def mock_api_call(ticker: str):
+        async def mock_get_financials(*args, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count < 3:
                 raise TimeoutError("API timeout")
-            return True  # Success
+            # Return a mock response object with results
+            mock_response = type('MockResponse', (), {'results': [{'test': 'data'}]})()
+            return mock_response
 
-        # Patch the actual collection method
-        with patch.object(self.collector, '_collect_with_retry', side_effect=mock_api_call):
+        # Mock the ticker cache to return a valid ticker_id for AAPL
+        self.collector.ticker_cache = {"AAPL": 1}
+
+        # Mock _has_recent_data to return False so it proceeds to API call
+        with patch.object(self.collector, '_has_recent_data', return_value=False), \
+             patch('src.data_collector.polygon_fundamentals.optimized_collector.PolygonFundamentalsClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.get_financials = mock_get_financials
+
             result = await self.collector.collect_fundamental_data("AAPL")
             assert result is True
             assert call_count == 3  # 2 retries + 1 success
@@ -270,21 +280,23 @@ class TestOptimizedFundamentalProcessorReliability:
         """Test individual ticker processing retries on failure."""
         call_count = 0
 
-        async def mock_ticker_processing(ticker: str):
+        async def mock_collect_fundamental_data(ticker: str):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise Exception("Processing failed")
+                raise ConnectionError("Processing failed")
             return True
 
-        with patch.object(self.processor, '_process_ticker_with_retry', side_effect=mock_ticker_processing):
-            # Process multiple tickers - some should succeed after retry
-            tickers = ["AAPL", "MSFT"]
-            results = await self.processor.process_with_progress(tickers)
+        # Mock the collector's collect_fundamental_data method
+        self.processor.collector.collect_fundamental_data = mock_collect_fundamental_data
 
-            assert results["AAPL"] is True
-            assert results["MSFT"] is True
-            assert call_count == 4  # 2 tickers × (1 failure + 1 success)
+        # Process multiple tickers - some should succeed after retry
+        tickers = ["AAPL", "MSFT"]
+        results = await self.processor.process_with_progress(tickers)
+
+        assert results["AAPL"] is True
+        assert results["MSFT"] is True
+        assert call_count == 3  # AAPL: 1 failure + 1 success, MSFT: 1 success
 
     def test_fault_tolerance_with_partial_failures(self):
         """Test system continues processing when some tickers fail."""
@@ -324,10 +336,10 @@ class TestSystemWideFaultTolerance:
             canned_api_factory("grouped_daily"),  # Recovery
         ]
 
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = call_sequence
+        client = PolygonDataClient(api_key="TEST")
 
-            client = PolygonDataClient(api_key="TEST")
+        with patch.object(client.session, 'get') as mock_get:
+            mock_get.side_effect = call_sequence
 
             # Should eventually succeed
             result = client.get_grouped_daily("2024-01-01")

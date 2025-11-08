@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.data_collector.polygon_news.models import validate_article_data
 from src.data_collector.config import config
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.database.connection import fetch_one, fetch_all, execute, run_in_transaction
 
 logger = get_logger(__name__, utility="data_collector")

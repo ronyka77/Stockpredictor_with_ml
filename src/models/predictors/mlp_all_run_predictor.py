@@ -12,7 +12,7 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 from src.models.predictors.mlp_predictor import MLPPredictorWrapper
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

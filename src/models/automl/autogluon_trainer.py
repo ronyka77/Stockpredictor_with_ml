@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from typing import Any, Dict, Tuple, Optional
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.automl.autogluon_model import AutoGluonModel
 from src.models.automl.autogluen_load_model import run_model_evaluation

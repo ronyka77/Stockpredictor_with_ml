@@ -16,7 +16,7 @@ import pandas as pd
 
 from skforecast.direct._forecaster_direct import ForecasterDirect
 
-from src.utils.mlflow_utils import MLFlowManager
+from src.utils.mlops.mlflow_utils import MLFlowManager
 
 from src.models.skforecast.utils import (
     build_last_window_from_series,

@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 
-from src.utils.logger import get_logger
-from src.utils.evaluation_orchestrator import EvaluationConfig
+from ..core.logger import get_logger
+from .evaluation_orchestrator import EvaluationConfig
 
 logger = get_logger(__name__)
 

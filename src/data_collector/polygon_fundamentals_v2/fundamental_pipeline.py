@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from src.data_collector.polygon_fundamentals_v2.processor import FundamentalsProcessor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

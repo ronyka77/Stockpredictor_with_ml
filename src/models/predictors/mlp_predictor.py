@@ -8,7 +8,7 @@ on the most recent data, saving results to Excel files.
 import pandas as pd
 from src.models.time_series.mlp.mlp_main import MLPPredictorWithMLflow
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

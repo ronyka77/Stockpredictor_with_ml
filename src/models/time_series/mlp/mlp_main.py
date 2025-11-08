@@ -19,8 +19,8 @@ import numpy as np  # noqa: F401 (used in smoke test via alias)
 from sklearn.preprocessing import StandardScaler  # noqa: F401 (used in smoke test via alias)
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
-from src.utils.logger import get_logger
-from src.utils.mlflow_utils import MLFlowManager
+from src.utils.core.logger import get_logger
+from src.utils.mlops.mlflow_utils import MLFlowManager
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 from src.models.time_series.mlp.mlp_evaluation import MLPEvaluationMixin
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils

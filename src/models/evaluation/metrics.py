@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from typing import Union
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -670,7 +670,7 @@ class TestValidateInputData:
             validate_input_data(malicious_data, TestModel)
         assert exc_info.value.security_threat is True
 
-    @patch('src.utils.validation.validation_metrics')
+    @patch('src.utils.core.validation.validation_metrics')
     def test_metrics_recording(self, mock_metrics):
         """Test that validation metrics are recorded"""
         class TestModel(SecureBaseModel):

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 import networkx as nx
 
-from .logger import get_logger
+from ..core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -420,7 +420,7 @@ def Evaluator(config):
         def run(self):
             """Run architecture assessment and return standardized results."""
             try:
-                from src.utils.evaluation_orchestrator import EvaluationConfig
+                from src.utils.qa.evaluation_orchestrator import EvaluationConfig
                 target_path = Path(self.config.target_directory)
 
                 if not target_path.exists():

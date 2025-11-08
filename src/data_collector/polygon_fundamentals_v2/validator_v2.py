@@ -6,8 +6,8 @@ from src.data_collector.polygon_fundamentals.data_validator import (
     FundamentalDataValidator,
     ValidationResult,
 )
-from src.utils.logger import get_logger
-from src.utils.validation import (
+from src.utils.core.logger import get_logger
+from src.utils.core.validation import (
     SecureBaseModel,
     SecureNumeric,
     SecureString,
@@ -16,7 +16,7 @@ from src.utils.validation import (
     SecurityValidationError,
     validate_input_data,
 )
-from src.utils.security_audit import (
+from src.utils.qa.security_audit import (
     SecurityAuditLogger,
     log_input_validation_failure,
 )

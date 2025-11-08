@@ -7,7 +7,7 @@ from typing import Dict, Any, Iterable, Tuple, List
 import json
 from src.database.connection import execute_values
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="database")
 

@@ -21,8 +21,8 @@ from src.feature_engineering.data_loader import StockDataLoader
 from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
-from src.utils.logger import get_logger
-from src.utils.feature_categories import classify_feature_name
+from src.utils.core.logger import get_logger
+from src.utils.data.feature_categories import classify_feature_name
 
 logger = get_logger(__name__, utility="feature_engineering")
 
@@ -814,7 +814,7 @@ def main():
     """Main function for production batch processing"""
     run_production_batch()
 
-    from src.utils.cleaned_data_cache import CleanedDataCache
+    from src.utils.data.cleaned_data_cache import CleanedDataCache
 
     cache = CleanedDataCache()
     cache.clear_cache()

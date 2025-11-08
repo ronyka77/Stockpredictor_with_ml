@@ -65,7 +65,7 @@ def test_extract_financial_values_handles_object_format_and_missing_fields():
     if value_obj.source:
         assert 0.0 < result["data_source_confidence"] <= 1.0
     else:
-        assert result["data_source_confidence"] is None
+        assert result["data_source_confidence"] == 0.0
 
 
 def test_prepare_raw_data_parses_dates_and_computes_quality():

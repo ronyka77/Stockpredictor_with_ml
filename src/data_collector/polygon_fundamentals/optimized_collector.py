@@ -17,8 +17,8 @@ from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCac
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
-from src.utils.logger import get_logger
-from src.utils.retry import (
+from src.utils.core.logger import get_logger
+from src.utils.core.retry import (
     retry,
     async_retry,
     DATABASE_RETRY_CONFIG,
@@ -301,7 +301,7 @@ class OptimizedFundamentalCollector:
             self.stats["failed"] += 1
             return False
 
-    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # We'll use instance circuit breaker
+    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # Circuit breaker handled at higher level
     async def _collect_with_retry(self, ticker: str) -> Optional[Any]:
         """
         Collect financial data for a ticker with retry logic
@@ -570,21 +570,19 @@ class OptimizedFundamentalCollector:
         )
         return values
 
-    def _resolve_value_and_confidence(self, value: Any) -> Tuple[Optional[float], float]:
+    def _resolve_value_and_confidence(self, value: Any) -> Tuple[Optional[float], Optional[float]]:
         """Class-level helper used by _extract_financial_values to reduce complexity."""
         if value is None:
             return None, 0.0
         if isinstance(value, dict):
             if "value" in value:
-                conf = calculate_source_confidence(value["source"]) if value.get("source") else 0.5
+                source = value.get("source")
+                conf = calculate_source_confidence(source) if source else None
                 return value["value"], conf
             return None, 0.0
         if hasattr(value, "value"):
-            conf = (
-                calculate_source_confidence(getattr(value, "source", None))
-                if getattr(value, "source", None)
-                else 0.5
-            )
+            source = getattr(value, "source", None)
+            conf = calculate_source_confidence(source) if source else None
             return value.value, conf
         return None, 0.0
 

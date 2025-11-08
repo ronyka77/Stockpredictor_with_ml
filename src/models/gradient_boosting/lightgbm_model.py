@@ -17,8 +17,8 @@ import os
 
 from src.models.base_model import BaseModel
 from src.models.evaluation import ThresholdEvaluator, CustomMetrics
-from src.utils.logger import get_logger
-from src.utils.mlflow_utils import MLFlowManager
+from src.utils.core.logger import get_logger
+from src.utils.mlops.mlflow_utils import MLFlowManager
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 
 logger = get_logger(__name__)

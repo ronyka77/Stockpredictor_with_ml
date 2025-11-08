@@ -6,8 +6,8 @@ import requests
 from typing import Dict, List, Optional, Any, Union, TypedDict, cast, Generator
 from urllib.parse import urljoin, urlparse, parse_qs
 
-from src.utils.logger import get_logger
-from src.utils.retry import (
+from src.utils.core.logger import get_logger
+from src.utils.core.retry import (
     retry,
     API_RETRY_CONFIG,
     API_CIRCUIT_BREAKER,

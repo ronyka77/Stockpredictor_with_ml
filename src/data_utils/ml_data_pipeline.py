@@ -11,7 +11,7 @@ import numpy as np
 from pathlib import Path
 import time
 from typing import Dict, Union, Optional, Tuple
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_utils.ml_feature_loader import load_all_data
 from src.data_utils.target_engineering import (
     convert_absolute_to_percentage_returns,
@@ -25,7 +25,7 @@ from src.data_utils.feature_engineering import (
     clean_features_for_training,
     add_date_features,
 )
-from src.utils.cleaned_data_cache import CleanedDataCache, collect_garbage
+from src.utils.data.cleaned_data_cache import CleanedDataCache, collect_garbage
 
 
 logger = get_logger(__name__)

@@ -20,7 +20,7 @@ from dateutil.parser import isoparse
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.database.db_utils import _upsert_dividends_batch
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 

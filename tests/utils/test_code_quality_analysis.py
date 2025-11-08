@@ -8,13 +8,13 @@ from typing import Dict, Any
 
 import pytest
 
-from src.utils.code_quality_analysis import (
+from src.utils.qa.code_quality_analysis import (
     CodeQualityAnalyzer,
     CodeQualityFinding,
     CodeQualityMetrics,
     Evaluator
 )
-from src.utils.evaluation_orchestrator import EvaluationConfig
+from src.utils.qa.evaluation_orchestrator import EvaluationConfig
 
 
 @pytest.fixture

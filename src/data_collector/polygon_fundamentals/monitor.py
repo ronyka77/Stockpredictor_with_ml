@@ -7,7 +7,7 @@ This script monitors the progress and quality of fundamental data collection.
 from typing import Dict, List, Any
 
 from src.database.connection import get_global_pool, fetch_one, fetch_all
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

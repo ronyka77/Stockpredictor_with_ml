@@ -4,7 +4,7 @@ from src.data_collector.polygon_fundamentals_v2.collector_service import (
     FundamentalsCollectorService,
 )
 from src.database.connection import get_global_pool, fetch_all
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

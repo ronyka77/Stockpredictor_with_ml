@@ -9,7 +9,7 @@ Simple programmatic interface that always performs full setup and verification.
 from pathlib import Path
 
 from src.database.connection import init_global_pool, execute, fetch_one, fetch_all
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

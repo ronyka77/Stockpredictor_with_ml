@@ -18,7 +18,7 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import markdown
 
-from .logger import get_logger
+from ..core.logger import get_logger
 
 logger = get_logger(__name__)
 

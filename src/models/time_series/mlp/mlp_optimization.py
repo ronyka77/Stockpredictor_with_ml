@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

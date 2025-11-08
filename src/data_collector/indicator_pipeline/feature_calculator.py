@@ -19,7 +19,7 @@ from src.data_collector.indicator_pipeline.volatility_indicators import (
 from src.data_collector.indicator_pipeline.volume_indicators import VolumeIndicatorCalculator
 from src.data_collector.indicator_pipeline.base import IndicatorResult, IndicatorValidator
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="feature_engineering")

@@ -7,7 +7,7 @@ from src.data_collector.polygon_fundamentals.data_models import (
     CashFlowStatement,
     FinancialValue,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

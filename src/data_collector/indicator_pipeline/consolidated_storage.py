@@ -15,8 +15,8 @@ from dataclasses import dataclass
 
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
 from src.feature_engineering.config import config as fe_config
-from src.utils.logger import get_logger
-from src.utils.feature_categories import filter_columns_by_categories
+from src.utils.core.logger import get_logger
+from src.utils.data.feature_categories import filter_columns_by_categories
 
 logger = get_logger(__name__, utility="feature_engineering")
 

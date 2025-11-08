@@ -6,8 +6,8 @@ from typing import List, Dict, Optional, Any, Iterator, Callable
 from datetime import datetime, date
 import pandas as pd
 
-from src.utils.logger import get_logger
-from src.utils.memory_efficient import ChunkedDataProcessor, StreamingDataFrame
+from src.utils.core.logger import get_logger
+from src.utils.data.memory_efficient import ChunkedDataProcessor, StreamingDataFrame
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
 from src.database.connection import init_global_pool, fetch_all, fetch_one, execute, execute_values
 

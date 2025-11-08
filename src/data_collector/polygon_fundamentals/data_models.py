@@ -8,7 +8,7 @@ from the Polygon fundamentals API endpoints.
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, date
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

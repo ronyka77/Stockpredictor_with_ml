@@ -5,7 +5,7 @@ Rate limiting functionality for Polygon.io API requests
 import time
 from dataclasses import dataclass
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="data_collector")

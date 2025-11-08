@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.config import config
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 

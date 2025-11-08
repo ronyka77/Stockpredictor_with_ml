@@ -7,12 +7,12 @@ from typing import List, Dict, Optional, Any, Union, Tuple
 from pydantic import BaseModel, field_validator, field_serializer, Field, ConfigDict
 from enum import Enum
 
-from src.utils.logger import get_logger
-from src.utils.validation import (
+from src.utils.core.logger import get_logger
+from src.utils.core.validation import (
     SecureBaseModel, SecurityValidationError, ValidationUtils,
     SecureNumeric, validate_input_data
 )
-from src.utils.security_audit import log_input_validation_failure
+from src.utils.qa.security_audit import log_input_validation_failure
 
 logger = get_logger(__name__, utility="data_collector")
 
