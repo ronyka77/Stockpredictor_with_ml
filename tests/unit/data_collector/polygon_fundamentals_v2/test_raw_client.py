@@ -3,9 +3,7 @@ from unittest.mock import patch, AsyncMock
 
 import pytest
 
-from src.data_collector.polygon_fundamentals_v2.raw_client import (
-    RawPolygonFundamentalsClient,
-)
+from src.data_collector.polygon_fundamentals_v2.raw_client import RawPolygonFundamentalsClient
 from src.data_collector.polygon_fundamentals import config as pf_config
 
 
@@ -68,6 +66,11 @@ def test_get_financials_raw_success():
             "src.data_collector.polygon_fundamentals_v2.raw_client.BasicRateLimiter",
             _FakeRateLimiter,
         ),
+        patch.object(
+            pf_config.polygon_fundamentals_config,
+            "get_financials_url",
+            return_value="https://api.polygon.io/v2/reference/financials",
+        ),
     ):
         # Execution
         async def _call():
@@ -88,11 +91,7 @@ def test_get_financials_raw_rate_limit_retry():
     payload_ok = {"status": "OK"}
 
     fake_session = _FakeSession(
-        [
-            _FakeResp(429, {}),
-            _FakeResp(429, {}),
-            _FakeResp(200, payload_ok),
-        ]
+        [_FakeResp(429, {}), _FakeResp(429, {}), _FakeResp(200, payload_ok)]
     )
 
     with (
@@ -102,6 +101,11 @@ def test_get_financials_raw_rate_limit_retry():
             _FakeRateLimiter,
         ),
         patch("asyncio.sleep", new=AsyncMock(return_value=None)),
+        patch.object(
+            pf_config.polygon_fundamentals_config,
+            "get_financials_url",
+            return_value="https://api.polygon.io/v2/reference/financials",
+        ),
     ):
         # Execution
         async def _call():

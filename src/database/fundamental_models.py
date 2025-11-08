@@ -195,8 +195,7 @@ class FundamentalScores(Base):
         CheckConstraint(TICKER_LENGTH_CONSTRAINT, name="valid_ticker_scores"),
         CheckConstraint(MIN_DATE_CONSTRAINT, name="valid_date_scores"),
         CheckConstraint(
-            "piotroski_f_score >= 0 AND piotroski_f_score <= 9",
-            name="valid_piotroski_score",
+            "piotroski_f_score >= 0 AND piotroski_f_score <= 9", name="valid_piotroski_score"
         ),
     )
 
@@ -337,30 +336,16 @@ def get_latest_fundamental_data(session, ticker: str) -> Optional[dict]:
     }
 
 
-def get_fundamental_data_by_date(
-    session, ticker: str, target_date: date
-) -> Optional[dict]:
+def get_fundamental_data_by_date(session, ticker: str, target_date: date) -> Optional[dict]:
     """Get fundamental data for a specific ticker and date"""
 
-    ratios = (
-        session.query(FundamentalRatios)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
-    )
+    ratios = session.query(FundamentalRatios).filter_by(ticker=ticker, date=target_date).first()
     growth = (
-        session.query(FundamentalGrowthMetrics)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
+        session.query(FundamentalGrowthMetrics).filter_by(ticker=ticker, date=target_date).first()
     )
-    scores = (
-        session.query(FundamentalScores)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
-    )
+    scores = session.query(FundamentalScores).filter_by(ticker=ticker, date=target_date).first()
     sector = (
-        session.query(FundamentalSectorAnalysis)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
+        session.query(FundamentalSectorAnalysis).filter_by(ticker=ticker, date=target_date).first()
     )
 
     if not ratios:

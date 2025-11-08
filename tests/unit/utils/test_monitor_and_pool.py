@@ -4,7 +4,7 @@ from src.data_collector.polygon_fundamentals import monitor as monitor_mod
 def test_fundamental_data_monitor_methods(mocker):
     """Exercise FundamentalDataMonitor methods and assert returned types/keys."""
     # Use canonical PoolFake via patch_global_pool
-    from tests._fixtures.db import patch_global_pool, PoolFake
+    from tests.fixtures.db import patch_global_pool, PoolFake
 
     pool = PoolFake()
     patch_global_pool(mocker, pool)

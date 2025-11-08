@@ -50,13 +50,20 @@ class FakeConn:
         return False
 
 
+@pytest.fixture
+def pool_fake():
+    from tests.fixtures.db import PoolFake
+
+    return PoolFake()
+
+
 @pytest.mark.unit
 def test_upsert_raw_payload_idempotent(mocker, pool_fake):
     """Upsert raw payload twice should be idempotent and commit twice"""
     repo = FundamentalsRepository()
     mocker.patch.object(repo, "pool", pool_fake)
     # Also ensure module-level helpers use the same fake pool
-    from tests._fixtures import patch_global_pool
+    from tests.fixtures import patch_global_pool
 
     patch_global_pool(mocker, repo.pool)
 

@@ -5,9 +5,7 @@ from src.data_utils import feature_engineering as fe
 import pandas.testing as pdt
 
 
-def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
-    small_market_df,
-):
+def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(small_market_df):
     """Ensure SMA_5_Ratio and Close_Open_Ratio are added and computed correctly."""
     df = small_market_df.copy()
 
@@ -41,11 +39,7 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
     out = fe.add_prediction_bounds_features(df)
     import pandas.testing as pdt
 
-    expected_cols = [
-        "Expected_10D_Move",
-        "RSI_Mean_Reversion_Pressure",
-        "Expected_Daily_Move",
-    ]
+    expected_cols = ["Expected_10D_Move", "RSI_Mean_Reversion_Pressure", "Expected_Daily_Move"]
     for c in expected_cols:
         assert c in out.columns, f"Expected column {c} missing"
     pdt.assert_series_equal(
@@ -80,18 +74,14 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
     assert not out[numeric_cols].isnull().any().any(), (
         f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
     )
-    if out["a"].dtype != np.float64:
-        raise AssertionError("Numeric dtype not converted to float64")
+    if out["a"].dtype != np.float32:
+        raise AssertionError("Numeric dtype not converted to float32")
 
 
 def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
     """Detect constant and zero-variance features and report high-variance features."""
     df = pd.DataFrame(
-        {
-            "const": [1, 1, 1, 1],
-            "zero_var": [0.0, 0.0, 0.0, 0.0],
-            "varied": [1, 2, 3, 4],
-        }
+        {"const": [1, 1, 1, 1], "zero_var": [0.0, 0.0, 0.0, 0.0], "varied": [1, 2, 3, 4]}
     )
     res = fe.analyze_feature_diversity(df, min_variance_threshold=1e-6)
     if res["constant_feature_count"] < 1:
@@ -117,9 +107,7 @@ def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves
     )
     y = pd.Series([0.1, 0.2, 0.3, 0.4])
 
-    x_clean, y_clean, removed = fe.clean_features_for_training(
-        df, y, correlation_threshold=0.9
-    )
+    x_clean, y_clean, removed = fe.clean_features_for_training(df, y, correlation_threshold=0.9)
     if "cat" in x_clean.columns:
         raise AssertionError("Non-numeric column not removed")
     if not ("const" not in x_clean.columns or "const" in removed["constant"]):

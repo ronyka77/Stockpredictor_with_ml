@@ -56,11 +56,7 @@ def test_add_prediction_bounds_features_expected_columns_and_values():
 
     out = add_prediction_bounds_features(df.copy())
 
-    expected_new = [
-        "Expected_Daily_Move",
-        "Expected_10D_Move",
-        "RSI_Mean_Reversion_Pressure",
-    ]
+    expected_new = ["Expected_Daily_Move", "Expected_10D_Move", "RSI_Mean_Reversion_Pressure"]
     for col in expected_new:
         if col not in out.columns:
             raise AssertionError(
@@ -94,9 +90,9 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan_and_dtypes():
     assert not out[numeric_cols].isnull().any().any(), (
         f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
     )
-    if out["a"].dtype != np.float64:
+    if out["a"].dtype != np.float32:
         raise AssertionError(
-            f"Numeric dtype not converted to float64 for 'a': got {out['a'].dtype}"
+            f"Numeric dtype not converted to float32 for 'a': got {out['a'].dtype}"
         )
 
 

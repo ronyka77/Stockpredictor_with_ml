@@ -7,9 +7,7 @@ import numpy as np
 import pytest
 from datetime import date
 
-from src.data_collector.indicator_pipeline.dividend_features import (
-    compute_dividend_features,
-)
+from src.data_collector.indicator_pipeline.dividend_features import compute_dividend_features
 
 
 class TestComputeDividendFeatures:
@@ -85,9 +83,7 @@ class TestComputeDividendFeatures:
         """Test ex-dividend date mapping to nearest prior trading day."""
         # Create price data with weekend gaps
         dates = [date(2023, 1, 2), date(2023, 1, 3), date(2023, 1, 6)]  # Mon, Tue, Fri
-        price_df = pd.DataFrame(
-            {"close": [100.0, 101.0, 102.0]}, index=pd.DatetimeIndex(dates)
-        )
+        price_df = pd.DataFrame({"close": [100.0, 101.0, 102.0]}, index=pd.DatetimeIndex(dates))
 
         # Ex-dividend date falls on Saturday (non-trading day)
         dividends_df = pd.DataFrame(
@@ -154,12 +150,8 @@ class TestComputeDividendFeatures:
             assert pd.isna(result.loc[d, "days_since_last_dividend"])
 
         # Jan 6-11: days since Jan 5
-        assert (
-            result.loc[dates[5], "days_since_last_dividend"] == 1
-        )  # Jan 6 - Jan 5 = 1
-        assert (
-            result.loc[dates[10], "days_since_last_dividend"] == 6
-        )  # Jan 11 - Jan 5 = 6
+        assert result.loc[dates[5], "days_since_last_dividend"] == 1  # Jan 6 - Jan 5 = 1
+        assert result.loc[dates[10], "days_since_last_dividend"] == 6  # Jan 11 - Jan 5 = 6
 
         # Check days_to_next_dividend
         # Jan 13-15: NaN (after last dividend)
@@ -168,18 +160,14 @@ class TestComputeDividendFeatures:
 
         # Jan 6-11: days until Jan 12
         assert result.loc[dates[5], "days_to_next_dividend"] == 6  # Jan 12 - Jan 6 = 6
-        assert (
-            result.loc[dates[10], "days_to_next_dividend"] == 1
-        )  # Jan 12 - Jan 11 = 1
+        assert result.loc[dates[10], "days_to_next_dividend"] == 1  # Jan 12 - Jan 11 = 1
 
     def test_empty_dividends(self):
         """Test handling of empty dividend DataFrame."""
         dates = pd.date_range("2023-01-01", "2023-01-05", freq="D")
         price_df = pd.DataFrame({"close": [100.0] * len(dates)}, index=dates)
 
-        dividends_df = pd.DataFrame(
-            columns=["ex_dividend_date", "cash_amount", "id", "currency"]
-        )
+        dividends_df = pd.DataFrame(columns=["ex_dividend_date", "cash_amount", "id", "currency"])
 
         result = compute_dividend_features(price_df, dividends_df)
 

@@ -6,7 +6,6 @@ and prediction, including the comprehensive data loading, feature engineering,
 target transformation, and data cleaning operations.
 """
 
-
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -14,7 +13,10 @@ import time
 from typing import Dict, Union, Optional, Tuple
 from src.utils.logger import get_logger
 from src.data_utils.ml_feature_loader import load_all_data
-from src.data_utils.target_engineering import convert_absolute_to_percentage_returns, _maybe_downcast_numeric
+from src.data_utils.target_engineering import (
+    convert_absolute_to_percentage_returns,
+    _maybe_downcast_numeric,
+)
 from src.data_utils.feature_engineering import (
     add_price_normalized_features,
     add_prediction_bounds_features,
@@ -57,14 +59,8 @@ def filter_dates_to_weekdays(
     return keep, filtered_dates
 
 
-
-
-
-
 def prepare_ml_data_for_training(
-    prediction_horizon: int = 10,
-    split_date: str = "2025-05-01",
-    ticker: Optional[str] = None,
+    prediction_horizon: int = 10, split_date: str = "2025-05-01", ticker: Optional[str] = None
 ) -> Dict[str, Union[pd.DataFrame, pd.Series, str]]:
     """
     Comprehensive data preparation function for ML training
@@ -85,9 +81,7 @@ def prepare_ml_data_for_training(
 
         # Early validation: ensure required date column exists before further processing
         if "date" not in combined_data.columns:
-            raise ValueError(
-                "'date' column not found in data. Cannot perform date-based split."
-            )
+            raise ValueError("'date' column not found in data. Cannot perform date-based split.")
 
         logger.info(
             f"✅ Data loaded: {combined_data.shape[0]:,} records, {combined_data.shape[1]} features"
@@ -129,9 +123,7 @@ def prepare_ml_data_for_training(
             "file_size_mb",
         ]
         # Also exclude all Future_* columns to avoid data leakage
-        future_cols = [
-            col for col in combined_data.columns if col.startswith("Future_")
-        ]
+        future_cols = [col for col in combined_data.columns if col.startswith("Future_")]
         exclude_cols.extend(future_cols)
 
         feature_cols = [col for col in combined_data.columns if col not in exclude_cols]
@@ -142,7 +134,9 @@ def prepare_ml_data_for_training(
         try:
             data_folder = Path("checkpoints")
             data_folder.mkdir(parents=True, exist_ok=True)
-            x_original_path = data_folder / f"x_original_h{prediction_horizon}_{int(time.time())}.parquet"
+            x_original_path = (
+                data_folder / f"x_original_h{prediction_horizon}_{int(time.time())}.parquet"
+            )
             X.to_parquet(x_original_path, index=False)
             transformation_manifest["x_original_path"] = str(x_original_path)
             logger.info(f"Persisted x_original to {x_original_path} to reduce memory")
@@ -196,9 +190,7 @@ def prepare_ml_data_for_training(
 
         # Check if date column exists
         if "date" not in X.columns:
-            raise ValueError(
-                "'date' column not found in data. Cannot perform date-based split."
-            )
+            raise ValueError("'date' column not found in data. Cannot perform date-based split.")
 
         dates_all = X["date"][valid_mask].copy()
         # Convert to datetime if not already
@@ -246,9 +238,7 @@ def prepare_ml_data_for_training(
 
         # Validation checks
         if len(x_test) == 0:
-            raise ValueError(
-                f"No test data found after {split_date}. Check your data date range."
-            )
+            raise ValueError(f"No test data found after {split_date}. Check your data date range.")
 
         if len(x_train) == 0:
             raise ValueError(
@@ -349,9 +339,7 @@ def prepare_ml_data_for_prediction(
         ]
 
         # Also exclude all Future_* columns to avoid data leakage
-        future_cols = [
-            col for col in combined_data.columns if col.startswith("Future_")
-        ]
+        future_cols = [col for col in combined_data.columns if col.startswith("Future_")]
         exclude_cols.extend(future_cols)
 
         feature_cols = [col for col in combined_data.columns if col not in exclude_cols]
@@ -437,14 +425,10 @@ def prepare_ml_data_for_training_with_cleaning(
     if _cleaned_data_cache.cache_exists(cache_key, "training"):
         cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "training")
         if cache_age_hours is not None and cache_age_hours > 24:
-            logger.info(
-                f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache..."
-            )
+            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
             _cleaned_data_cache.clear_cache(cache_key, "training")
         else:
-            logger.info(
-                f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)"
-            )
+            logger.info(f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)")
             try:
                 return _cleaned_data_cache.load_cleaned_data(cache_key, "training")
             except Exception as e:
@@ -454,21 +438,15 @@ def prepare_ml_data_for_training_with_cleaning(
     # 1. Use original data preparation function
     logger.info("Step 1: Running original data preparation pipeline...")
     data_result = prepare_ml_data_for_training(
-        prediction_horizon=prediction_horizon,
-        split_date=split_date,
-        ticker=ticker,
+        prediction_horizon=prediction_horizon, split_date=split_date, ticker=ticker
     )
     logger.info(
         f"   Loaded: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
     )
     # 2. Apply data cleaning (always performed)
     logger.info("Step 2: Applying data cleaning to combined train/test set...")
-    combined_x = pd.concat(
-        [data_result["x_train"], data_result["x_test"]], ignore_index=True
-    )
-    combined_y = pd.concat(
-        [data_result["y_train"], data_result["y_test"]], ignore_index=True
-    )
+    combined_x = pd.concat([data_result["x_train"], data_result["x_test"]], ignore_index=True)
+    combined_y = pd.concat([data_result["y_train"], data_result["y_test"]], ignore_index=True)
     combined_x_clean = clean_data_for_training(combined_x)
     logger.info(
         f"   After cleaning: {len(combined_x_clean)} samples, {combined_x_clean.shape[1]} features"
@@ -508,14 +486,10 @@ def prepare_ml_data_for_training_with_cleaning(
         logger.warning(
             f"⚠️ Still {diversity_analysis['constant_feature_count']} constant features after cleaning"
         )
-        logger.warning(
-            "💡 Consider expanding date range or checking feature engineering"
-        )
+        logger.warning("💡 Consider expanding date range or checking feature engineering")
     # 5. Cache the cleaned data
     try:
-        logger.info(
-            f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)"
-        )
+        logger.info(f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
         _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "training")
         logger.info("✅ [CACHE] Data cached successfully.")
     except Exception as e:
@@ -553,18 +527,12 @@ def prepare_ml_data_for_prediction_with_cleaning(
 
     # Check if cached data exists and is newer than 24 hours
     if _cleaned_data_cache.cache_exists(cache_key, "prediction"):
-        cache_age_hours = _cleaned_data_cache.get_cache_age_hours(
-            cache_key, "prediction"
-        )
+        cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "prediction")
         if cache_age_hours is not None and cache_age_hours > 24:
-            logger.info(
-                f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache..."
-            )
+            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
             _cleaned_data_cache.clear_cache(cache_key, "prediction")
         else:
-            logger.info(
-                f"💾 Loading cached cleaned prediction data (key: {cache_key[:8]}...)"
-            )
+            logger.info(f"💾 Loading cached cleaned prediction data (key: {cache_key[:8]}...)")
             try:
                 return _cleaned_data_cache.load_cleaned_data(cache_key, "prediction")
             except Exception as e:
@@ -594,9 +562,7 @@ def prepare_ml_data_for_prediction_with_cleaning(
         logger.warning(
             f"⚠️ {diversity_analysis['constant_feature_count']} constant features in prediction data"
         )
-        logger.warning(
-            f"💡 Consider increasing days_back from {days_back} to add date diversity"
-        )
+        logger.warning(f"💡 Consider increasing days_back from {days_back} to add date diversity")
 
     # 4. Cache the cleaned data
     try:

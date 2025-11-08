@@ -9,10 +9,7 @@ from src.data_collector.polygon_fundamentals.optimized_processor import (
 
 @pytest.mark.parametrize(
     "collector_results",
-    [
-        ([True, True], {"A": True, "B": True}),
-        ([True, False], {"A": True, "B": False}),
-    ],
+    [([True, True], {"A": True, "B": True}), ([True, False], {"A": True, "B": False})],
 )
 def test_process_with_progress_calls_collector_for_each_ticker(collector_results):
     # Setup

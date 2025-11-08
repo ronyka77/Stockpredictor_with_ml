@@ -111,9 +111,7 @@ class NewsTickerIntegration:
         ]
 
     def get_prioritized_tickers(
-        self,
-        max_tickers: int = 100,
-        include_etfs: bool = True,
+        self, max_tickers: int = 100, include_etfs: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Get prioritized list of tickers for news collection
@@ -179,9 +177,7 @@ class NewsTickerIntegration:
             self.logger.error(f"Error getting tickers from manager: {e}")
             raise
 
-    def _get_fallback_tickers(
-        self, max_tickers: int, include_etfs: bool
-    ) -> List[Dict[str, Any]]:
+    def _get_fallback_tickers(self, max_tickers: int, include_etfs: bool) -> List[Dict[str, Any]]:
         """Get fallback ticker list when ticker manager is unavailable"""
         fallback_tickers = []
 

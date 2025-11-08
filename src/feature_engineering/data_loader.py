@@ -83,9 +83,7 @@ class StockDataLoader:
                 df["date"] = pd.to_datetime(df["date"])
 
             if df.empty:
-                logger.warning(
-                    f"No data found for {ticker} between {start_date} and {end_date}"
-                )
+                logger.warning(f"No data found for {ticker} between {start_date} and {end_date}")
                 return df
 
             # Set date as index
@@ -99,9 +97,7 @@ class StockDataLoader:
 
             # Convert volume to int64
             if "volume" in df.columns:
-                df["volume"] = pd.to_numeric(df["volume"], errors="coerce").astype(
-                    "int64"
-                )
+                df["volume"] = pd.to_numeric(df["volume"], errors="coerce").astype("int64")
 
             # Validate and clean the data
             df = self._validate_and_clean_data(df, ticker)
@@ -113,9 +109,7 @@ class StockDataLoader:
             raise
 
     def get_available_tickers(
-        self,
-        min_data_points: Optional[int] = None,
-        market: str = "stocks",
+        self, min_data_points: Optional[int] = None, market: str = "stocks"
     ) -> List[str]:
         """
         Get list of available tickers with sufficient data
@@ -130,9 +124,7 @@ class StockDataLoader:
         if min_data_points is None:
             min_data_points = self.feature_config.data_quality.MIN_DATA_POINTS
 
-        logger.info(
-            f"Getting available tickers with at least {min_data_points} data points"
-        )
+        logger.info(f"Getting available tickers with at least {min_data_points} data points")
 
         try:
             # Join tickers table with historical_prices to get active tickers with sufficient data
@@ -160,9 +152,7 @@ class StockDataLoader:
             )
 
             tickers = df["ticker"].tolist()
-            logger.info(
-                f"Found {len(tickers)} tickers with at least {min_data_points} data points"
-            )
+            logger.info(f"Found {len(tickers)} tickers with at least {min_data_points} data points")
 
             return tickers
 
@@ -263,9 +253,7 @@ class StockDataLoader:
         missing_columns = [col for col in required_columns if col not in df.columns]
 
         if missing_columns:
-            raise ValueError(
-                f"Missing required columns for {ticker}: {missing_columns}"
-            )
+            raise ValueError(f"Missing required columns for {ticker}: {missing_columns}")
 
         # Remove rows with missing OHLCV data
         df = df.dropna(subset=required_columns)
@@ -296,9 +284,7 @@ class StockDataLoader:
 
         if invalid_ohlc.any():
             invalid_count = invalid_ohlc.sum()
-            logger.warning(
-                f"Removing {invalid_count} rows with invalid OHLC data for {ticker}"
-            )
+            logger.warning(f"Removing {invalid_count} rows with invalid OHLC data for {ticker}")
             df = df[~invalid_ohlc]
 
         # Check for extreme outliers (more than 50% price change in one day)
@@ -308,9 +294,7 @@ class StockDataLoader:
 
             if extreme_changes.any():
                 extreme_count = extreme_changes.sum()
-                logger.warning(
-                    f"Found {extreme_count} extreme price changes for {ticker}"
-                )
+                logger.warning(f"Found {extreme_count} extreme price changes for {ticker}")
 
         # Sort by date to ensure chronological order
         df = df.sort_index()
@@ -322,17 +306,13 @@ class StockDataLoader:
 
             if large_gaps.any():
                 gap_count = large_gaps.sum()
-                logger.warning(
-                    f"Found {gap_count} large date gaps (>7 days) for {ticker}"
-                )
+                logger.warning(f"Found {gap_count} large date gaps (>7 days) for {ticker}")
 
         cleaned_length = len(df)
         removed_count = original_length - cleaned_length
 
         if removed_count > 0:
-            logger.info(
-                f"Cleaned data for {ticker}: removed {removed_count} invalid rows"
-            )
+            logger.info(f"Cleaned data for {ticker}: removed {removed_count} invalid rows")
 
         return df
 

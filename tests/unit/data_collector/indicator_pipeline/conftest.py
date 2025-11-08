@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from unittest.mock import patch
 
-from tests._fixtures.factories import OHLCVRecordFactory, set_factory_seed
+from tests.fixtures.factories import OHLCVRecordFactory, set_factory_seed
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -61,9 +61,7 @@ def mock_pipeline_logger():
 @pytest.fixture
 def processor():
     """Construct a BatchFeatureProcessor and ensure it's closed after tests that use it."""
-    from src.data_collector.indicator_pipeline.indicator_pipeline import (
-        BatchFeatureProcessor,
-    )
+    from src.data_collector.indicator_pipeline.indicator_pipeline import BatchFeatureProcessor
 
     inst = BatchFeatureProcessor()
     yield inst

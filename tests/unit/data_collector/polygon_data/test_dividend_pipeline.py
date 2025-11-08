@@ -62,9 +62,7 @@ def test_ingest_dividends_for_all_tickers_routing(
 
     # Test sequential (default)
     ingest_dividends_for_all_tickers(concurrent=False)
-    mock_sequential.assert_called_once_with(
-        tickers=[{"id": 1, "ticker": "AAPL"}], batch_size=100
-    )
+    mock_sequential.assert_called_once_with(tickers=[{"id": 1, "ticker": "AAPL"}], batch_size=100)
     mock_concurrent.assert_not_called()
 
     # Reset mocks
@@ -72,14 +70,9 @@ def test_ingest_dividends_for_all_tickers_routing(
     mock_concurrent.reset_mock()
 
     # Test concurrent
-    ingest_dividends_for_all_tickers(
-        concurrent=True, max_workers=3, requests_per_minute=10
-    )
+    ingest_dividends_for_all_tickers(concurrent=True, max_workers=3, requests_per_minute=10)
     mock_concurrent.assert_called_once_with(
-        tickers=[{"id": 1, "ticker": "AAPL"}],
-        batch_size=100,
-        max_workers=3,
-        requests_per_minute=10,
+        tickers=[{"id": 1, "ticker": "AAPL"}], batch_size=100, max_workers=3, requests_per_minute=10
     )
     mock_sequential.assert_not_called()
 
@@ -87,9 +80,7 @@ def test_ingest_dividends_for_all_tickers_routing(
 @patch("concurrent.futures.ThreadPoolExecutor")
 @patch("src.data_collector.polygon_data.dividend_pipeline.PolygonDataClient")
 @patch("src.data_collector.polygon_data.dividend_pipeline.DataStorage")
-def test_concurrent_processing_basic(
-    mock_storage_class, mock_client_class, mock_executor_class
-):
+def test_concurrent_processing_basic(mock_storage_class, mock_client_class, mock_executor_class):
     """Test basic concurrent processing functionality."""
     # Mock storage
     mock_storage = MagicMock()
@@ -102,12 +93,7 @@ def test_concurrent_processing_basic(
     # Mock executor
     mock_executor = MagicMock()
     mock_future = MagicMock()
-    mock_future.result.return_value = {
-        "fetched": 5,
-        "upserted": 3,
-        "invalid": 0,
-        "skipped": 2,
-    }
+    mock_future.result.return_value = {"fetched": 5, "upserted": 3, "invalid": 0, "skipped": 2}
     mock_executor.__enter__.return_value = mock_executor
     mock_executor.__exit__.return_value = None
     mock_executor.submit.return_value = mock_future
@@ -117,12 +103,7 @@ def test_concurrent_processing_basic(
     with patch(
         "src.data_collector.polygon_data.dividend_pipeline.ingest_dividends_for_ticker"
     ) as mock_ingest:
-        mock_ingest.return_value = {
-            "fetched": 5,
-            "upserted": 3,
-            "invalid": 0,
-            "skipped": 2,
-        }
+        mock_ingest.return_value = {"fetched": 5, "upserted": 3, "invalid": 0, "skipped": 2}
 
         tickers = [{"id": 1, "ticker": "AAPL"}, {"id": 2, "ticker": "GOOGL"}]
 

@@ -50,11 +50,7 @@ class TechnicalIndicatorConfig:
 
     @property
     def MACD_PARAMS(self) -> Dict[str, int]:
-        return {
-            "fast": self.MACD_FAST,
-            "slow": self.MACD_SLOW,
-            "signal": self.MACD_SIGNAL,
-        }
+        return {"fast": self.MACD_FAST, "slow": self.MACD_SLOW, "signal": self.MACD_SIGNAL}
 
     # RSI Parameters
     RSI_PERIODS: List[int] = field(default_factory=lambda: [14, 21])
@@ -72,17 +68,12 @@ class TechnicalIndicatorConfig:
     # Stochastic Oscillator
     STOCHASTIC_K_PERIOD: int = int(os.getenv("FE_STOCH_K_PERIOD", "14"))
     STOCHASTIC_D_PERIOD: int = int(os.getenv("FE_STOCH_D_PERIOD", "3"))
-    STOCHASTIC_OVERBOUGHT_THRESHOLD: float = float(
-        os.getenv("FE_STOCH_OVERBOUGHT", "80.0")
-    )
+    STOCHASTIC_OVERBOUGHT_THRESHOLD: float = float(os.getenv("FE_STOCH_OVERBOUGHT", "80.0"))
     STOCHASTIC_OVERSOLD_THRESHOLD: float = float(os.getenv("FE_STOCH_OVERSOLD", "20.0"))
 
     @property
     def STOCHASTIC_PARAMS(self) -> Dict[str, int]:
-        return {
-            "k_period": self.STOCHASTIC_K_PERIOD,
-            "d_period": self.STOCHASTIC_D_PERIOD,
-        }
+        return {"k_period": self.STOCHASTIC_K_PERIOD, "d_period": self.STOCHASTIC_D_PERIOD}
 
     # ATR (Average True Range)
     ATR_PERIOD: int = int(os.getenv("FE_ATR_PERIOD", "14"))
@@ -157,21 +148,15 @@ class StorageConfig:
     FEATURE_VERSION: str = os.getenv("FEATURE_VERSION", "v1.0")
 
     # Parquet Settings
-    PARQUET_COMPRESSION: str = os.getenv(
-        "FE_PARQUET_COMPRESSION", "snappy"
-    )  # snappy, gzip, brotli
-    PARQUET_ENGINE: str = os.getenv(
-        "FE_PARQUET_ENGINE", "pyarrow"
-    )  # pyarrow, fastparquet
+    PARQUET_COMPRESSION: str = os.getenv("FE_PARQUET_COMPRESSION", "snappy")  # snappy, gzip, brotli
+    PARQUET_ENGINE: str = os.getenv("FE_PARQUET_ENGINE", "pyarrow")  # pyarrow, fastparquet
     PARQUET_ROW_GROUP_SIZE: int = int(os.getenv("FE_PARQUET_ROW_GROUP_SIZE", "50000"))
 
     # Storage Behavior
     SAVE_TO_DATABASE: bool = True
     SAVE_TO_PARQUET: bool = True
     USE_CONSOLIDATED_STORAGE: bool = True
-    OVERWRITE_EXISTING: bool = (
-        os.getenv("FE_OVERWRITE_EXISTING", "false").lower() == "true"
-    )
+    OVERWRITE_EXISTING: bool = os.getenv("FE_OVERWRITE_EXISTING", "false").lower() == "true"
 
     # Partitioning
     PARTITIONING_STRATEGY: str = "by_date"  # Only year-based supported
@@ -181,9 +166,7 @@ class StorageConfig:
     MAX_VERSIONS_TO_KEEP: int = int(os.getenv("FE_MAX_VERSIONS_TO_KEEP", "3"))
 
     # Consolidated Storage
-    MAX_ROWS_PER_FILE: int = int(
-        os.getenv("FE_MAX_ROWS_PER_FILE", "5000000")
-    )  # 5M rows
+    MAX_ROWS_PER_FILE: int = int(os.getenv("FE_MAX_ROWS_PER_FILE", "5000000"))  # 5M rows
     INCLUDE_METADATA_COLUMNS: bool = True
 
 
@@ -209,9 +192,7 @@ class DatabaseConfig:
         return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
-def _parse_tuple_float(
-    env_var: str, default: Tuple[float, float]
-) -> Tuple[float, float]:
+def _parse_tuple_float(env_var: str, default: Tuple[float, float]) -> Tuple[float, float]:
     """Parse comma-separated float tuple from environment variable"""
     value = os.getenv(env_var)
     if value:
@@ -254,8 +235,7 @@ class FundamentalConfig:
 
     # Data Collection
     POLYGON_FUNDAMENTALS_ENDPOINT: str = os.getenv(
-        "FE_FUNDAMENTAL_POLYGON_ENDPOINT",
-        "https://api.polygon.io/vX/reference/financials",
+        "FE_FUNDAMENTAL_POLYGON_ENDPOINT", "https://api.polygon.io/vX/reference/financials"
     )
     UPDATE_FREQUENCY: str = os.getenv("FE_FUNDAMENTAL_UPDATE_FREQUENCY", "daily")
     HISTORICAL_YEARS: int = 3
@@ -298,9 +278,7 @@ class FundamentalConfig:
         default_factory=lambda: _parse_tuple_float("FE_CASH_RATIO_CAP", (0, 10))
     )
     INTEREST_COVERAGE_CAP: Tuple[float, float] = field(
-        default_factory=lambda: _parse_tuple_float(
-            "FE_INTEREST_COVERAGE_CAP", (-100, 1000)
-        )
+        default_factory=lambda: _parse_tuple_float("FE_INTEREST_COVERAGE_CAP", (-100, 1000))
     )
     FINANCIAL_LEVERAGE_CAP: Tuple[float, float] = field(
         default_factory=lambda: _parse_tuple_float("FE_FINANCIAL_LEVERAGE_CAP", (1, 50))
@@ -314,22 +292,16 @@ class FundamentalConfig:
         default_factory=lambda: _parse_tuple_int("FE_SIC_MATERIALS_RANGE", (1000, 1499))
     )
     SIC_INDUSTRIALS_RANGE_1: Tuple[int, int] = field(
-        default_factory=lambda: _parse_tuple_int(
-            "FE_SIC_INDUSTRIALS_RANGE_1", (1500, 1799)
-        )
+        default_factory=lambda: _parse_tuple_int("FE_SIC_INDUSTRIALS_RANGE_1", (1500, 1799))
     )
     SIC_INDUSTRIALS_RANGE_2: Tuple[int, int] = field(
-        default_factory=lambda: _parse_tuple_int(
-            "FE_SIC_INDUSTRIALS_RANGE_2", (2000, 3999)
-        )
+        default_factory=lambda: _parse_tuple_int("FE_SIC_INDUSTRIALS_RANGE_2", (2000, 3999))
     )
     SIC_UTILITIES_RANGE: Tuple[int, int] = field(
         default_factory=lambda: _parse_tuple_int("FE_SIC_UTILITIES_RANGE", (4000, 4999))
     )
     SIC_CONSUMER_STAPLES_RANGE: Tuple[int, int] = field(
-        default_factory=lambda: _parse_tuple_int(
-            "FE_SIC_CONSUMER_STAPLES_RANGE", (5000, 5199)
-        )
+        default_factory=lambda: _parse_tuple_int("FE_SIC_CONSUMER_STAPLES_RANGE", (5000, 5199))
     )
     SIC_CONSUMER_DISCRETIONARY_RANGE: Tuple[int, int] = field(
         default_factory=lambda: _parse_tuple_int(
@@ -337,39 +309,25 @@ class FundamentalConfig:
         )
     )
     SIC_FINANCIALS_RANGE: Tuple[int, int] = field(
-        default_factory=lambda: _parse_tuple_int(
-            "FE_SIC_FINANCIALS_RANGE", (6000, 6799)
-        )
+        default_factory=lambda: _parse_tuple_int("FE_SIC_FINANCIALS_RANGE", (6000, 6799))
     )
     SIC_TECHNOLOGY_RANGE: Tuple[int, int] = field(
-        default_factory=lambda: _parse_tuple_int(
-            "FE_SIC_TECHNOLOGY_RANGE", (7000, 8999)
-        )
+        default_factory=lambda: _parse_tuple_int("FE_SIC_TECHNOLOGY_RANGE", (7000, 8999))
     )
     SIC_DEFAULT_SECTOR: str = os.getenv("FE_SIC_DEFAULT_SECTOR", "Industrials")
 
     # Quality Thresholds
-    MIN_FUNDAMENTAL_DATA_POINTS: int = int(
-        os.getenv("FE_MIN_FUNDAMENTAL_DATA_POINTS", "8")
-    )
-    MAX_MISSING_FUNDAMENTAL_PCT: float = float(
-        os.getenv("FE_MAX_MISSING_FUNDAMENTAL_PCT", "0.25")
-    )
+    MIN_FUNDAMENTAL_DATA_POINTS: int = int(os.getenv("FE_MIN_FUNDAMENTAL_DATA_POINTS", "8"))
+    MAX_MISSING_FUNDAMENTAL_PCT: float = float(os.getenv("FE_MAX_MISSING_FUNDAMENTAL_PCT", "0.25"))
 
     # Scoring System Weights
     ALTMAN_Z_SCORE_WEIGHT: float = float(os.getenv("FE_ALTMAN_Z_SCORE_WEIGHT", "0.3"))
-    PIOTROSKI_F_SCORE_WEIGHT: float = float(
-        os.getenv("FE_PIOTROSKI_F_SCORE_WEIGHT", "0.3")
-    )
-    FINANCIAL_HEALTH_WEIGHT: float = float(
-        os.getenv("FE_FINANCIAL_HEALTH_WEIGHT", "0.4")
-    )
+    PIOTROSKI_F_SCORE_WEIGHT: float = float(os.getenv("FE_PIOTROSKI_F_SCORE_WEIGHT", "0.3"))
+    FINANCIAL_HEALTH_WEIGHT: float = float(os.getenv("FE_FINANCIAL_HEALTH_WEIGHT", "0.4"))
 
     # Sector Analysis
     MIN_SECTOR_COMPANIES: int = int(os.getenv("FE_MIN_SECTOR_COMPANIES", "5"))
-    PERCENTILE_CALCULATION_METHOD: str = os.getenv(
-        "FE_PERCENTILE_CALCULATION_METHOD", "linear"
-    )
+    PERCENTILE_CALCULATION_METHOD: str = os.getenv("FE_PERCENTILE_CALCULATION_METHOD", "linear")
 
     # Growth Calculation
     GROWTH_PERIODS: List[int] = field(
@@ -388,24 +346,16 @@ class FeatureEngineeringConfig:
 
     # Sub-configurations
     data_quality: DataQualityConfig = field(default_factory=DataQualityConfig)
-    batch_processing: BatchProcessingConfig = field(
-        default_factory=BatchProcessingConfig
-    )
-    technical_indicators: TechnicalIndicatorConfig = field(
-        default_factory=TechnicalIndicatorConfig
-    )
+    batch_processing: BatchProcessingConfig = field(default_factory=BatchProcessingConfig)
+    technical_indicators: TechnicalIndicatorConfig = field(default_factory=TechnicalIndicatorConfig)
     date_range: DateRangeConfig = field(default_factory=DateRangeConfig)
-    feature_categories: FeatureCategoryConfig = field(
-        default_factory=FeatureCategoryConfig
-    )
+    feature_categories: FeatureCategoryConfig = field(default_factory=FeatureCategoryConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     fundamental: FundamentalConfig = field(default_factory=FundamentalConfig)
 
     # Global Settings
-    ENABLE_PARALLEL_PROCESSING: bool = (
-        os.getenv("FE_ENABLE_PARALLEL", "true").lower() == "true"
-    )
+    ENABLE_PARALLEL_PROCESSING: bool = os.getenv("FE_ENABLE_PARALLEL", "true").lower() == "true"
     ENVIRONMENT: str = os.getenv("FE_ENVIRONMENT", "production")
 
     def validate_config(self) -> List[str]:
@@ -436,9 +386,7 @@ class FeatureEngineeringConfig:
             self.technical_indicators.RSI_OVERBOUGHT_THRESHOLD
             <= self.technical_indicators.RSI_OVERSOLD_THRESHOLD
         ):
-            errors.append(
-                "RSI overbought threshold must be greater than oversold threshold"
-            )
+            errors.append("RSI overbought threshold must be greater than oversold threshold")
 
         # Validate storage paths
         if not self.storage.FEATURES_STORAGE_PATH:
@@ -462,9 +410,7 @@ class FeatureEngineeringConfig:
             "default_categories": self.feature_categories.DEFAULT_CATEGORIES,
             "storage_path": self.storage.FEATURES_STORAGE_PATH,
             "feature_version": self.storage.FEATURE_VERSION,
-            "database_url": self.database.database_url.replace(
-                self.database.DB_PASSWORD, "***"
-            )
+            "database_url": self.database.database_url.replace(self.database.DB_PASSWORD, "***")
             if self.database.DB_PASSWORD
             else self.database.database_url,
         }
@@ -507,8 +453,7 @@ def validate_configuration() -> None:
     errors = config.validate_config()
     if errors:
         raise ValueError(
-            "Configuration validation failed:\n"
-            + "\n".join(f"  - {error}" for error in errors)
+            "Configuration validation failed:\n" + "\n".join(f"  - {error}" for error in errors)
         )
 
 

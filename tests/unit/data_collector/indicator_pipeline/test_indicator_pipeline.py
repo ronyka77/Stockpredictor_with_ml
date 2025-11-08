@@ -36,9 +36,7 @@ def sample_stock_df():
 
 def test_get_available_tickers_calls_loader(mocker, processor):
     """Call data loader to obtain available tickers"""
-    mocker.patch.object(
-        processor.data_loader, "get_available_tickers", return_value=["A", "B"]
-    )
+    mocker.patch.object(processor.data_loader, "get_available_tickers", return_value=["A", "B"])
     tickers = processor.get_available_tickers(min_data_points=1)
     assert tickers == ["A", "B"]
 
@@ -46,12 +44,8 @@ def test_get_available_tickers_calls_loader(mocker, processor):
 def test_process_single_ticker_no_data(mocker, processor):
     """Return error when loader provides no data for a ticker"""
     # Make loader return empty DataFrame
-    mocker.patch.object(
-        processor.data_loader, "load_stock_data", return_value=pd.DataFrame()
-    )
-    cfg = BatchJobConfig(
-        start_date="2025-01-01", end_date="2025-01-02", min_data_points=1
-    )
+    mocker.patch.object(processor.data_loader, "load_stock_data", return_value=pd.DataFrame())
+    cfg = BatchJobConfig(start_date="2025-01-01", end_date="2025-01-02", min_data_points=1)
     res = processor.process_single_ticker("T", cfg, job_id="j1")
     assert res["success"] is False
     assert res["error"] == "No data available"
@@ -61,28 +55,18 @@ def make_feature_result():
     # features DataFrame with two feature columns; include a NaN, inf, and huge value to test filtering
     idx = pd.date_range(end=datetime.today(), periods=3, freq="D")
     feats = pd.DataFrame(
-        {
-            "feat_a": [1.0, float("nan"), 2.0],
-            "feat_b": [float("inf"), 3.0, 1e12],
-        },
-        index=idx,
+        {"feat_a": [1.0, float("nan"), 2.0], "feat_b": [float("inf"), 3.0, 1e12]}, index=idx
     )
     return SimpleNamespace(data=feats, warnings=["w1"], quality_score=0.95)
 
 
-def test_process_single_ticker_saves_to_parquet_and_db(
-    processor, sample_stock_df, mocker, caplog
-):
+def test_process_single_ticker_saves_to_parquet_and_db(processor, sample_stock_df, mocker, caplog):
     """Calculate features, save to parquet and perform DB bulk upsert"""
     # Arrange
-    mocker.patch.object(
-        processor.data_loader, "load_stock_data", return_value=sample_stock_df
-    )
+    mocker.patch.object(processor.data_loader, "load_stock_data", return_value=sample_stock_df)
     mock_feature_result = make_feature_result()
     mocker.patch.object(
-        processor.feature_calculator,
-        "calculate_all_features",
-        return_value=mock_feature_result,
+        processor.feature_calculator, "calculate_all_features", return_value=mock_feature_result
     )
 
     # Patch storage save and DB bulk upsert (patch upstream db util)
@@ -128,9 +112,7 @@ def test_batchjobconfig_parses_dates():
     assert isinstance(cfg1.start_date, date) and isinstance(cfg1.end_date, date)
 
     # datetime objects
-    cfg2 = BatchJobConfig(
-        start_date=datetime(2025, 1, 1), end_date=datetime(2025, 1, 2)
-    )
+    cfg2 = BatchJobConfig(start_date=datetime(2025, 1, 1), end_date=datetime(2025, 1, 2))
     assert isinstance(cfg2.start_date, date) and isinstance(cfg2.end_date, date)
 
 
@@ -139,12 +121,8 @@ def test_process_batch_aggregates_results(processor, mocker):
     # Arrange: patch process_single_ticker to simulate one success and one failure
     success = {"ticker": "A", "success": True, "features_calculated": 2, "warnings": 0}
     failure = {"ticker": "B", "success": False, "error": "bad"}
-    mocker.patch.object(
-        processor, "process_single_ticker", side_effect=[success, failure]
-    )
-    cfg = BatchJobConfig(
-        batch_size=2, max_workers=2, use_processes=False, min_data_points=1
-    )
+    mocker.patch.object(processor, "process_single_ticker", side_effect=[success, failure])
+    cfg = BatchJobConfig(batch_size=2, max_workers=2, use_processes=False, min_data_points=1)
 
     # Act
     summary = processor.process_batch(["A", "B"], cfg)
@@ -230,9 +208,7 @@ def test__save_features_to_database_filters_and_returns_count(mocker, processor)
         "src.database.db_utils.bulk_upsert_technical_features", return_value=7
     )
 
-    saved = processor._save_features_to_database(
-        "TICK", feature_result, overwrite=True
-    )
+    saved = processor._save_features_to_database("TICK", feature_result, overwrite=True)
     assert saved == 7
     # ensure rows passed do not contain NaN or inf or huge values
     args, _ = bulk_upsert_mock.call_args
@@ -252,37 +228,26 @@ def test_process_single_ticker_insufficient_data(processor, mocker):
     # loader returns small DF
     small_df = pd.DataFrame({"a": [1]})
     mocker.patch.object(processor.data_loader, "load_stock_data", return_value=small_df)
-    cfg = BatchJobConfig(
-        start_date="2025-01-01", end_date="2025-01-02", min_data_points=5
-    )
+    cfg = BatchJobConfig(start_date="2025-01-01", end_date="2025-01-02", min_data_points=5)
     res = processor.process_single_ticker("T", cfg, job_id="j1")
     assert res["success"] is False
     assert "Insufficient data" in res["error"]
 
 
-def test_process_single_ticker_db_error_logs_but_succeeds(
-    processor, sample_stock_df, mocker
-):
+def test_process_single_ticker_db_error_logs_but_succeeds(processor, sample_stock_df, mocker):
     """Log DB errors during upsert but still succeed overall"""
-    mocker.patch.object(
-        processor.data_loader, "load_stock_data", return_value=sample_stock_df
-    )
+    mocker.patch.object(processor.data_loader, "load_stock_data", return_value=sample_stock_df)
     mock_feature_result = make_feature_result()
     mocker.patch.object(
-        processor.feature_calculator,
-        "calculate_all_features",
-        return_value=mock_feature_result,
+        processor.feature_calculator, "calculate_all_features", return_value=mock_feature_result
     )
 
     # make bulk upsert raise
     mocker.patch(
-        "src.database.db_utils.bulk_upsert_technical_features",
-        side_effect=RuntimeError("db down"),
+        "src.database.db_utils.bulk_upsert_technical_features", side_effect=RuntimeError("db down")
     )
     # patch logger.error to observe it's called
-    log_mock = mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.logger"
-    )
+    log_mock = mocker.patch("src.data_collector.indicator_pipeline.indicator_pipeline.logger")
 
     cfg = BatchJobConfig(
         start_date=(date.today() - timedelta(days=10)),
@@ -311,8 +276,7 @@ def test_run_production_batch_consolidation_paths(mocker):
 
     # Patch FeatureStorage.remove_all_versions_for_all_tickers
     module_fs = __import__(
-        "src.data_collector.indicator_pipeline.indicator_pipeline",
-        fromlist=["FeatureStorage"],
+        "src.data_collector.indicator_pipeline.indicator_pipeline", fromlist=["FeatureStorage"]
     )
     storage_cls = getattr(module_fs, "FeatureStorage")
     mocker.patch.object(storage_cls, "remove_all_versions_for_all_tickers")
@@ -325,10 +289,7 @@ def test_run_production_batch_consolidation_paths(mocker):
             "total_tickers": 2,
             "successful": 2,
             "failed": 0,
-            "results": [
-                {"ticker": "A", "success": True},
-                {"ticker": "B", "success": True},
-            ],
+            "results": [{"ticker": "A", "success": True}, {"ticker": "B", "success": True}],
             "total_features": 4,
             "success_rate": 100.0,
         },
@@ -351,14 +312,11 @@ def test_run_production_batch_consolidation_paths(mocker):
         return_value=proc_inst,
     )
 
-    from src.data_collector.indicator_pipeline.indicator_pipeline import (
-        run_production_batch,
-    )
+    from src.data_collector.indicator_pipeline.indicator_pipeline import run_production_batch
 
     # Patch FeatureStorage.get_storage_stats to avoid KeyError
     fs_module = __import__(
-        "src.data_collector.indicator_pipeline.indicator_pipeline",
-        fromlist=["FeatureStorage"],
+        "src.data_collector.indicator_pipeline.indicator_pipeline", fromlist=["FeatureStorage"]
     )
     fs_cls = getattr(fs_module, "FeatureStorage")
     mocker.patch.object(
@@ -393,8 +351,7 @@ def test__process_ticker_worker_save_parquet_called(mocker):
     mock_loader = mock_loader_cls.return_value
     mock_loader.load_stock_data.return_value = ohlcv_df
     mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.StockDataLoader",
-        mock_loader_cls,
+        "src.data_collector.indicator_pipeline.indicator_pipeline.StockDataLoader", mock_loader_cls
     )
 
     mock_calc = mocker.Mock()
@@ -411,8 +368,7 @@ def test__process_ticker_worker_save_parquet_called(mocker):
     storage = storage_cls.return_value
     storage.save_features = mocker.Mock()
     mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.FeatureStorage",
-        storage_cls,
+        "src.data_collector.indicator_pipeline.indicator_pipeline.FeatureStorage", storage_cls
     )
 
     config_dict = {
@@ -446,8 +402,7 @@ def test__process_ticker_worker_bulk_upsert_exception_logged(mocker):
     mock_loader = mock_loader_cls.return_value
     mock_loader.load_stock_data.return_value = ohlcv_df
     mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.StockDataLoader",
-        mock_loader_cls,
+        "src.data_collector.indicator_pipeline.indicator_pipeline.StockDataLoader", mock_loader_cls
     )
 
     mock_calc = mocker.Mock()
@@ -464,12 +419,9 @@ def test__process_ticker_worker_bulk_upsert_exception_logged(mocker):
 
     # cause bulk upsert to raise
     mocker.patch(
-        "src.database.db_utils.bulk_upsert_technical_features",
-        side_effect=RuntimeError("boom"),
+        "src.database.db_utils.bulk_upsert_technical_features", side_effect=RuntimeError("boom")
     )
-    log_mock = mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.logger"
-    )
+    log_mock = mocker.patch("src.data_collector.indicator_pipeline.indicator_pipeline.logger")
 
     config_dict = {
         "start_date": "2025-01-01",
@@ -491,9 +443,7 @@ def test_process_batch_future_exception(processor, mocker):
         raise RuntimeError("boom")
 
     mocker.patch.object(processor, "process_single_ticker", side_effect=raise_exc)
-    cfg = BatchJobConfig(
-        batch_size=2, max_workers=2, use_processes=False, min_data_points=1
-    )
+    cfg = BatchJobConfig(batch_size=2, max_workers=2, use_processes=False, min_data_points=1)
 
     summary = processor.process_batch(["A", "B"], cfg)
     # both should have failed
@@ -530,8 +480,7 @@ def test_run_production_batch_consolidation_failure(mocker):
         side_effect=RuntimeError("consolidation failed"),
     )
     fs_module = __import__(
-        "src.data_collector.indicator_pipeline.indicator_pipeline",
-        fromlist=["FeatureStorage"],
+        "src.data_collector.indicator_pipeline.indicator_pipeline", fromlist=["FeatureStorage"]
     )
     fs_cls = getattr(fs_module, "FeatureStorage")
     mocker.patch.object(
@@ -540,9 +489,7 @@ def test_run_production_batch_consolidation_failure(mocker):
         return_value={"total_tickers": 1, "total_size_mb": 0.1, "base_path": "/tmp"},
     )
 
-    from src.data_collector.indicator_pipeline.indicator_pipeline import (
-        run_production_batch,
-    )
+    from src.data_collector.indicator_pipeline.indicator_pipeline import run_production_batch
 
     res = run_production_batch()
     assert res is not None
@@ -552,9 +499,7 @@ def test_run_production_batch_consolidation_failure(mocker):
 def test_main_invokes_cache_clear(mocker):
     """Main should clear cleaned data cache after running production batch"""
     # Patch run_production_batch and CleanedDataCache
-    mocker.patch(
-        "src.data_collector.indicator_pipeline.indicator_pipeline.run_production_batch"
-    )
+    mocker.patch("src.data_collector.indicator_pipeline.indicator_pipeline.run_production_batch")
     cache_cls = mocker.patch("src.utils.cleaned_data_cache.CleanedDataCache")
     inst = cache_cls.return_value
     inst.clear_cache = mocker.Mock()

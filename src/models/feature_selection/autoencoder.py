@@ -3,6 +3,7 @@
 Designed to train on large tabular datasets in batches with AMP and early stopping.
 Exports small, well-documented functions so the orchestrator can call them.
 """
+
 import os
 import time
 from typing import Tuple, Dict, Any
@@ -44,7 +45,9 @@ class DenseAutoencoder(nn.Module):
         return self.decoder(z)
 
 
-def _make_dataloader(array: np.ndarray, batch_size: int, shuffle: bool = True, num_workers: int = 4) -> DataLoader:
+def _make_dataloader(
+    array: np.ndarray, batch_size: int, shuffle: bool = True, num_workers: int = 4
+) -> DataLoader:
     tensor = torch.from_numpy(array.astype(np.float32))
     ds = TensorDataset(tensor)
     return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
@@ -116,7 +119,9 @@ def train_autoencoder(
         hist["train_loss"].append(avg_train)
         hist["val_loss"].append(avg_val)
 
-        logger.info(f"AE epoch {epoch}/{epochs} train_loss={avg_train:.6f} val_loss={avg_val:.6f} elapsed={time.time()-t0:.1f}s")
+        logger.info(
+            f"AE epoch {epoch}/{epochs} train_loss={avg_train:.6f} val_loss={avg_val:.6f} elapsed={time.time() - t0:.1f}s"
+        )
 
         # early stopping
         if avg_val < best_val:
@@ -151,7 +156,9 @@ def train_autoencoder(
     return encoder, meta
 
 
-def encode_df(encoder: nn.Module, X: np.ndarray, batch_size: int = 2048, device: str = "cuda") -> np.ndarray:
+def encode_df(
+    encoder: nn.Module, X: np.ndarray, batch_size: int = 2048, device: str = "cuda"
+) -> np.ndarray:
     """Encode a numpy array X using encoder in batches and return numpy array of latent embeddings.
 
     Encoder is expected to be a torch.nn.Module that maps input -> latent.
@@ -174,5 +181,3 @@ def encode_df(encoder: nn.Module, X: np.ndarray, batch_size: int = 2048, device:
 def save_encoder(encoder: nn.Module, path: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     torch.save(encoder.state_dict(), path)
-
-

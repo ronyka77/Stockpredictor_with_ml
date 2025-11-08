@@ -4,27 +4,20 @@ from datetime import date
 from unittest.mock import patch
 
 from src.data_collector.polygon_data.data_fetcher import HistoricalDataFetcher
-from src.data_collector.polygon_data.data_validator import (
-    OHLCVRecord,
-    DataQualityMetrics,
-)
+from src.data_collector.polygon_data.data_validator import OHLCVRecord, DataQualityMetrics
 from src.data_collector.polygon_data.client import PolygonDataClient
-from tests._fixtures import canned_api_factory
-from tests._fixtures.factories import polygon_payload_dict
+from tests.fixtures import canned_api_factory
+from tests.fixtures.factories import polygon_payload_dict
 
 
 def test_get_historical_data_returns_empty_when_no_data(polygon_client):
     """Return empty records and metrics when API returns no aggregates"""
     empty_resp = canned_api_factory("empty")
     with patch.object(
-        PolygonDataClient,
-        "get_aggregates",
-        return_value=empty_resp.json().get("results", []),
+        PolygonDataClient, "get_aggregates", return_value=empty_resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client)
-        records, metrics = fetcher.get_historical_data(
-            "TICK", "2020-01-01", "2020-01-02"
-        )
+        records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
 
     assert records == []
     assert isinstance(metrics, DataQualityMetrics)
@@ -48,9 +41,7 @@ def test_get_historical_data_validation_path(polygon_client):
         PolygonDataClient, "get_aggregates", return_value=resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client, validator=validator)
-        records, metrics = fetcher.get_historical_data(
-            "TICK", "2020-01-01", "2020-01-02"
-        )
+        records, metrics = fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
 
     assert records == fake_validated
     assert metrics.success_rate == 99.9
@@ -78,9 +69,7 @@ def test_get_historical_data_transform_without_validation(polygon_client):
 
 def test_get_historical_data_raises_on_client_exception(polygon_client):
     """Raise an exception when the underlying client fails during fetch"""
-    with patch.object(
-        PolygonDataClient, "get_aggregates", side_effect=Exception("API down")
-    ):
+    with patch.object(PolygonDataClient, "get_aggregates", side_effect=Exception("API down")):
         fetcher = HistoricalDataFetcher(client=polygon_client)
         with pytest.raises(Exception):
             fetcher.get_historical_data("TICK", "2020-01-01", "2020-01-02")
@@ -92,9 +81,7 @@ def test_get_grouped_daily_data_without_validation(polygon_client):
     resp = canned_api_factory("empty")
     resp._payload = {"results": [grouped_rec]}
     with patch.object(
-        PolygonDataClient,
-        "get_grouped_daily",
-        return_value=resp.json().get("results", []),
+        PolygonDataClient, "get_grouped_daily", return_value=resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client)
         results = fetcher.get_grouped_daily_data("2020-01-01", validate_data=False)
@@ -127,14 +114,10 @@ def test_get_historical_data_no_data(polygon_client):
     """Return no records and zero total_records when API returns empty results"""
     empty_resp = canned_api_factory("empty")
     with patch.object(
-        PolygonDataClient,
-        "get_aggregates",
-        return_value=empty_resp.json().get("results", []),
+        PolygonDataClient, "get_aggregates", return_value=empty_resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client)
-        records, metrics = fetcher.get_historical_data(
-            "AAA", "2020-01-01", "2020-01-02"
-        )
+        records, metrics = fetcher.get_historical_data("AAA", "2020-01-01", "2020-01-02")
 
     assert records == []
     assert metrics.total_records == 0
@@ -153,9 +136,7 @@ def test_get_historical_data_transforms_and_validates(polygon_client):
         PolygonDataClient, "get_aggregates", return_value=resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client)
-        records, metrics = fetcher.get_historical_data(
-            "BBB", date(2020, 1, 1), date(2020, 1, 2)
-        )
+        records, metrics = fetcher.get_historical_data("BBB", date(2020, 1, 1), date(2020, 1, 2))
 
     assert metrics.total_records == 2
     assert metrics.valid_records == len(records)
@@ -164,15 +145,11 @@ def test_get_historical_data_transforms_and_validates(polygon_client):
 
 def test_get_grouped_daily_data(polygon_client):
     """Fetch grouped daily data and return correctly keyed OHLCVRecord entries"""
-    grouped = [
-        {"T": "CCC", "t": 1577923200000, "o": 5, "h": 6, "l": 4, "c": 5, "v": 50},
-    ]
+    grouped = [{"T": "CCC", "t": 1577923200000, "o": 5, "h": 6, "l": 4, "c": 5, "v": 50}]
     resp = canned_api_factory("empty")
     resp._payload = {"results": grouped}
     with patch.object(
-        PolygonDataClient,
-        "get_grouped_daily",
-        return_value=resp.json().get("results", []),
+        PolygonDataClient, "get_grouped_daily", return_value=resp.json().get("results", [])
     ):
         fetcher = HistoricalDataFetcher(client=polygon_client)
         res = fetcher.get_grouped_daily_data("2020-01-01")

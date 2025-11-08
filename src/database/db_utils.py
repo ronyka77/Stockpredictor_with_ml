@@ -49,9 +49,7 @@ def bulk_upsert_technical_features(
             "quality_score = EXCLUDED.quality_score, calculation_timestamp = CURRENT_TIMESTAMP"
         )
     else:
-        conflict_clause = (
-            "ON CONFLICT (ticker, date, feature_category, feature_name) DO NOTHING"
-        )
+        conflict_clause = "ON CONFLICT (ticker, date, feature_category, feature_name) DO NOTHING"
 
     insert_sql = (
         "INSERT INTO technical_features "
@@ -90,9 +88,7 @@ def _dividend_row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
     )
 
 
-def _upsert_dividends_batch(
-    rows: Iterable[Dict[str, Any]], page_size: int = 500
-) -> int:
+def _upsert_dividends_batch(rows: Iterable[Dict[str, Any]], page_size: int = 500) -> int:
     """Bulk upsert dividend rows into the `dividends` table.
 
     Args:

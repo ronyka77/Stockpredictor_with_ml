@@ -96,9 +96,7 @@ def test_normalize_meta_yaml_paths_with_artifact_location(tmp_mlruns_dir):
     assert "file:///new/base" in data["artifact_location"]
 
 
-def test_normalize_meta_yaml_paths_creates_missing_for_run_and_experiment(
-    tmp_mlruns_dir,
-):
+def test_normalize_meta_yaml_paths_creates_missing_for_run_and_experiment(tmp_mlruns_dir):
     """Call helper to create missing meta.yaml for run and experiment when absent."""
     meta_path = tmp_mlruns_dir / "1" / "2" / "meta.yaml"
 
@@ -122,10 +120,7 @@ def test_normalize_all_meta_yaml_paths_calls_helpers(tmp_mlruns_dir):
 
     manager.normalize_all_meta_yaml_paths()
 
-    assert (
-        manager.create_missing_meta_yaml.called
-        or manager.normalize_meta_yaml_paths.called
-    )
+    assert manager.create_missing_meta_yaml.called or manager.normalize_meta_yaml_paths.called
 
 
 def test_normalize_meta_yaml_artifact_location_no_file_prefix(tmp_mlruns_dir):

@@ -139,8 +139,7 @@ class MLPModule(nn.Module):
             )
         else:
             raise ValueError(
-                f"Unsupported task: {self.task}. "
-                f"Supported: 'regression', 'classification'"
+                f"Unsupported task: {self.task}. Supported: 'regression', 'classification'"
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -183,11 +182,7 @@ class MLPModule(nn.Module):
                 x_activated = self._get_activation(self.activation)(x_linear)
 
             # Residual connection (if enabled and input/output sizes match)
-            if (
-                self.residual
-                and i == 0
-                and original_input.size(-1) == x_activated.size(-1)
-            ):
+            if self.residual and i == 0 and original_input.size(-1) == x_activated.size(-1):
                 x_activated = x_activated + original_input
 
             # Dropout (only apply to hidden layers, not the last layer)
@@ -275,17 +270,13 @@ class MLPDataUtils:
         # Check if any NaN values remain (should not happen after fillna)
         remaining_nans = cleaned_data.isnull().sum().sum()
         if remaining_nans > 0:
-            logger.warning(
-                f"⚠️ {remaining_nans} NaN values remain after cleaning - filling with 0"
-            )
+            logger.warning(f"⚠️ {remaining_nans} NaN values remain after cleaning - filling with 0")
             cleaned_data = cleaned_data.fillna(0)
 
         # Check for infinite values after cleaning
         inf_count = np.isinf(cleaned_data.values).sum()
         if inf_count > 0:
-            logger.warning(
-                f"⚠️ {inf_count} infinite values found after cleaning - replacing with 0"
-            )
+            logger.warning(f"⚠️ {inf_count} infinite values found after cleaning - replacing with 0")
             cleaned_data = cleaned_data.replace([np.inf, -np.inf], 0)
 
         # Final validation
@@ -300,9 +291,7 @@ class MLPDataUtils:
             logger.error(
                 f"❌ Data still contains invalid values after cleaning: {final_nans} NaNs, {final_infs} Infs"
             )
-            raise ValueError(
-                f"Data validation failed: {final_nans} NaNs, {final_infs} Infs remain"
-            )
+            raise ValueError(f"Data validation failed: {final_nans} NaNs, {final_infs} Infs remain")
 
         logger.info(
             f"✅ Data validation and cleaning completed successfully: {len(cleaned_data)} rows, {len(cleaned_data.columns)} columns"
@@ -311,9 +300,7 @@ class MLPDataUtils:
 
     @staticmethod
     def scale_data(
-        data: pd.DataFrame,
-        scaler: Optional[StandardScaler] = None,
-        fit_scaler: bool = False,
+        data: pd.DataFrame, scaler: Optional[StandardScaler] = None, fit_scaler: bool = False
     ) -> Tuple[pd.DataFrame, StandardScaler]:
         """
         Apply StandardScaler to data for consistent normalization.
@@ -351,9 +338,7 @@ class MLPDataUtils:
         if fit_scaler:
             # Fit new scaler (for training)
             if scaler is not None:
-                logger.warning(
-                    "⚠️ fit_scaler=True but scaler provided - will fit new scaler"
-                )
+                logger.warning("⚠️ fit_scaler=True but scaler provided - will fit new scaler")
 
             scaler = StandardScaler()
             # Fit using DataFrame to preserve feature names and avoid transform warnings
@@ -516,9 +501,7 @@ class MLPModelWrapper(nn.Module):
 
         return predictions_np
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "variance"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "variance") -> np.ndarray:
         """
         Get prediction confidence scores.
 

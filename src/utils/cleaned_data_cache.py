@@ -6,7 +6,7 @@ recomputing expensive cleaning operations.
 """
 
 import pandas as pd
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 import hashlib
 from pathlib import Path
 import json
@@ -59,9 +59,7 @@ class CleanedDataCache:
         cache_key = hashlib.md5(param_str.encode(), usedforsecurity=False).hexdigest()
         return cache_key
 
-    def _get_cache_paths(
-        self, cache_key: str, data_type: str = "training"
-    ) -> Dict[str, Path]:
+    def _get_cache_paths(self, cache_key: str, data_type: str = "training") -> Dict[str, Path]:
         """
         Get file paths for cached data components
 
@@ -132,9 +130,7 @@ class CleanedDataCache:
             if data_type == "training":
                 data_result["x_train"].to_parquet(paths["x_train"])
                 data_result["y_train"].to_frame().to_parquet(paths["y_train"])
-                logger.info(
-                    f"   Saved training data: {len(data_result['x_train'])} samples"
-                )
+                logger.info(f"   Saved training data: {len(data_result['x_train'])} samples")
 
             data_result["x_test"].to_parquet(paths["x_test"])
             data_result["y_test"].to_frame().to_parquet(paths["y_test"])
@@ -202,9 +198,7 @@ class CleanedDataCache:
             Dictionary containing loaded cleaned data
         """
         if not self.cache_exists(cache_key, data_type):
-            raise FileNotFoundError(
-                f"Cache not found for key: {cache_key}, type: {data_type}"
-            )
+            raise FileNotFoundError(f"Cache not found for key: {cache_key}, type: {data_type}")
 
         paths = self._get_cache_paths(cache_key, data_type)
 
@@ -215,9 +209,7 @@ class CleanedDataCache:
             if data_type == "training":
                 result["x_train"] = pd.read_parquet(paths["x_train"])
                 result["y_train"] = pd.read_parquet(paths["y_train"]).squeeze()
-                logger.info(
-                    f"   Loaded training data: {len(result['x_train'])} samples"
-                )
+                logger.info(f"   Loaded training data: {len(result['x_train'])} samples")
 
             result["x_test"] = pd.read_parquet(paths["x_test"])
             result["y_test"] = pd.read_parquet(paths["y_test"]).squeeze()
@@ -230,9 +222,7 @@ class CleanedDataCache:
             if "removed_features" in metadata:
                 if isinstance(metadata["removed_features"], str):
                     try:
-                        metadata["removed_features"] = json.loads(
-                            metadata["removed_features"]
-                        )
+                        metadata["removed_features"] = json.loads(metadata["removed_features"])
                     except json.JSONDecodeError:
                         # If it's just '{}', convert to empty dict
                         metadata["removed_features"] = {}
@@ -240,9 +230,7 @@ class CleanedDataCache:
             if "diversity_analysis" in metadata:
                 if isinstance(metadata["diversity_analysis"], str):
                     try:
-                        metadata["diversity_analysis"] = json.loads(
-                            metadata["diversity_analysis"]
-                        )
+                        metadata["diversity_analysis"] = json.loads(metadata["diversity_analysis"])
                     except json.JSONDecodeError:
                         # If it's just '{}', convert to empty dict
                         metadata["diversity_analysis"] = {}
@@ -250,9 +238,7 @@ class CleanedDataCache:
             # Add metadata to result
             result.update(metadata)
 
-            logger.info(
-                f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}"
-            )
+            logger.info(f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}")
             logger.info(
                 f"   Test data: {len(result['x_test'])} samples, {len(result['x_test'].columns)} features"
             )
@@ -263,9 +249,7 @@ class CleanedDataCache:
             logger.error(f"❌ Error loading cleaned data from cache: {str(e)}")
             raise
 
-    def clear_cache(
-        self, cache_key: Optional[str] = None, data_type: Optional[str] = None
-    ) -> None:
+    def clear_cache(self, cache_key: Optional[str] = None, data_type: Optional[str] = None) -> None:
         """
         Clear cached data
 
@@ -288,24 +272,6 @@ class CleanedDataCache:
                     file.unlink()
             collect_garbage()
             logger.info("Cleared all cached data")
-
-    def list_cached_data(self) -> List[Dict]:
-        """
-        List all cached data entries
-
-        Returns:
-            List of cache information dictionaries
-        """
-        cached_entries = []
-
-        for info_file in self.cache_dir.glob("*.info.json"):
-            try:
-                with open(info_file, "r") as f:
-                    info = json.load(f)
-                cached_entries.append(info)
-            except Exception as e:
-                logger.warning(f"Could not read cache info file {info_file}: {str(e)}")
-        return cached_entries
 
     # Compatibility convenience methods
     def set(self, cache_key: str, df: pd.DataFrame) -> None:
@@ -336,9 +302,7 @@ class CleanedDataCache:
         return result["x_test"]
 
     # Start Generation Here
-    def get_cache_age_hours(
-        self, cache_key: str, data_type: str = "training"
-    ) -> Optional[float]:
+    def get_cache_age_hours(self, cache_key: str, data_type: str = "training") -> Optional[float]:
         """
         Get the age of cached data in hours
 

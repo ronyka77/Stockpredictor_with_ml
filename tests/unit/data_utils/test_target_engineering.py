@@ -25,9 +25,7 @@ def test_convert_absolute_to_percentage_returns_basic():
 
     df = make_combined_df(np.array([100.0, 200.0]), np.array([110.0, 220.0]))
 
-    out_df, new_col = convert_absolute_to_percentage_returns(
-        df.copy(), prediction_horizon=10
-    )
+    out_df, new_col = convert_absolute_to_percentage_returns(df.copy(), prediction_horizon=10)
 
     assert new_col == "Future_Return_10D"
     assert np.allclose(out_df[new_col].values, np.array([0.10, 0.10]))
@@ -57,15 +55,10 @@ def test_convert_absolute_to_percentage_returns_fallback_column_and_extremes(cap
 
     df = pd.DataFrame({"close": [10.0, 1.0], "Future_High_10D": [100.0, 0.1]})
 
-    out_df, new_col = convert_absolute_to_percentage_returns(
-        df.copy(), prediction_horizon=10
-    )
+    out_df, new_col = convert_absolute_to_percentage_returns(df.copy(), prediction_horizon=10)
 
     assert new_col.startswith("Future_Return_")
-    assert (
-        "Found extreme returns" in "\n".join([r.getMessage() for r in caplog.records])
-        or True
-    )
+    assert "Found extreme returns" in "\n".join([r.getMessage() for r in caplog.records]) or True
 
 
 @pytest.mark.parametrize(
@@ -86,9 +79,7 @@ def test_convert_percentage_predictions_to_prices_basic(
     Verification: output shape matches and bounds applied when requested
     """
 
-    out = convert_percentage_predictions_to_prices(
-        preds, current, apply_bounds=apply_bounds
-    )
+    out = convert_percentage_predictions_to_prices(preds, current, apply_bounds=apply_bounds)
 
     assert out.shape == current.shape
     # When bounds not applied, direct multiplication

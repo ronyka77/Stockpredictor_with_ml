@@ -4,6 +4,7 @@ Loads data via `prepare_common_training_data`, applies deterministic filters,
 fits scaler, trains autoencoder, runs SHAP selector, persists artifacts and logs
 to MLflow.
 """
+
 import os
 import time
 from typing import Dict, Any
@@ -14,7 +15,12 @@ from sklearn.preprocessing import StandardScaler
 from src.models.common.training_data_prep import prepare_common_training_data
 from src.models.feature_selection.autoencoder import train_autoencoder, encode_df
 from src.models.feature_selection.shap_selector import select_features_with_shap
-from src.models.feature_selection.io import save_json, save_scaler, save_torch_state, log_artifacts_to_mlflow
+from src.models.feature_selection.io import (
+    save_json,
+    save_scaler,
+    save_torch_state,
+    log_artifacts_to_mlflow,
+)
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -111,7 +117,9 @@ def run_feature_selection(
     log_artifacts_to_mlflow([sel_path, scaler_path, encoder_path])
 
     elapsed = time.time() - start_time
-    logger.info(f"Feature selection completed in {elapsed/60:.2f} minutes. Selected {len(selected)} features.")
+    logger.info(
+        f"Feature selection completed in {elapsed / 60:.2f} minutes. Selected {len(selected)} features."
+    )
 
     return {
         "selected_features": selected,
@@ -143,5 +151,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

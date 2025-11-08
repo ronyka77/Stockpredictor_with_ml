@@ -27,12 +27,8 @@ def test_extract_financial_values_handles_cached_nested_structure():
 
     cached_stmt = {
         "financials": {
-            "income_statement": {
-                "revenues": {"value": 123.45, "source": "direct_report"}
-            },
-            "balance_sheet": {
-                "assets": {"value": 1000.0, "source": "intra_report_impute"}
-            },
+            "income_statement": {"revenues": {"value": 123.45, "source": "direct_report"}},
+            "balance_sheet": {"assets": {"value": 1000.0, "source": "intra_report_impute"}},
         }
     }
 
@@ -150,9 +146,7 @@ def test_store_statement_period_success_path_calls_execute():
         "src.data_collector.polygon_fundamentals.optimized_collector.execute", Mock()
     ) as mock_exec:
         # Execution
-        result = asyncio.run(
-            collector._store_statement_period(1, income_stmt, response)
-        )
+        result = asyncio.run(collector._store_statement_period(1, income_stmt, response))
 
         # Verification
         assert result is True
@@ -175,24 +169,18 @@ def test_find_matching_statement_with_dict_and_object_inputs():
 
     # Execution & Verification for dict match
     assert (
-        collector._find_matching_statement([dict_stmt, obj], "2025-01-01", "Q1", 2025)
-        == dict_stmt
+        collector._find_matching_statement([dict_stmt, obj], "2025-01-01", "Q1", 2025) == dict_stmt
     )
 
     # Execution & Verification for object match
-    assert (
-        collector._find_matching_statement([dict_stmt, obj], "2025-02-02", "Q2", 2025)
-        is obj
-    )
+    assert collector._find_matching_statement([dict_stmt, obj], "2025-02-02", "Q2", 2025) is obj
 
 
 def test_load_ticker_cache_and_existing_data_cache():
     # Setup
     collector = OptimizedFundamentalCollector.__new__(OptimizedFundamentalCollector)
     collector.data_storage = Mock(
-        get_tickers=Mock(
-            return_value=[{"ticker": "MSFT", "id": 7}, {"ticker": None, "id": 8}]
-        )
+        get_tickers=Mock(return_value=[{"ticker": "MSFT", "id": 7}, {"ticker": None, "id": 8}])
     )
 
     # Execution for ticker cache

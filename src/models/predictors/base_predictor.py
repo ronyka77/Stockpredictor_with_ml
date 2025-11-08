@@ -42,6 +42,8 @@ class BasePredictor(ABC):
         self.prediction_horizon = 20
         self.optimal_threshold = None
         self.model_dir = None
+        self.min_profit_threshold = 10
+        self.only_friday = True
 
     @abstractmethod
     def load_model_from_mlflow(self) -> None:
@@ -73,16 +75,13 @@ class BasePredictor(ABC):
         if self.optimal_threshold:
             logger.info(f"   Optimal threshold: {self.optimal_threshold:.3f}")
 
-    def load_recent_data(
-        self, days_back: int = 30
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def load_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Load the most recent data for making predictions.
         """
         logger.info(f"📊 Loading recent data (last {days_back} days)...")
         data_result = prepare_ml_data_for_prediction_with_cleaning(
-            prediction_horizon=self.prediction_horizon,
-            days_back=days_back,
+            prediction_horizon=self.prediction_horizon, days_back=days_back
         )
         logger.info(f"Data shape after cleaning: {data_result['x_test'].shape}")
 
@@ -93,19 +92,13 @@ class BasePredictor(ABC):
             unique_tickers = recent_features["ticker_id"].nunique()
             logger.info(f"   Unique tickers: {unique_tickers}")
 
-        if (
-            self.model
-            and hasattr(self.model, "feature_names")
-            and self.model.feature_names
-        ):
+        if self.model and hasattr(self.model, "feature_names") and self.model.feature_names:
             model_features = set(self.model.feature_names)
             data_features = set(recent_features.columns)
 
             missing_in_data = model_features - data_features
             if missing_in_data:
-                logger.warning(
-                    f"   ⚠️  Missing features ({len(missing_in_data)}): Filling with 0.0"
-                )
+                logger.warning(f"   ⚠️  Missing features ({len(missing_in_data)}): Filling with 0.0")
                 for feature in missing_in_data:
                     recent_features[feature] = 0.0
 
@@ -124,9 +117,7 @@ class BasePredictor(ABC):
         """
         logger.info("🔍 Validating feature diversity...")
         numeric_cols = features_df.select_dtypes(include=[np.number]).columns
-        numeric_cols = [
-            col for col in numeric_cols if col not in ["ticker_id", "date_int"]
-        ]
+        numeric_cols = [col for col in numeric_cols if col not in ["ticker_id", "date_int"]]
 
         if not numeric_cols:
             logger.warning("   ⚠️  No numeric features to validate.")
@@ -194,15 +185,10 @@ class BasePredictor(ABC):
         Apply threshold filtering to predictions via centralized ThresholdPolicy.
         """
         try:
-            from src.models.evaluation.threshold_policy import (
-                ThresholdPolicy,
-                ThresholdConfig,
-            )
+            from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
 
             policy = ThresholdPolicy()
-            threshold_value = (
-                self.optimal_threshold if self.optimal_threshold is not None else 0.5
-            )
+            threshold_value = self.optimal_threshold if self.optimal_threshold is not None else 0.5
             cfg = ThresholdConfig(method="ge", value=threshold_value)
             # Note: BasePredictor does not keep X here; mask on confidence only
             result = policy.compute_mask(confidence_scores, None, cfg)
@@ -210,9 +196,7 @@ class BasePredictor(ABC):
         except Exception:
             # Legacy fallback to preserve behavior on unexpected errors
             if self.optimal_threshold is None:
-                return np.arange(len(predictions)), np.ones(
-                    len(predictions), dtype=bool
-                )
+                return np.arange(len(predictions)), np.ones(len(predictions), dtype=bool)
             threshold_mask = confidence_scores >= self.optimal_threshold
             filtered_indices = np.nonzero(threshold_mask)[0]
             return filtered_indices, threshold_mask
@@ -233,7 +217,9 @@ class BasePredictor(ABC):
         else:
             model_dir = ""
         if model_name is not None:
-            file_name = f"predictions_{model_name}_{model_dir[:11] if model_dir else ''}_{timestamp}.xlsx"
+            file_name = (
+                f"predictions_{model_name}_{model_dir[:11] if model_dir else ''}_{timestamp}.xlsx"
+            )
         else:
             file_name = f"predictions_{self.run_id[:8]}_{model_dir[:11] if model_dir else ''}_{timestamp}.xlsx"
 
@@ -244,9 +230,7 @@ class BasePredictor(ABC):
         logger.info("💾 Validating and saving predictions")
 
         results_df = self._build_results_dataframe_and_profit(
-            features_df=features_df,
-            metadata_df=metadata_df,
-            predictions=predictions,
+            features_df=features_df, metadata_df=metadata_df, predictions=predictions
         )
         if not results_df.empty:
             # Drop threshold-related columns before saving (keep date_int for schema compatibility)
@@ -273,13 +257,9 @@ class BasePredictor(ABC):
                 ticker_map = dict(zip(all_metadata_df["id"], all_metadata_df["ticker"]))
                 name_map = dict(zip(all_metadata_df["id"], all_metadata_df["name"]))
                 results_df["ticker"] = (
-                    results_df["ticker_id"]
-                    .map(ticker_map)
-                    .fillna(results_df["ticker_id"])
+                    results_df["ticker_id"].map(ticker_map).fillna(results_df["ticker_id"])
                 )
-                results_df["company_name"] = (
-                    results_df["ticker_id"].map(name_map).fillna("Unknown")
-                )
+                results_df["company_name"] = results_df["ticker_id"].map(name_map).fillna("Unknown")
         except Exception as e:
             logger.warning(f"   Could not fetch ticker metadata: {e}")
             results_df["ticker"] = results_df["ticker_id"]
@@ -287,11 +267,7 @@ class BasePredictor(ABC):
         return results_df
 
     def _build_results_dataframe_and_profit(
-        self,
-        *,
-        features_df: pd.DataFrame,
-        metadata_df: pd.DataFrame,
-        predictions: np.ndarray,
+        self, *, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray
     ) -> Tuple[pd.DataFrame, float]:
         """
         Build the results DataFrame and compute the average profit per investment
@@ -311,15 +287,15 @@ class BasePredictor(ABC):
         if results_df is None or results_df.empty:
             return pd.DataFrame()
 
-        avg_profit_per_investment = self._aggregate_profit_and_filter_by_weekday(
-            results_df
-        )
+        avg_profit_per_investment = self._aggregate_profit_and_filter_by_weekday(results_df)
         if avg_profit_per_investment is None:
             return pd.DataFrame()
 
         return results_df
 
-    def _init_results_df(self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray) -> pd.DataFrame | None:
+    def _init_results_df(
+        self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray
+    ) -> pd.DataFrame | None:
         results_df = metadata_df.copy()
         try:
             results_df["ticker_id"] = features_df["ticker_id"].values
@@ -352,7 +328,9 @@ class BasePredictor(ABC):
         results_df.rename(columns={"target_values": "actual_return"}, inplace=True)
         return results_df
 
-    def _apply_threshold_and_top10(self, results_df: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame | None:
+    def _apply_threshold_and_top10(
+        self, results_df: pd.DataFrame, features_df: pd.DataFrame
+    ) -> pd.DataFrame | None:
         threshold_filtered_count = 0
         if self.optimal_threshold is not None:
             confidence_scores = self.get_confidence_scores(features_df)
@@ -382,6 +360,9 @@ class BasePredictor(ABC):
             .reset_index(drop=True)
         )
         results_df["day_of_week"] = pd.to_datetime(results_df["date"]).dt.day_name()
+        if self.only_friday:
+            results_df = results_df[results_df["day_of_week"] == "Friday"]
+
         top_10_count = len(results_df)
         logger.info(f"   📈 Top 10 final count: {top_10_count}")
         if top_10_count == 0:
@@ -397,18 +378,14 @@ class BasePredictor(ABC):
         filtered_prices = results_df.loc[non_nan_mask, "current_price"].values
         filtered_returns = results_df.loc[non_nan_mask, "actual_return"]
 
-        results_df.loc[non_nan_mask, "actual_price"] = (
-            convert_percentage_predictions_to_prices(
-                filtered_returns, filtered_prices, apply_bounds=False
-            )
+        results_df.loc[non_nan_mask, "actual_price"] = convert_percentage_predictions_to_prices(
+            filtered_returns, filtered_prices, apply_bounds=False
         )
 
         ap = results_df.loc[non_nan_mask, "actual_price"]
         cp = results_df.loc[non_nan_mask, "current_price"]
 
-        results_df.loc[non_nan_mask, "profit_100_investment"] = (100.0 / cp) * (
-            ap - cp
-        )
+        results_df.loc[non_nan_mask, "profit_100_investment"] = (100.0 / cp) * (ap - cp)
         results_df.loc[non_nan_mask, "price_prediction_error"] = (
             results_df.loc[non_nan_mask, "predicted_price"]
             - results_df.loc[non_nan_mask, "actual_price"]
@@ -424,7 +401,9 @@ class BasePredictor(ABC):
 
         return results_df
 
-    def _aggregate_profit_and_filter_by_weekday(self, results_df: pd.DataFrame) -> float | None:  # NOSONAR
+    def _aggregate_profit_and_filter_by_weekday(
+        self, results_df: pd.DataFrame
+    ) -> float | None:  # NOSONAR
         valid_profit_df = self._get_valid_profit_df(results_df)
         avg_profit_per_investment = self._calc_avg_profit(valid_profit_df)
 
@@ -437,9 +416,13 @@ class BasePredictor(ABC):
             return None
 
         dates_series = pd.to_datetime(results_df["date"].copy())
-        friday_avg, monday_avg = self._compute_weekday_avgs(results_df, dates_series, valid_profit_df)
+        friday_avg, monday_avg = self._compute_weekday_avgs(
+            results_df, dates_series, valid_profit_df
+        )
 
-        return self._decide_export_and_return_avg(results_df, avg_profit_per_investment, friday_avg, monday_avg)
+        return self._decide_export_and_return_avg(
+            results_df, avg_profit_per_investment, friday_avg, monday_avg
+        )
 
     def _get_valid_profit_df(self, results_df: pd.DataFrame) -> pd.DataFrame:
         if "actual_price" in results_df.columns:
@@ -449,34 +432,53 @@ class BasePredictor(ABC):
         return results_df[valid_mask].copy()
 
     def _calc_avg_profit(self, valid_profit_df: pd.DataFrame) -> float:
-        return float(valid_profit_df["profit_100_investment"].mean()) if not valid_profit_df.empty else 0.0
+        return (
+            float(valid_profit_df["profit_100_investment"].mean())
+            if not valid_profit_df.empty
+            else 0.0
+        )
 
     def _count_not_closed_predictions(self, results_df: pd.DataFrame) -> int:
         if "actual_price" in results_df.columns:
             return int(results_df["actual_price"].isna().sum())
         return 0
 
-    def _compute_weekday_avgs(self, results_df: pd.DataFrame, dates_series: pd.Series, valid_profit_df: pd.DataFrame) -> tuple[float, float]:
+    def _compute_weekday_avgs(
+        self, results_df: pd.DataFrame, dates_series: pd.Series, valid_profit_df: pd.DataFrame
+    ) -> tuple[float, float]:
         friday_keep, _ = filter_dates_to_weekdays(dates_series, (4,))
         friday_df = results_df[friday_keep & (results_df.index.isin(valid_profit_df.index))]
-        friday_avg = float(friday_df["profit_100_investment"].mean()) if not friday_df.empty else 0.0
+        friday_avg = (
+            float(friday_df["profit_100_investment"].mean()) if not friday_df.empty else 0.0
+        )
+
+        if self.only_friday:
+            return friday_avg, 0.0
 
         monday_keep, _ = filter_dates_to_weekdays(dates_series, (0,))
         monday_df = results_df[monday_keep & (results_df.index.isin(valid_profit_df.index))]
-        monday_avg = float(monday_df["profit_100_investment"].mean()) if not monday_df.empty else 0.0
+        monday_avg = (
+            float(monday_df["profit_100_investment"].mean()) if not monday_df.empty else 0.0
+        )
 
-        logger.info(f"   🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)")
-        logger.info(f"   🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)")
+        logger.info(
+            f"   🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
+        )
+        logger.info(
+            f"   🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
+        )
         return friday_avg, monday_avg
 
-    def _decide_export_and_return_avg(self, results_df: pd.DataFrame, avg_profit: float, friday_avg: float, monday_avg: float) -> float | None:  # NOSONAR
+    def _decide_export_and_return_avg(
+        self, results_df: pd.DataFrame, avg_profit: float, friday_avg: float, monday_avg: float
+    ) -> float | None:  # NOSONAR
         # Decide whether to export and which weekday filter to apply
         filtered = None
-        if friday_avg > 8 and monday_avg > 8:
+        if friday_avg > self.min_profit_threshold and monday_avg > self.min_profit_threshold:
             filtered = results_df
-        elif friday_avg > 8:
+        elif friday_avg > self.min_profit_threshold:
             filtered = results_df[results_df["day_of_week"] == "Friday"]
-        elif monday_avg > 8:
+        elif monday_avg > self.min_profit_threshold and not self.only_friday:
             filtered = results_df[results_df["day_of_week"] == "Monday"]
 
         if filtered is None:
@@ -495,9 +497,7 @@ class BasePredictor(ABC):
         - metadata_df
         - predictions
         """
-        logger.info(
-            f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)..."
-        )
+        logger.info(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
         if self.model is None:
             self.load_model_from_mlflow()
             self._load_metadata_from_mlflow()
@@ -517,7 +517,5 @@ class BasePredictor(ABC):
         self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
-        output_file = self.save_predictions_to_excel(
-            features_df, metadata_df, predictions
-        )
+        output_file = self.save_predictions_to_excel(features_df, metadata_df, predictions)
         return output_file

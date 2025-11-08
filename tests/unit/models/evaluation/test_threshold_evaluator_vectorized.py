@@ -13,9 +13,7 @@ class DummyModel:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         return self._pred[: len(X)]
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "simple"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "simple") -> np.ndarray:
         return self._conf[: len(X)]
 
 
@@ -62,9 +60,7 @@ def test_vectorized_threshold_testing_monotonic_mask():
     # Monotonicity: as threshold increases, samples_kept should not increase
     kept = df.sort_values("threshold")["test_samples_kept"].values
     if not np.all(kept[:-1] >= kept[1:]):
-        raise AssertionError(
-            "Monotonicity violation: samples_kept increases with threshold"
-        )
+        raise AssertionError("Monotonicity violation: samples_kept increases with threshold")
 
 
 @pytest.mark.unit
@@ -83,6 +79,4 @@ def test_predict_with_threshold_filters_and_returns_confidence():
     if out["filtered_samples"] > n:
         raise AssertionError("Filtered samples count exceeds input samples")
     if not ("all_confidence" in out and "filtered_confidence" in out):
-        raise AssertionError(
-            "Missing confidence outputs in predict_with_threshold result"
-        )
+        raise AssertionError("Missing confidence outputs in predict_with_threshold result")

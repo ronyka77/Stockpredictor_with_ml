@@ -6,9 +6,7 @@ Consolidate existing individual Parquet files into year-partitioned format
 for optimal ML performance and time-series analysis.
 """
 
-from src.data_collector.indicator_pipeline.consolidated_storage import (
-    consolidate_existing_features,
-)
+from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 import time
 from src.utils.logger import get_logger
@@ -57,9 +55,7 @@ def main():
         consolidation_time = time.time() - start_time
 
         # log results
-        logger.info(
-            f"✅ Year-based consolidation completed in {consolidation_time:.2f} seconds"
-        )
+        logger.info(f"✅ Year-based consolidation completed in {consolidation_time:.2f} seconds")
         logger.info(f"   Files created: {result['files_created']}")
         logger.info(f"   Total size: {result['total_size_mb']:.2f} MB")
         logger.info(f"   Total rows: {result['total_rows']:,}")

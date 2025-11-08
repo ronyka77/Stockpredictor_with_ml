@@ -42,9 +42,7 @@ class IndicatorResult:
             logger.warning("IndicatorResult created with empty DataFrame")
 
         if not 0 <= self.quality_score <= 100:
-            raise ValueError(
-                f"Quality score must be between 0-100, got {self.quality_score}"
-            )
+            raise ValueError(f"Quality score must be between 0-100, got {self.quality_score}")
 
 
 class BaseIndicator(ABC):
@@ -80,9 +78,7 @@ class BaseIndicator(ABC):
             raise ValueError("Input data cannot be empty")
 
         required_columns = ["open", "high", "low", "close", "volume"]
-        missing_columns = [
-            col for col in required_columns if col not in self.data.columns
-        ]
+        missing_columns = [col for col in required_columns if col not in self.data.columns]
 
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
@@ -96,10 +92,7 @@ class BaseIndicator(ABC):
 
         # Check for data quality
         for col in required_columns:
-            if (
-                self.data[col].isna().sum() / len(self.data)
-                > self.config.MAX_MISSING_PCT
-            ):
+            if self.data[col].isna().sum() / len(self.data) > self.config.MAX_MISSING_PCT:
                 raise ValueError(f"Too many missing values in column {col}")
 
     def standardize_columns(self) -> None:
@@ -129,9 +122,7 @@ class IndicatorValidator:
     """
 
     @staticmethod
-    def validate_result(
-        result: IndicatorResult, min_quality_score: float = 50.0
-    ) -> bool:
+    def validate_result(result: IndicatorResult, min_quality_score: float = 50.0) -> bool:
         """
         Validate an indicator result
 
@@ -156,9 +147,7 @@ class IndicatorValidator:
         numeric_cols = result.data.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
             if np.isinf(result.data[col]).any():
-                logger.warning(
-                    f"Validation failed: Infinite values found in column {col}"
-                )
+                logger.warning(f"Validation failed: Infinite values found in column {col}")
                 return False
 
         return True

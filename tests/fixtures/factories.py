@@ -65,10 +65,7 @@ def build_fundamental_scores(
 
 
 def build_fundamental_sector(
-    ticker: str = "AAPL",
-    date: date = date(2025, 1, 1),
-    gics_sector: str = "Tech",
-    **kwargs,
+    ticker: str = "AAPL", date: date = date(2025, 1, 1), gics_sector: str = "Tech", **kwargs
 ) -> fm.FundamentalSectorAnalysis:
     obj = fm.FundamentalSectorAnalysis()
     obj.ticker = ticker
@@ -119,17 +116,9 @@ class OHLCVRecordFactory(ModelFactory[OHLCVRecord]):
         base = round(faker.pyfloat(min_value=1.0, max_value=500.0, right_digits=4), 4)
 
         # Random spreads above/below base
-        up = round(
-            faker.pyfloat(
-                min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4
-            ),
-            4,
-        )
+        up = round(faker.pyfloat(min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4), 4)
         down = round(
-            faker.pyfloat(
-                min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4
-            ),
-            4,
+            faker.pyfloat(min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4), 4
         )
 
         high = round(base + up, 4)
@@ -141,9 +130,7 @@ class OHLCVRecordFactory(ModelFactory[OHLCVRecord]):
 
         volume = faker.pyint(min_value=0, max_value=10_000_000)
 
-        ticker = (
-            overrides.get("ticker") or faker.pystr(min_chars=1, max_chars=4).upper()
-        )
+        ticker = overrides.get("ticker") or faker.pystr(min_chars=1, max_chars=4).upper()
         timestamp = (
             overrides.get("timestamp")
             or (
@@ -199,11 +186,7 @@ class APIResponseFactory:
         status: str = "OK",
         next_url: Optional[str] = None,
     ):
-        self._payload = {
-            "status": status,
-            "results": results or [],
-            "next_url": next_url,
-        }
+        self._payload = {"status": status, "results": results or [], "next_url": next_url}
 
     def json(self) -> Dict[str, Any]:
         return self._payload

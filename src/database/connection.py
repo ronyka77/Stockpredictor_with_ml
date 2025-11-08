@@ -49,9 +49,7 @@ class PostgresConnection:
         dsn = " ".join(dsn_parts)
         # Use the alias (ThreadedConnectionPool) so unit tests that patch that
         # symbol receive the fake pool instead of creating a real ConnectionPool.
-        self._pool = ThreadedConnectionPool(
-            conninfo=dsn, min_size=minconn, max_size=maxconn
-        )
+        self._pool = ThreadedConnectionPool(conninfo=dsn, min_size=minconn, max_size=maxconn)
         self._sem = Semaphore(maxconn)
         self._closed = False
 
@@ -67,7 +65,6 @@ class PostgresConnection:
 
         # Use the pool's context manager to get a connection when possible,
         # but preserve backward compatibility with pools that expose getconn/
-        # putconn (psycopg2 ThreadedConnectionPool) for tests and older callers.
         acquired = self._sem.acquire(timeout=timeout)
         if not acquired:
             logger.error("Timeout acquiring pooled connection")
@@ -161,13 +158,6 @@ class PostgresConnection:
         except Exception as exc:
             logger.error(f"Error closing pooled connections: {exc}")
 
-    def get_connection(self, timeout: float = 5.0):
-        """Compatibility wrapper for older `get_connection()` API.
-
-        Returns the same contextmanager as `connection()`.
-        """
-        return self.connection(timeout=timeout)
-
 
 # Module-level singleton management for a single pool instance
 _GLOBAL_POOL: Optional[PostgresConnection] = None
@@ -223,9 +213,7 @@ def close_global_pool() -> None:
 # --- Convenience DB helpers ---
 
 
-def fetch_all(
-    query: str, params: Optional[Tuple] = None, dict_cursor: bool = True
-) -> List[Any]:
+def fetch_all(query: str, params: Optional[Tuple] = None, dict_cursor: bool = True) -> List[Any]:
     """Execute a read query and return all rows.
 
     Uses the global pool and a RealDictCursor by default.

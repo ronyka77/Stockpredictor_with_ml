@@ -32,18 +32,8 @@ def test_get_ticker_info_from_manager(mocker):
     class FakeStorage:
         def get_tickers(self):
             return [
-                {
-                    "ticker": "XYZ",
-                    "market_cap": 200e9,
-                    "avg_volume": 30e6,
-                    "sector": "Technology",
-                },
-                {
-                    "ticker": "ABC",
-                    "market_cap": 5e8,
-                    "avg_volume": 100000,
-                    "sector": "Small",
-                },
+                {"ticker": "XYZ", "market_cap": 200e9, "avg_volume": 30e6, "sector": "Technology"},
+                {"ticker": "ABC", "market_cap": 5e8, "avg_volume": 100000, "sector": "Small"},
             ]
 
     class FakeManager:

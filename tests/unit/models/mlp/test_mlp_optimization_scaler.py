@@ -34,9 +34,7 @@ class TestMLPOptimizationScalerIntegration:
             model_name="test_mlp_optimization",
             config={"layer_sizes": [10, 5], "input_size": 4, "batch_size": 16},
         )
-        self.predictor.model = MLPModule(
-            input_size=4, layer_sizes=[10, 5], output_size=1
-        )
+        self.predictor.model = MLPModule(input_size=4, layer_sizes=[10, 5], output_size=1)
         self.predictor.device = torch.device("cpu")
         self.predictor.model = self.predictor.model.to("cpu")
 

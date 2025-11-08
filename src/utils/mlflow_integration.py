@@ -102,10 +102,7 @@ class MLflowIntegration:
 
             logger.info(
                 "Started MLflow run",
-                extra={
-                    "run_id": run.info.run_id,
-                    "experiment_id": run.info.experiment_id,
-                },
+                extra={"run_id": run.info.run_id, "experiment_id": run.info.experiment_id},
             )
             return run
 
@@ -130,10 +127,7 @@ class MLflowIntegration:
             raise
 
     def log_metrics(
-        self,
-        metrics: dict[str, float],
-        step: Optional[int] = None,
-        run_id: Optional[str] = None,
+        self, metrics: dict[str, float], step: Optional[int] = None, run_id: Optional[str] = None
     ) -> None:
         """Log metrics to MLflow.
 
@@ -194,10 +188,7 @@ class MLflowIntegration:
 
             logger.info(
                 f"Logged {flavor} model to MLflow",
-                extra={
-                    "artifact_path": artifact_path,
-                    "has_signature": signature is not None,
-                },
+                extra={"artifact_path": artifact_path, "has_signature": signature is not None},
             )
 
         except Exception as e:
@@ -245,8 +236,7 @@ class MLflowIntegration:
             model = mlflow.pyfunc.load_model(model_uri)
 
             logger.info(
-                "Loaded model from MLflow",
-                extra={"run_id": run_id, "model_path": model_path},
+                "Loaded model from MLflow", extra={"run_id": run_id, "model_path": model_path}
             )
             return model
 
@@ -273,9 +263,7 @@ def cleanup_deleted_runs(mlruns_dir="mlruns"):
                 run_path = os.path.join(mlruns_dir, exp.experiment_id, run_id)
                 try:
                     if os.path.exists(run_path):
-                        logger.info(
-                            f"Deleting run folder for run_id {run_id} at {run_path}"
-                        )
+                        logger.info(f"Deleting run folder for run_id {run_id} at {run_path}")
                         shutil.rmtree(run_path)
                 except Exception as e:
                     logger.error(

@@ -25,9 +25,7 @@ class FundamentalsExtractor:
             return float(obj)
         return None
 
-    def _upsert_fact_row(
-        self, ticker_id: int, meta: Dict[str, Any], row: Dict[str, Any]
-    ) -> None:
+    def _upsert_fact_row(self, ticker_id: int, meta: Dict[str, Any], row: Dict[str, Any]) -> None:
         # Metadata fields
         params: Dict[str, Any] = {
             "ticker_id": ticker_id,
@@ -210,21 +208,15 @@ class FundamentalsExtractor:
                 "revenues": self._flatten_value(meta.get("revenues")),
                 "cost_of_revenue": self._flatten_value(meta.get("cost_of_revenue")),
                 "gross_profit": self._flatten_value(meta.get("gross_profit")),
-                "operating_expenses": self._flatten_value(
-                    meta.get("operating_expenses")
-                ),
+                "operating_expenses": self._flatten_value(meta.get("operating_expenses")),
                 "selling_general_and_administrative_expenses": self._flatten_value(
                     meta.get("selling_general_and_administrative_expenses")
                 ),
                 "research_and_development": self._flatten_value(
                     meta.get("research_and_development")
                 ),
-                "operating_income_loss": self._flatten_value(
-                    meta.get("operating_income_loss")
-                ),
-                "nonoperating_income_loss": self._flatten_value(
-                    meta.get("other_income_expense")
-                ),
+                "operating_income_loss": self._flatten_value(meta.get("operating_income_loss")),
+                "nonoperating_income_loss": self._flatten_value(meta.get("other_income_expense")),
                 "income_loss_from_continuing_operations_before_tax": self._flatten_value(
                     meta.get("income_loss_before_income_tax_expense_benefit")
                 ),
@@ -265,31 +257,17 @@ class FundamentalsExtractor:
                 "current_assets": self._flatten_value(meta.get("current_assets")),
                 "noncurrent_assets": self._flatten_value(meta.get("noncurrent_assets")),
                 "inventory": self._flatten_value(meta.get("inventory_net")),
-                "other_current_assets": self._flatten_value(
-                    meta.get("other_assets_current")
-                ),
-                "fixed_assets": self._flatten_value(
-                    meta.get("property_plant_equipment_net")
-                ),
-                "other_noncurrent_assets": self._flatten_value(
-                    meta.get("other_assets_noncurrent")
-                ),
+                "other_current_assets": self._flatten_value(meta.get("other_assets_current")),
+                "fixed_assets": self._flatten_value(meta.get("property_plant_equipment_net")),
+                "other_noncurrent_assets": self._flatten_value(meta.get("other_assets_noncurrent")),
                 "liabilities": self._flatten_value(meta.get("liabilities")),
-                "current_liabilities": self._flatten_value(
-                    meta.get("current_liabilities")
-                ),
-                "noncurrent_liabilities": self._flatten_value(
-                    meta.get("noncurrent_liabilities")
-                ),
-                "accounts_payable": self._flatten_value(
-                    meta.get("accounts_payable_current")
-                ),
+                "current_liabilities": self._flatten_value(meta.get("current_liabilities")),
+                "noncurrent_liabilities": self._flatten_value(meta.get("noncurrent_liabilities")),
+                "accounts_payable": self._flatten_value(meta.get("accounts_payable_current")),
                 "other_current_liabilities": self._flatten_value(
                     meta.get("other_liabilities_current")
                 ),
-                "long_term_debt": self._flatten_value(
-                    meta.get("long_term_debt_noncurrent")
-                ),
+                "long_term_debt": self._flatten_value(meta.get("long_term_debt_noncurrent")),
                 "other_noncurrent_liabilities": self._flatten_value(
                     meta.get("other_liabilities_noncurrent")
                 ),

@@ -1,4 +1,5 @@
 """I/O helpers for feature-selection pipeline: JSON save/load, scaler, encoder persistence and MLflow logging."""
+
 from __future__ import annotations
 
 import json
@@ -87,5 +88,3 @@ def log_artifacts_to_mlflow(local_paths: list[str], run_name: str = "feature-sel
             mlflow.end_run()
         except Exception:
             logger.warning("Failed to end MLflow run cleanly")
-
-

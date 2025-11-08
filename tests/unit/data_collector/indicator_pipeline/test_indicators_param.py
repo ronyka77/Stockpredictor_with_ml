@@ -18,10 +18,7 @@ from src.data_collector.indicator_pipeline.volatility_indicators import (
     calculate_bollinger_bands,
     calculate_atr,
 )
-from src.data_collector.indicator_pipeline.volume_indicators import (
-    calculate_obv,
-    calculate_vpt,
-)
+from src.data_collector.indicator_pipeline.volume_indicators import calculate_obv, calculate_vpt
 
 
 def make_price_df(n=60):
@@ -39,10 +36,7 @@ def make_price_df(n=60):
     return df
 
 
-@pytest.mark.parametrize(
-    "fn",
-    [calculate_sma, calculate_ema, calculate_macd, calculate_ichimoku],
-)
+@pytest.mark.parametrize("fn", [calculate_sma, calculate_ema, calculate_macd, calculate_ichimoku])
 def test_trend_indicators_smoke_param(fn):
     df = make_price_df(60)
     res = fn(df)
@@ -50,8 +44,7 @@ def test_trend_indicators_smoke_param(fn):
 
 
 @pytest.mark.parametrize(
-    "fn",
-    [calculate_rsi, calculate_stochastic, calculate_roc, calculate_williams_r],
+    "fn", [calculate_rsi, calculate_stochastic, calculate_roc, calculate_williams_r]
 )
 def test_momentum_indicators_smoke_param(fn):
     df = make_price_df(60)
@@ -59,10 +52,7 @@ def test_momentum_indicators_smoke_param(fn):
     assert not res.data.empty
 
 
-@pytest.mark.parametrize(
-    "fn",
-    [calculate_bollinger_bands, calculate_atr],
-)
+@pytest.mark.parametrize("fn", [calculate_bollinger_bands, calculate_atr])
 def test_volatility_indicators_smoke_param(fn):
     df = make_price_df(100)
     res = fn(df)

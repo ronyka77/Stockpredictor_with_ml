@@ -41,9 +41,7 @@ class FundamentalDataMonitor:
             return {
                 "total_tickers": total_tickers,
                 "tickers_with_data": tickers_with_data,
-                "overall_progress": tickers_with_data / total_tickers
-                if total_tickers > 0
-                else 0,
+                "overall_progress": tickers_with_data / total_tickers if total_tickers > 0 else 0,
                 "recent_data_count": recent_data,
             }
 
@@ -58,9 +56,7 @@ class FundamentalDataMonitor:
                 "SELECT AVG(data_quality_score) as avg FROM raw_fundamental_data WHERE data_quality_score IS NOT NULL"
             )
             avg_quality = (
-                float(avg_row.get("avg"))
-                if avg_row and avg_row.get("avg") is not None
-                else 0
+                float(avg_row.get("avg")) if avg_row and avg_row.get("avg") is not None else 0
             )
 
             missing_data_stats = fetch_all(
@@ -71,9 +67,7 @@ class FundamentalDataMonitor:
                 "SELECT COUNT(CASE WHEN revenues IS NOT NULL THEN 1 END) as revenues_count, COUNT(CASE WHEN net_income_loss IS NOT NULL THEN 1 END) as net_income_count, COUNT(CASE WHEN assets IS NOT NULL THEN 1 END) as assets_count, COUNT(CASE WHEN net_cash_flow_from_operating_activities IS NOT NULL THEN 1 END) as cash_flow_count, COUNT(*) as total_records FROM raw_fundamental_data"
             )
 
-            total_records = (
-                field_completeness.get("total_records") if field_completeness else 0
-            )
+            total_records = field_completeness.get("total_records") if field_completeness else 0
 
             return {
                 "average_quality_score": avg_quality,
@@ -85,24 +79,16 @@ class FundamentalDataMonitor:
                     for row in (missing_data_stats or [])
                 ],
                 "field_completeness": {
-                    "revenues": (
-                        field_completeness.get("revenues_count", 0) / total_records
-                    )
+                    "revenues": (field_completeness.get("revenues_count", 0) / total_records)
                     if total_records and total_records > 0
                     else 0,
-                    "net_income": (
-                        field_completeness.get("net_income_count", 0) / total_records
-                    )
+                    "net_income": (field_completeness.get("net_income_count", 0) / total_records)
                     if total_records and total_records > 0
                     else 0,
-                    "assets": (
-                        field_completeness.get("assets_count", 0) / total_records
-                    )
+                    "assets": (field_completeness.get("assets_count", 0) / total_records)
                     if total_records and total_records > 0
                     else 0,
-                    "cash_flow": (
-                        field_completeness.get("cash_flow_count", 0) / total_records
-                    )
+                    "cash_flow": (field_completeness.get("cash_flow_count", 0) / total_records)
                     if total_records and total_records > 0
                     else 0,
                 },

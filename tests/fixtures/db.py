@@ -69,11 +69,7 @@ class ConnectionFake:
         return None
 
     # Convenience: support execute_values-based upsert used in many tests
-    def execute_values(
-        self,
-        query: str,
-        rows: Iterable
-    ):
+    def execute_values(self, query: str, rows: Iterable):
         # Accept dict-like values or tuples. Attempt to map to columns if tuples.
         rows = list(rows)
         if not rows:
@@ -176,11 +172,7 @@ class PoolFake:
         # no-op for fake
         return None
 
-    def execute_values(
-        self,
-        insert_sql: str,
-        rows: Iterable[Tuple],
-    ):
+    def execute_values(self, insert_sql: str, rows: Iterable[Tuple]):
         # Convenience proxy: use a transient connection to perform execute_values
         conn = ConnectionFake()
         conn.execute_values(insert_sql, rows)

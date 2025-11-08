@@ -26,9 +26,7 @@ from src.data_collector.config import feature_config
 logger = get_logger(__name__, utility="feature_engineering")
 
 
-def calculate_sma(
-    data: pd.DataFrame, periods: Optional[List[int]] = None
-) -> IndicatorResult:
+def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
     """
     Calculate Simple Moving Averages for multiple periods
 
@@ -52,7 +50,9 @@ def calculate_sma(
 
         for period in periods:
             if len(data) < period:
-                warning_msg = f"Insufficient data for SMA_{period}. Need {period} points, have {len(data)}"
+                warning_msg = (
+                    f"Insufficient data for SMA_{period}. Need {period} points, have {len(data)}"
+                )
                 warnings.append(warning_msg)
                 logger.warning(warning_msg)
                 continue
@@ -85,9 +85,7 @@ def calculate_sma(
         raise
 
 
-def calculate_ema(
-    data: pd.DataFrame, periods: Optional[List[int]] = None
-) -> IndicatorResult:
+def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
     """
     Calculate Exponential Moving Averages for multiple periods
 
@@ -109,7 +107,9 @@ def calculate_ema(
 
         for period in periods:
             if len(data) < period:
-                warning_msg = f"Insufficient data for EMA_{period}. Need {period} points, have {len(data)}"
+                warning_msg = (
+                    f"Insufficient data for EMA_{period}. Need {period} points, have {len(data)}"
+                )
                 warnings.append(warning_msg)
                 logger.warning(warning_msg)
                 continue
@@ -175,7 +175,9 @@ def calculate_macd(
         # Check minimum data requirements
         min_required = slow + signal
         if len(data) < min_required:
-            warning_msg = f"Insufficient data for MACD. Need {min_required} points, have {len(data)}"
+            warning_msg = (
+                f"Insufficient data for MACD. Need {min_required} points, have {len(data)}"
+            )
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
@@ -267,23 +269,19 @@ def calculate_ichimoku(
         # Check minimum data requirements
         min_required = max(tenkan, kijun, senkou_b) + displacement
         if len(data) < min_required:
-            warning_msg = f"Insufficient data for Ichimoku. Need {min_required} points, have {len(data)}"
+            warning_msg = (
+                f"Insufficient data for Ichimoku. Need {min_required} points, have {len(data)}"
+            )
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
         # Calculate Ichimoku components using ta library
-        ichimoku_a = ta.trend.ichimoku_a(
-            data["high"], data["low"], window1=tenkan, window2=kijun
-        )
-        ichimoku_b = ta.trend.ichimoku_b(
-            data["high"], data["low"], window2=kijun, window3=senkou_b
-        )
+        ichimoku_a = ta.trend.ichimoku_a(data["high"], data["low"], window1=tenkan, window2=kijun)
+        ichimoku_b = ta.trend.ichimoku_b(data["high"], data["low"], window2=kijun, window3=senkou_b)
         ichimoku_base = ta.trend.ichimoku_base_line(
             data["high"], data["low"], window1=tenkan, window2=kijun
         )
-        ichimoku_conv = ta.trend.ichimoku_conversion_line(
-            data["high"], data["low"], window1=tenkan
-        )
+        ichimoku_conv = ta.trend.ichimoku_conversion_line(data["high"], data["low"], window1=tenkan)
 
         result_data = pd.DataFrame(index=data.index)
         result_data["Ichimoku_Tenkan"] = ichimoku_conv
@@ -301,16 +299,12 @@ def calculate_ichimoku(
 
         result_data["Ichimoku_Price_Above_Cloud"] = (
             data["close"]
-            > np.maximum(
-                result_data["Ichimoku_Senkou_A"], result_data["Ichimoku_Senkou_B"]
-            )
+            > np.maximum(result_data["Ichimoku_Senkou_A"], result_data["Ichimoku_Senkou_B"])
         ).astype(int)
 
         result_data["Ichimoku_Price_Below_Cloud"] = (
             data["close"]
-            < np.minimum(
-                result_data["Ichimoku_Senkou_A"], result_data["Ichimoku_Senkou_B"]
-            )
+            < np.minimum(result_data["Ichimoku_Senkou_A"], result_data["Ichimoku_Senkou_B"])
         ).astype(int)
 
         result_data["Ichimoku_Cloud_Green"] = (
@@ -384,13 +378,7 @@ class TrendIndicatorCalculator(BaseIndicator):
 
             # Combine all results
             combined_data = pd.concat(
-                [
-                    sma_result.data,
-                    ema_result.data,
-                    macd_result.data,
-                    ichimoku_result.data,
-                ],
-                axis=1,
+                [sma_result.data, ema_result.data, macd_result.data, ichimoku_result.data], axis=1
             )
 
             # Combine warnings

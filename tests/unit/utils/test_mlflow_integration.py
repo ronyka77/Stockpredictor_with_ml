@@ -10,9 +10,7 @@ from src.utils.mlflow_integration import (
 
 
 @pytest.mark.parametrize("existing_experiment", [True, False])
-def test_setup_experiment_creates_or_uses_existing(
-    existing_experiment, patch_mlflow_start
-):
+def test_setup_experiment_creates_or_uses_existing(existing_experiment, patch_mlflow_start):
     """Create or reuse an MLflow experiment depending on existence."""
     fake_get = Mock()
     if existing_experiment:
@@ -129,9 +127,7 @@ def test_log_model_xgboost_with_signature_and_run_id(patch_mlflow_start):
     fake_signature = Mock()
     with patch("mlflow.xgboost.log_model", new=Mock()) as fake_log:
         mlfi = MLflowIntegration()
-        mlfi.log_model(
-            object(), "artifact", flavor="xgboost", signature=fake_signature, run_id="r"
-        )
+        mlfi.log_model(object(), "artifact", flavor="xgboost", signature=fake_signature, run_id="r")
 
     fake_log.assert_called_once()
 
@@ -183,9 +179,7 @@ def test_cleanup_deleted_and_empty_runs(tmp_mlruns_dir, patch_mlflow_client):
     assert not run_dir.exists() or any(True for _ in run_dir.iterdir()) is False
 
 
-def test_cleanup_deleted_runs_handles_rmtree_exception(
-    tmp_mlruns_dir, patch_mlflow_client
-):
+def test_cleanup_deleted_runs_handles_rmtree_exception(tmp_mlruns_dir, patch_mlflow_client):
     """Handle exceptions thrown by rmtree when clearing deleted runs."""
     mlruns_dir = tmp_mlruns_dir
     exp_dir = mlruns_dir / "1"
@@ -206,16 +200,12 @@ def test_cleanup_deleted_runs_handles_search_experiments_exception(patch_mlflow_
         cleanup_deleted_runs("mlruns")
 
 
-def test_cleanup_empty_experiments_handles_delete_exception(
-    tmp_mlruns_dir, patch_mlflow_client
-):
+def test_cleanup_empty_experiments_handles_delete_exception(tmp_mlruns_dir, patch_mlflow_client):
     """Safely handle exceptions thrown when deleting empty experiments."""
     mlruns_dir = tmp_mlruns_dir
     (mlruns_dir / "1").mkdir(parents=True)
 
-    patch_mlflow_client.search_experiments.return_value = [
-        Mock(name="e", experiment_id="1")
-    ]
+    patch_mlflow_client.search_experiments.return_value = [Mock(name="e", experiment_id="1")]
     patch_mlflow_client.search_runs.return_value = []
     patch_mlflow_client.delete_experiment.side_effect = Exception("del fail")
 
@@ -223,9 +213,7 @@ def test_cleanup_empty_experiments_handles_delete_exception(
         cleanup_empty_experiments(str(mlruns_dir))
 
 
-def test_cleanup_empty_experiments_handles_search_experiments_exception(
-    patch_mlflow_client,
-):
+def test_cleanup_empty_experiments_handles_search_experiments_exception(patch_mlflow_client):
     """Raise when search_experiments fails during empty-experiment cleanup."""
     patch_mlflow_client.search_experiments.side_effect = Exception("boom")
     with pytest.raises(Exception):

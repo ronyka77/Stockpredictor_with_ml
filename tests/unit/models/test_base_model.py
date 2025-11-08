@@ -47,9 +47,7 @@ def test_predict_raises_if_untrained(sample_dataframe):
     model = DummyModel("dummy")
 
     # Execution / Verification
-    with pytest.raises(
-        ValueError, match="Model must be trained before making predictions"
-    ):
+    with pytest.raises(ValueError, match="Model must be trained before making predictions"):
         model.predict(sample_dataframe)
 
 
@@ -150,18 +148,14 @@ def test_save_and_load_model_interacts_with_mlflow(sample_dataframe, sample_seri
     assert isinstance(loaded.feature_names, list)
 
 
-def test_predict_with_threshold_defaults_and_delegation(
-    sample_dataframe, sample_series
-):
+def test_predict_with_threshold_defaults_and_delegation(sample_dataframe, sample_series):
     # Setup
     model = DummyModel("dummy")
     model.fit(sample_dataframe, sample_series)
 
     # Replace threshold_evaluator with a mock to capture calls
     fake_evaluator = Mock()
-    fake_evaluator.predict_with_threshold = Mock(
-        return_value={"preds": np.array([0, 0, 0])}
-    )
+    fake_evaluator.predict_with_threshold = Mock(return_value={"preds": np.array([0, 0, 0])})
     model.threshold_evaluator = fake_evaluator
 
     # Execution

@@ -30,9 +30,7 @@ def test_rate_limiter_failure_causes_collect_to_fail():
 
     # Simulate rate limiter acquire raising an exception
     collector.rate_limiter = Mock()
-    collector.rate_limiter.acquire = AsyncMock(
-        side_effect=Exception("rate limit error")
-    )
+    collector.rate_limiter.acquire = AsyncMock(side_effect=Exception("rate limit error"))
 
     # Execution
     result = asyncio.run(collector.collect_fundamental_data("TICK"))
@@ -57,9 +55,7 @@ def test_db_execute_failure_on_cached_data():
                 "fiscal_year": 2025,
                 "timeframe": "annual",
                 "financials": {
-                    "income_statement": {
-                        "revenues": {"value": 100.0, "source": "direct_report"}
-                    }
+                    "income_statement": {"revenues": {"value": 100.0, "source": "direct_report"}}
                 },
             }
         ]

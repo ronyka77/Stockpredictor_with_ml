@@ -66,13 +66,7 @@ def test_get_prediction_confidence_invalid_method_raises():
 
 def test_fit_with_huber_and_val_loader():
     """Training with Huber loss and validation loader runs without error and marks trained."""
-    cfg = {
-        "epochs": 1,
-        "learning_rate": 1e-2,
-        "batch_size": 8,
-        "loss": "huber",
-        "huber_delta": 0.5,
-    }
+    cfg = {"epochs": 1, "learning_rate": 1e-2, "batch_size": 8, "loss": "huber", "huber_delta": 0.5}
     p = MinimalPytorchPredictor(model_name="huber", config=cfg)
     train_loader = _make_loader(16, batch_size=8)
     val_loader = _make_loader(8, batch_size=4)

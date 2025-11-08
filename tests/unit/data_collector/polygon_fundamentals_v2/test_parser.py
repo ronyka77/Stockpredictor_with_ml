@@ -2,9 +2,7 @@ import pytest
 import numpy as np
 
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
-from src.data_collector.polygon_fundamentals.data_models import (
-    FundamentalDataResponse,
-)
+from src.data_collector.polygon_fundamentals.data_models import FundamentalDataResponse
 
 
 @pytest.fixture()
@@ -12,10 +10,7 @@ def parser() -> FundamentalsParser:
     return FundamentalsParser()
 
 
-@pytest.mark.parametrize(
-    "format_type, expected_revenue",
-    [("nested", 100.0), ("legacy", 200.0)],
-)
+@pytest.mark.parametrize("format_type, expected_revenue", [("nested", 100.0), ("legacy", 200.0)])
 def test_parser_handles_nested_and_legacy_formats(
     parser, fv_factory, format_type, expected_revenue
 ):

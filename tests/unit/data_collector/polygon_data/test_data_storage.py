@@ -12,9 +12,7 @@ def test_store_historical_no_records():
     assert res["error_count"] == 0
 
 
-def test_store_historical_batches_and_upsert(
-    patch_execute_values_to_fake_pool, poly_ohlcv_factory
-):
+def test_store_historical_batches_and_upsert(patch_execute_values_to_fake_pool, poly_ohlcv_factory):
     """Store batches and upsert into DB, returning counts"""
     ds = DataStorage()
 
@@ -31,9 +29,7 @@ def test_store_historical_batches_and_upsert(
 def test_get_historical_query_and_params(mocker):
     """Patch fetch_all to return deterministic rows and validate query results"""
     fake_rows = [{"ticker": "AAA", "date": date(2020, 1, 1), "close": 10}]
-    mocker.patch(
-        "src.data_collector.polygon_data.data_storage.fetch_all", return_value=fake_rows
-    )
+    mocker.patch("src.data_collector.polygon_data.data_storage.fetch_all", return_value=fake_rows)
 
     ds = DataStorage()
     out = ds.get_historical_data(
@@ -49,10 +45,7 @@ def test_insert_ignore_and_upsert_batch_calls_execute_values(mocker, ohlcv_df):
     ds = DataStorage()
 
     # Patch execute_values used by insert/ upsert helpers
-    ev = mocker.patch(
-        "src.data_collector.polygon_data.data_storage.execute_values",
-        autospec=True,
-    )
+    ev = mocker.patch("src.data_collector.polygon_data.data_storage.execute_values", autospec=True)
 
     # _insert_ignore_batch should return count equal to rows
     count = ds._insert_ignore_batch(ohlcv_df)
@@ -93,13 +86,7 @@ def test_get_historical_data_builds_query_and_returns_rows(mocker):
     ds = DataStorage()
     fake_rows = [{"ticker": "T1", "date": "2025-03-01"}]
 
-    mocker.patch(
-        "src.data_collector.polygon_data.data_storage.fetch_all", return_value=fake_rows
-    )
+    mocker.patch("src.data_collector.polygon_data.data_storage.fetch_all", return_value=fake_rows)
 
-    rows = ds.get_historical_data(
-        "T1", start_date="2025-03-01", end_date="2025-03-02", limit=10
-    )
-    assert rows == fake_rows, (
-        f"Expected returned rows to match mocked fetch_all result; got {rows}"
-    )
+    rows = ds.get_historical_data("T1", start_date="2025-03-01", end_date="2025-03-02", limit=10)
+    assert rows == fake_rows, f"Expected returned rows to match mocked fetch_all result; got {rows}"

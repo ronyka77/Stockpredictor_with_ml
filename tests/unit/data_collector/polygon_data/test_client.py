@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch
 
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
-from tests._fixtures import canned_api_factory
+from tests.fixtures import canned_api_factory
 
 
 def test_make_request_success(polygon_client):
@@ -34,9 +34,7 @@ def test_make_request_rate_limit_retries(polygon_client):
     r3._payload = {"status": "OK", "results": []}
 
     # Patch time.sleep to avoid delays during backoff retries
-    with patch.object(
-        polygon_client.session, "get", side_effect=[r1, r2, r3]
-    ) as mock_get:
+    with patch.object(polygon_client.session, "get", side_effect=[r1, r2, r3]) as mock_get:
         with patch("time.sleep", return_value=None):
             data = polygon_client._make_request("/test/rate")
 
@@ -48,10 +46,7 @@ def test_make_request_rate_limit_retries(polygon_client):
 def test_fetch_paginated_data_concatenates_pages(polygon_client):
     """Confirm paginated pages are fetched and concatenated into a single list"""
     page1 = canned_api_factory("empty")
-    page1._payload = {
-        "results": [{"a": 1}],
-        "next_url": "https://api/p/v1?page=2&apikey=TEST",
-    }
+    page1._payload = {"results": [{"a": 1}], "next_url": "https://api/p/v1?page=2&apikey=TEST"}
     page2 = canned_api_factory("empty")
     page2._payload = {"results": [{"b": 2}], "next_url": None}
 

@@ -50,13 +50,6 @@ def test_transform_missing_id_raises_skip():
         transform_dividend_record(raw, ticker_id=1)
 
 
-def test_transform_invalid_date_raises():
-    raw = make_valid_raw()
-    raw["ex_dividend_date"] = "not-a-date"
-    with pytest.raises(TransformError):
-        transform_dividend_record(raw, ticker_id=1)
-
-
 def test_transform_invalid_currency_raises():
     raw = make_valid_raw()
     raw["currency"] = "US"

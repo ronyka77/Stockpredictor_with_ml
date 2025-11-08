@@ -26,25 +26,19 @@ class AutoGluonPredictor(BasePredictor):
             try:
                 self.model = AutoGluonModel()
                 self.model.load_from_dir(self.model_dir)
-                logger.info(
-                    f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}"
-                )
+                logger.info(f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
                 return
             except Exception as e:
                 logger.warning(
                     f"Failed to load AutoGluon predictor from AG_MODEL_DIR '{self.model_dir}': {e}"
                 )
         else:
-            logger.warning(
-                f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}"
-            )
+            logger.warning(f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}")
 
     def _load_metadata(self) -> None:
         if os.path.exists(self.model_dir):
             try:
-                with open(
-                    os.path.join(self.model_dir, "best_model_metadata.json"), "r"
-                ) as f:
+                with open(os.path.join(self.model_dir, "best_model_metadata.json"), "r") as f:
                     data = json.load(f)
 
                 threshold = data["optimal_threshold"]
@@ -60,9 +54,7 @@ class AutoGluonPredictor(BasePredictor):
                     f"Failed to load AutoGluon metadata from AG_MODEL_DIR '{self.model_dir}': {e}"
                 )
         else:
-            logger.warning(
-                f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}"
-            )
+            logger.warning(f"AG_MODEL_DIR is set but path does not exist: {self.model_dir}")
 
 
 def predict_best_model(model_dir: str):
@@ -88,9 +80,7 @@ def predict_all_model(model_dir: str):
         metadata_df = metadata_df_base.copy()
         predictor.model.selected_model_name = model_name
         predictions = predictor.make_predictions(features_df)
-        predictor.save_predictions_to_excel(
-            features_df, metadata_df, predictions, model_name
-        )
+        predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
 
 
 def predict_all_model_folders():
@@ -103,9 +93,7 @@ def predict_all_model_folders():
         logger.error(f"AutogluonModels directory not found at {base_dir}")
         return
 
-    model_folders = [
-        f for f in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, f))
-    ]
+    model_folders = [f for f in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, f))]
 
     if not model_folders:
         logger.warning(f"No model folders found in {base_dir}")
@@ -127,5 +115,5 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
     model_dir = "AutogluonModels/ag-20251019_213356"
-    predict_all_model(model_dir)
-    # predict_all_model_folders()
+    # predict_all_model(model_dir)
+    predict_all_model_folders()

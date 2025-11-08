@@ -1,9 +1,7 @@
 import pytest
 
 from polyfactory.factories.pydantic_factory import ModelFactory
-from src.data_collector.polygon_fundamentals.data_models import (
-    FinancialValue,
-)
+from src.data_collector.polygon_fundamentals.data_models import FinancialValue
 
 
 class FinancialValueFactory(ModelFactory[FinancialValue]):

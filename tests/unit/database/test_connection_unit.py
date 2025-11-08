@@ -18,19 +18,11 @@ def test_databaseconnection_raises_when_password_missing():
         # pool init should validate missing password
         init_kwargs = cfg.copy()
         PostgresConnection(1, 1, **init_kwargs)
-    assert "DB_PASSWORD" in str(exc.value), (
-        f"Expected missing password error; got: {exc.value}"
-    )
+    assert "DB_PASSWORD" in str(exc.value), f"Expected missing password error; got: {exc.value}"
 
 
 def test_safe_pooled_connection_timeout_and_release():
-    fake_kwargs = {
-        "host": "h",
-        "port": 5432,
-        "database": "d",
-        "user": "u",
-        "password": "p",
-    }
+    fake_kwargs = {"host": "h", "port": 5432, "database": "d", "user": "u", "password": "p"}
     # Patch ThreadedConnectionPool to avoid real DB network calls during init
     with patch("src.database.connection.ThreadedConnectionPool"):
         sp = PostgresConnection(1, 1, **fake_kwargs)
@@ -48,7 +40,7 @@ def test_safe_pooled_connection_timeout_and_release():
 
 def test_get_connection_pool_singleton(mocker):
     # Use the canonical PoolFake via patch_global_pool
-    from tests._fixtures.db import patch_global_pool, PoolFake
+    from tests.fixtures.db import patch_global_pool, PoolFake
 
     pool = PoolFake()
     patch_global_pool(mocker, pool)
@@ -88,7 +80,7 @@ def test_run_in_transaction_commits_and_rolls_back_on_exception(mocker):
         def connection(self):
             return conn_cm()
 
-    from tests._fixtures.db import patch_global_pool
+    from tests.fixtures.db import patch_global_pool
 
     patch_global_pool(mocker, DummyPool())
 
@@ -196,9 +188,6 @@ def test_bulk_upsert_technical_features_success():
     fake_conn = MagicMock()
     fake_cur = MagicMock()
     fake_cur.rowcount = 1
-    # psycopg2.execute_values expects cursor.connection.encoding to map to an
-    # encoding; set a realistic attribute on the fake connection to avoid
-    # psycopg2.extras.execute_values using MagicMock keys.
     fake_conn.cursor.return_value = fake_cur
     fake_conn.encoding = "UTF8"
     # also ensure cursor().connection.encoding is accessible
@@ -214,7 +203,6 @@ def test_bulk_upsert_technical_features_success():
             return conn_cm()
 
     def fake_execute_values(cur, sql, argslist, page_size=1000):
-        # emulate psycopg2.extras.execute_values: set rowcount on cursor
         try:
             cur.rowcount = 1
         except Exception:
@@ -222,9 +210,7 @@ def test_bulk_upsert_technical_features_success():
 
     with (
         patch("src.database.connection.get_global_pool", return_value=DummyPool()),
-        patch(
-            "src.database.connection.execute_values", side_effect=fake_execute_values
-        ),
+        patch("src.database.connection.execute_values", side_effect=fake_execute_values),
     ):
         res = db_utils.bulk_upsert_technical_features(rows)
         assert res == 1
@@ -245,9 +231,6 @@ def test_bulk_upsert_technical_features_rollback_on_exception():
 
     fake_conn = MagicMock()
     fake_cur = MagicMock()
-    # Make execute_values raise when psycopg2.extras.execute_values calls
-    # the cursor; set cursor().connection.encoding to a real string and then
-    # cause execute to raise.
     fake_cur.connection = MagicMock()
     fake_cur.connection.encoding = "UTF8"
     fake_cur.execute.side_effect = RuntimeError("boom")
@@ -266,9 +249,7 @@ def test_bulk_upsert_technical_features_rollback_on_exception():
 
     with (
         patch("src.database.connection.get_global_pool", return_value=DummyPool()),
-        patch(
-            "src.database.db_utils.execute_values", side_effect=raising_execute_values
-        ),
+        patch("src.database.db_utils.execute_values", side_effect=raising_execute_values),
     ):
         with pytest.raises(RuntimeError):
             db_utils.bulk_upsert_technical_features(rows)

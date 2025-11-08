@@ -13,9 +13,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__, utility="feature_engineering")
 
 
-def compute_dividend_features(
-    price_df: pd.DataFrame, dividends_df: pd.DataFrame
-) -> pd.DataFrame:
+def compute_dividend_features(price_df: pd.DataFrame, dividends_df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute dividend-derived features aligned to price data index.
 
@@ -77,10 +75,14 @@ def compute_dividend_features(
     warnings = []
 
     for ex_dt in ex_dates:
-        window_mask = (trading_index >= ex_dt - pd.Timedelta(days=3)) & (trading_index <= ex_dt + pd.Timedelta(days=3))
+        window_mask = (trading_index >= ex_dt - pd.Timedelta(days=3)) & (
+            trading_index <= ex_dt + pd.Timedelta(days=3)
+        )
         candidates = trading_index[window_mask]
         if len(candidates) == 0:
-            warnings.append(f"Could not map ex-dividend date {ex_dt.date()} to any trading date within ±3 days")
+            warnings.append(
+                f"Could not map ex-dividend date {ex_dt.date()} to any trading date within ±3 days"
+            )
             continue
         nearest = candidates[np.argmin(abs(candidates - ex_dt))]
         mapped_dates[pd.Timestamp(ex_dt).date()] = pd.Timestamp(nearest)
@@ -90,13 +92,18 @@ def compute_dividend_features(
         logger.warning(warning)
 
     for ex_date_key, trade_timestamp in mapped_dates.items():
-        dividend_rows = dividends_df[pd.to_datetime(dividends_df["ex_dividend_date"]).dt.normalize() == pd.to_datetime(ex_date_key)]
+        dividend_rows = dividends_df[
+            pd.to_datetime(dividends_df["ex_dividend_date"]).dt.normalize()
+            == pd.to_datetime(ex_date_key)
+        ]
         total_amount = dividend_rows["cash_amount"].sum()
 
         if trade_timestamp not in price_df.index:
             matched_idx = price_df.index.normalize() == trade_timestamp.normalize()
             if not matched_idx.any():
-                logger.warning(f"Mapped trade date {trade_timestamp} not found in price index for ex-date {ex_date_key}")
+                logger.warning(
+                    f"Mapped trade date {trade_timestamp} not found in price index for ex-date {ex_date_key}"
+                )
                 continue
             trade_timestamp = price_df.index[matched_idx.argmax()]
 
@@ -107,7 +114,9 @@ def compute_dividend_features(
         if pd.notna(close_val) and close_val != 0:
             result.loc[trade_timestamp, "dividend_yield"] = total_amount / close_val
         else:
-            logger.warning(f"Missing or zero close price for {trade_timestamp}, cannot calculate dividend_yield")
+            logger.warning(
+                f"Missing or zero close price for {trade_timestamp}, cannot calculate dividend_yield"
+            )
 
     # Calculate days_since_last_dividend and days_to_next_dividend
     ex_timestamps_mapped = sorted(
@@ -129,9 +138,7 @@ def compute_dividend_features(
             next_dates = [d for d in ex_timestamps_mapped if d > current_date]
             if next_dates:
                 next_date = min(next_dates)
-                result.loc[current_date, "days_to_next_dividend"] = (
-                    next_date - current_date
-                ).days
+                result.loc[current_date, "days_to_next_dividend"] = (next_date - current_date).days
 
     logger.info(
         f"Computed dividend features for {len(result)} trading dates, {len(mapped_dates)} ex-dividend dates mapped"

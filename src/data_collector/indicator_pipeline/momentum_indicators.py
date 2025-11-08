@@ -25,9 +25,7 @@ from src.data_collector.config import feature_config
 logger = get_logger(__name__, utility="feature_engineering")
 
 
-def calculate_rsi(
-    data: pd.DataFrame, periods: Optional[List[int]] = None
-) -> IndicatorResult:
+def calculate_rsi(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
     """
     Calculate Relative Strength Index for multiple periods
 
@@ -62,9 +60,9 @@ def calculate_rsi(
             # Add RSI-based signals
             result_data[f"RSI_{period}_Overbought"] = (rsi_values > 70).astype(int)
             result_data[f"RSI_{period}_Oversold"] = (rsi_values < 30).astype(int)
-            result_data[f"RSI_{period}_Neutral"] = (
-                (rsi_values >= 30) & (rsi_values <= 70)
-            ).astype(int)
+            result_data[f"RSI_{period}_Neutral"] = ((rsi_values >= 30) & (rsi_values <= 70)).astype(
+                int
+            )
 
             # logger.info(f"Calculated RSI_{period}: {rsi_values.notna().sum()} valid values")
 
@@ -124,24 +122,18 @@ def calculate_stochastic(
         # Check minimum data requirements
         min_required = k_period + d_period
         if len(data) < min_required:
-            warning_msg = f"Insufficient data for Stochastic. Need {min_required} points, have {len(data)}"
+            warning_msg = (
+                f"Insufficient data for Stochastic. Need {min_required} points, have {len(data)}"
+            )
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
         # Calculate Stochastic using ta library
         stoch_k = ta.momentum.stoch(
-            data["high"],
-            data["low"],
-            data["close"],
-            window=k_period,
-            smooth_window=d_period,
+            data["high"], data["low"], data["close"], window=k_period, smooth_window=d_period
         )
         stoch_d = ta.momentum.stoch_signal(
-            data["high"],
-            data["low"],
-            data["close"],
-            window=k_period,
-            smooth_window=d_period,
+            data["high"], data["low"], data["close"], window=k_period, smooth_window=d_period
         )
 
         result_data = pd.DataFrame(index=data.index)
@@ -157,9 +149,9 @@ def calculate_stochastic(
             (result_data["Stoch_K"] < 20) & (result_data["Stoch_D"] < 20)
         ).astype(int)
 
-        result_data["Stoch_K_Above_D"] = (
-            result_data["Stoch_K"] > result_data["Stoch_D"]
-        ).astype(int)
+        result_data["Stoch_K_Above_D"] = (result_data["Stoch_K"] > result_data["Stoch_D"]).astype(
+            int
+        )
 
         result_data["Stoch_Crossover"] = (
             (result_data["Stoch_K"] > result_data["Stoch_D"]).astype(int).diff()
@@ -197,9 +189,7 @@ def calculate_stochastic(
         raise
 
 
-def calculate_roc(
-    data: pd.DataFrame, periods: Optional[List[int]] = None
-) -> IndicatorResult:
+def calculate_roc(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
     """
     Calculate Rate of Change for multiple periods
 
@@ -301,12 +291,8 @@ def calculate_williams_r(
             result_data[f"Williams_R_{period}"] = williams_r_values
 
             # Add Williams %R signals
-            result_data[f"Williams_R_{period}_Overbought"] = (
-                williams_r_values > -20
-            ).astype(int)
-            result_data[f"Williams_R_{period}_Oversold"] = (
-                williams_r_values < -80
-            ).astype(int)
+            result_data[f"Williams_R_{period}_Overbought"] = (williams_r_values > -20).astype(int)
+            result_data[f"Williams_R_{period}_Oversold"] = (williams_r_values < -80).astype(int)
             result_data[f"Williams_R_{period}_Neutral"] = (
                 (williams_r_values >= -80) & (williams_r_values <= -20)
             ).astype(int)

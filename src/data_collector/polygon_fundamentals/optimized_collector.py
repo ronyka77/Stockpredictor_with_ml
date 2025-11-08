@@ -6,16 +6,14 @@ per ticker and simplified rate limiting.
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any, AsyncGenerator
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.data_collector.polygon_fundamentals.client import PolygonFundamentalsClient
 from src.data_collector.polygon_fundamentals.config import PolygonFundamentalsConfig
-from src.data_collector.polygon_fundamentals.cache_manager import (
-    FundamentalCacheManager,
-)
+from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCacheManager
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
@@ -26,11 +24,7 @@ logger = get_logger(__name__)
 
 
 def calculate_source_confidence(source: str) -> float:
-    mapping = {
-        "direct_report": 1.0,
-        "intra_report_impute": 0.8,
-        "inter_report_derive": 0.6,
-    }
+    mapping = {"direct_report": 1.0, "intra_report_impute": 0.8, "inter_report_derive": 0.6}
     return mapping.get(source, 0.5)
 
 
@@ -64,9 +58,7 @@ class OptimizedFundamentalCollector:
         cfg = getattr(self.db_pool, "config", {})
         database_url = f"postgresql://{cfg.get('user', '')}:{cfg.get('password', '')}@{cfg.get('host', 'localhost')}:{cfg.get('port', 5432)}/{cfg.get('database', '')}"
         self.engine = create_engine(database_url)
-        self.session_local = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.engine
-        )
+        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
         # Initialize data storage for ticker metadata
         self.data_storage = DataStorage()
@@ -153,9 +145,7 @@ class OptimizedFundamentalCollector:
             logger.error(f"Error checking recent data for ticker_id {ticker_id}: {e}")
             return False
 
-    async def _process_cached_data(
-        self, ticker: str, cached_data: Dict[str, Any]
-    ) -> bool:
+    async def _process_cached_data(self, ticker: str, cached_data: Dict[str, Any]) -> bool:
         """Process cached data and store to database"""
         try:
             # Get ticker_id from cache
@@ -303,9 +293,7 @@ class OptimizedFundamentalCollector:
             )
 
             # Prepare raw data
-            raw_data = self._prepare_raw_data(
-                ticker_id, income_stmt, balance_sheet, cash_flow
-            )
+            raw_data = self._prepare_raw_data(ticker_id, income_stmt, balance_sheet, cash_flow)
 
             # Store to database using connection pool
             # Use centralized execute helper for single-statement upsert
@@ -510,7 +498,11 @@ class OptimizedFundamentalCollector:
                 return value["value"], conf
             return value, None
         if hasattr(value, "value"):
-            conf = calculate_source_confidence(getattr(value, "source", None)) if getattr(value, "source", None) else None
+            conf = (
+                calculate_source_confidence(getattr(value, "source", None))
+                if getattr(value, "source", None)
+                else None
+            )
             return value.value, conf
         return value, None
 
@@ -525,43 +517,6 @@ class OptimizedFundamentalCollector:
                 return None
             return stmt_obj.get(f_name)
         return getattr(stmt_obj, f_name, None)
-
-    async def collect_with_progress(
-        self, tickers: List[str]
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Collect fundamental data with real-time progress tracking"""
-        self.stats["start_time"] = datetime.now()
-
-        for i, ticker in enumerate(tickers):
-            logger.info(f"Processing ticker {i + 1}/{len(tickers)}: {ticker}")
-
-            try:
-                success = await self.collect_fundamental_data(ticker)
-                self.stats["total_processed"] += 1
-
-                yield {
-                    "ticker": ticker,
-                    "success": success,
-                    "progress": i + 1,
-                    "total": len(tickers),
-                    "stats": self.stats.copy(),
-                }
-
-            except Exception as e:
-                logger.error(f"Exception processing {ticker}: {e}")
-                self.stats["failed"] += 1
-                self.stats["total_processed"] += 1
-
-                yield {
-                    "ticker": ticker,
-                    "success": False,
-                    "error": str(e),
-                    "progress": i + 1,
-                    "total": len(tickers),
-                    "stats": self.stats.copy(),
-                }
-
-        self.stats["end_time"] = datetime.now()
 
     def close(self):
         """Close the collector and cleanup resources"""

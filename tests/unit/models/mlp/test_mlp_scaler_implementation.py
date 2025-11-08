@@ -11,11 +11,7 @@ class TestMLPScalerImplementation:
     def setup_method(self):
         rng = np.random.RandomState(42)
         self.x_test = pd.DataFrame(
-            {
-                "feature1": rng.randn(100),
-                "feature2": rng.randn(100),
-                "feature3": rng.randn(100),
-            }
+            {"feature1": rng.randn(100), "feature2": rng.randn(100), "feature3": rng.randn(100)}
         )
         self.x_test.loc[0, "feature1"] = np.nan
         self.x_test.loc[1, "feature2"] = np.inf
@@ -24,9 +20,7 @@ class TestMLPScalerImplementation:
             model_name="test_mlp",
             config={"layer_sizes": [10, 5], "input_size": 3, "batch_size": 16},
         )
-        self.predictor.model = MLPModule(
-            input_size=3, layer_sizes=[10, 5], output_size=1
-        )
+        self.predictor.model = MLPModule(input_size=3, layer_sizes=[10, 5], output_size=1)
         self.predictor.device = torch.device("cpu")
         self.predictor.model = self.predictor.model.to("cpu")
 
@@ -54,6 +48,4 @@ class TestMLPScalerImplementation:
         assert isinstance(predictions, (list, tuple, np.ndarray)), (
             "Predictions should be a sequence or numpy ndarray"
         )
-        assert len(predictions) == len(self.x_test), (
-            "Predictions length mismatch with input data"
-        )
+        assert len(predictions) == len(self.x_test), "Predictions length mismatch with input data"

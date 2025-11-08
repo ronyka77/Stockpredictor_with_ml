@@ -3,9 +3,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 
-from src.data_collector.polygon_fundamentals.cache_manager import (
-    FundamentalCacheManager,
-)
+from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCacheManager
 
 
 def make_cache_file(directory: Path, ticker: str, days_ago: int, payload: dict):
@@ -67,8 +65,7 @@ def test_save_cache_and_clear_expired(tmp_path):
     assert removed >= 1
     # The original saved file for today should remain
     assert any(
-        p.name.startswith("MSFT_financials_")
-        for p in tmp_path.glob("MSFT_financials_*.json")
+        p.name.startswith("MSFT_financials_") for p in tmp_path.glob("MSFT_financials_*.json")
     )
 
 

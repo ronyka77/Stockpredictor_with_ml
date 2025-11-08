@@ -8,13 +8,7 @@ import pandas as pd
 
 from src.utils.logger import get_logger
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
-from src.database.connection import (
-    init_global_pool,
-    fetch_all,
-    fetch_one,
-    execute,
-    execute_values,
-)
+from src.database.connection import init_global_pool, fetch_all, fetch_one, execute, execute_values
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -35,9 +29,7 @@ class DataStorage:
         init_global_pool()
 
     def store_historical_data(
-        self,
-        records: List[OHLCVRecord],
-        batch_size: int = 5000,
+        self, records: List[OHLCVRecord], batch_size: int = 5000
     ) -> Dict[str, Any]:
         """
         Store validated OHLCV data to PostgreSQL database
@@ -82,10 +74,7 @@ class DataStorage:
                     batch_stored, batch_updated = self._upsert_batch(batch_df)
                     stored_count += batch_stored
                     updated_count += batch_updated
-                    logger.info(
-                        f"Processed batch {i // batch_size + 1}: "
-                        f"{len(batch_df)} records"
-                    )
+                    logger.info(f"Processed batch {i // batch_size + 1}: {len(batch_df)} records")
                 except Exception as e:
                     logger.error(f"Error processing batch {i // batch_size + 1}: {e}")
                     error_count += len(batch_df)
@@ -179,28 +168,6 @@ class DataStorage:
             return len(batch_df)
         except Exception as e:
             logger.error(f"_insert_ignore_batch failed: {e}")
-            raise
-
-    def _insert_batch(self, batch_df: pd.DataFrame) -> int:
-        """
-        Insert batch without conflict handling
-
-        Args:
-            batch_df: DataFrame with batch data
-
-        Returns:
-            Number of records inserted
-        """
-        # Generic insert using execute_values
-        cols = list(batch_df.columns)
-        values = [tuple(row[col] for col in cols) for _, row in batch_df.iterrows()]
-        insert_sql = "INSERT INTO historical_prices (" + ",".join(cols) + ") VALUES %s"
-
-        try:
-            execute_values(insert_sql, values, page_size=1000)
-            return len(batch_df)
-        except Exception as e:
-            logger.error(f"_insert_batch failed: {e}")
             raise
 
     def get_historical_data(
@@ -373,9 +340,7 @@ class DataStorage:
             record_count = 0
             if table_exists:
                 rc = fetch_one("SELECT COUNT(*) as cnt FROM historical_prices")
-                record_count = (
-                    rc.get("cnt") if isinstance(rc, dict) else (rc[0] if rc else 0)
-                )
+                record_count = rc.get("cnt") if isinstance(rc, dict) else (rc[0] if rc else 0)
 
             return {
                 "status": "healthy",
@@ -387,11 +352,7 @@ class DataStorage:
 
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }
+            return {"status": "unhealthy", "error": str(e), "timestamp": datetime.now().isoformat()}
 
     def __enter__(self):
         """Context manager entry"""
@@ -454,9 +415,7 @@ class DataStorage:
                             "list_date": ticker_data.get("list_date"),
                         }
                         # Remove None values
-                        upsert_data = {
-                            k: v for k, v in upsert_data.items() if v is not None
-                        }
+                        upsert_data = {k: v for k, v in upsert_data.items() if v is not None}
 
                         if cols is None:
                             cols = list(upsert_data.keys())
@@ -471,9 +430,7 @@ class DataStorage:
                     insert_sql = (
                         f"INSERT INTO tickers ({insert_columns}) VALUES %s "
                         f"ON CONFLICT (ticker) DO UPDATE SET "
-                        + ", ".join(
-                            [f"{c}=EXCLUDED.{c}" for c in cols if c != "ticker"]
-                        )
+                        + ", ".join([f"{c}=EXCLUDED.{c}" for c in cols if c != "ticker"])
                     )
 
                     # use centralized helper for batched upsert
@@ -485,15 +442,11 @@ class DataStorage:
                     )
 
                 except Exception as e:
-                    logger.error(
-                        f"Error processing ticker batch {i // batch_size + 1}: {e}"
-                    )
+                    logger.error(f"Error processing ticker batch {i // batch_size + 1}: {e}")
                     error_count += len(batch_data)
                     continue
 
-            logger.info(
-                f"Ticker storage complete: {stored_count} processed, {error_count} errors"
-            )
+            logger.info(f"Ticker storage complete: {stored_count} processed, {error_count} errors")
 
             return {
                 "stored_count": stored_count,
@@ -533,10 +486,7 @@ class DataStorage:
             raise
 
     def load_dividends_for_ticker(
-        self,
-        ticker: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        self, ticker: str, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> pd.DataFrame:
         """
         Load dividend data for a specific ticker within a date range.

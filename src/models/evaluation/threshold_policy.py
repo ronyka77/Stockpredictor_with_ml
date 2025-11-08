@@ -23,9 +23,7 @@ logger = get_logger(__name__, utility="evaluation")
 
 @dataclass
 class ThresholdConfig:
-    method: str = (
-        "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
-    )
+    method: str = "ge"  # "ge" (>=), "gt" (>), future: "quantile", "topk", "adaptive", "per_group"
     value: Optional[float] = None
     quantile: Optional[float] = None
     top_k: Optional[int] = None
@@ -88,18 +86,14 @@ class ThresholdPolicy:
                 raise ValueError("ThresholdConfig.value is required for method 'gt'")
             raw_mask = conf > float(cfg.value)
         else:
-            raise ValueError(
-                f"Unknown threshold method '{cfg.method}'. Supported: 'ge', 'gt'"
-            )
+            raise ValueError(f"Unknown threshold method '{cfg.method}'. Supported: 'ge', 'gt'")
 
         # Exclude non-finite from raw_mask
         final_mask = np.logical_and(raw_mask, finite_mask)
         indices = np.nonzero(final_mask)[0]
 
         samples_kept = int(final_mask.sum())
-        samples_kept_ratio = (
-            float(samples_kept / total_samples) if total_samples else 0.0
-        )
+        samples_kept_ratio = float(samples_kept / total_samples) if total_samples else 0.0
 
         stats = {
             "samples_kept": samples_kept,

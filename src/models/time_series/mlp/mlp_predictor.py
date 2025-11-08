@@ -66,9 +66,7 @@ class MLPPredictor(PyTorchBasePredictor):
             self.config.setdefault("lr_scheduler_params", {})
             self.config.setdefault("checkpoint_dir", "./checkpoints")
             self.config.setdefault("save_best_model", True)
-            self.config.setdefault(
-                "save_checkpoint_frequency", 5
-            )  # Save every N epochs
+            self.config.setdefault("save_checkpoint_frequency", 5)  # Save every N epochs
 
         # Training state
         self.best_val_loss = float("inf")
@@ -142,9 +140,7 @@ class MLPPredictor(PyTorchBasePredictor):
         # Resume from checkpoint if specified
         start_epoch = 0
         if resume_from_checkpoint and os.path.exists(resume_from_checkpoint):
-            start_epoch = self._load_checkpoint(
-                self.model, optimizer, resume_from_checkpoint
-            )
+            start_epoch = self._load_checkpoint(self.model, optimizer, resume_from_checkpoint)
             logger.info(f"Resuming training from epoch {start_epoch}")
 
         # Training history initialization
@@ -196,11 +192,7 @@ class MLPPredictor(PyTorchBasePredictor):
             if (epoch + 1) % save_checkpoint_frequency == 0:
                 is_best = val_loss is not None and val_loss < self.best_val_loss
                 self._save_checkpoint(
-                    epoch + 1,
-                    self.model,
-                    optimizer,
-                    val_loss or train_metrics["loss"],
-                    is_best,
+                    epoch + 1, self.model, optimizer, val_loss or train_metrics["loss"], is_best
                 )
 
         # Restore best model if available
@@ -238,9 +230,7 @@ class MLPPredictor(PyTorchBasePredictor):
             ):
                 try:
                     # Temporarily load best state into model to save correct best checkpoint
-                    current_state = (
-                        self.model.state_dict() if self.model is not None else None
-                    )
+                    current_state = self.model.state_dict() if self.model is not None else None
                     if self.model is not None and self.best_model_state is not None:
                         self.model.load_state_dict(self.best_model_state)
                     self._save_checkpoint(
@@ -267,9 +257,7 @@ class MLPPredictor(PyTorchBasePredictor):
         optimizer_name = self.config.get("optimizer", "adam").lower()
 
         if optimizer_name == "adam":
-            return torch.optim.Adam(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay
-            )
+            return torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         elif optimizer_name == "adamw":
             return torch.optim.AdamW(
                 model.parameters(), lr=learning_rate, weight_decay=weight_decay
@@ -297,8 +285,7 @@ class MLPPredictor(PyTorchBasePredictor):
 
         if scheduler_type == "cosine":
             return torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
-                T_max=scheduler_params.get("T_max", self.config.get("epochs", 50)),
+                optimizer, T_max=scheduler_params.get("T_max", self.config.get("epochs", 50))
             )
         elif scheduler_type == "step":
             return torch.optim.lr_scheduler.StepLR(
@@ -335,9 +322,7 @@ class MLPPredictor(PyTorchBasePredictor):
         checkpoint = {
             "epoch": epoch,
             "model_state_dict": model.state_dict() if model is not None else None,
-            "optimizer_state_dict": optimizer.state_dict()
-            if optimizer is not None
-            else None,
+            "optimizer_state_dict": optimizer.state_dict() if optimizer is not None else None,
             "val_loss": val_loss,
             "config": self.config,
             "training_history": self.training_history,
@@ -346,9 +331,7 @@ class MLPPredictor(PyTorchBasePredictor):
         }
 
         # Save regular checkpoint
-        checkpoint_path = os.path.join(
-            checkpoint_dir, f"{self.model_name}_checkpoint.pth"
-        )
+        checkpoint_path = os.path.join(checkpoint_dir, f"{self.model_name}_checkpoint.pth")
         torch.save(checkpoint, checkpoint_path)
 
         # Save best model if specified
@@ -408,9 +391,7 @@ class MLPPredictor(PyTorchBasePredictor):
                 batch_X, batch_y, optimizer, criterion, scaler, gradient_clip
             )
         else:
-            return self._standard_step(
-                batch_X, batch_y, optimizer, criterion, gradient_clip
-            )
+            return self._standard_step(batch_X, batch_y, optimizer, criterion, gradient_clip)
 
     def _mixed_precision_step(
         self,
@@ -498,9 +479,7 @@ class MLPPredictor(PyTorchBasePredictor):
             num_batches += 1
 
         avg_loss = total_loss / num_batches
-        avg_gradient_norm = (
-            total_gradient_norm / num_batches if total_gradient_norm > 0 else 0.0
-        )
+        avg_gradient_norm = total_gradient_norm / num_batches if total_gradient_norm > 0 else 0.0
 
         return {"loss": avg_loss, "gradient_norm": avg_gradient_norm}
 
@@ -528,9 +507,7 @@ class MLPPredictor(PyTorchBasePredictor):
         return total_loss / num_batches
 
     def _update_learning_rate(
-        self,
-        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler],
-        val_loss: Optional[float],
+        self, scheduler: Optional[torch.optim.lr_scheduler._LRScheduler], val_loss: Optional[float]
     ) -> float:
         """Update learning rate using scheduler."""
         # Get current learning rate from optimizer (if available) or use a default
@@ -585,19 +562,13 @@ class MLPPredictor(PyTorchBasePredictor):
         """Log training metrics for the current epoch."""
         # Update training history
         self.training_history["train_loss"].append(train_metrics["loss"])
-        self.training_history["val_loss"].append(
-            val_loss if val_loss is not None else float("inf")
-        )
+        self.training_history["val_loss"].append(val_loss if val_loss is not None else float("inf"))
         self.training_history["learning_rate"].append(learning_rate)
-        self.training_history["gradient_norm"].append(
-            train_metrics.get("gradient_norm", 0.0)
-        )
+        self.training_history["gradient_norm"].append(train_metrics.get("gradient_norm", 0.0))
         self.training_history["epoch"].append(epoch + 1)
 
         # Log metrics
-        log_msg = (
-            f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_metrics['loss']:.6f}"
-        )
+        log_msg = f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_metrics['loss']:.6f}"
         if val_loss is not None:
             log_msg += f", Val Loss: {val_loss:.6f}"
         log_msg += f", LR: {learning_rate:.2e}"
@@ -691,9 +662,7 @@ class MLPPredictor(PyTorchBasePredictor):
             if getattr(self, "scaler", None) is not None:
                 X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
                 if for_confidence:
-                    logger.info(
-                        "✅ Applied loaded scaler for confidence calculation preprocessing"
-                    )
+                    logger.info("✅ Applied loaded scaler for confidence calculation preprocessing")
                 else:
                     logger.info("✅ Applied loaded scaler for prediction preprocessing")
             else:
@@ -717,9 +686,7 @@ class MLPPredictor(PyTorchBasePredictor):
                 )
                 logger.info("🔄 Falling back to basic preprocessing for confidence")
             else:
-                logger.error(
-                    f"❌ Error during preprocessing: {str(preprocessing_error)}"
-                )
+                logger.error(f"❌ Error during preprocessing: {str(preprocessing_error)}")
                 logger.info("🔄 Falling back to basic preprocessing")
             raise preprocessing_error
 
@@ -756,9 +723,7 @@ class MLPPredictor(PyTorchBasePredictor):
         # Debug: Check prediction diversity
         unique_predictions = len(np.unique(predictions_np))
         if unique_predictions < 10:
-            logger.warning(
-                f"⚠️ Low prediction diversity: {unique_predictions} unique values"
-            )
+            logger.warning(f"⚠️ Low prediction diversity: {unique_predictions} unique values")
             logger.warning(
                 f"   Prediction range: {predictions_np.min():.6f} to {predictions_np.max():.6f}"
             )
@@ -767,9 +732,7 @@ class MLPPredictor(PyTorchBasePredictor):
 
         return predictions_np
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "variance"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "variance") -> np.ndarray:
         """
         Get prediction confidence scores.
 
@@ -781,9 +744,7 @@ class MLPPredictor(PyTorchBasePredictor):
             Confidence scores as numpy array
         """
         if self.model is None:
-            raise ValueError(
-                "Model must be trained before calculating confidence scores"
-            )
+            raise ValueError("Model must be trained before calculating confidence scores")
 
         self.model.eval()
 

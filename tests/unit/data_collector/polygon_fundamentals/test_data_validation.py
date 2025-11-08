@@ -1,6 +1,4 @@
-from src.data_collector.polygon_fundamentals.data_validator import (
-    FundamentalDataValidator,
-)
+from src.data_collector.polygon_fundamentals.data_validator import FundamentalDataValidator
 from src.data_collector.polygon_fundamentals.data_models import (
     FundamentalDataResponse,
     IncomeStatement,
@@ -39,7 +37,4 @@ def test_validate_income_statement_warnings_and_outliers():
     # validator reports warnings and outliers and records missing essential fields
     assert "Negative revenues in income statement" in result.warnings
     assert "Extremely high revenues" in result.outliers
-    assert any(
-        "income_statement.earnings_per_share_basic" in mf
-        for mf in result.missing_fields
-    )
+    assert any("income_statement.earnings_per_share_basic" in mf for mf in result.missing_fields)

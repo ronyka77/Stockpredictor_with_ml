@@ -1,12 +1,8 @@
 import pytest
 from datetime import date
 
-from src.data_collector.polygon_data.data_validator import (
-    OHLCVRecord,
-)
-from tests._fixtures.factories import (
-    OHLCVRecordFactory,
-)
+from src.data_collector.polygon_data.data_validator import OHLCVRecord
+from tests.fixtures.factories import OHLCVRecordFactory
 
 
 def test_ohlcv_record_valid_and_invalid():

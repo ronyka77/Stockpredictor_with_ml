@@ -35,7 +35,5 @@ def test_basic_training():
     predictor.fit(train_loader, val_loader)
     x_test = pd.DataFrame(x_train.numpy())
     predictions = predictor.predict(x_test)
-    if not (
-        predictions.ndim == 1 or (predictions.ndim == 2 and predictions.shape[1] == 1)
-    ):
+    if not (predictions.ndim == 1 or (predictions.ndim == 2 and predictions.shape[1] == 1)):
         raise AssertionError("Predictions have unexpected dimensions")

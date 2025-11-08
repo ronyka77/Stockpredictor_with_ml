@@ -9,6 +9,7 @@ Run:
 uv run python -m src.models.automl.autogluon_trainer --preset high_quality
 """
 
+import contextlib
 import os
 import json
 import psutil
@@ -50,10 +51,9 @@ def filter_to_selected_features(
 
     if selected_features_path and os.path.exists(selected_features_path):
         try:
-            with open(selected_features_path, 'r') as f:
+            with open(selected_features_path, "r") as f:
                 selected_features_data = json.load(f)
                 selected_features = selected_features_data["selected_features"]
-
 
             # Filter to only include selected features that exist in the dataset
             available_features = [col for col in selected_features if col in x_train.columns]
@@ -70,14 +70,18 @@ def filter_to_selected_features(
             x_train_filtered = x_train[available_features]
             x_test_filtered = x_test[available_features]
 
-            logger.info(f"Filtered to {len(available_features)} selected features,x_train shape: {x_train_filtered.shape}, x_test shape: {x_test_filtered.shape}")
+            logger.info(
+                f"Filtered to {len(available_features)} selected features,x_train shape: {x_train_filtered.shape}, x_test shape: {x_test_filtered.shape}"
+            )
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.warning(f"Error loading selected features file: {e}. Using all features.")
             x_train_filtered, x_test_filtered = x_train, x_test
             available_features = list(x_train.columns)
     else:
-        logger.warning(f"Selected features file not found: {selected_features_path}. Using all features.")
+        logger.warning(
+            f"Selected features file not found: {selected_features_path}. Using all features."
+        )
         x_train_filtered, x_test_filtered = x_train, x_test
         available_features = list(x_train.columns)
 
@@ -88,17 +92,13 @@ def top_dataframes(top_n: int = 10):
     dfs = []
     logger.info("TOP dataframes:")
     for obj in gc.get_objects():
-        try:
+        with contextlib.suppress(Exception):
             if isinstance(obj, pd.DataFrame):
                 size = obj.memory_usage(deep=True).sum()
                 dfs.append((size, obj))
-        except Exception:
-            continue
     dfs.sort(reverse=True, key=lambda x: x[0])
     for size, df in dfs[:top_n]:
-        logger.info(
-            f"{size / 1024**2:8.2f} MB | shape={df.shape} | columns={len(df.columns)}"
-        )
+        logger.info(f"{size / 1024**2:8.2f} MB | shape={df.shape} | columns={len(df.columns)}")
     return dfs
 
 
@@ -110,10 +110,7 @@ def _find_latest_artifact(pattern: str) -> Optional[str]:
 
 
 def apply_saved_encoder_and_scaler(
-    x_train: pd.DataFrame,
-    x_test: pd.DataFrame,
-    batch_size: int = 2048,
-    device: str = "cpu",
+    x_train: pd.DataFrame, x_test: pd.DataFrame, batch_size: int = 2048, device: str = "cpu"
 ) -> tuple[pd.DataFrame, pd.DataFrame, Optional[torch.nn.Module], Optional[StandardScaler]]:
     # locate and load latest artifacts
     encoder = None
@@ -145,7 +142,9 @@ def apply_saved_encoder_and_scaler(
         return x_train, x_test, used_encoding
 
     try:
-        logger.info("Applying saved scaler and encoder to training and test data before training AutoGluon")
+        logger.info(
+            "Applying saved scaler and encoder to training and test data before training AutoGluon"
+        )
 
         # Align DataFrame columns to scaler's expected feature names when available
         expected = getattr(scaler, "feature_names_in_", None)
@@ -154,7 +153,9 @@ def apply_saved_encoder_and_scaler(
             missing = [c for c in expected if c not in x_train.columns]
             extra = [c for c in x_train.columns if c not in expected]
             if missing:
-                logger.warning(f"Scaler expects {len(missing)} missing cols: {missing}; filling with 0")
+                logger.warning(
+                    f"Scaler expects {len(missing)} missing cols: {missing}; filling with 0"
+                )
                 for c in missing:
                     x_train[c] = 0.0
                     x_test[c] = 0.0
@@ -181,7 +182,9 @@ def apply_saved_encoder_and_scaler(
         logger.info(f"Using encoded features for AutoGluon training: {len(enc_cols)} dims")
         return x_train_enc, x_test_enc, encoder, scaler
     except Exception as e:
-        logger.warning(f"Failed to apply encoder/scaler pre-transforms; falling back to original features: {e}")
+        logger.warning(
+            f"Failed to apply encoder/scaler pre-transforms; falling back to original features: {e}"
+        )
         return x_train, x_test, None, None
 
 
@@ -190,8 +193,7 @@ def train_autogluon(
 ) -> Dict[str, Any]:
     # Use centralized common training data preparation
     data = prepare_common_training_data(
-        prediction_horizon=prediction_horizon,
-        recent_date_int_cut=10,
+        prediction_horizon=prediction_horizon, recent_date_int_cut=10
     )
     logger.info(f"target_column: {data.get('target_column')}")
     x_train: pd.DataFrame = data["x_train"]
@@ -212,11 +214,7 @@ def train_autogluon(
     print("RSS MB:", proc.memory_info().rss / 1024**2)
     top_dataframes(10)
     # Build model
-    config = {
-        "label": f"Future_Return_{prediction_horizon}D",
-        "presets": presets,
-        "groups": "year",
-    }
+    config = {"label": f"Future_Return_{prediction_horizon}D", "presets": presets, "groups": "year"}
     model = AutoGluonModel(model_name="autogluon", config=config)
     model.fit(x_train, y_train, X_val=x_test, y_val=y_test)
 
@@ -233,10 +231,7 @@ def train_autogluon(
 
 def main():
     prediction_horizon = 20
-    train_autogluon(
-        prediction_horizon=prediction_horizon,
-        presets="best_quality",
-    )
+    train_autogluon(prediction_horizon=prediction_horizon, presets="best_quality")
 
 
 if __name__ == "__main__":

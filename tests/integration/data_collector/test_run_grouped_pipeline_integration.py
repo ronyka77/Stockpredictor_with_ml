@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch
 
 from src.data_collector.polygon_data.data_pipeline import DataPipeline
-from tests._fixtures.factories import APIResponseFactory
+from tests.fixtures.factories import APIResponseFactory
 
 
 @pytest.mark.integration
@@ -10,20 +10,7 @@ from tests._fixtures.factories import APIResponseFactory
     "api_results, expected_stored_count",
     [
         ([], 0),
-        (
-            [
-                {
-                    "T": "AAA",
-                    "t": 1700000000000,
-                    "o": 1.0,
-                    "h": 2.0,
-                    "l": 0.5,
-                    "c": 1.5,
-                    "v": 100,
-                }
-            ],
-            1,
-        ),
+        ([{"T": "AAA", "t": 1700000000000, "o": 1.0, "h": 2.0, "l": 0.5, "c": 1.5, "v": 100}], 1),
     ],
 )
 def test_run_grouped_daily_pipeline_integration(
@@ -39,7 +26,7 @@ def test_run_grouped_daily_pipeline_integration(
     # Build API-like response payload using factory when results provided
     if api_results:
         # Convert simple polygon-style dicts into polygon payloads (include 'T')
-        from tests._fixtures.factories import polygon_payload_dict
+        from tests.fixtures.factories import polygon_payload_dict
 
         results = [polygon_payload_dict(**r) for r in api_results]
     else:
@@ -58,10 +45,7 @@ def test_run_grouped_daily_pipeline_integration(
         patch.object(DataPipeline, "_perform_health_checks", return_value=None),
     ):
         stats = pipeline.run_grouped_daily_pipeline(
-            start_date="2025-01-01",
-            end_date="2025-01-01",
-            validate_data=False,
-            save_stats=False,
+            start_date="2025-01-01", end_date="2025-01-01", validate_data=False, save_stats=False
         )
 
     assert stats.total_records_stored == expected_stored_count, (

@@ -6,6 +6,7 @@ This module implements `transform_dividend_record` according to the
 staging for bad records. Supports both sequential and concurrent processing.
 """
 
+from contextlib import suppress
 from decimal import Decimal, InvalidOperation
 from typing import Dict, Any, Optional, List
 from datetime import date
@@ -91,11 +92,8 @@ def transform_dividend_record(raw: Dict[str, Any], ticker_id: int) -> Dict[str, 
             val = raw.get(key)
             if not val:
                 return None
-            try:
+            with suppress(Exception):
                 return isoparse(val).date()
-            except Exception:
-                # Keep failure localized
-                raise
 
         try:
             declaration_date = _parse_date_field("declaration_date")
@@ -123,10 +121,9 @@ def transform_dividend_record(raw: Dict[str, Any], ticker_id: int) -> Dict[str, 
 
         # Currency
         currency = raw.get("currency")
-        if currency:
-            if not isinstance(currency, str) or len(currency) != 3:
-                _write_bad_record(raw, "invalid_currency")
-                raise TransformError("Invalid currency")
+        if currency and (not isinstance(currency, str) or len(currency) != 3):
+            _write_bad_record(raw, "invalid_currency")
+            raise TransformError("Invalid currency")
 
         # Frequency and type
         frequency = raw.get("frequency")
@@ -244,19 +241,15 @@ def ingest_dividends_for_all_tickers(
         return _ingest_dividends_sequential(tickers=tickers, batch_size=batch_size)
 
 
-def _ingest_dividends_sequential(
-    tickers: List[Dict[str, Any]], batch_size: int
-) -> Dict[str, int]:
+def _ingest_dividends_sequential(tickers: List[Dict[str, Any]], batch_size: int) -> Dict[str, int]:
     """Sequential processing of dividend ingestion."""
     client = PolygonDataClient()
-    storage = DataStorage()
+    DataStorage()
     overall = {"tickers_processed": 0, "total_fetched": 0, "total_upserted": 0}
 
     for t in tickers:
         try:
-            stats = ingest_dividends_for_ticker(
-                client, t, batch_size=batch_size
-            )
+            stats = ingest_dividends_for_ticker(client, t, batch_size=batch_size)
             overall["tickers_processed"] += 1
             overall["total_fetched"] += stats.get("fetched", 0)
             overall["total_upserted"] += stats.get("upserted", 0)
@@ -269,22 +262,14 @@ def _ingest_dividends_sequential(
 
 
 def _ingest_dividends_concurrent(
-    tickers: List[Dict[str, Any]],
-    batch_size: int,
-    max_workers: int,
-    requests_per_minute: int,
+    tickers: List[Dict[str, Any]], batch_size: int, max_workers: int, requests_per_minute: int
 ) -> Dict[str, int]:
     """Concurrent processing of dividend ingestion using ThreadPoolExecutor."""
     logger.info(f"Starting concurrent dividend ingestion with {max_workers} workers")
 
     # Thread-safe result collection
     results_lock = threading.Lock()
-    overall_stats = {
-        "tickers_processed": 0,
-        "total_fetched": 0,
-        "total_upserted": 0,
-        "errors": 0,
-    }
+    overall_stats = {"tickers_processed": 0, "total_fetched": 0, "total_upserted": 0, "errors": 0}
 
     def process_ticker_with_lock(ticker: Dict[str, Any]) -> Dict[str, int]:
         """Process a single ticker and return its stats."""
@@ -294,20 +279,16 @@ def _ingest_dividends_concurrent(
         try:
             # Each thread gets its own client instance for rate limiting
             client = PolygonDataClient(requests_per_minute=requests_per_minute)
-            storage = DataStorage()
+            DataStorage()
 
-            stats = ingest_dividends_for_ticker(
-                client, ticker, batch_size=batch_size
-            )
+            stats = ingest_dividends_for_ticker(client, ticker, batch_size=batch_size)
 
             with results_lock:
                 overall_stats["tickers_processed"] += 1
                 overall_stats["total_fetched"] += stats.get("fetched", 0)
                 overall_stats["total_upserted"] += stats.get("upserted", 0)
 
-            logger.debug(
-                f"Thread {thread_id}: Completed ticker {ticker['ticker']}: {stats}"
-            )
+            logger.debug(f"Thread {thread_id}: Completed ticker {ticker['ticker']}: {stats}")
             return stats
 
         except Exception as e:
@@ -320,8 +301,7 @@ def _ingest_dividends_concurrent(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all ticker processing tasks
         future_to_ticker = {
-            executor.submit(process_ticker_with_lock, ticker): ticker
-            for ticker in tickers
+            executor.submit(process_ticker_with_lock, ticker): ticker for ticker in tickers
         }
 
         # Wait for all tasks to complete and handle any remaining exceptions
@@ -330,9 +310,7 @@ def _ingest_dividends_concurrent(
             try:
                 future.result()  # This will raise any exception that occurred
             except Exception as e:
-                logger.error(
-                    f"Ticker {ticker['ticker']} failed in concurrent processing: {e}"
-                )
+                logger.error(f"Ticker {ticker['ticker']} failed in concurrent processing: {e}")
 
     logger.info(f"Concurrent dividend ingestion complete: {overall_stats}")
     return overall_stats

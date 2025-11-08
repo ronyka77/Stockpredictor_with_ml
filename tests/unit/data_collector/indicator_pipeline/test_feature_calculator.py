@@ -2,9 +2,7 @@ def test_feature_calculator_integrates_components(mocker):
     """Verify FeatureCalculator merges component outputs into a combined result"""
     import pandas as pd
     from src.data_collector.indicator_pipeline.base import IndicatorResult
-    from src.data_collector.indicator_pipeline.feature_calculator import (
-        FeatureCalculator,
-    )
+    from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
 
     # Create simple price DataFrame
     idx = pd.date_range("2025-01-01", periods=5)
@@ -22,11 +20,7 @@ def test_feature_calculator_integrates_components(mocker):
     # Simple result to return from each calculator
     simple_df = pd.DataFrame({"trend_sma": [1, 1, 1, 1, 1]}, index=idx)
     simple_result = IndicatorResult(
-        data=simple_df,
-        metadata={},
-        quality_score=80.0,
-        warnings=[],
-        calculation_time=0.0,
+        data=simple_df, metadata={}, quality_score=80.0, warnings=[], calculation_time=0.0
     )
 
     # Patch BaseIndicator.validate_data to skip minimum data checks

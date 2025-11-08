@@ -169,13 +169,9 @@ class FeatureStorage:
 
             # Apply filters
             if start_date:
-                features_data = features_data[
-                    features_data.index >= pd.Timestamp(start_date)
-                ]
+                features_data = features_data[features_data.index >= pd.Timestamp(start_date)]
             if end_date:
-                features_data = features_data[
-                    features_data.index <= pd.Timestamp(end_date)
-                ]
+                features_data = features_data[features_data.index <= pd.Timestamp(end_date)]
 
             if categories:
                 # Filter columns by category using centralized taxonomy
@@ -347,9 +343,7 @@ class FeatureStorage:
 
             # Save metadata as Parquet
             metadata_df.to_parquet(
-                metadata_path,
-                compression=self.config.compression,
-                engine=self.config.engine,
+                metadata_path, compression=self.config.compression, engine=self.config.engine
             )
 
             # logger.info(f"Saved metadata for {metadata.ticker} to {metadata_path}")
@@ -395,9 +389,7 @@ class FeatureStorage:
             logger.warning(f"Could not load metadata from Parquet: {str(e)}")
             return None
 
-    def _get_metadata_file_path(
-        self, ticker: str, version: Optional[str] = None
-    ) -> Path:
+    def _get_metadata_file_path(self, ticker: str, version: Optional[str] = None) -> Path:
         """Get metadata file path for ticker"""
         version_path = self.version_path if not version else self.base_path / version
         filename = f"{ticker}_metadata.parquet"

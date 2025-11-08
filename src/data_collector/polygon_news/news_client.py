@@ -21,9 +21,7 @@ class PolygonNewsClient(PolygonDataClient):
     including ticker-based queries, date filtering, and sentiment analysis.
     """
 
-    def __init__(
-        self, api_key: Optional[str] = None, requests_per_minute: Optional[int] = None
-    ):
+    def __init__(self, api_key: Optional[str] = None, requests_per_minute: Optional[int] = None):
         """
         Initialize the Polygon News client
 
@@ -37,9 +35,7 @@ class PolygonNewsClient(PolygonDataClient):
             requests_per_minute = config.REQUESTS_PER_MINUTE
 
         super().__init__(api_key, requests_per_minute)
-        logger.info(
-            f"Polygon News client initialized with {requests_per_minute} requests/minute"
-        )
+        logger.info(f"Polygon News client initialized with {requests_per_minute} requests/minute")
 
     def get_news_for_ticker(
         self,
@@ -90,9 +86,7 @@ class PolygonNewsClient(PolygonDataClient):
             # Use pagination to get all results
             all_articles = self._fetch_paginated_data(endpoint, params)
 
-            logger.info(
-                f"Successfully fetched {len(all_articles)} articles for {ticker}"
-            )
+            logger.info(f"Successfully fetched {len(all_articles)} articles for {ticker}")
             return all_articles
 
         except PolygonAPIError as e:
@@ -157,10 +151,7 @@ class PolygonNewsClient(PolygonDataClient):
         return results
 
     def get_recent_market_news(
-        self,
-        days_back: int = 7,
-        major_tickers: Optional[List[str]] = None,
-        limit: int = 1000,
+        self, days_back: int = 7, major_tickers: Optional[List[str]] = None, limit: int = 1000
     ) -> List[Dict[str, Any]]:
         """
         Get recent market news across major tickers
@@ -175,17 +166,7 @@ class PolygonNewsClient(PolygonDataClient):
         """
         if major_tickers is None:
             # Default major tickers for market news
-            major_tickers = [
-                "AAPL",
-                "GOOGL",
-                "MSFT",
-                "AMZN",
-                "TSLA",
-                "META",
-                "NVDA",
-                "SPY",
-                "QQQ",
-            ]
+            major_tickers = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "SPY", "QQQ"]
 
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
@@ -274,9 +255,7 @@ class PolygonNewsClient(PolygonDataClient):
             published_str = article.get("published_utc", "")
             if published_str:
                 try:
-                    published_date = datetime.fromisoformat(
-                        published_str.replace("Z", "+00:00")
-                    )
+                    published_date = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                     if start_date <= published_date <= end_date:
                         filtered_articles.append(article)
                 except ValueError:
@@ -343,9 +322,7 @@ class PolygonNewsClient(PolygonDataClient):
             "publisher_logo_url": publisher.get("logo_url"),
             "publisher_favicon_url": publisher.get("favicon_url"),
             # Sentiment analysis
-            "sentiment": sentiment_insight.get("sentiment")
-            if sentiment_insight
-            else None,
+            "sentiment": sentiment_insight.get("sentiment") if sentiment_insight else None,
             "sentiment_reasoning": sentiment_insight.get("sentiment_reasoning")
             if sentiment_insight
             else None,

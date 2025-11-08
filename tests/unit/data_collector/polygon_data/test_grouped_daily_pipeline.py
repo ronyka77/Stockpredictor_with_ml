@@ -7,18 +7,14 @@ from src.data_collector.polygon_data.data_pipeline import DataPipeline
 
 @pytest.mark.parametrize(
     "api_results,expected_count",
-    [
-        ({"A": [{"T": "A", "c": 1.0, "o": 1.0, "h": 1.0, "l": 1.0, "v": 10}]}, 1),
-        ({}, 0),
-    ],
+    [({"A": [{"T": "A", "c": 1.0, "o": 1.0, "h": 1.0, "l": 1.0, "v": 10}]}, 1), ({}, 0)],
 )
 def test_run_grouped_daily_pipeline_mocks(api_results, expected_count, tmp_path):
     """Unit test that patches external API client and storage for grouped daily pipeline"""
 
     # Arrange - patch health check and data fetching
     with patch(
-        "src.data_collector.polygon_data.client.PolygonDataClient.health_check",
-        return_value=True,
+        "src.data_collector.polygon_data.client.PolygonDataClient.health_check", return_value=True
     ):
         with patch(
             "src.data_collector.polygon_data.data_fetcher.HistoricalDataFetcher.get_grouped_daily_data",

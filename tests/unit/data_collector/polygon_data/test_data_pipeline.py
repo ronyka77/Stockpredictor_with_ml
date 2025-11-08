@@ -18,9 +18,7 @@ def test_run_grouped_daily_pipeline_skips_weekends_and_counts_success():
             return {}
 
         with patch.object(
-            dp.data_fetcher,
-            "get_grouped_daily_data",
-            side_effect=fake_get_grouped_daily_data,
+            dp.data_fetcher, "get_grouped_daily_data", side_effect=fake_get_grouped_daily_data
         ):
             with patch.object(
                 dp.storage, "store_historical_data", return_value={"stored_count": 1}
@@ -38,8 +36,6 @@ def test_run_grouped_daily_pipeline_skips_weekends_and_counts_success():
 def test_run_grouped_daily_pipeline_raises_when_health_check_fails():
     """Pipeline should raise if pre-flight health checks fail"""
     dp = DataPipeline(api_key="x", requests_per_minute=100)
-    with patch.object(
-        dp, "_perform_health_checks", side_effect=RuntimeError("api down")
-    ):
+    with patch.object(dp, "_perform_health_checks", side_effect=RuntimeError("api down")):
         with pytest.raises(RuntimeError):
             dp.run_grouped_daily_pipeline("2025-03-01", "2025-03-02", save_stats=False)

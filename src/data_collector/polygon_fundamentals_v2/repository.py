@@ -159,9 +159,7 @@ class FundamentalsRepository:
                     f"No ticker updated for id={ticker_id} when setting has_financials={has_financials}"
                 )
             else:
-                logger.info(
-                    f"Updated has_financials={has_financials} for ticker_id={ticker_id}"
-                )
+                logger.info(f"Updated has_financials={has_financials} for ticker_id={ticker_id}")
             return updated > 0
         except Exception as e:  # noqa: BLE001
             logger.error(

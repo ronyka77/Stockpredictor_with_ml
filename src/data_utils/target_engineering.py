@@ -81,9 +81,7 @@ def convert_absolute_to_percentage_returns(
     )
     # Look for any Future_High_XD column as fallback
     if target_column not in combined_data.columns:
-        future_cols = [
-            col for col in combined_data.columns if col.startswith("Future_High_")
-        ]
+        future_cols = [col for col in combined_data.columns if col.startswith("Future_High_")]
         if not future_cols:
             raise ValueError(
                 f"No future price target columns found. Expected '{target_column}' or similar."
@@ -93,9 +91,7 @@ def convert_absolute_to_percentage_returns(
         new_target_column = target_column.replace("Future_High_", "Future_Return_")
 
     if "close" not in combined_data.columns:
-        raise ValueError(
-            "'close' column not found. Required for percentage return calculation."
-        )
+        raise ValueError("'close' column not found. Required for percentage return calculation.")
 
     # Perform memory-optimized numeric downcast and chunked return computation
     _maybe_downcast_numeric(combined_data)
@@ -117,9 +113,7 @@ def convert_absolute_to_percentage_returns(
         logger.info(
             f"   Mean return: {valid_returns.mean():.4f} ({valid_returns.mean() * 100:.2f}%)"
         )
-        logger.info(
-            f"   Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)"
-        )
+        logger.info(f"   Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)")
 
     return combined_data, new_target_column
 
@@ -167,9 +161,7 @@ def convert_percentage_predictions_to_prices(
 
         if capped_high > 0 or capped_low > 0:
             logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
-            logger.info(
-                f"   Capped high: {capped_high} times and capped low: {capped_low} times"
-            )
+            logger.info(f"   Capped high: {capped_high} times and capped low: {capped_low} times")
 
         return bounded_predictions
     else:

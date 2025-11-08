@@ -89,11 +89,7 @@ class DataPipeline:
     for efficient and reliable data acquisition from Polygon.io.
     """
 
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        requests_per_minute: int = 5,
-    ):
+    def __init__(self, api_key: Optional[str] = None, requests_per_minute: int = 5):
         """
         Initialize the data pipeline
 
@@ -156,9 +152,7 @@ class DataPipeline:
             for i, target_date in enumerate(dates_to_process, 1):
                 logger.info(f"Processing date {i}/{len(dates_to_process)}: {target_date}")
 
-                records_count, _ = self._process_single_date(
-                    target_date, validate_data
-                )
+                records_count, _ = self._process_single_date(target_date, validate_data)
 
                 total_records_processed += records_count
 
@@ -219,26 +213,20 @@ class DataPipeline:
 
             if not grouped_data:
                 logger.warning(f"No grouped data returned for {target_date}")
-                self.stats.add_ticker_result(
-                    f"date_{target_date}", False, 0, "No data returned"
-                )
+                self.stats.add_ticker_result(f"date_{target_date}", False, 0, "No data returned")
                 return 0, 0
 
             records_to_store = list(grouped_data.values())
 
             if not records_to_store:
-                self.stats.add_ticker_result(
-                    f"date_{target_date}", False, 0, "No valid records"
-                )
+                self.stats.add_ticker_result(f"date_{target_date}", False, 0, "No valid records")
                 return 0, 0
 
             storage_result = self.storage.store_historical_data(records_to_store)
             stored_count = storage_result.get("stored_count", 0)
 
             self.stats.total_records_stored += stored_count
-            self.stats.add_ticker_result(
-                f"date_{target_date}", True, len(records_to_store)
-            )
+            self.stats.add_ticker_result(f"date_{target_date}", True, len(records_to_store))
 
             logger.info(
                 f"Stored {stored_count} records for {len(grouped_data)} tickers on {target_date}"
@@ -248,9 +236,7 @@ class DataPipeline:
 
         except Exception as e:
             logger.error(f"Error processing date {target_date}: {e}")
-            self.stats.add_ticker_result(
-                f"date_{target_date}", False, 0, str(e)
-            )
+            self.stats.add_ticker_result(f"date_{target_date}", False, 0, str(e))
             return 0, 0
 
     def _perform_health_checks(self) -> None:
@@ -309,7 +295,7 @@ if __name__ == "__main__":
 
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = datetime.now() - timedelta(days=30)
+    start_date = datetime.now() - timedelta(days=720)
 
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

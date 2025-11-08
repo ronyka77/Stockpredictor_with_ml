@@ -15,12 +15,7 @@ def create_test_data(n_samples=1000, n_features=20):
     X["close"] = rng.uniform(100, 200, n_samples)
     y = pd.Series(rng.binomial(1, 0.3, n_samples), name="target")
     train_size = int(0.8 * n_samples)
-    return (
-        X.iloc[:train_size],
-        y.iloc[:train_size],
-        X.iloc[train_size:],
-        y.iloc[train_size:],
-    )
+    return (X.iloc[:train_size], y.iloc[:train_size], X.iloc[train_size:], y.iloc[train_size:])
 
 
 def test_mlp_hyperparameter_objective_callable():
@@ -39,11 +34,7 @@ def test_mlp_hyperparameter_objective_callable():
 
     opt_mixin = MLPPredictorWithOptimization(
         model_name="test_mlp",
-        config={
-            "input_size": x_train.shape[1],
-            "output_size": 1,
-            "task": "classification",
-        },
+        config={"input_size": x_train.shape[1], "output_size": 1, "task": "classification"},
         threshold_evaluator=threshold_evaluator,
     )
 
@@ -86,8 +77,6 @@ def test_mlp_hyperparameter_optimization_integration():
     if not isinstance(info, dict):
         raise AssertionError("Best trial info should be a dict")
     if "best_investment_success_rate" not in info:
-        raise AssertionError(
-            "Expected 'best_investment_success_rate' key in best trial info"
-        )
+        raise AssertionError("Expected 'best_investment_success_rate' key in best trial info")
     if "model_updated" not in info:
         raise AssertionError("Expected 'model_updated' key in best trial info")

@@ -119,9 +119,7 @@ class PyTorchBasePredictor(BaseModel):
                     f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}, Val Loss: {avg_val_loss:.6f}"
                 )
             else:
-                logger.info(
-                    f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}"
-                )
+                logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}")
 
         self.is_trained = True
         logger.info("Training complete.")
@@ -152,9 +150,7 @@ class PyTorchBasePredictor(BaseModel):
 
         return np.concatenate(predictions).squeeze()
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "leaf_depth"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "leaf_depth") -> np.ndarray:
         """
         Calculate confidence scores for predictions using various methods
 
@@ -178,12 +174,13 @@ class PyTorchBasePredictor(BaseModel):
                 predictions = []
                 n_passes = 5  # Reduced from 10 for efficiency
 
-                x_tensor = torch.tensor(
-                    X[self.feature_names].values, dtype=torch.float32
-                )
+                x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
                 dataset = TensorDataset(x_tensor)
                 loader = DataLoader(
-                    dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
+                    dataset,
+                    batch_size=self.config.get("batch_size", 32),
+                    shuffle=False,
+                    num_workers=0,
                 )
 
                 for _ in range(n_passes):
@@ -198,9 +195,7 @@ class PyTorchBasePredictor(BaseModel):
                 # Calculate variance across passes
                 predictions_array = np.array(predictions)
                 variance = np.var(predictions_array, axis=0)
-                confidence_scores = 1.0 / (
-                    1.0 + variance
-                )  # Inverse variance as confidence
+                confidence_scores = 1.0 / (1.0 + variance)  # Inverse variance as confidence
 
             finally:
                 # Always restore original training state

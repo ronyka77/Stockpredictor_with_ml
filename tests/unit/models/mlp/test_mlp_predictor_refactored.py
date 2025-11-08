@@ -6,9 +6,7 @@ import torch
 
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
-VALIDATE_PATH = (
-    "src.models.time_series.mlp.mlp_architecture.MLPDataUtils.validate_and_clean_data"
-)
+VALIDATE_PATH = "src.models.time_series.mlp.mlp_architecture.MLPDataUtils.validate_and_clean_data"
 SCALE_PATH = "src.models.time_series.mlp.mlp_architecture.MLPDataUtils.scale_data"
 
 

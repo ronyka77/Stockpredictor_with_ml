@@ -10,9 +10,7 @@ from typing import List, Tuple, Optional
 from datetime import date
 
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
-from src.data_collector.indicator_pipeline.consolidated_storage import (
-    ConsolidatedFeatureStorage,
-)
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 from src.feature_engineering.data_loader import StockDataLoader
 from src.utils.logger import get_logger
 
@@ -24,9 +22,7 @@ class MLFeatureLoader:
     Utility class for loading and preparing features for ML models
     """
 
-    def __init__(
-        self, storage: Optional[FeatureStorage] = None, use_consolidated: bool = True
-    ):
+    def __init__(self, storage: Optional[FeatureStorage] = None, use_consolidated: bool = True):
         """
         Initialize ML feature loader
         Args:
@@ -56,10 +52,7 @@ class MLFeatureLoader:
         try:
             # Load consolidated features with filters
             features = self.consolidated_storage.load_consolidated_features(
-                ticker=ticker,
-                start_date=start_date,
-                end_date=end_date,
-                categories=categories,
+                ticker=ticker, start_date=start_date, end_date=end_date, categories=categories
             )
 
             if features.empty:
@@ -79,9 +72,7 @@ class MLFeatureLoader:
 
                 # Remove target column from features to avoid data leakage
                 features_clean = features.drop(
-                    columns=[
-                        col for col in features.columns if col.startswith("Future_")
-                    ]
+                    columns=[col for col in features.columns if col.startswith("Future_")]
                 )
 
                 # Remove rows with NaN targets
@@ -92,9 +83,7 @@ class MLFeatureLoader:
                 logger.info(
                     f"Using pre-calculated target '{target_column}': {len(targets_final)} valid samples"
                 )
-                logger.info(
-                    f"Target range: [{targets_final.min():.2f}, {targets_final.max():.2f}]"
-                )
+                logger.info(f"Target range: [{targets_final.min():.2f}, {targets_final.max():.2f}]")
                 logger.info(
                     f"Final dataset: {len(features_final)} samples, {len(features_final.columns)} features"
                 )
@@ -102,9 +91,7 @@ class MLFeatureLoader:
                 return features_final, targets_final
             else:
                 # Fallback to any available Future_High_XD column
-                future_cols = [
-                    col for col in features.columns if col.startswith("Future_High_")
-                ]
+                future_cols = [col for col in features.columns if col.startswith("Future_High_")]
                 if future_cols:
                     fallback_col = future_cols[0]
                     logger.warning(
@@ -116,9 +103,7 @@ class MLFeatureLoader:
 
                     # Remove target columns from features
                     features_clean = features.drop(
-                        columns=[
-                            col for col in features.columns if col.startswith("Future_")
-                        ]
+                        columns=[col for col in features.columns if col.startswith("Future_")]
                     )
 
                     # Remove rows with NaN targets
@@ -205,7 +190,9 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                     # Log date range for this year
                     if "date" in features.columns:
                         features["date"] = pd.to_datetime(features["date"])
-                        date_range = f"{features['date'].min().date()} to {features['date'].max().date()}"
+                        date_range = (
+                            f"{features['date'].min().date()} to {features['date'].max().date()}"
+                        )
                         logger.info(f"📅 Date range: {date_range}")
                 else:
                     logger.warning(f"No data found for {year}")
@@ -218,9 +205,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
             logger.info("Combining and analyzing ALL yearly data...")
             combined_features = pd.concat(all_features_data, ignore_index=True)
 
-            logger.info(
-                f"✓ Combined dataset: {combined_features.shape[0]:,} total records"
-            )
+            logger.info(f"✓ Combined dataset: {combined_features.shape[0]:,} total records")
             logger.info(f"✓ Total features: {combined_features.shape[1]} columns")
 
             # Add ticker_id column from database metadata
@@ -242,16 +227,14 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                         )
 
                         # Map ticker_id to the combined features
-                        combined_features["ticker_id"] = combined_features[
-                            "ticker"
-                        ].map(ticker_id_mapping)
+                        combined_features["ticker_id"] = combined_features["ticker"].map(
+                            ticker_id_mapping
+                        )
 
                         # Log statistics about ticker_id mapping
                         null_ticker_ids = combined_features["ticker_id"].isnull().sum()
                         if null_ticker_ids > 0:
-                            logger.warning(
-                                f"⚠ {null_ticker_ids:,} records have null ticker_id"
-                            )
+                            logger.warning(f"⚠ {null_ticker_ids:,} records have null ticker_id")
                             missing_tickers = [
                                 t for t in unique_tickers if t not in ticker_id_mapping
                             ]

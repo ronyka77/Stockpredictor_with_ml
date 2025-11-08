@@ -66,9 +66,7 @@ def test_clear_cache(tmp_path):
     info_path = (Path(str(tmp_path)) / f"training_{key}").with_suffix(".info.json")
     info_path.write_text(json.dumps({"cache_key": key}))
     if c.cache_exists(key, data_type="training") is not False:  # partial
-        raise AssertionError(
-            "Expected cache to indicate non-existence for partial info"
-        )
+        raise AssertionError("Expected cache to indicate non-existence for partial info")
     c.clear_cache()  # should not raise
     if any(tmp_path.iterdir()):
         raise AssertionError("Temporary path was not cleared as expected")

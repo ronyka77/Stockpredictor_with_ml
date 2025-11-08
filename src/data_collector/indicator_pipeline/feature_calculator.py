@@ -11,22 +11,13 @@ import numpy as np
 import time
 from typing import List, Optional, Any
 
-from src.data_collector.indicator_pipeline.trend_indicators import (
-    TrendIndicatorCalculator,
-)
-from src.data_collector.indicator_pipeline.momentum_indicators import (
-    MomentumIndicatorCalculator,
-)
+from src.data_collector.indicator_pipeline.trend_indicators import TrendIndicatorCalculator
+from src.data_collector.indicator_pipeline.momentum_indicators import MomentumIndicatorCalculator
 from src.data_collector.indicator_pipeline.volatility_indicators import (
     VolatilityIndicatorCalculator,
 )
-from src.data_collector.indicator_pipeline.volume_indicators import (
-    VolumeIndicatorCalculator,
-)
-from src.data_collector.indicator_pipeline.base import (
-    IndicatorResult,
-    IndicatorValidator,
-)
+from src.data_collector.indicator_pipeline.volume_indicators import VolumeIndicatorCalculator
+from src.data_collector.indicator_pipeline.base import IndicatorResult, IndicatorValidator
 
 from src.utils.logger import get_logger
 from src.data_collector.config import config
@@ -84,9 +75,7 @@ class FeatureCalculator:
                 trend_result = trend_calc.calculate()
 
                 if self.validator.validate_result(trend_result):
-                    combined_data = pd.concat(
-                        [combined_data, trend_result.data], axis=1
-                    )
+                    combined_data = pd.concat([combined_data, trend_result.data], axis=1)
                     calculated_components.append("trend")
                     all_warnings.extend(trend_result.warnings)
                 else:
@@ -99,9 +88,7 @@ class FeatureCalculator:
                 momentum_result = momentum_calc.calculate()
 
                 if self.validator.validate_result(momentum_result):
-                    combined_data = pd.concat(
-                        [combined_data, momentum_result.data], axis=1
-                    )
+                    combined_data = pd.concat([combined_data, momentum_result.data], axis=1)
                     calculated_components.append("momentum")
                     all_warnings.extend(momentum_result.warnings)
                 else:
@@ -113,9 +100,7 @@ class FeatureCalculator:
                 volatility_result = volatility_calc.calculate()
 
                 if self.validator.validate_result(volatility_result):
-                    combined_data = pd.concat(
-                        [combined_data, volatility_result.data], axis=1
-                    )
+                    combined_data = pd.concat([combined_data, volatility_result.data], axis=1)
                     calculated_components.append("volatility")
                     all_warnings.extend(volatility_result.warnings)
                 else:
@@ -127,9 +112,7 @@ class FeatureCalculator:
                 volume_result = volume_calc.calculate()
 
                 if self.validator.validate_result(volume_result):
-                    combined_data = pd.concat(
-                        [combined_data, volume_result.data], axis=1
-                    )
+                    combined_data = pd.concat([combined_data, volume_result.data], axis=1)
                     calculated_components.append("volume")
                     all_warnings.extend(volume_result.warnings)
                 else:
@@ -160,8 +143,7 @@ class FeatureCalculator:
                             col
                             for col in combined_data.columns
                             if any(
-                                trend in col.lower()
-                                for trend in ["sma", "ema", "macd", "ichimoku"]
+                                trend in col.lower() for trend in ["sma", "ema", "macd", "ichimoku"]
                             )
                         ]
                     ),
@@ -170,8 +152,7 @@ class FeatureCalculator:
                             col
                             for col in combined_data.columns
                             if any(
-                                mom in col.lower()
-                                for mom in ["rsi", "stoch", "roc", "williams"]
+                                mom in col.lower() for mom in ["rsi", "stoch", "roc", "williams"]
                             )
                         ]
                     ),
@@ -179,10 +160,7 @@ class FeatureCalculator:
                         [
                             col
                             for col in combined_data.columns
-                            if any(
-                                vol in col.lower()
-                                for vol in ["bb_", "atr", "volatility"]
-                            )
+                            if any(vol in col.lower() for vol in ["bb_", "atr", "volatility"])
                         ]
                     ),
                     "volume": len(
@@ -197,17 +175,12 @@ class FeatureCalculator:
                             col
                             for col in combined_data.columns
                             if any(
-                                basic in col.lower()
-                                for basic in ["price_", "return_", "range_"]
+                                basic in col.lower() for basic in ["price_", "return_", "range_"]
                             )
                         ]
                     ),
                     "future_targets": len(
-                        [
-                            col
-                            for col in combined_data.columns
-                            if "future_" in col.lower()
-                        ]
+                        [col for col in combined_data.columns if "future_" in col.lower()]
                     ),
                 },
             }
@@ -266,7 +239,9 @@ class FeatureCalculator:
 
             # Reindex temp back to original features_df index and copy columns with alignment
             temp = temp.reindex(features_df.index)
-            for col in [c for c in temp.columns if c.startswith("Future_") or c.startswith("Target_Date_")]:
+            for col in [
+                c for c in temp.columns if c.startswith("Future_") or c.startswith("Target_Date_")
+            ]:
                 features_df[col] = temp[col]
 
             # cleanup helper
@@ -304,12 +279,8 @@ class FeatureCalculator:
 
         # Body and shadow ratios (candlestick analysis)
         body = abs(price_data["close"] - price_data["open"])
-        upper_shadow = price_data["high"] - np.maximum(
-            price_data["close"], price_data["open"]
-        )
-        lower_shadow = (
-            np.minimum(price_data["close"], price_data["open"]) - price_data["low"]
-        )
+        upper_shadow = price_data["high"] - np.maximum(price_data["close"], price_data["open"])
+        lower_shadow = np.minimum(price_data["close"], price_data["open"]) - price_data["low"]
 
         features_df["Body_Size"] = body
         features_df["Upper_Shadow"] = upper_shadow
@@ -320,22 +291,20 @@ class FeatureCalculator:
         horizon_shifts = [1, 5, 10, 20, 30]
         for h in horizon_shifts:
             features_df[f"Return_{h}D"] = price_data["close"].pct_change(h)
-            features_df[f"Log_Return_{h}D"] = np.log(price_data["close"] / price_data["close"].shift(h))
+            features_df[f"Log_Return_{h}D"] = np.log(
+                price_data["close"] / price_data["close"].shift(h)
+            )
 
         # Volume features
         if "volume" in price_data.columns:
-            features_df["Volume_Price_Ratio"] = (
-                price_data["volume"] / price_data["close"]
-            )
-            features_df["Volume_Range_Ratio"] = price_data["volume"] / features_df["Price_Range"].replace({0: np.nan})
+            features_df["Volume_Price_Ratio"] = price_data["volume"] / price_data["close"]
+            features_df["Volume_Range_Ratio"] = price_data["volume"] / features_df[
+                "Price_Range"
+            ].replace({0: np.nan})
 
         # Gap analysis
-        features_df["Gap_Up"] = (
-            price_data["open"] > price_data["high"].shift(1)
-        ).astype(int)
-        features_df["Gap_Down"] = (
-            price_data["open"] < price_data["low"].shift(1)
-        ).astype(int)
+        features_df["Gap_Up"] = (price_data["open"] > price_data["high"].shift(1)).astype(int)
+        features_df["Gap_Down"] = (price_data["open"] < price_data["low"].shift(1)).astype(int)
         features_df["Gap_Size"] = price_data["open"] - price_data["close"].shift(1)
 
         return features_df
@@ -373,20 +342,14 @@ class FeatureCalculator:
                 q1 = values.quantile(0.25)
                 q3 = values.quantile(0.75)
                 iqr = q3 - q1
-                outliers = (
-                    (values < (q1 - 1.5 * iqr)) | (values > (q3 + 1.5 * iqr))
-                ).sum()
+                outliers = ((values < (q1 - 1.5 * iqr)) | (values > (q3 + 1.5 * iqr))).sum()
                 outlier_count += outliers
                 total_numeric_values += len(values)
 
-        outlier_pct = (
-            outlier_count / total_numeric_values if total_numeric_values > 0 else 0
-        )
+        outlier_pct = outlier_count / total_numeric_values if total_numeric_values > 0 else 0
 
         # Calculate overall quality score
-        quality_score = (
-            100 * (1 - missing_pct) * (1 - infinite_pct) * (1 - min(outlier_pct, 0.5))
-        )
+        quality_score = 100 * (1 - missing_pct) * (1 - infinite_pct) * (1 - min(outlier_pct, 0.5))
 
         # logger.info(
         #     f"Quality score calculation: missing={missing_pct:.3f}, infinite={infinite_pct:.3f}, outliers={outlier_pct:.3f}, score={quality_score:.1f}"

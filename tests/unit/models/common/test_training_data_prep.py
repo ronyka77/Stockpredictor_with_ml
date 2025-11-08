@@ -7,9 +7,7 @@ from src.models.common.training_data_prep import prepare_common_training_data
 
 def _make_sample_data():
     pd.RangeIndex(0, 100)
-    X = pd.DataFrame(
-        {"f1": np.linspace(0, 1, 100), "date_int": np.repeat(np.arange(20), 5)}
-    )
+    X = pd.DataFrame({"f1": np.linspace(0, 1, 100), "date_int": np.repeat(np.arange(20), 5)})
     y = pd.Series(np.linspace(-1, 1, 100))
     # split
     x_train = X.iloc[:80].reset_index(drop=True)

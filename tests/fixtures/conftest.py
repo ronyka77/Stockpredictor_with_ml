@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from tests._fixtures import PoolFake, ConnectionFake
+from .db import PoolFake, ConnectionFake
 
 
 # Central deterministic seed fixture for all tests (Polyfactory + numeric libs)

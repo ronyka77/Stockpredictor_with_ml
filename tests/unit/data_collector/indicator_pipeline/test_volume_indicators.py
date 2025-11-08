@@ -26,19 +26,10 @@ def _make_ohlcv_dataframe(num_rows: int = 120) -> pd.DataFrame:
     open_ = close - np.random.default_rng(0).normal(0.1, 0.05, size=num_rows)
     high = np.maximum(close, open_) + 0.2
     low = np.minimum(close, open_) - 0.2
-    volume = np.abs(
-        np.random.default_rng(1).integers(1_000_000, 5_000_000, size=num_rows)
-    )
+    volume = np.abs(np.random.default_rng(1).integers(1_000_000, 5_000_000, size=num_rows))
 
     return pd.DataFrame(
-        {
-            "open": open_,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": volume,
-        },
-        index=index,
+        {"open": open_, "high": high, "low": low, "close": close, "volume": volume}, index=index
     )
 
 
@@ -127,9 +118,7 @@ def test_calculate_volume_profile_success_and_features():
 def test_calculate_volume_profile_raises_with_insufficient_rows():
     """Raise ValueError when there are too few rows to compute volume profile"""
     df = _make_ohlcv_dataframe(5)
-    with pytest.raises(
-        ValueError, match="No Volume Profile indicators could be calculated"
-    ):
+    with pytest.raises(ValueError, match="No Volume Profile indicators could be calculated"):
         calculate_volume_profile(df)
 
 
@@ -157,13 +146,7 @@ def test_volume_indicator_calculator_combines_all():
     combined = calc.calculate()
 
     # Spot-check presence of representative columns from each component
-    representative = {
-        "OBV",
-        "VPT",
-        "AD_Line",
-        "Volume_MA_10",
-        "MFI",
-    }
+    representative = {"OBV", "VPT", "AD_Line", "Volume_MA_10", "MFI"}
     assert representative.issubset(set(combined.data.columns))
     assert combined.metadata["indicator_name"] == "Combined Volume Indicators"
     assert "individual_results" in combined.metadata

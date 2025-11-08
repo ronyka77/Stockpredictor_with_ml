@@ -41,3 +41,6 @@ cluster_analysis/
 /.idea/
 .sonarlint/connectedMode.json
 check_coverage.py
+.spec-workflow/
+predictions/
+evaluation_reports/

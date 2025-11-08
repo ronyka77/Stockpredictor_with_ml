@@ -17,9 +17,7 @@ async def main() -> Dict[str, Any]:
     elapsed_s = (datetime.now() - started).total_seconds()
     total = len(results)
     ok = sum(1 for v in results.values() if v)
-    logger.info(
-        f"Fundamentals V2 complete: {ok}/{total} success in {elapsed_s / 60:.1f} minutes"
-    )
+    logger.info(f"Fundamentals V2 complete: {ok}/{total} success in {elapsed_s / 60:.1f} minutes")
     return {"results": results, "success": ok, "total": total, "elapsed_s": elapsed_s}
 
 

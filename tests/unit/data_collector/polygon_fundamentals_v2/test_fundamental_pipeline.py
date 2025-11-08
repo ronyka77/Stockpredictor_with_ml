@@ -25,25 +25,21 @@ class TestFundamentalPipeline:
     @pytest.fixture
     def sample_process_results(self):
         """Sample results from processor.process_all()."""
-        return {
-            "AAPL": True,
-            "MSFT": False,
-            "GOOGL": True,
-            "AMZN": True,
-            "TSLA": False,
-        }
+        return {"AAPL": True, "MSFT": False, "GOOGL": True, "AMZN": True, "TSLA": False}
 
     def test_main_successful_processing(self, mock_processor, sample_process_results):
         """Test main function with successful processing of all tickers."""
         mock_processor.process_all.return_value = sample_process_results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+        ):
             # Mock datetime.now() calls
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 5, 30)  # 5 minutes 30 seconds later
@@ -77,13 +73,15 @@ class TestFundamentalPipeline:
         """Test main function with empty results."""
         mock_processor.process_all.return_value = {}
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 1, 0)
 
@@ -104,13 +102,15 @@ class TestFundamentalPipeline:
         results = {"AAPL": True, "MSFT": True, "GOOGL": True}
         mock_processor.process_all.return_value = results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 2, 15)
 
@@ -130,13 +130,15 @@ class TestFundamentalPipeline:
         results = {"AAPL": False, "MSFT": False}
         mock_processor.process_all.return_value = results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 0, 45)
 
@@ -155,13 +157,16 @@ class TestFundamentalPipeline:
         """Test main function handles processor exceptions gracefully."""
         mock_processor.process_all.side_effect = Exception("Test exception")
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime, pytest.raises(Exception, match="Test exception"):
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+            pytest.raises(Exception, match="Test exception"),
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 0, 30)
 
@@ -176,15 +181,18 @@ class TestFundamentalPipeline:
         """Test that main function logs appropriately."""
         mock_processor.process_all.return_value = sample_process_results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime, patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.logger"
-        ) as mock_logger:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.logger"
+            ) as mock_logger,
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 5, 30)
 
@@ -203,15 +211,18 @@ class TestFundamentalPipeline:
         """Test the logic that would run in the if __name__ == "__main__" block."""
         mock_processor.process_all.return_value = sample_process_results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime, patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.logger"
-        ) as mock_logger:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.logger"
+            ) as mock_logger,
+        ):
             start_time = datetime(2024, 1, 1, 10, 0, 0)
             end_time = datetime(2024, 1, 1, 10, 5, 30)
 
@@ -238,16 +249,18 @@ class TestFundamentalPipeline:
         results = {"TICKER": True}
         mock_processor.process_all.return_value = results
 
-        with patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
-            return_value=mock_processor,
-        ), patch(
-            "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
-        ) as mock_datetime:
-
+        with (
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.FundamentalsProcessor",
+                return_value=mock_processor,
+            ),
+            patch(
+                "src.data_collector.polygon_fundamentals_v2.fundamental_pipeline.datetime"
+            ) as mock_datetime,
+        ):
             # Test with very precise timing
             start_time = datetime(2024, 1, 1, 10, 0, 0, 123456)  # microseconds
-            end_time = datetime(2024, 1, 1, 10, 0, 1, 654321)   # 1 second + microseconds
+            end_time = datetime(2024, 1, 1, 10, 0, 1, 654321)  # 1 second + microseconds
 
             mock_datetime.now.side_effect = [start_time, end_time]
 

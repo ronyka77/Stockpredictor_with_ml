@@ -66,9 +66,7 @@ class RateLimiter:
         self.request_count += 1
         self.last_request_time = current_time
 
-        logger.info(
-            f"Request {self.request_count}/{self.requests_per_minute} in current window"
-        )
+        logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
 
     def get_remaining_requests(self) -> int:
         """Get number of remaining requests in current window"""
@@ -134,9 +132,7 @@ class AdaptiveRateLimiter(RateLimiter):
             self.requests_per_minute = max(2, int(old_limit * 0.6))
         else:
             # Standard backoff for paid tiers
-            self.requests_per_minute = max(
-                1, int(self.requests_per_minute * self.backoff_factor)
-            )
+            self.requests_per_minute = max(1, int(self.requests_per_minute * self.backoff_factor))
 
         logger.warning(
             f"Rate limit error detected. Reducing limit from {old_limit} to "
@@ -158,14 +154,10 @@ class AdaptiveRateLimiter(RateLimiter):
             self.consecutive_errors = max(0, self.consecutive_errors - 1)
 
             # If we've had several successful requests, try to restore rate
-            if (
-                self.consecutive_errors == 0
-                and self.requests_per_minute < self.original_limit
-            ):
+            if self.consecutive_errors == 0 and self.requests_per_minute < self.original_limit:
                 old_limit = self.requests_per_minute
                 self.requests_per_minute = min(
-                    self.original_limit,
-                    int(self.requests_per_minute / self.backoff_factor),
+                    self.original_limit, int(self.requests_per_minute / self.backoff_factor)
                 )
 
                 logger.info(

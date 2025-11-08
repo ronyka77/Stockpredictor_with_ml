@@ -59,9 +59,7 @@ class PolygonFundamentalsConfig:
     def headers(self) -> Dict[str, str]:
         """Get HTTP headers for API requests"""
         if not self.API_KEY:
-            raise ValueError(
-                "POLYGON_API_KEY environment variable is required for API requests"
-            )
+            raise ValueError("POLYGON_API_KEY environment variable is required for API requests")
 
         return {
             "Authorization": f"Bearer {self.API_KEY}",

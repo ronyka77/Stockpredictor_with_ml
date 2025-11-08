@@ -42,11 +42,7 @@ def test_save_features_returns_metadata_with_expected_fields(mocker, tmp_path):
     mocker.patch.object(
         storage,
         "_get_file_stats",
-        return_value={
-            "size_mb": 0.1,
-            "created": datetime.now(),
-            "modified": datetime.now(),
-        },
+        return_value={"size_mb": 0.1, "created": datetime.now(), "modified": datetime.now()},
     )
 
     metadata = {"categories": ["trend"], "quality_score": 95.0, "warnings": []}
@@ -61,9 +57,7 @@ def test_save_features_returns_metadata_with_expected_fields(mocker, tmp_path):
     assert isinstance(feat_meta.file_path, str)
 
 
-def test_save_features_success_calls_parquet_and_returns_metadata(
-    tmp_path, mock_pipeline_logger
-):
+def test_save_features_success_calls_parquet_and_returns_metadata(tmp_path, mock_pipeline_logger):
     cfg = StorageConfig(
         base_path=str(tmp_path),
         version="vtest",
@@ -82,9 +76,7 @@ def test_save_features_success_calls_parquet_and_returns_metadata(
         patch("pyarrow.parquet.write_table", return_value=None) as write_table,
         patch(
             "pathlib.Path.stat",
-            return_value=SimpleNamespace(
-                st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0
-            ),
+            return_value=SimpleNamespace(st_size=int(0.5 * 1024 * 1024), st_ctime=0, st_mtime=0),
         ),
     ):
         feat_meta = storage.save_features("TICK", df, metadata)
@@ -95,9 +87,7 @@ def test_save_features_success_calls_parquet_and_returns_metadata(
     assert write_table.called
 
 
-def test_save_features_small_file_triggers_metadata_handling(
-    tmp_path, mock_pipeline_logger
-):
+def test_save_features_small_file_triggers_metadata_handling(tmp_path, mock_pipeline_logger):
     cfg = StorageConfig(
         base_path=str(tmp_path),
         version="vtest",
@@ -116,8 +106,7 @@ def test_save_features_small_file_triggers_metadata_handling(
     with (
         patch("pyarrow.parquet.write_table", return_value=None) as write_table,
         patch(
-            "pathlib.Path.stat",
-            return_value=SimpleNamespace(st_size=10, st_ctime=0, st_mtime=0),
+            "pathlib.Path.stat", return_value=SimpleNamespace(st_size=10, st_ctime=0, st_mtime=0)
         ),
     ):
         feat_meta = storage.save_features("TICK", df, metadata)
@@ -144,12 +133,8 @@ def test_save_features_pyarrow_raises_and_logged(tmp_path, mock_pipeline_logger)
 
     # Patch the module-level logger used by feature_storage and the pyarrow writer
     with (
-        patch(
-            "pyarrow.parquet.write_table", side_effect=RuntimeError("io fail")
-        ) as write_table,
-        patch(
-            "src.data_collector.indicator_pipeline.feature_storage.logger"
-        ) as fs_logger,
+        patch("pyarrow.parquet.write_table", side_effect=RuntimeError("io fail")) as write_table,
+        patch("src.data_collector.indicator_pipeline.feature_storage.logger") as fs_logger,
     ):
         with pytest.raises(RuntimeError):
             _ = storage.save_features("TICK", df, metadata)

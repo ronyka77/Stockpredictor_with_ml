@@ -57,14 +57,8 @@ def _fake_analyze_feature_diversity(X: pd.DataFrame):
     }
 
 
-@patch(
-    "src.data_utils.ml_data_pipeline.add_price_normalized_features",
-    side_effect=_identity,
-)
-@patch(
-    "src.data_utils.ml_data_pipeline.add_prediction_bounds_features",
-    side_effect=_identity,
-)
+@patch("src.data_utils.ml_data_pipeline.add_price_normalized_features", side_effect=_identity)
+@patch("src.data_utils.ml_data_pipeline.add_prediction_bounds_features", side_effect=_identity)
 @patch("src.data_utils.ml_data_pipeline.add_date_features", side_effect=_identity)
 @patch(
     "src.data_utils.ml_data_pipeline.convert_absolute_to_percentage_returns",
@@ -72,12 +66,7 @@ def _fake_analyze_feature_diversity(X: pd.DataFrame):
 )
 @patch("src.data_utils.ml_data_pipeline.load_all_data")
 def test_prepare_ml_data_for_training_splits_and_filters(
-    mock_load_all_data,
-    _conv,
-    _add_date,
-    _add_bounds,
-    _add_price,
-    sample_combined_data,
+    mock_load_all_data, _conv, _add_date, _add_bounds, _add_price, sample_combined_data
 ):
     """Verify training data is prepared, split, and filtered to expected weekdays."""
 
@@ -87,9 +76,7 @@ def test_prepare_ml_data_for_training_splits_and_filters(
     from src.data_utils import ml_data_pipeline as pipeline
 
     # Act
-    result = pipeline.prepare_ml_data_for_training(
-        prediction_horizon=10, split_date="2025-03-20"
-    )
+    result = pipeline.prepare_ml_data_for_training(prediction_horizon=10, split_date="2025-03-20")
 
     # Assert
     assert isinstance(result, dict)
@@ -101,9 +88,7 @@ def test_prepare_ml_data_for_training_splits_and_filters(
 
 
 @patch("src.data_utils.ml_data_pipeline.prepare_ml_data_for_training")
-def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
-    mock_prepare, sample_combined_data
-):
+def test_prepare_ml_data_for_training_with_cleaning_uses_cache(mock_prepare, sample_combined_data):
     """Return cached cleaned payload when cache exists and is recent."""
 
     from src.data_utils import ml_data_pipeline as pipeline
@@ -118,12 +103,8 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
 
     with (
         patch.object(pipeline._cleaned_data_cache, "cache_exists", return_value=True),
-        patch.object(
-            pipeline._cleaned_data_cache, "get_cache_age_hours", return_value=1.0
-        ),
-        patch.object(
-            pipeline._cleaned_data_cache, "load_cleaned_data", return_value=fake_cached
-        ),
+        patch.object(pipeline._cleaned_data_cache, "get_cache_age_hours", return_value=1.0),
+        patch.object(pipeline._cleaned_data_cache, "load_cleaned_data", return_value=fake_cached),
     ):
         # Act
         out = pipeline.prepare_ml_data_for_training_with_cleaning(
@@ -135,9 +116,7 @@ def test_prepare_ml_data_for_training_with_cleaning_uses_cache(
     assert out["cached"] is True
 
 
-def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
-    sample_combined_data,
-):
+def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(sample_combined_data):
     """Run full cleaning pipeline and save cleaned data when no cache exists."""
 
     from src.data_utils import ml_data_pipeline as pipeline
@@ -156,8 +135,7 @@ def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
             },
         ):
             with patch(
-                "src.data_utils.ml_data_pipeline.clean_data_for_training",
-                side_effect=_identity,
+                "src.data_utils.ml_data_pipeline.clean_data_for_training", side_effect=_identity
             ) as _clean:
                 with patch(
                     "src.data_utils.ml_data_pipeline.clean_features_for_training",
@@ -168,9 +146,7 @@ def test_prepare_ml_data_for_training_with_cleaning_saves_when_not_cached(
                         side_effect=_fake_analyze_feature_diversity,
                     ) as _diversity:
                         with patch.object(
-                            pipeline._cleaned_data_cache,
-                            "save_cleaned_data",
-                            autospec=True,
+                            pipeline._cleaned_data_cache, "save_cleaned_data", autospec=True
                         ) as mock_save:
                             # Act
                             out = pipeline.prepare_ml_data_for_training_with_cleaning(
@@ -188,9 +164,7 @@ def test_prepare_ml_data_for_training_empty_raises():
 
     from src.data_utils import ml_data_pipeline as pipeline
 
-    with patch(
-        "src.data_utils.ml_data_pipeline.load_all_data", return_value=pd.DataFrame()
-    ):
+    with patch("src.data_utils.ml_data_pipeline.load_all_data", return_value=pd.DataFrame()):
         with pytest.raises(ValueError) as exc:
             pipeline.prepare_ml_data_for_training()
 
@@ -216,9 +190,7 @@ def test_prepare_ml_data_for_training_missing_date_raises(sample_combined_data):
     side_effect=_fake_convert_absolute_to_percentage_returns,
 )
 @patch("src.data_utils.ml_data_pipeline.load_all_data")
-def test_prepare_ml_data_for_prediction_filters_days(
-    mock_load, _conv, sample_combined_data
-):
+def test_prepare_ml_data_for_prediction_filters_days(mock_load, _conv, sample_combined_data):
     """Ensure prediction path filters x_test to Mondays and Fridays."""
 
     mock_load.return_value = sample_combined_data
@@ -253,9 +225,7 @@ def test_prepare_ml_data_for_prediction_with_cleaning_cache_old_triggers_clear_a
                 pipeline._cleaned_data_cache, "clear_cache", autospec=True
             ) as mock_clear:
                 with patch.object(
-                    pipeline,
-                    "prepare_ml_data_for_prediction",
-                    return_value=fake_pred_result,
+                    pipeline, "prepare_ml_data_for_prediction", return_value=fake_pred_result
                 ):
                     with patch(
                         "src.data_utils.ml_data_pipeline.clean_data_for_training",
@@ -266,9 +236,7 @@ def test_prepare_ml_data_for_prediction_with_cleaning_cache_old_triggers_clear_a
                             side_effect=_fake_analyze_feature_diversity,
                         ) as _div:
                             with patch.object(
-                                pipeline._cleaned_data_cache,
-                                "save_cleaned_data",
-                                autospec=True,
+                                pipeline._cleaned_data_cache, "save_cleaned_data", autospec=True
                             ) as mock_save:
                                 out = pipeline.prepare_ml_data_for_prediction_with_cleaning(
                                     prediction_horizon=10, days_back=5

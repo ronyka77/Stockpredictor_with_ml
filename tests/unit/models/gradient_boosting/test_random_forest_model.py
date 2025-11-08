@@ -136,9 +136,9 @@ def test_rf_evaluate_uses_threshold_evaluator(
     assert "optimal_threshold" in metrics
     assert (
         metrics["threshold_investment_success_rate"]
-        == mock_threshold_evaluator.optimize_prediction_threshold.return_value[
-            "best_result"
-        ]["investment_success_rate"]
+        == mock_threshold_evaluator.optimize_prediction_threshold.return_value["best_result"][
+            "investment_success_rate"
+        ]
     )
 
 

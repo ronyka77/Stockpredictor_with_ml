@@ -5,9 +5,7 @@ from datetime import datetime
 import pandas as pd
 
 from src.utils.logger import get_logger
-from src.data_utils.ml_data_pipeline import (
-    prepare_ml_data_for_training_with_cleaning,
-)
+from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
 
@@ -83,8 +81,7 @@ def prepare_common_training_data(
 
     # 1) Load base dataset
     data_result = prepare_ml_data_for_training_with_cleaning(
-        prediction_horizon=prediction_horizon,
-        clean_features=True,
+        prediction_horizon=prediction_horizon, clean_features=True
     )
 
     x_train: pd.DataFrame = data_result["x_train"]
@@ -122,11 +119,7 @@ def prepare_common_training_data(
 
     # 4) Optional date_int trimming on test set
     try:
-        if (
-            "date_int" in x_test_clean.columns
-            and recent_date_int_cut
-            and recent_date_int_cut > 0
-        ):
+        if "date_int" in x_test_clean.columns and recent_date_int_cut and recent_date_int_cut > 0:
             uniq = x_test_clean["date_int"].drop_duplicates().sort_values()
             if len(uniq) > recent_date_int_cut:
                 threshold = uniq.iloc[-recent_date_int_cut - 1]
@@ -135,11 +128,15 @@ def prepare_common_training_data(
                 x_test_clean = x_test_clean[mask]
                 y_test = y_test[mask]
                 # Try interpreting `threshold` as an offset in days from an origin
-                max_tested_ts = pd.to_datetime(threshold, unit="D", origin="2020-01-01", errors="coerce")
+                max_tested_ts = pd.to_datetime(
+                    threshold, unit="D", origin="2020-01-01", errors="coerce"
+                )
                 if pd.isna(max_tested_ts):
                     # Fallback to generic parsing (handles YYYY, YYYYMM, YYYYMMDD, ISO strings)
                     try:
-                        max_tested_ts = pd.to_datetime(str(threshold), errors="coerce", infer_datetime_format=True)
+                        max_tested_ts = pd.to_datetime(
+                            str(threshold), errors="coerce", infer_datetime_format=True
+                        )
                     except Exception:
                         max_tested_ts = pd.NaT
 

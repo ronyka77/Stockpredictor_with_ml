@@ -5,9 +5,7 @@ from src.data_utils import ml_feature_loader as mfl
 from src.data_utils import ml_data_pipeline as mp
 
 
-def test__load_from_consolidated_uses_target_and_drops_future_cols(
-    mocker, features_with_future
-):
+def test__load_from_consolidated_uses_target_and_drops_future_cols(mocker, features_with_future):
     """Load consolidated features, return targets Series, and drop future columns."""
     loader = mfl.MLFeatureLoader()
     fake_df = features_with_future
@@ -29,11 +27,7 @@ def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
     """Combine yearly feature frames and map ticker metadata to `ticker_id`."""
     # prepare per-year frames: only one year has data
     df2024 = pd.DataFrame(
-        {
-            "ticker": ["AAA", "BBB"],
-            "date": ["2024-01-01", "2024-01-02"],
-            "close": [1, 2],
-        }
+        {"ticker": ["AAA", "BBB"], "date": ["2024-01-01", "2024-01-02"], "close": [1, 2]}
     )
     # patch load_yearly_data to return df for 2024 and empty for others
     mocker.patch(
@@ -49,9 +43,7 @@ def test_load_all_data_combines_years_and_maps_ticker_id(mocker):
     out = mfl.load_all_data(ticker=None)
     # Expect combined DataFrame with ticker_id mapped
     if out.empty:
-        raise AssertionError(
-            "load_all_data returned empty when it should have combined data"
-        )
+        raise AssertionError("load_all_data returned empty when it should have combined data")
     if "ticker_id" not in out.columns:
         raise AssertionError("ticker_id column missing after metadata mapping")
     # date converted to datetime in loader

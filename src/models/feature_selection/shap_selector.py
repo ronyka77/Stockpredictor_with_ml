@@ -7,6 +7,7 @@ Expectations:
 - `X_enc_train` and `X_enc_val` are numpy arrays (train/val encodings) aligned
   with `X_orig_scaled` rows used for correlation mapping.
 """
+
 from typing import List
 
 import numpy as np
@@ -101,7 +102,9 @@ def select_features_with_shap(
         cov = (z.T @ x_f) / float(z.shape[0]) - np.outer(z_mean, x_mean)
         corr = cov / np.outer(z_std, x_std)
     except Exception as e:
-        logger.warning(f"Correlation compute failed: {e}; falling back to numpy.corrcoef per-column")
+        logger.warning(
+            f"Correlation compute failed: {e}; falling back to numpy.corrcoef per-column"
+        )
         # fallback slower method
         corr = np.zeros((z.shape[1], x_f.shape[1]), dtype=float)
         for i in range(z.shape[1]):
@@ -127,5 +130,3 @@ def select_features_with_shap(
     top_k = [f for f, _ in feature_scores[:final_k]]
     logger.info(f"Selected top {len(top_k)} features via SHAP mapping")
     return top_k
-
-

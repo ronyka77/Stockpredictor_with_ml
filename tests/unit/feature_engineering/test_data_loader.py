@@ -19,17 +19,7 @@ def sample_rows():
 
 def build_df_from_rows(rows):
     df = pd.DataFrame(
-        rows,
-        columns=[
-            "date",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "adjusted_close",
-            "vwap",
-        ],
+        rows, columns=["date", "open", "high", "low", "close", "volume", "adjusted_close", "vwap"]
     )
     df["date"] = pd.to_datetime(df["date"])
     df.set_index("date", inplace=True)
@@ -72,9 +62,7 @@ def test_load_stock_data_converts_and_cleans(sample_rows):
         ),
     ],
 )
-def test_load_stock_data_handles_empty_and_missing(
-    rows, expected_len, expected_exception
-):
+def test_load_stock_data_handles_empty_and_missing(rows, expected_len, expected_exception):
     """
     Setup: mock fetch_all to return empty or rows with missing data
 
@@ -125,9 +113,7 @@ def test_get_available_tickers_uses_min_data_points_from_config():
     rows = [("AAPL", 100, "Apple Inc.", "stocks"), ("MSFT", 90, "Microsoft", "stocks")]
     loader = StockDataLoader()
 
-    with patch(
-        "src.feature_engineering.data_loader.fetch_all", return_value=rows
-    ) as mock_fetch:
+    with patch("src.feature_engineering.data_loader.fetch_all", return_value=rows) as mock_fetch:
         tickers = loader.get_available_tickers()
 
     mock_fetch.assert_called_once()
@@ -145,13 +131,7 @@ def test_get_ticker_metadata_returns_dict_and_dataframe():
 
     # Build rows with the exact number of columns expected by the loader
     def make_row(
-        ticker,
-        row_id=1,
-        name=None,
-        market="stocks",
-        active=True,
-        type_="CS",
-        market_cap=1000,
+        ticker, row_id=1, name=None, market="stocks", active=True, type_="CS", market_cap=1000
     ):
         row = [None] * 22
         row[0] = row_id

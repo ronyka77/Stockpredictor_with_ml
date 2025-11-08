@@ -16,22 +16,14 @@ from src.data_collector.indicator_pipeline.indicator_pipeline import (
 class TestDividendIntegration:
     """Integration tests for dividend features in indicator pipeline."""
 
-    @patch(
-        "src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker"
-    )
+    @patch("src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker")
     @patch("src.feature_engineering.data_loader.StockDataLoader.load_stock_data")
     @patch(
         "src.data_collector.indicator_pipeline.feature_calculator.FeatureCalculator.calculate_all_features"
     )
-    @patch(
-        "src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features"
-    )
+    @patch("src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features")
     def test_dividend_features_included_in_processing(
-        self,
-        mock_save_features,
-        mock_calculate_features,
-        mock_load_stock_data,
-        mock_load_dividends,
+        self, mock_save_features, mock_calculate_features, mock_load_stock_data, mock_load_dividends
     ):
         """Test that dividend features are included in the processing pipeline."""
         # Setup mocks
@@ -116,22 +108,14 @@ class TestDividendIntegration:
         assert save_metadata["dividend_features"] is True
         assert save_metadata["dividend_source"] == "polygon"
 
-    @patch(
-        "src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker"
-    )
+    @patch("src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker")
     @patch("src.feature_engineering.data_loader.StockDataLoader.load_stock_data")
     @patch(
         "src.data_collector.indicator_pipeline.feature_calculator.FeatureCalculator.calculate_all_features"
     )
-    @patch(
-        "src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features"
-    )
+    @patch("src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features")
     def test_no_dividend_data_available(
-        self,
-        mock_save_features,
-        mock_calculate_features,
-        mock_load_stock_data,
-        mock_load_dividends,
+        self, mock_save_features, mock_calculate_features, mock_load_stock_data, mock_load_dividends
     ):
         """Test processing when no dividend data is available."""
         # Setup mocks
@@ -140,9 +124,7 @@ class TestDividendIntegration:
         mock_load_stock_data.return_value = stock_data
 
         mock_feature_result = MagicMock()
-        mock_feature_result.data = pd.DataFrame(
-            {"sma_20": [100.0] * len(dates)}, index=dates
-        )
+        mock_feature_result.data = pd.DataFrame({"sma_20": [100.0] * len(dates)}, index=dates)
         mock_feature_result.metadata = {}
         mock_feature_result.quality_score = 95.0
         mock_feature_result.warnings = []
@@ -176,9 +158,7 @@ class TestDividendIntegration:
         assert save_metadata["dividend_features"] is False
         assert save_metadata["dividend_source"] is None
 
-    @patch(
-        "src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker"
-    )
+    @patch("src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker")
     @patch("src.feature_engineering.data_loader.StockDataLoader.load_stock_data")
     @patch(
         "src.data_collector.indicator_pipeline.feature_calculator.FeatureCalculator.calculate_all_features"
@@ -193,9 +173,7 @@ class TestDividendIntegration:
         mock_load_stock_data.return_value = stock_data
 
         mock_feature_result = MagicMock()
-        mock_feature_result.data = pd.DataFrame(
-            {"sma_20": [100.0] * len(dates)}, index=dates
-        )
+        mock_feature_result.data = pd.DataFrame({"sma_20": [100.0] * len(dates)}, index=dates)
         mock_feature_result.metadata = {}
         mock_feature_result.quality_score = 95.0
         mock_feature_result.warnings = []
@@ -221,22 +199,14 @@ class TestDividendIntegration:
         assert result["success"] is True
         assert result["warnings"] > 0  # Should have dividend failure warning
 
-    @patch(
-        "src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker"
-    )
+    @patch("src.data_collector.polygon_data.data_storage.DataStorage.load_dividends_for_ticker")
     @patch("src.feature_engineering.data_loader.StockDataLoader.load_stock_data")
     @patch(
         "src.data_collector.indicator_pipeline.feature_calculator.FeatureCalculator.calculate_all_features"
     )
-    @patch(
-        "src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features"
-    )
+    @patch("src.data_collector.indicator_pipeline.feature_storage.FeatureStorage.save_features")
     def test_dividend_metadata_in_feature_result(
-        self,
-        mock_save_features,
-        mock_calculate_features,
-        mock_load_stock_data,
-        mock_load_dividends,
+        self, mock_save_features, mock_calculate_features, mock_load_stock_data, mock_load_dividends
     ):
         """Test that dividend metadata is properly set in the feature result."""
         # Setup mocks
@@ -245,9 +215,7 @@ class TestDividendIntegration:
         mock_load_stock_data.return_value = stock_data
 
         mock_feature_result = MagicMock()
-        mock_feature_result.data = pd.DataFrame(
-            {"sma_20": [100.0] * len(dates)}, index=dates
-        )
+        mock_feature_result.data = pd.DataFrame({"sma_20": [100.0] * len(dates)}, index=dates)
         mock_feature_result.metadata = {}  # Start with empty metadata
         mock_feature_result.quality_score = 95.0
         mock_feature_result.warnings = []

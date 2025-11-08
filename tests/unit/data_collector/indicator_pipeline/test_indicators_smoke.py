@@ -17,10 +17,7 @@ from src.data_collector.indicator_pipeline.volatility_indicators import (
     calculate_bollinger_bands,
     calculate_atr,
 )
-from src.data_collector.indicator_pipeline.volume_indicators import (
-    calculate_obv,
-    calculate_vpt,
-)
+from src.data_collector.indicator_pipeline.volume_indicators import calculate_obv, calculate_vpt
 
 
 def make_price_df(n=50):
@@ -49,12 +46,7 @@ def test_trend_indicators_smoke():
 def test_momentum_indicators_smoke():
     """Smoke test: momentum indicator calculators produce non-empty results"""
     df = make_price_df(60)
-    for fn in (
-        calculate_rsi,
-        calculate_stochastic,
-        calculate_roc,
-        calculate_williams_r,
-    ):
+    for fn in (calculate_rsi, calculate_stochastic, calculate_roc, calculate_williams_r):
         res = fn(df)
         assert not res.data.empty
 

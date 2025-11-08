@@ -4,9 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from src.data_collector.polygon_news.storage import PolygonNewsStorage
-from tests.unit.data_collector.polygon_news.helpers import (
-    processed_article_expected,
-)
+from tests.unit.data_collector.polygon_news.helpers import processed_article_expected
 
 
 @pytest.mark.unit
@@ -92,15 +90,11 @@ def test_get_latest_date_for_ticker_and_overall():
     storage = PolygonNewsStorage()
     dt = datetime(2025, 8, 1, tzinfo=timezone.utc)
 
-    with patch(
-        "src.data_collector.polygon_news.storage.fetch_one", return_value={"latest": dt}
-    ):
+    with patch("src.data_collector.polygon_news.storage.fetch_one", return_value={"latest": dt}):
         res = storage.get_latest_date_for_ticker("AAPL")
         assert res == dt
 
-    with patch(
-        "src.data_collector.polygon_news.storage.fetch_one", return_value={"latest": dt}
-    ):
+    with patch("src.data_collector.polygon_news.storage.fetch_one", return_value={"latest": dt}):
         res2 = storage.get_latest_date_overall()
         assert res2 == dt
 
@@ -122,8 +116,7 @@ def test_get_articles_for_ticker_calls_fetch_all_and_returns_rows():
     rows = [{"id": 1}]
 
     with patch(
-        "src.data_collector.polygon_news.storage.fetch_all",
-        return_value=rows,
+        "src.data_collector.polygon_news.storage.fetch_all", return_value=rows
     ) as mock_fetch:
         out = storage.get_articles_for_ticker("ACME", limit=5)
 
@@ -159,9 +152,7 @@ def test_get_article_statistics_success_path():
         patch("src.data_collector.polygon_news.storage.fetch_one", fake_fetch_one),
         patch("src.data_collector.polygon_news.storage.fetch_all", fake_fetch_all),
         patch.object(
-            storage,
-            "get_latest_date_overall",
-            lambda: datetime(2025, 8, 1, tzinfo=timezone.utc),
+            storage, "get_latest_date_overall", lambda: datetime(2025, 8, 1, tzinfo=timezone.utc)
         ),
     ):
         stats = storage.get_article_statistics()

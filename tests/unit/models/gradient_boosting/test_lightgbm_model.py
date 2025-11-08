@@ -69,9 +69,7 @@ def test_predict_warns_on_feature_mismatch_and_returns_array(
 # New tests: fully mock LightGBM internals and MLflow interactions
 
 
-def test_get_prediction_confidence_various_methods(
-    lgb_model_instance, sample_tabular_data
-):
+def test_get_prediction_confidence_various_methods(lgb_model_instance, sample_tabular_data):
     """Setup: attach a DummyModel that simulates leaf indices and predictions for different confidence methods."""
 
     X = sample_tabular_data["X"].iloc[:20]
@@ -126,8 +124,7 @@ def test_log_model_to_mlflow_calls_helper(lgb_model_instance, sample_tabular_dat
     params = {"param": 1}
 
     with patch(
-        "src.models.gradient_boosting.lightgbm_model.log_to_mlflow_lightgbm",
-        return_value="run-123",
+        "src.models.gradient_boosting.lightgbm_model.log_to_mlflow_lightgbm", return_value="run-123"
     ) as mock_log:
         # Execution
         # Ensure a model object exists to satisfy precondition
@@ -141,19 +138,14 @@ def test_log_model_to_mlflow_calls_helper(lgb_model_instance, sample_tabular_dat
         assert run_id == "run-123"
 
 
-def test_load_model_uses_mlflow_client_and_handles_missing_signature(
-    lgb_model_instance,
-):
+def test_load_model_uses_mlflow_client_and_handles_missing_signature(lgb_model_instance):
     """Setup: patch mlflow client and get_model_info to simulate missing signature and ensure no exception."""
 
     fake_run_id = "fake-run-1"
 
     fake_run_info = Mock()
     fake_run_info.data = Mock()
-    fake_run_info.data.params = {
-        "model_model_name": "name",
-        "model_prediction_horizon": "10",
-    }
+    fake_run_info.data.params = {"model_model_name": "name", "model_prediction_horizon": "10"}
     fake_run_info.info = Mock()
     fake_run_info.info.run_id = fake_run_id
 

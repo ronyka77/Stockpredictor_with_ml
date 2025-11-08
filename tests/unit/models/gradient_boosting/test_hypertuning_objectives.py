@@ -24,9 +24,7 @@ def _make_dummy_trial(number, params_overrides=None):
     return trial
 
 
-def test_lightgbm_objective_selects_best_trial_and_finalize(
-    small_dataset, lgb_model_instance
-):
+def test_lightgbm_objective_selects_best_trial_and_finalize(small_dataset, lgb_model_instance):
     """Setup: create objective then simulate two trials calling the objective function directly with mocked training behavior."""
 
     X, y = small_dataset
@@ -143,4 +141,4 @@ def test_xgboost_objective_tracks_best_trial_and_finalize(small_dataset):
 
     # Verification
     assert xgb_model.model is not None
-    assert getattr(xgb_model, "optimal_threshold", None) == 0.55
+    assert np.isclose(getattr(xgb_model, "optimal_threshold", None), 0.55, rtol=1e-09, atol=1e-09)

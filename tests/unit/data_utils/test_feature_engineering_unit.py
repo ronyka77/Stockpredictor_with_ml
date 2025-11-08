@@ -38,9 +38,7 @@ def test_add_price_normalized_features_creates_expected_columns(small_market_df)
         expected.add("Return_Volume_Efficiency")
 
     missing = expected - set(out.columns)
-    assert not missing, (
-        f"Missing normalized columns: {missing}. Got columns: {list(out.columns)}"
-    )
+    assert not missing, f"Missing normalized columns: {missing}. Got columns: {list(out.columns)}"
 
     # Check SMA ratio for whichever SMA column exists
     sma_ratio_col = None
@@ -51,9 +49,7 @@ def test_add_price_normalized_features_creates_expected_columns(small_market_df)
 
     if sma_ratio_col is not None:
         # derive the original SMA period from column name, fallback to index-based check
-        assert out.loc[0, sma_ratio_col] == pytest.approx(100.0 / 95.0), (
-            "SMA ratio incorrect"
-        )
+        assert out.loc[0, sma_ratio_col] == pytest.approx(100.0 / 95.0), "SMA ratio incorrect"
 
     # Price ATR ratio only checked if produced
     if "Price_ATR_Ratio" in out.columns:
@@ -78,11 +74,7 @@ def test_add_prediction_bounds_features_computes_expected_values():
 
     out = add_prediction_bounds_features(df)
     # assert expected columns exist
-    expected_new = [
-        "Expected_Daily_Move",
-        "Expected_10D_Move",
-        "RSI_Mean_Reversion_Pressure",
-    ]
+    expected_new = ["Expected_Daily_Move", "Expected_10D_Move", "RSI_Mean_Reversion_Pressure"]
     for col in expected_new:
         assert col in out.columns, f"Expected column {col} missing"
 
@@ -92,23 +84,18 @@ def test_add_prediction_bounds_features_computes_expected_values():
         check_dtype=True,
         check_names=False,
     )
-    assert out.loc[0, "RSI_Mean_Reversion_Pressure"] == pytest.approx(
-        abs(60 - 50) / 50
-    ), "RSI reversion pressure incorrect"
+    assert out.loc[0, "RSI_Mean_Reversion_Pressure"] == pytest.approx(abs(60 - 50) / 50), (
+        "RSI reversion pressure incorrect"
+    )
 
 
 def test_clean_data_for_training_handles_infinite_and_nan_and_types():
     """Clean numeric data: coerce types, remove NaNs, and make values finite."""
-    df = pd.DataFrame(
-        {
-            "a": [1.0, np.inf, -np.inf, 1e40],
-            "b": [np.nan, 2.0, 3.0, 4.0],
-        }
-    )
+    df = pd.DataFrame({"a": [1.0, np.inf, -np.inf, 1e40], "b": [np.nan, 2.0, 3.0, 4.0]})
 
     out = clean_data_for_training(df)
 
-    assert out["a"].dtype == float, "Column 'a' should be numeric float"
+    assert out["a"].dtype == np.float32, "Column 'a' should be float32"
     # expect no nulls in column 'b'
     pdt.assert_series_equal(
         out["b"].isnull().astype("int64").reset_index(drop=True),

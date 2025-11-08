@@ -21,9 +21,7 @@ class NewsValidator:
         self.max_title_length = 1000
         self.required_fields = ["polygon_id", "title", "article_url", "published_utc"]
 
-    def validate_article(
-        self, article: Dict[str, Any]
-    ) -> Tuple[bool, float, List[str]]:
+    def validate_article(self, article: Dict[str, Any]) -> Tuple[bool, float, List[str]]:
         """
         Validate article quality
 
@@ -63,9 +61,7 @@ class NewsValidator:
         if published_utc:
             try:
                 if isinstance(published_utc, str):
-                    pub_date = datetime.fromisoformat(
-                        published_utc.replace("Z", "+00:00")
-                    )
+                    pub_date = datetime.fromisoformat(published_utc.replace("Z", "+00:00"))
                 else:
                     pub_date = published_utc
 
@@ -88,9 +84,7 @@ class NewsValidator:
         quality_score = max(0.0, quality_score)
 
         # Article is valid if score > 0.5 and no critical issues
-        critical_issues = [
-            issue for issue in issues if "Missing required field" in issue
-        ]
+        critical_issues = [issue for issue in issues if "Missing required field" in issue]
         is_valid = quality_score > 0.5 and len(critical_issues) == 0
 
         return is_valid, quality_score, issues

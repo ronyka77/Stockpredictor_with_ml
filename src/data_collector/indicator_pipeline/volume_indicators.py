@@ -47,12 +47,8 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
         # Calculate additional OBV-based features
         result_data["OBV_SMA_10"] = obv_values.rolling(10).mean()
         result_data["OBV_SMA_20"] = obv_values.rolling(20).mean()
-        result_data["OBV_Above_SMA_10"] = (
-            obv_values > result_data["OBV_SMA_10"]
-        ).astype(int)
-        result_data["OBV_Above_SMA_20"] = (
-            obv_values > result_data["OBV_SMA_20"]
-        ).astype(int)
+        result_data["OBV_Above_SMA_10"] = (obv_values > result_data["OBV_SMA_10"]).astype(int)
+        result_data["OBV_Above_SMA_20"] = (obv_values > result_data["OBV_SMA_20"]).astype(int)
 
         # OBV trend analysis
         result_data["OBV_Rising"] = (obv_values > obv_values.shift(1)).astype(int)
@@ -66,8 +62,7 @@ def calculate_obv(data: pd.DataFrame) -> IndicatorResult:
         price_change = data["close"].pct_change(5)
         obv_change = obv_values.pct_change(5)
         result_data["OBV_Price_Divergence"] = (
-            ((price_change > 0) & (obv_change < 0))
-            | ((price_change < 0) & (obv_change > 0))
+            ((price_change > 0) & (obv_change < 0)) | ((price_change < 0) & (obv_change > 0))
         ).astype(int)
 
         metadata = {
@@ -125,12 +120,8 @@ def calculate_vpt(data: pd.DataFrame) -> IndicatorResult:
         # Calculate additional VPT-based features
         result_data["VPT_SMA_10"] = vpt_values.rolling(10).mean()
         result_data["VPT_SMA_20"] = vpt_values.rolling(20).mean()
-        result_data["VPT_Above_SMA_10"] = (
-            vpt_values > result_data["VPT_SMA_10"]
-        ).astype(int)
-        result_data["VPT_Above_SMA_20"] = (
-            vpt_values > result_data["VPT_SMA_20"]
-        ).astype(int)
+        result_data["VPT_Above_SMA_10"] = (vpt_values > result_data["VPT_SMA_10"]).astype(int)
+        result_data["VPT_Above_SMA_20"] = (vpt_values > result_data["VPT_SMA_20"]).astype(int)
 
         # VPT trend analysis
         result_data["VPT_Rising"] = (vpt_values > vpt_values.shift(1)).astype(int)
@@ -202,12 +193,8 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
         # Calculate additional A/D Line features
         result_data["AD_SMA_10"] = ad_values.rolling(10).mean()
         result_data["AD_SMA_20"] = ad_values.rolling(20).mean()
-        result_data["AD_Above_SMA_10"] = (ad_values > result_data["AD_SMA_10"]).astype(
-            int
-        )
-        result_data["AD_Above_SMA_20"] = (ad_values > result_data["AD_SMA_20"]).astype(
-            int
-        )
+        result_data["AD_Above_SMA_10"] = (ad_values > result_data["AD_SMA_10"]).astype(int)
+        result_data["AD_Above_SMA_20"] = (ad_values > result_data["AD_SMA_20"]).astype(int)
 
         # A/D Line trend analysis
         result_data["AD_Rising"] = (ad_values > ad_values.shift(1)).astype(int)
@@ -220,9 +207,7 @@ def calculate_ad_line(data: pd.DataFrame) -> IndicatorResult:
         # A/D Line oscillator (A/D Line - EMA of A/D Line)
         ad_ema = ad_values.ewm(span=10).mean()
         result_data["AD_Oscillator"] = ad_values - ad_ema
-        result_data["AD_Oscillator_Above_Zero"] = (
-            result_data["AD_Oscillator"] > 0
-        ).astype(int)
+        result_data["AD_Oscillator_Above_Zero"] = (result_data["AD_Oscillator"] > 0).astype(int)
 
         metadata = {
             "indicator_type": "volume",
@@ -295,15 +280,11 @@ def calculate_volume_profile(
 
             # High volume detection
             vol_threshold = vol_ma * 1.5
-            result_data[f"High_Volume_{period}"] = (
-                data["volume"] > vol_threshold
-            ).astype(int)
+            result_data[f"High_Volume_{period}"] = (data["volume"] > vol_threshold).astype(int)
 
             # Low volume detection
             vol_low_threshold = vol_ma * 0.5
-            result_data[f"Low_Volume_{period}"] = (
-                data["volume"] < vol_low_threshold
-            ).astype(int)
+            result_data[f"Low_Volume_{period}"] = (data["volume"] < vol_low_threshold).astype(int)
 
             # Volume trend
             volume_trend = (
@@ -326,25 +307,17 @@ def calculate_volume_profile(
             price_change = data["close"].pct_change()
             volume_change = data["volume"].pct_change()
 
-            result_data["PV_Correlation_10"] = price_change.rolling(10).corr(
-                volume_change
-            )
-            result_data["PV_Correlation_20"] = price_change.rolling(20).corr(
-                volume_change
-            )
+            result_data["PV_Correlation_10"] = price_change.rolling(10).corr(volume_change)
+            result_data["PV_Correlation_20"] = price_change.rolling(20).corr(volume_change)
 
             # Volume confirmation signals
             vol_ma_10 = data["volume"].rolling(10).mean()
             result_data["Volume_Confirms_Uptrend"] = (
-                ((price_change > 0) & (data["volume"] > vol_ma_10))
-                .fillna(False)
-                .astype(int)
+                ((price_change > 0) & (data["volume"] > vol_ma_10)).fillna(False).astype(int)
             )
 
             result_data["Volume_Confirms_Downtrend"] = (
-                ((price_change < 0) & (data["volume"] > vol_ma_10))
-                .fillna(False)
-                .astype(int)
+                ((price_change < 0) & (data["volume"] > vol_ma_10)).fillna(False).astype(int)
             )
 
             # Volume divergence
@@ -413,9 +386,7 @@ def calculate_volume_profile(
         raise
 
 
-def calculate_money_flow_index(
-    data: pd.DataFrame, period: Optional[int] = None
-) -> IndicatorResult:
+def calculate_money_flow_index(data: pd.DataFrame, period: Optional[int] = None) -> IndicatorResult:
     """
     Calculate Money Flow Index
 
@@ -435,9 +406,7 @@ def calculate_money_flow_index(
     try:
         # Check minimum data requirements
         if len(data) < period:
-            warning_msg = (
-                f"Insufficient data for MFI. Need {period} points, have {len(data)}"
-            )
+            warning_msg = f"Insufficient data for MFI. Need {period} points, have {len(data)}"
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
@@ -452,9 +421,7 @@ def calculate_money_flow_index(
         # Add MFI-based signals
         result_data["MFI_Overbought"] = (mfi_values > 80).astype(int)
         result_data["MFI_Oversold"] = (mfi_values < 20).astype(int)
-        result_data["MFI_Neutral"] = ((mfi_values >= 20) & (mfi_values <= 80)).astype(
-            int
-        )
+        result_data["MFI_Neutral"] = ((mfi_values >= 20) & (mfi_values <= 80)).astype(int)
 
         # MFI trend analysis
         result_data["MFI_Rising"] = (mfi_values > mfi_values.shift(1)).astype(int)

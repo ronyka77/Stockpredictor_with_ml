@@ -107,28 +107,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 259 (class 1255 OID 132787)
--- Name: migrate_technical_features(); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION public.migrate_technical_features() RETURNS text
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    result_text TEXT := '';
-BEGIN
-    -- This function would contain the migration logic
-    -- from the old technical_features table to the new structure
-    
-    result_text := 'Migration function created. Implement migration logic as needed.';
-    RETURN result_text;
-END;
-$$;
-
-
-ALTER FUNCTION public.migrate_technical_features() OWNER TO postgres;
-
---
 -- TOC entry 258 (class 1255 OID 132417)
 -- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: postgres
 --

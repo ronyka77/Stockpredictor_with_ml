@@ -29,9 +29,7 @@ def test_indicatorresult_post_init_warns_on_empty(mocker):
     """Warn when IndicatorResult is created with an empty DataFrame"""
     empty = pd.DataFrame()
     mock_warn = mocker.patch.object(base_mod.logger, "warning")
-    IndicatorResult(
-        data=empty, metadata={}, quality_score=0.0, warnings=[], calculation_time=0.0
-    )
+    IndicatorResult(data=empty, metadata={}, quality_score=0.0, warnings=[], calculation_time=0.0)
     mock_warn.assert_called()
     # Ensure expected warning message is included in the call args
     assert any(
@@ -46,11 +44,7 @@ def test_indicatorresult_quality_bounds_raise(bad_score):
     df = pd.DataFrame({"a": [1, 2]})
     with pytest.raises(ValueError):
         IndicatorResult(
-            data=df,
-            metadata={},
-            quality_score=bad_score,
-            warnings=[],
-            calculation_time=0.0,
+            data=df, metadata={}, quality_score=bad_score, warnings=[], calculation_time=0.0
         )
 
 

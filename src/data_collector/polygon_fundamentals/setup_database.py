@@ -8,12 +8,7 @@ Simple programmatic interface that always performs full setup and verification.
 
 from pathlib import Path
 
-from src.database.connection import (
-    init_global_pool,
-    execute,
-    fetch_one,
-    fetch_all,
-)
+from src.database.connection import init_global_pool, execute, fetch_one, fetch_all
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,11 +22,7 @@ def setup_fundamental_database():
         # Ensure global pool is initialized (will validate credentials)
         init_global_pool()
         # Read the SQL schema file
-        sql_file = (
-            Path(__file__).parent.parent.parent.parent
-            / "sql"
-            / "fundamentals_v2_schema.sql"
-        )
+        sql_file = Path(__file__).parent.parent.parent.parent / "sql" / "fundamentals_v2_schema.sql"
 
         if not sql_file.exists():
             logger.error(f"SQL schema file not found: {sql_file}")
@@ -107,9 +98,7 @@ def verify_database_setup():
         )
         logger.info(f"🔒 Table has {len(constraints)} constraints:")
         for constraint in constraints or []:
-            logger.info(
-                f"   - {constraint['constraint_name']}: {constraint['constraint_type']}"
-            )
+            logger.info(f"   - {constraint['constraint_name']}: {constraint['constraint_type']}")
 
         indexes = fetch_all(
             "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'raw_fundamental_data'"
@@ -146,9 +135,7 @@ def validate_table_structure():
         )
         existing_columns = [row["column_name"] for row in (existing or [])]
 
-        missing_columns = [
-            col for col in required_columns if col not in existing_columns
-        ]
+        missing_columns = [col for col in required_columns if col not in existing_columns]
 
         if missing_columns:
             logger.error(f"❌ Missing required columns: {missing_columns}")

@@ -3,18 +3,18 @@ import pytest
 import sys
 from pathlib import Path
 
-# Load shared fixtures from tests._fixtures so pytest discovers them
-pytest_plugins = [
-    "tests._fixtures.conftest",
-    "tests._fixtures.fixtures",
-]
-
-# Ensure the project `src` package is importable during pytest collection.
-# This mirrors editable installs by adding the repository `src/` to sys.path.
-root = Path(__file__).resolve().parent
-src_path = str(root / "src")
+# Ensure the repository root and the project `src` package are importable during pytest collection.
+# Add the repository root so `tests` can be discovered as a top-level package and also add `src/`.
+repo_root = Path(__file__).resolve().parent.parent
+src_path = str(repo_root / "src")
+repo_root_path = str(repo_root)
+if repo_root_path not in sys.path:
+    sys.path.insert(0, repo_root_path)
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
+
+# Ensure the shared fixtures package is imported so pytest registers fixtures
+pytest_plugins = ["tests.fixtures.fixtures"]
 
 
 @pytest.fixture(autouse=True)
@@ -27,20 +27,15 @@ def no_sleep(mocker):
 def patch_execute_values_to_fake_pool(mocker):
     """Expose wrapper fixture at top-level tests for delegating execute_values to fake pool."""
     # Create a local fake pool instance (centralized fake implementation)
-    from tests._fixtures import ConnectionFake as _FakePool
+    from tests.fixtures import ConnectionFake as _FakePool
 
     fake_pool = _FakePool()
 
-    def _execute_values_wrapper(
-        insert_sql, rows, **kwargs
-    ):
-        fake_pool.execute_values(
-            insert_sql, rows
-        )
+    def _execute_values_wrapper(insert_sql, rows, **kwargs):
+        fake_pool.execute_values(insert_sql, rows)
 
     mocker.patch(
-        "src.data_collector.polygon_data.data_storage.execute_values",
-        new=_execute_values_wrapper,
+        "src.data_collector.polygon_data.data_storage.execute_values", new=_execute_values_wrapper
     )
     return None
 
@@ -53,7 +48,7 @@ def patch_global_db_pool(mocker):
     `src.database.connection` operate against a test-controlled fake pool so
     tests never touch a real database connection.
     """
-    from tests._fixtures import PoolFake
+    from tests.fixtures import PoolFake
 
     pool_ref = {"pool": None}
 
@@ -79,13 +74,10 @@ def patch_global_db_pool(mocker):
 def patch_polygon_api_clients(mocker):
     """Autouse fixture: prevent any test from performing real network calls"""
     # Use canonical canned response factory from fixtures
-    from tests._fixtures.remote_api_responses import canned_api_factory
+    from tests.fixtures.remote_api_responses import canned_api_factory
 
     # Default network behavior: patch Session.get to return an empty canned
-    mocker.patch(
-        "requests.Session.get",
-        return_value=canned_api_factory("empty"),
-    )
+    mocker.patch("requests.Session.get", return_value=canned_api_factory("empty"))
 
     # Default news client pagination fetcher -> empty list
     mocker.patch(

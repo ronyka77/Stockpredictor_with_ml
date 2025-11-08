@@ -44,9 +44,7 @@ def fake_mlflow_client(dummy_run):
 @pytest.fixture
 def patch_mlflow_client(fake_mlflow_client):
     """Patch the MlflowClient used in `src.utils.mlflow_integration` to return our fake client."""
-    with patch(
-        "src.utils.mlflow_integration.MlflowClient", return_value=fake_mlflow_client
-    ):
+    with patch("src.utils.mlflow_integration.MlflowClient", return_value=fake_mlflow_client):
         yield fake_mlflow_client
 
 

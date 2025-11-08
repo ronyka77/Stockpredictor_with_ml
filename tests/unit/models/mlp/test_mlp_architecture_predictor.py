@@ -14,10 +14,7 @@ def test_mlp_forward_and_architecture_info():
     output_size = 2
 
     model = MLPModule(
-        input_size=input_size,
-        layer_sizes=layer_sizes,
-        output_size=output_size,
-        dropout=0.0,
+        input_size=input_size, layer_sizes=layer_sizes, output_size=output_size, dropout=0.0
     )
 
     # Batch input
@@ -47,9 +44,7 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
     n_features = 3
     # use local RNG to avoid global state
     rng = np.random.RandomState(0)
-    X = pd.DataFrame(
-        rng.randn(n_samples, n_features), columns=[f"f{i}" for i in range(n_features)]
-    )
+    X = pd.DataFrame(rng.randn(n_samples, n_features), columns=[f"f{i}" for i in range(n_features)])
     y = pd.Series(rng.randn(n_samples))
 
     # Scale training data and create dataloader
@@ -70,9 +65,7 @@ def test_mlppredictor_fit_predict_and_confidence(tmp_path):
     predictor = MLPPredictor(config=config)
 
     # Fit should complete quickly for 1 epoch
-    predictor.fit(
-        train_loader, val_loader=None, scaler=scaler, feature_names=list(X.columns)
-    )
+    predictor.fit(train_loader, val_loader=None, scaler=scaler, feature_names=list(X.columns))
 
     if predictor.is_trained is not True:
         raise AssertionError("Predictor should be marked trained after fit")

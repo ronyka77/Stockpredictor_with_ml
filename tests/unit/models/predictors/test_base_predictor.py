@@ -12,11 +12,7 @@ class DummyPredictor(BasePredictor):
 
 def _make_features_and_targets(n=5):
     features = pd.DataFrame(
-        {
-            "close": np.linspace(10, 15, n),
-            "date_int": np.arange(n),
-            "ticker_id": np.arange(n),
-        }
+        {"close": np.linspace(10, 15, n), "date_int": np.arange(n), "ticker_id": np.arange(n)}
     )
     targets = pd.Series(np.linspace(0.1, 0.5, n))
     return features, targets
@@ -79,8 +75,10 @@ def test_get_confidence_scores():
 
     class MockModel:
         feature_names = ["close", "date_int", "ticker_id"]
+
         def predict(self, X):
             return np.zeros(len(X))
+
         def get_prediction_confidence(self, X):
             return np.array([0.8, 0.9, 0.7])
 

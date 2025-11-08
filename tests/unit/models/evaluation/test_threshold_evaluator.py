@@ -55,9 +55,7 @@ class MockModel:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         return self._preds
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "simple"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "simple") -> np.ndarray:
         return self._conf
 
 
@@ -112,9 +110,7 @@ def test_evaluate_threshold_performance_perfect_predictions():
     y = pd.Series([0.12, -0.03, 0.18])  # Actual values
     current_prices = np.array([10.0, 20.0, 5.0])
 
-    results = te.evaluate_threshold_performance(
-        model, X, y, current_prices, threshold=0.8
-    )
+    results = te.evaluate_threshold_performance(model, X, y, current_prices, threshold=0.8)
 
     # Should return success status
     assert results["status"] == "success"

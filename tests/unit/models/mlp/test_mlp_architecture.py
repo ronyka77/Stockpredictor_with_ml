@@ -7,10 +7,7 @@ from src.models.time_series.mlp.mlp_architecture import MLPModule
 from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 
 
-@pytest.mark.parametrize(
-    "activation",
-    ["relu", "leaky_relu", "elu", "gelu"],
-)
+@pytest.mark.parametrize("activation", ["relu", "leaky_relu", "elu", "gelu"])
 def test_activation_output_shape(activation):
     """Ensure activations produce consistent output shape for MLPModule."""
     input_size = 5
@@ -18,10 +15,7 @@ def test_activation_output_shape(activation):
     batch_size = 8
 
     model = MLPModule(
-        input_size=input_size,
-        layer_sizes=layer_sizes,
-        activation=activation,
-        dropout=0.1,
+        input_size=input_size, layer_sizes=layer_sizes, activation=activation, dropout=0.1
     )
     x = torch.randn(batch_size, input_size)
     out = model(x)
@@ -34,10 +28,7 @@ def test_residual_and_architecture_info():
     input_size = 6
     layer_sizes = [6, 4]
     model = MLPModule(
-        input_size=input_size,
-        layer_sizes=layer_sizes,
-        residual=True,
-        batch_norm=True,
+        input_size=input_size, layer_sizes=layer_sizes, residual=True, batch_norm=True
     )
 
     x = torch.randn(4, input_size)

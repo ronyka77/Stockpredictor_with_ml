@@ -52,9 +52,7 @@ class PolygonNewsStorage:
             if existing:
                 updated = self._update_existing_article(existing, article_data)
                 if updated:
-                    self.logger.info(
-                        f"Updated existing article: {article_data['polygon_id']}"
-                    )
+                    self.logger.info(f"Updated existing article: {article_data['polygon_id']}")
                 return existing.get("id")
 
             # Create new article
@@ -70,9 +68,7 @@ class PolygonNewsStorage:
             )
             return None
 
-    def store_articles_batch(
-        self, articles_data: List[Dict[str, Any]]
-    ) -> Dict[str, int]:
+    def store_articles_batch(self, articles_data: List[Dict[str, Any]]) -> Dict[str, int]:
         """
         Store multiple articles in batch with transaction management
 
@@ -130,9 +126,7 @@ class PolygonNewsStorage:
             # Parse published date
             published_utc = self._parse_datetime(article_data["published_utc"])
             if not published_utc:
-                self.logger.warning(
-                    f"Invalid published_utc: {article_data['published_utc']}"
-                )
+                self.logger.warning(f"Invalid published_utc: {article_data['published_utc']}")
                 return None
 
             import json
@@ -300,9 +294,7 @@ class PolygonNewsStorage:
             return False
 
         except Exception as e:
-            self.logger.error(
-                f"Error updating article {article.get('polygon_id')}: {e}"
-            )
+            self.logger.error(f"Error updating article {article.get('polygon_id')}: {e}")
             return False
 
     def get_latest_date_for_ticker(self, ticker: str) -> Optional[datetime]:
@@ -315,9 +307,7 @@ class PolygonNewsStorage:
 
     def get_latest_date_overall(self) -> Optional[datetime]:
         """Get latest article date across all articles"""
-        row = fetch_one(
-            "SELECT MAX(published_utc) as latest FROM polygon_news_articles"
-        )
+        row = fetch_one("SELECT MAX(published_utc) as latest FROM polygon_news_articles")
         return row.get("latest") if row else None
 
     def cleanup_old_articles(self, retention_days: Optional[int] = None) -> int:
@@ -379,9 +369,7 @@ class PolygonNewsStorage:
                 sql_tickers += " GROUP BY t.ticker ORDER BY cnt DESC"
                 ticker_rows = fetch_all(sql_tickers, dict_cursor=True)
                 ticker_counts = (
-                    [(r.get("ticker"), r.get("cnt")) for r in ticker_rows]
-                    if ticker_rows
-                    else []
+                    [(r.get("ticker"), r.get("cnt")) for r in ticker_rows] if ticker_rows else []
                 )
             except Exception as e:
                 logger.error(f"Error getting top tickers: {e}")
@@ -392,9 +380,7 @@ class PolygonNewsStorage:
                 sql_sent = "SELECT sentiment, COUNT(*) as cnt FROM polygon_news_insights i JOIN polygon_news_articles a ON a.id = i.article_id GROUP BY sentiment"
                 sent_rows = fetch_all(sql_sent, dict_cursor=True)
                 sentiment_dist = (
-                    {r.get("sentiment"): r.get("cnt") for r in sent_rows}
-                    if sent_rows
-                    else {}
+                    {r.get("sentiment"): r.get("cnt") for r in sent_rows} if sent_rows else {}
                 )
             except Exception as e:
                 logger.error(f"Error getting sentiment distribution: {e}")
@@ -405,9 +391,7 @@ class PolygonNewsStorage:
                 sql_pub = "SELECT publisher_name, COUNT(*) as cnt FROM polygon_news_articles GROUP BY publisher_name ORDER BY cnt DESC LIMIT 10"
                 pub_rows = fetch_all(sql_pub, dict_cursor=True)
                 top_publishers = (
-                    {r.get("publisher_name"): r.get("cnt") for r in pub_rows}
-                    if pub_rows
-                    else {}
+                    {r.get("publisher_name"): r.get("cnt") for r in pub_rows} if pub_rows else {}
                 )
                 logger.info(f"Top publishers: {top_publishers}")
                 return {
@@ -488,11 +472,7 @@ class PolygonNewsStorage:
             }
 
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "error": str(e),
-                "database_connection": "failed",
-            }
+            return {"status": "unhealthy", "error": str(e), "database_connection": "failed"}
 
     def __enter__(self):
         """Context manager entry"""

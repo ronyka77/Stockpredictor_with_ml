@@ -83,9 +83,7 @@ mae_scorer = make_scorer(
 
 
 class AutoGluonModel(BaseModel, ModelProtocol):
-    def __init__(
-        self, *, model_name: str = "autogluon", config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, *, model_name: str = "autogluon", config: Optional[Dict[str, Any]] = None):
         super().__init__(model_name=model_name, config=config or {})
         self.predictor: Optional[TabularPredictor] = None
         self.feature_names: Optional[list[str]] = None
@@ -125,18 +123,15 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             "FASTAI": {},
             "GBM": {},
             "XGB": {},
-            # "TABM": {}, 
-            "RF": {}, 
-            "CAT": {'task_type': 'GPU'},
-            # "REALMLP": {}, 
+            # "TABM": {},
+            "RF": {},
+            "CAT": {"task_type": "GPU"},
+            # "REALMLP": {},
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(
-            label=label,
-            eval_metric=eval_metric,
-            problem_type="regression",
-            verbosity=2,
+            label=label, eval_metric=eval_metric, problem_type="regression", verbosity=2
         )
         collected = gc.collect()
         logger.info(f"Garbage collected: {collected}")
@@ -181,9 +176,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         return preds.to_numpy() if hasattr(preds, "to_numpy") else np.asarray(preds)
 
     # ModelProtocol requirement
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "margin"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "margin") -> np.ndarray:
         if not self.predictor:
             raise ValueError(PREDICTOR_NOT_TRAINED)
 
@@ -197,9 +190,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 p = p.to_numpy() if hasattr(p, "to_numpy") else np.asarray(p)
                 return p
             except Exception as e:
-                logger.warning(
-                    f"Failed to predict with model {self.selected_model_name}: {e}"
-                )
+                logger.warning(f"Failed to predict with model {self.selected_model_name}: {e}")
                 return np.ones(len(X))
         if method == "simple":
             base = self.predict(X)
@@ -212,9 +203,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 max_val = float(np.max(base_arr))
 
             # Determine output dtype: preserve float dtype, otherwise cast to float
-            out_dtype = (
-                base_arr.dtype if np.issubdtype(base_arr.dtype, np.floating) else float
-            )
+            out_dtype = base_arr.dtype if np.issubdtype(base_arr.dtype, np.floating) else float
 
             if np.isclose(max_val, 0):
                 # Return zeros with same shape and an appropriate dtype

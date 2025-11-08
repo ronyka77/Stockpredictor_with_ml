@@ -6,9 +6,7 @@ from unittest.mock import patch
 import pytest
 from datetime import date
 
-from src.data_collector.indicator_pipeline.consolidated_storage import (
-    ConsolidatedFeatureStorage,
-)
+from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 
 
 def make_sample_ticker_df():
@@ -49,15 +47,13 @@ def test_combine_ticker_data_and_year_partitioning(tmp_path):
             ),
         ),
     ):
-        result = storage.save_multiple_tickers(tdata, metadata={})
+        result = storage.save_multiple_tickers(tdata)
 
     assert "files_created" in result
     assert result["total_tickers"] == 2
 
 
-def test_save_multiple_tickers_creates_files_and_returns_summary(
-    tmp_path, mock_pipeline_logger
-):
+def test_save_multiple_tickers_creates_files_and_returns_summary(tmp_path, mock_pipeline_logger):
     storage = ConsolidatedFeatureStorage()
     storage.base_path = tmp_path
     storage.version_path = tmp_path / storage.config.version
@@ -80,7 +76,7 @@ def test_save_multiple_tickers_creates_files_and_returns_summary(
             ),
         ),
     ):
-        result = storage.save_multiple_tickers(tdata, metadata={})
+        result = storage.save_multiple_tickers(tdata)
 
     assert "files_created" in result
     assert result["total_tickers"] == 2
@@ -104,12 +100,10 @@ def test_save_multiple_tickers_handles_small_files(tmp_path, mock_pipeline_logge
         patch.object(Path, "mkdir", return_value=None),
         patch(
             "pathlib.Path.stat",
-            return_value=SimpleNamespace(
-                st_size=10, st_ctime=0, st_mtime=0, st_mode=0o755
-            ),
+            return_value=SimpleNamespace(st_size=10, st_ctime=0, st_mtime=0, st_mode=0o755),
         ),
     ):
-        result = storage.save_multiple_tickers(tdata, metadata={})
+        result = storage.save_multiple_tickers(tdata)
 
     assert result["total_tickers"] == 2
     assert write_table.called
@@ -129,7 +123,7 @@ def test_save_multiple_tickers_unsupported_strategy_raises(tmp_path):
     tdata = {"AAA": a}
 
     with pytest.raises(ValueError):
-        storage.save_multiple_tickers(tdata, metadata={})
+        storage.save_multiple_tickers(tdata)
 
 
 def test_build_parquet_filters_combinations():
@@ -267,18 +261,12 @@ def test_consolidate_existing_features_handles_no_available_and_success(
         def __init__(self):
             pass
 
-        def save_multiple_tickers(self, ticker_data, metadata):
-            return {
-                "files_created": 1,
-                "total_size_mb": 0.1,
-                "compression_ratio": 1.0,
-                "files": [],
-            }
+        def save_multiple_tickers(self, ticker_data):
+            return {"files_created": 1, "total_size_mb": 0.1, "compression_ratio": 1.0, "files": []}
 
     with (
         patch(
-            "src.data_collector.indicator_pipeline.consolidated_storage.FeatureStorage",
-            FakeStorage,
+            "src.data_collector.indicator_pipeline.consolidated_storage.FeatureStorage", FakeStorage
         ),
         patch(
             "src.data_collector.indicator_pipeline.consolidated_storage.ConsolidatedFeatureStorage",
