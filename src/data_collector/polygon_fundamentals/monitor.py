@@ -15,7 +15,8 @@ logger = get_logger(__name__)
 class FundamentalDataMonitor:
     """Monitor for fundamental data collection progress"""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize fundamental data monitor"""
         self.db_pool = get_global_pool()
 
     def get_collection_progress(self) -> Dict[str, Any]:
@@ -130,12 +131,12 @@ class FundamentalDataMonitor:
             logger.error(f"Failed to get recent activity: {e}")
             return []
 
-    def close(self):
+    def close(self) -> None:
         """Close the monitor and cleanup resources"""
         # The pool will be closed by the main application when needed
         logger.info("FundamentalDataMonitor closed")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor to ensure cleanup"""
         try:
             self.close()

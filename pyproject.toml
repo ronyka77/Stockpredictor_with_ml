@@ -81,4 +81,11 @@ markers = [
     "db: Tests that interact with databases",
     "file: Tests that read/write files",
     "performance: Performance and benchmark tests",
+    "asyncio: Tests that use asyncio for asynchronous testing",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
+    "types-requests>=2.32.4.20250913",
 ]

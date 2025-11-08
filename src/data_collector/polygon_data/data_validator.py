@@ -8,6 +8,11 @@ from pydantic import BaseModel, field_validator, field_serializer, Field, Config
 from enum import Enum
 
 from src.utils.logger import get_logger
+from src.utils.validation import (
+    SecureBaseModel, SecurityValidationError, ValidationUtils,
+    SecureNumeric, validate_input_data
+)
+from src.utils.security_audit import log_input_validation_failure
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -22,25 +27,23 @@ class MarketType(str, Enum):
     INDICES = "indices"
 
 
-class OHLCVRecord(BaseModel):
+class OHLCVRecord(SecureBaseModel):
     """
     Validated OHLCV (Open, High, Low, Close, Volume) record
 
-    This model ensures data integrity and consistency for stock market data.
+    This model ensures data integrity, consistency, and security for stock market data.
+    Extends SecureBaseModel to provide security-focused validation.
     """
 
     ticker: str = Field(..., min_length=1, max_length=10, description="Stock ticker symbol")
     timestamp: Union[datetime, date] = Field(..., description="Date/time of the record")
-    open: float = Field(..., gt=0, description="Opening price")
-    high: float = Field(..., gt=0, description="Highest price")
-    low: float = Field(..., gt=0, description="Lowest price")
-    close: float = Field(..., gt=0, description="Closing price")
+    open: float = Field(..., description="Opening price")
+    high: float = Field(..., description="Highest price")
+    low: float = Field(..., description="Lowest price")
+    close: float = Field(..., description="Closing price")
     volume: int = Field(..., ge=0, description="Trading volume")
     vwap: Optional[float] = Field(None, ge=0, description="Volume weighted average price")
     adjusted_close: Optional[float] = Field(None, gt=0, description="Adjusted closing price")
-
-    # Pydantic V2 configuration
-    model_config = ConfigDict(validate_assignment=True)
 
     @field_serializer("timestamp")
     def _serialize_timestamp(self, v, _info):
@@ -51,24 +54,42 @@ class OHLCVRecord(BaseModel):
     @field_validator("ticker")
     @classmethod
     def validate_ticker(cls, v):
-        """Validate ticker symbol format"""
-        if not v or not v.strip():
-            raise ValueError("Ticker cannot be empty")
+        """Validate ticker symbol format with security checks"""
+        try:
+            # Use secure validation from validation framework
+            return ValidationUtils.validate_ticker_symbol(v, "ticker")
+        except SecurityValidationError as e:
+            # Log security event and re-raise as ValueError for compatibility
+            log_input_validation_failure(
+                field="ticker",
+                value=str(v)[:100],
+                validation_error=str(e),
+                severity="medium"
+            )
+            raise ValueError(f"Ticker validation failed: {e.message}")
 
-        # Clean ticker symbol
-        ticker = v.strip().upper()
-
-        # Basic ticker validation (alphanumeric + some special chars)
-        if not ticker.replace(".", "").replace("-", "").replace("/", "").isalnum():
-            raise ValueError(f"Invalid ticker format: {ticker}")
-
-        return ticker
+    @field_validator("open", "high", "low", "close", mode="before")
+    @classmethod
+    def validate_price_fields(cls, v, info):
+        """Validate price fields with security checks"""
+        if v is None:
+            return v
+        try:
+            return SecureNumeric.validate_positive_number(v, field_name=info.field_name)
+        except SecurityValidationError as e:
+            log_input_validation_failure(
+                field=info.field_name,
+                value=str(v),
+                validation_error=str(e),
+                severity="low"
+            )
+            raise ValueError(f"Price validation failed for {info.field_name}: {e.message}")
 
     @field_validator("high", mode="after")
     @classmethod
     def validate_high_price(cls, v, info):
-        values = info.data or {}
         """Validate that high price is the highest among OHLC"""
+        values = info.data or {}
         if "low" in values and v < values["low"]:
             raise ValueError(f"High price ({v}) must be >= Low price ({values['low']})")
 
@@ -83,8 +104,8 @@ class OHLCVRecord(BaseModel):
     @field_validator("low", mode="after")
     @classmethod
     def validate_low_price(cls, v, info):
-        values = info.data or {}
         """Validate that low price is the lowest among OHLC"""
+        values = info.data or {}
         if "open" in values and v > values["open"]:
             raise ValueError(f"Low price ({v}) must be <= Open price ({values['open']})")
 
@@ -96,21 +117,24 @@ class OHLCVRecord(BaseModel):
     @field_validator("volume")
     @classmethod
     def validate_volume(cls, v):
-        """Validate trading volume"""
-        if v < 0:
-            raise ValueError("Volume cannot be negative")
-
-        # Check for unreasonably high volume (potential data error)
-        if v > 1e12:  # 1 trillion shares
-            raise ValueError(f"Volume appears unreasonably high: {v}")
-
-        return v
+        """Validate trading volume with security checks"""
+        try:
+            # Use secure numeric validation with reasonable bounds
+            return SecureNumeric.validate_range(v, min_val=0, max_val=1e12, field_name="volume")
+        except SecurityValidationError as e:
+            log_input_validation_failure(
+                field="volume",
+                value=str(v),
+                validation_error=str(e),
+                severity="low"
+            )
+            raise ValueError(f"Volume validation failed: {e.message}")
 
     @field_validator("vwap", mode="before")
     @classmethod
     def validate_vwap(cls, v, info):
-        values = info.data or {}
         """Validate volume weighted average price with fallback calculation"""
+        values = info.data or {}
         if v is None:
             return v
 
@@ -307,7 +331,7 @@ class DataValidator:
         self, record: Dict[str, Any], ticker: Optional[str] = None
     ) -> Optional[OHLCVRecord]:
         """
-        Validate a single OHLCV record
+        Validate a single OHLCV record with security checks
 
         Args:
             record: Raw OHLCV data dictionary
@@ -317,6 +341,9 @@ class DataValidator:
             Validated OHLCVRecord or None if validation fails
         """
         try:
+            # First, validate input data for security threats
+            validate_input_data(record, strict=True)
+
             # Transform Polygon.io format if needed
             if "t" in record:  # Polygon.io timestamp format
                 transformed_record = self._transform_polygon_record(record, ticker)
@@ -325,9 +352,22 @@ class DataValidator:
                 if ticker and "ticker" not in transformed_record:
                     transformed_record["ticker"] = ticker
 
-            validated_record = OHLCVRecord(**transformed_record)
+            # Use secure validation for the transformed record
+            validated_record = OHLCVRecord.validate_security(transformed_record)
             return validated_record
 
+        except SecurityValidationError as e:
+            # Log security threat
+            log_input_validation_failure(
+                field="ohlcv_record",
+                value=str(record)[:200],  # Limit logged data
+                validation_error=str(e),
+                severity="high" if e.security_threat else "medium"
+            )
+            self.logger.warning(f"Security validation failed for OHLCV record: {e.message}")
+            if self.strict_mode:
+                raise
+            return None
         except Exception as e:
             self.logger.warning(f"Validation failed for record: {e}")
             if self.strict_mode:
@@ -338,7 +378,7 @@ class DataValidator:
         self, records: List[Dict[str, Any]], ticker: Optional[str] = None
     ) -> Tuple[List[OHLCVRecord], DataQualityMetrics]:
         """
-        Validate a batch of OHLCV records
+        Validate a batch of OHLCV records with security checks
 
         Args:
             records: List of raw OHLCV data dictionaries
@@ -347,6 +387,25 @@ class DataValidator:
         Returns:
             Tuple of (validated_records, quality_metrics)
         """
+        # First validate the entire batch input for security threats
+        try:
+            validate_input_data({"records": records, "ticker": ticker}, strict=True)
+        except SecurityValidationError as e:
+            log_input_validation_failure(
+                field="ohlcv_batch",
+                value=f"batch_size={len(records)}, ticker={ticker}",
+                validation_error=str(e),
+                severity="high" if e.security_threat else "medium"
+            )
+            self.logger.warning(f"Security validation failed for OHLCV batch: {e.message}")
+            if self.strict_mode:
+                raise
+            # Return empty results if security validation fails
+            metrics = DataQualityMetrics()
+            metrics.total_records = len(records)
+            metrics.add_error("Batch security validation failed")
+            return [], metrics
+
         validated_records = []
         metrics = DataQualityMetrics()
         metrics.total_records = len(records)
@@ -368,6 +427,11 @@ class DataValidator:
                 else:
                     metrics.add_error(f"Record {i}: Validation failed")
 
+            except SecurityValidationError as e:
+                # Security errors are already logged in validate_ohlcv_record
+                error_msg = f"Record {i}: Security validation failed - {e.message}"
+                metrics.add_error(error_msg)
+                self.logger.warning(error_msg)
             except Exception as e:
                 error_msg = f"Record {i}: {str(e)}"
                 metrics.add_error(error_msg)
@@ -388,7 +452,7 @@ class DataValidator:
         self, polygon_record: Dict[str, Any], ticker: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Transform Polygon.io API response format to internal format
+        Transform Polygon.io API response format to internal format with security validation
 
         Args:
             polygon_record: Raw record from Polygon.io API
@@ -397,31 +461,98 @@ class DataValidator:
         Returns:
             Transformed record dictionary
         """
-        # Handle different timestamp formats
-        timestamp = polygon_record.get("t")
-        if timestamp:
-            # Polygon.io uses milliseconds since epoch
-            if isinstance(timestamp, (int, float)):
-                timestamp = datetime.fromtimestamp(timestamp / 1000)
+        try:
+            # Validate API response data for security threats
+            validate_input_data(polygon_record, strict=False)  # Less strict for API responses
 
-        # Get ticker from record or use provided ticker
-        record_ticker = polygon_record.get("T", "")
-        if not record_ticker and ticker:
-            record_ticker = ticker
+            # Handle different timestamp formats with security validation
+            timestamp = polygon_record.get("t")
+            if timestamp:
+                # Polygon.io uses milliseconds since epoch
+                if isinstance(timestamp, (int, float)):
+                    # Validate timestamp is reasonable (not too far in future/past)
+                    if timestamp > 0 and timestamp < 2147483647000:  # Valid until year 2038
+                        timestamp = datetime.fromtimestamp(timestamp / 1000)
+                    else:
+                        raise SecurityValidationError(f"Invalid timestamp value: {timestamp}", security_threat=True)
+                else:
+                    raise SecurityValidationError(f"Invalid timestamp type: {type(timestamp)}", security_threat=False)
 
-        transformed = {
-            "ticker": record_ticker,
-            "timestamp": timestamp,
-            "open": polygon_record.get("o", 0),  # Open
-            "high": polygon_record.get("h", 0),  # High
-            "low": polygon_record.get("l", 0),  # Low
-            "close": polygon_record.get("c", 0),  # Close
-            "volume": polygon_record.get("v", 0),  # Volume
-            "vwap": polygon_record.get("vw"),  # Volume weighted average price
-        }
+            # Get ticker from record or use provided ticker with validation
+            record_ticker = polygon_record.get("T", "")
+            if not record_ticker and ticker:
+                record_ticker = ticker
 
-        # Remove None values
-        return {k: v for k, v in transformed.items() if v is not None}
+            # Validate ticker symbol
+            if record_ticker:
+                record_ticker = ValidationUtils.validate_ticker_symbol(record_ticker, "polygon_ticker")
+
+            # Extract and validate numeric fields with security checks
+            transformed = {
+                "ticker": record_ticker,
+                "timestamp": timestamp,
+            }
+
+            # Validate price fields
+            price_fields = ["o", "h", "l", "c"]  # Open, High, Low, Close
+            for field, internal_name in zip(price_fields, ["open", "high", "low", "close"]):
+                value = polygon_record.get(field, 0)
+                if value is not None:
+                    # Validate as positive number
+                    try:
+                        SecureNumeric.validate_positive_number(value, f"polygon_{internal_name}")
+                        transformed[internal_name] = value
+                    except SecurityValidationError as e:
+                        self.logger.warning(f"Invalid {internal_name} price in API response: {value}")
+                        log_input_validation_failure(
+                            field=f"polygon_{internal_name}",
+                            value=str(value),
+                            validation_error=str(e),
+                            severity="low"
+                        )
+                        transformed[internal_name] = 0  # Default to 0 for invalid prices
+
+            # Validate volume
+            volume = polygon_record.get("v", 0)
+            if volume is not None:
+                try:
+                    SecureNumeric.validate_range(volume, min_val=0, max_val=1e12, field_name="polygon_volume")
+                    transformed["volume"] = volume
+                except SecurityValidationError as e:
+                    self.logger.warning(f"Invalid volume in API response: {volume}")
+                    log_input_validation_failure(
+                        field="polygon_volume",
+                        value=str(volume),
+                        validation_error=str(e),
+                        severity="low"
+                    )
+                    transformed["volume"] = 0
+
+            # Validate VWAP if present
+            vwap = polygon_record.get("vw")
+            if vwap is not None:
+                try:
+                    SecureNumeric.validate_positive_number(vwap, "polygon_vwap")
+                    transformed["vwap"] = vwap
+                except SecurityValidationError as e:
+                    self.logger.warning(f"Invalid VWAP in API response: {vwap}")
+                    # Don't include invalid VWAP - let downstream logic handle missing VWAP
+
+            # Remove None values
+            return {k: v for k, v in transformed.items() if v is not None}
+
+        except SecurityValidationError as e:
+            log_input_validation_failure(
+                field="polygon_api_response",
+                value=str(polygon_record)[:300],
+                validation_error=str(e),
+                severity="high" if e.security_threat else "medium"
+            )
+            self.logger.warning(f"Security validation failed for Polygon.io record: {e.message}")
+            raise  # Re-raise to let caller handle
+        except Exception as e:
+            self.logger.warning(f"Unexpected error transforming Polygon.io record: {e}")
+            raise SecurityValidationError(f"Failed to transform API record: {str(e)}")
 
     def _check_data_quality(self, records: List[OHLCVRecord], metrics: DataQualityMetrics) -> None:
         """
@@ -516,7 +647,7 @@ class DataValidator:
 
     def validate_ticker_info(self, ticker_data: Dict[str, Any]) -> Optional[TickerInfo]:
         """
-        Validate ticker information
+        Validate ticker information with security checks
 
         Args:
             ticker_data: Raw ticker data dictionary
@@ -525,6 +656,9 @@ class DataValidator:
             Validated TickerInfo or None if validation fails
         """
         try:
+            # First, validate input data for security threats
+            validate_input_data(ticker_data, strict=True)
+
             # Transform Polygon.io ticker format if needed
             if "ticker" in ticker_data:
                 transformed_data = {
@@ -539,8 +673,29 @@ class DataValidator:
             else:
                 transformed_data = ticker_data
 
+            # Use secure validation - TickerInfo should also extend SecureBaseModel for consistency
+            # For now, we'll validate the data manually
+            if "ticker" in transformed_data:
+                transformed_data["ticker"] = ValidationUtils.validate_ticker_symbol(
+                    transformed_data["ticker"], "ticker"
+                )
+            if "name" in transformed_data and transformed_data["name"]:
+                # Basic name sanitization
+                transformed_data["name"] = str(transformed_data["name"]).strip()
+
             return TickerInfo(**transformed_data)
 
+        except SecurityValidationError as e:
+            log_input_validation_failure(
+                field="ticker_info",
+                value=str(ticker_data)[:200],
+                validation_error=str(e),
+                severity="medium"
+            )
+            self.logger.warning(f"Security validation failed for ticker info: {e.message}")
+            if self.strict_mode:
+                raise
+            return None
         except Exception as e:
             self.logger.warning(f"Ticker validation failed: {e}")
             if self.strict_mode:

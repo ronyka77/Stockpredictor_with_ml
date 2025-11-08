@@ -14,7 +14,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def setup_fundamental_database():
+def setup_fundamental_database() -> bool:
     """Set up database tables for fundamental data"""
     # For setup operations, prefer a pooled connection but allow direct use via pool
     conn = None
@@ -73,7 +73,7 @@ def setup_fundamental_database():
         return False
 
 
-def verify_database_setup():
+def verify_database_setup() -> bool:
     """Verify that the database is properly set up using connection pool"""
     try:
         # Use helper functions for verification

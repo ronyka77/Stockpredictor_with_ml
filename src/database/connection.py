@@ -7,7 +7,7 @@ This module provides database connection functionality for the StockPredictor V1
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from typing import Iterable, Optional, Any, List, Tuple, Callable
+from typing import Iterable, Optional, Any, List, Tuple, Callable, Union, Dict
 from contextlib import contextmanager
 from typing import Generator
 import os
@@ -15,10 +15,27 @@ import threading
 import atexit
 from threading import Semaphore
 import itertools
+import time
+from dataclasses import dataclass
 
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="database")
+
+
+@dataclass
+class PoolStats:
+    """Connection pool statistics for monitoring."""
+    min_size: int
+    max_size: int
+    current_size: int
+    available_connections: int
+    used_connections: int
+    waiting_requests: int
+    total_connections_created: int
+    total_connections_destroyed: int
+    last_health_check: float
+    health_check_success: bool
 
 
 class PostgresConnection:
@@ -52,6 +69,127 @@ class PostgresConnection:
         self._pool = ThreadedConnectionPool(conninfo=dsn, min_size=minconn, max_size=maxconn)
         self._sem = Semaphore(maxconn)
         self._closed = False
+        self._last_health_check = 0.0
+        self._health_check_success = True
+        self._health_check_interval = 30.0  # Check health every 30 seconds
+
+    def _perform_health_check(self) -> bool:
+        """Perform a health check on the database connection pool.
+
+        Returns:
+            bool: True if health check passes, False otherwise.
+        """
+        try:
+            with self._pool.connection() as conn:
+                # Simple query to test connection health
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1 as health_check")
+                    result = cur.fetchone()
+                    return result is not None and result[0] == 1
+        except Exception as exc:
+            logger.warning(f"Database health check failed: {exc}")
+            return False
+
+    def check_health(self, force: bool = False) -> bool:
+        """Check database connection health, with optional forced recheck.
+
+        Args:
+            force: If True, perform health check regardless of timing.
+
+        Returns:
+            bool: True if database is healthy, False otherwise.
+        """
+        current_time = time.time()
+
+        # Skip health check if recently performed and not forced
+        if not force and (current_time - self._last_health_check) < self._health_check_interval:
+            return self._health_check_success
+
+        self._health_check_success = self._perform_health_check()
+        self._last_health_check = current_time
+
+        if not self._health_check_success:
+            logger.error("Database health check failed - connection pool may need recovery")
+        else:
+            logger.debug("Database health check passed")
+
+        return self._health_check_success
+
+    def validate_connection(self, conn: Any) -> bool:
+        """Validate a connection before use and attempt recovery if invalid.
+
+        Args:
+            conn: Database connection to validate.
+
+        Returns:
+            bool: True if connection is valid, False otherwise.
+        """
+        # Basic closed check
+        if getattr(conn, "closed", False):
+            logger.debug("Connection is closed, marking as invalid")
+            return False
+
+        # Perform health check if needed
+        if not self.check_health():
+            logger.warning("Database health check failed during connection validation")
+            return False
+
+        # Try a simple query to validate connection
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                result = cur.fetchone()
+                return result is not None and result[0] == 1
+        except Exception as exc:
+            logger.warning(f"Connection validation failed: {exc}")
+            return False
+
+    def get_pool_stats(self) -> PoolStats:
+        """Get current connection pool statistics.
+
+        Returns:
+            PoolStats: Current pool statistics.
+        """
+        # Get basic pool information
+        try:
+            # Try to get stats from psycopg_pool if available
+            if hasattr(self._pool, 'get_stats'):
+                stats = self._pool.get_stats()
+                current_size = getattr(stats, 'size', self._maxconn)
+                available = getattr(stats, 'available', 0)
+                used = current_size - available
+                waiting = getattr(stats, 'waiting', 0)
+                created = getattr(stats, 'connections_created', 0)
+                destroyed = getattr(stats, 'connections_destroyed', 0)
+            else:
+                # Fallback estimates
+                current_size = self._maxconn  # Conservative estimate
+                available = self._sem._value if hasattr(self._sem, '_value') else 0
+                used = max(0, current_size - available)
+                waiting = max(0, self._maxconn - available)
+                created = 0  # Not available
+                destroyed = 0  # Not available
+        except Exception:
+            # If stats collection fails, provide basic info
+            current_size = self._maxconn
+            available = 0
+            used = 0
+            waiting = 0
+            created = 0
+            destroyed = 0
+
+        return PoolStats(
+            min_size=self._minconn,
+            max_size=self._maxconn,
+            current_size=current_size,
+            available_connections=available,
+            used_connections=used,
+            waiting_requests=waiting,
+            total_connections_created=created,
+            total_connections_destroyed=destroyed,
+            last_health_check=self._last_health_check,
+            health_check_success=self._health_check_success
+        )
 
     @contextmanager
     def connection(self, timeout: float = 5.0) -> Generator[Any, None, None]:
@@ -76,14 +214,18 @@ class PostgresConnection:
             conn = None
             try:
                 conn = self._pool.getconn()
-                # Optional lightweight validation: ensure not closed
-                if getattr(conn, "closed", 0):
-                    # return the broken connection and get a fresh one
+                # Enhanced validation with health monitoring and recovery
+                if not self.validate_connection(conn):
+                    logger.debug("Invalid connection detected, attempting recovery")
+                    # Return the broken connection and get a fresh one
                     try:
                         self._pool.putconn(conn, close=True)
                     except Exception:
                         pass
                     conn = self._pool.getconn()
+                    # Validate the new connection
+                    if not self.validate_connection(conn):
+                        raise RuntimeError("Failed to obtain valid connection after recovery attempt")
 
                 yield conn
             except Exception as exc:
@@ -121,8 +263,9 @@ class PostgresConnection:
             try:
                 with self._pool.connection() as conn:
                     try:
-                        if getattr(conn, "closed", False):
-                            raise RuntimeError("Acquired closed connection from pool")
+                        # Enhanced validation with health monitoring
+                        if not self.validate_connection(conn):
+                            raise RuntimeError("Acquired invalid connection from pool - health check failed")
                         yield conn
                     except Exception:
                         try:
@@ -213,6 +356,46 @@ def close_global_pool() -> None:
 # --- Convenience DB helpers ---
 
 
+def check_database_health() -> bool:
+    """Check the health of the global database connection pool.
+
+    Returns:
+        bool: True if database is healthy, False otherwise.
+    """
+    try:
+        pool = get_global_pool()
+        return pool.check_health(force=True)
+    except Exception as exc:
+        logger.error(f"Database health check failed: {exc}")
+        return False
+
+
+def get_database_stats() -> PoolStats:
+    """Get statistics for the global database connection pool.
+
+    Returns:
+        PoolStats: Current pool statistics.
+    """
+    try:
+        pool = get_global_pool()
+        return pool.get_pool_stats()
+    except Exception as exc:
+        logger.error(f"Failed to get database stats: {exc}")
+        # Return basic fallback stats
+        return PoolStats(
+            min_size=1,
+            max_size=10,
+            current_size=0,
+            available_connections=0,
+            used_connections=0,
+            waiting_requests=0,
+            total_connections_created=0,
+            total_connections_destroyed=0,
+            last_health_check=time.time(),
+            health_check_success=False
+        )
+
+
 def fetch_all(query: str, params: Optional[Tuple] = None, dict_cursor: bool = True) -> List[Any]:
     """Execute a read query and return all rows.
 
@@ -236,7 +419,7 @@ def fetch_one(
         return cur.fetchone()
 
 
-def execute(query: str, params: Optional[Tuple] = None, commit: bool = True) -> None:
+def execute(query: str, params: Optional[Union[Tuple, Dict[str, Any]]] = None, commit: bool = True) -> None:
     pool = get_global_pool()
     with pool.connection() as conn:
         with conn.cursor() as cur:

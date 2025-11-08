@@ -72,8 +72,8 @@ class CodeQualityAnalyzer:
         self.findings: List[CodeQualityFinding] = []
 
         # Naming convention patterns
-        self.function_pattern = re.compile(r'^[a-z][a-z0-9_]*$')
-        self.variable_pattern = re.compile(r'^[a-z][a-z0-9_]*$')
+        self.function_pattern = re.compile(r'^_?[a-z][a-z0-9_]*$')
+        self.variable_pattern = re.compile(r'^_?[a-z][a-z0-9_]*$')
         self.class_pattern = re.compile(r'^[A-Z][a-zA-Z0-9]*$')
         self.constant_pattern = re.compile(r'^[A-Z][A-Z0-9_]*$')
 

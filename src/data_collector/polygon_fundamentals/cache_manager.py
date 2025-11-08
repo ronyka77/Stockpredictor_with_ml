@@ -18,7 +18,12 @@ logger = get_logger(__name__)
 class FundamentalCacheManager:
     """Manages cached fundamental data from JSON files"""
 
-    def __init__(self, cache_dir: str = "data/cache/fundamentals"):
+    def __init__(self, cache_dir: str = "data/cache/fundamentals") -> None:
+        """Initialize cache manager
+
+        Args:
+            cache_dir: Directory path for cache files
+        """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 

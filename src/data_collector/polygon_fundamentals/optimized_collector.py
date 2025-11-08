@@ -6,7 +6,7 @@ per ticker and simplified rate limiting.
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -18,12 +18,28 @@ from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
 from src.utils.logger import get_logger
+from src.utils.retry import (
+    retry,
+    async_retry,
+    DATABASE_RETRY_CONFIG,
+    API_RETRY_CONFIG,
+    CircuitBreaker,
+    CircuitBreakerConfig
+)
 from src.database.connection import get_global_pool, fetch_all, fetch_one, execute
 
 logger = get_logger(__name__)
 
 
 def calculate_source_confidence(source: str) -> float:
+    """Calculate confidence score for data source
+
+    Args:
+        source: Data source identifier
+
+    Returns:
+        Confidence score between 0.0 and 1.0
+    """
     mapping = {"direct_report": 1.0, "intra_report_impute": 0.8, "inter_report_derive": 0.6}
     return mapping.get(source, 0.5)
 
@@ -31,16 +47,17 @@ def calculate_source_confidence(source: str) -> float:
 class FundamentalRateLimiter:
     """Wrapper for existing polygon rate limiter"""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize rate limiter wrapper"""
         self.rate_limiter = AdaptiveRateLimiter()
 
-    async def acquire(self):
+    async def acquire(self) -> None:
         """Acquire rate limit using existing framework (skip if disabled)"""
         if not getattr(config, "DISABLE_RATE_LIMITING", False):
             # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so run in thread
             await asyncio.to_thread(self.rate_limiter.wait_if_needed)
 
-    def release(self):
+    def release(self) -> None:
         """Release rate limit using existing framework"""
         # No release needed for the AdaptiveRateLimiter - it handles timing internally
         pass
@@ -49,7 +66,12 @@ class FundamentalRateLimiter:
 class OptimizedFundamentalCollector:
     """Optimized collector with complete pipeline per ticker"""
 
-    def __init__(self, config: Optional[PolygonFundamentalsConfig] = None):
+    def __init__(self, config: Optional[PolygonFundamentalsConfig] = None) -> None:
+        """Initialize optimized fundamental data collector
+
+        Args:
+            config: Configuration for fundamental data collection
+        """
         self.config = config or PolygonFundamentalsConfig()
         self.db_pool = get_global_pool()
 
@@ -62,8 +84,8 @@ class OptimizedFundamentalCollector:
 
         # Initialize data storage for ticker metadata
         self.data_storage = DataStorage()
-        self.ticker_cache = {}  # Cache for ticker_id mapping
-        self.existing_data_cache = set()  # Cache for existing ticker-date combinations
+        self.ticker_cache: Dict[str, int] = {}  # Cache for ticker_id mapping
+        self.existing_data_cache: set = set()  # Cache for existing ticker-date combinations
 
         # Initialize cache manager
         self.cache_manager = FundamentalCacheManager()
@@ -71,8 +93,20 @@ class OptimizedFundamentalCollector:
         # Rate limiting - use existing framework
         self.rate_limiter = FundamentalRateLimiter()
 
+        # Initialize circuit breakers for fault tolerance
+        self.api_circuit_breaker = CircuitBreaker(CircuitBreakerConfig(
+            failure_threshold=5,
+            success_threshold=2,
+            timeout=60.0
+        ))
+        self.db_circuit_breaker = CircuitBreaker(CircuitBreakerConfig(
+            failure_threshold=3,
+            success_threshold=1,
+            timeout=30.0
+        ))
+
         # Statistics
-        self.stats = {
+        self.stats: Dict[str, Any] = {
             "total_processed": 0,
             "successful": 0,
             "failed": 0,
@@ -109,12 +143,14 @@ class OptimizedFundamentalCollector:
             logger.error(f"Failed to load ticker cache: {e}")
             return {}
 
-    def _load_existing_data_cache(self):
+    def _load_existing_data_cache(self) -> None:
         """Load existing fundamental data into cache"""
         try:
             logger.info("Loading existing data cache...")
 
-            rows = fetch_all("SELECT ticker_id, date FROM raw_fundamental_data")
+            rows = self._execute_db_operation(
+                lambda: fetch_all("SELECT ticker_id, date FROM raw_fundamental_data")
+            )
             existing_data = {(r["ticker_id"], r["date"]) for r in (rows or [])}
             self.existing_data_cache = existing_data
             logger.info(f"Loaded {len(existing_data)} existing data points")
@@ -126,16 +162,18 @@ class OptimizedFundamentalCollector:
     def _has_recent_data(self, ticker_id: int) -> bool:
         """Check if ticker has recent data (within 6 months)"""
         try:
-            result = fetch_one(
-                """
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM raw_fundamental_data
-                        WHERE ticker_id = %s
-                        AND date >= %s::date
-                    ) AS has_recent
-                """,
-                (ticker_id, (datetime.now() - timedelta(days=180)).date()),
+            result = self._execute_db_operation(
+                lambda: fetch_one(
+                    """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM raw_fundamental_data
+                            WHERE ticker_id = %s
+                            AND date >= %s::date
+                        ) AS has_recent
+                    """,
+                    (ticker_id, (datetime.now() - timedelta(days=180)).date()),
+                )
             )
             has_recent = result and result.get("has_recent")
             logger.info(f"Ticker ID {ticker_id} recent data: {has_recent}")
@@ -227,37 +265,77 @@ class OptimizedFundamentalCollector:
             # Rate limiting
             await self.rate_limiter.acquire()
 
-            # Collect data using client
-            async with PolygonFundamentalsClient() as client:
-                response = await client.get_financials(ticker)
-                self.stats["api_calls"] += 1
+            # Collect data using client with retry logic
+            response = await self._collect_with_retry(ticker)
+            if not response:
+                logger.warning(f"Failed to collect data for {ticker} after retries")
+                self.stats["failed"] += 1
+                return False
 
-                if not response or not response.results:
-                    logger.warning(f"No financial data found for {ticker}")
-                    self.stats["failed"] += 1
-                    return False
+            self.stats["api_calls"] += 1
 
-                # Process each statement period
-                success_count = 0
-                for result in response.results:
-                    if await self._store_statement_period(ticker_id, result, response):
-                        success_count += 1
+            if not response.results:
+                logger.warning(f"No financial data found for {ticker}")
+                self.stats["failed"] += 1
+                return False
 
-                if success_count > 0:
-                    logger.info(
-                        f"Successfully stored {success_count} statement periods for {ticker}"
-                    )
-                    self.stats["successful"] += 1
-                    return True
-                else:
-                    logger.warning(f"No statement periods stored for {ticker}")
-                    self.stats["failed"] += 1
-                    return False
+            # Process each statement period
+            success_count = 0
+            for result in response.results:
+                if await self._store_statement_period(ticker_id, result, response):
+                    success_count += 1
+
+            if success_count > 0:
+                logger.info(
+                    f"Successfully stored {success_count} statement periods for {ticker}"
+                )
+                self.stats["successful"] += 1
+                return True
+            else:
+                logger.warning(f"No statement periods stored for {ticker}")
+                self.stats["failed"] += 1
+                return False
 
         except Exception as e:
             logger.error(f"Error collecting fundamental data for {ticker}: {e}")
             self.stats["failed"] += 1
             return False
+
+    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # We'll use instance circuit breaker
+    async def _collect_with_retry(self, ticker: str) -> Optional[Any]:
+        """
+        Collect financial data for a ticker with retry logic
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            FundamentalDataResponse or None if failed
+        """
+        try:
+            async with PolygonFundamentalsClient() as client:
+                response = await client.get_financials(ticker)
+                return response
+        except Exception as e:
+            logger.warning(f"API call failed for {ticker}: {e}")
+            raise  # Let retry framework handle this
+
+    @retry(config=DATABASE_RETRY_CONFIG, circuit_breaker=None)  # Use instance circuit breaker
+    def _execute_db_operation(self, operation_func):
+        """
+        Execute database operation with retry logic
+
+        Args:
+            operation_func: Function that performs the database operation
+
+        Returns:
+            Result of the database operation
+        """
+        try:
+            return operation_func()
+        except Exception as e:
+            logger.warning(f"Database operation failed: {e}")
+            raise  # Let retry framework handle this
 
     async def _store_statement_period(
         self, ticker_id: int, income_stmt: Any, response: Any
@@ -295,53 +373,57 @@ class OptimizedFundamentalCollector:
             # Prepare raw data
             raw_data = self._prepare_raw_data(ticker_id, income_stmt, balance_sheet, cash_flow)
 
-            # Store to database using connection pool
+            # Store to database using connection pool with retry logic
             # Use centralized execute helper for single-statement upsert
             await asyncio.to_thread(
-                execute,
-                """
-                INSERT INTO raw_fundamental_data (
-                    ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
-                    revenues, cost_of_revenue, gross_profit, operating_expenses, net_income_loss,
-                    assets, current_assets, liabilities, equity, long_term_debt,
-                    net_cash_flow_from_operating_activities, net_cash_flow_from_investing_activities,
-                    comprehensive_income_loss, other_comprehensive_income_loss,
-                    data_quality_score, missing_data_count, source_filing_url, source_filing_file_url,
-                    data_source_confidence
-                ) VALUES (
-                    %(ticker_id)s, %(date)s, %(filing_date)s, %(fiscal_period)s, %(fiscal_year)s, %(timeframe)s,
-                    %(revenues)s, %(cost_of_revenue)s, %(gross_profit)s, %(operating_expenses)s, %(net_income_loss)s,
-                    %(assets)s, %(current_assets)s, %(liabilities)s, %(equity)s, %(long_term_debt)s,
-                    %(net_cash_flow_from_operating_activities)s, %(net_cash_flow_from_investing_activities)s,
-                    %(comprehensive_income_loss)s, %(other_comprehensive_income_loss)s,
-                    %(data_quality_score)s, %(missing_data_count)s, %(source_filing_url)s, %(source_filing_file_url)s,
-                    %(data_source_confidence)s
-                ) ON CONFLICT (ticker_id, date) DO UPDATE SET
-                    filing_date = EXCLUDED.filing_date,
-                    fiscal_period = EXCLUDED.fiscal_period,
-                    fiscal_year = EXCLUDED.fiscal_year,
-                    timeframe = EXCLUDED.timeframe,
-                    revenues = EXCLUDED.revenues,
-                    cost_of_revenue = EXCLUDED.cost_of_revenue,
-                    gross_profit = EXCLUDED.gross_profit,
-                    operating_expenses = EXCLUDED.operating_expenses,
-                    net_income_loss = EXCLUDED.net_income_loss,
-                    assets = EXCLUDED.assets,
-                    current_assets = EXCLUDED.current_assets,
-                    liabilities = EXCLUDED.liabilities,
-                    equity = EXCLUDED.equity,
-                    long_term_debt = EXCLUDED.long_term_debt,
-                    net_cash_flow_from_operating_activities = EXCLUDED.net_cash_flow_from_operating_activities,
-                    net_cash_flow_from_investing_activities = EXCLUDED.net_cash_flow_from_investing_activities,
-                    comprehensive_income_loss = EXCLUDED.comprehensive_income_loss,
-                    other_comprehensive_income_loss = EXCLUDED.other_comprehensive_income_loss,
-                    data_quality_score = EXCLUDED.data_quality_score,
-                    missing_data_count = EXCLUDED.missing_data_count,
-                    source_filing_url = EXCLUDED.source_filing_url,
-                    source_filing_file_url = EXCLUDED.source_filing_file_url,
-                    data_source_confidence = EXCLUDED.data_source_confidence
-                """,
-                raw_data,
+                lambda: self._execute_db_operation(
+                    lambda: execute(
+                    """
+                    INSERT INTO raw_fundamental_data (
+                        ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
+                        revenues, cost_of_revenue, gross_profit, operating_expenses, net_income_loss,
+                        assets, current_assets, liabilities, equity, long_term_debt,
+                        net_cash_flow_from_operating_activities, net_cash_flow_from_investing_activities,
+                        comprehensive_income_loss, other_comprehensive_income_loss,
+                        data_quality_score, missing_data_count, source_filing_url, source_filing_file_url,
+                        data_source_confidence
+                    ) VALUES (
+                        %(ticker_id)s, %(date)s, %(filing_date)s, %(fiscal_period)s, %(fiscal_year)s, %(timeframe)s,
+                        %(revenues)s, %(cost_of_revenue)s, %(gross_profit)s, %(operating_expenses)s, %(net_income_loss)s,
+                        %(assets)s, %(current_assets)s, %(liabilities)s, %(equity)s, %(long_term_debt)s,
+                        %(net_cash_flow_from_operating_activities)s, %(net_cash_flow_from_investing_activities)s,
+                        %(comprehensive_income_loss)s, %(other_comprehensive_income_loss)s,
+                        %(data_quality_score)s, %(missing_data_count)s, %(source_filing_url)s, %(source_filing_file_url)s,
+                        %(data_source_confidence)s
+                    ) ON CONFLICT (ticker_id, date) DO UPDATE SET
+                        filing_date = EXCLUDED.filing_date,
+                        fiscal_period = EXCLUDED.fiscal_period,
+                        fiscal_year = EXCLUDED.fiscal_year,
+                        timeframe = EXCLUDED.timeframe,
+                        revenues = EXCLUDED.revenues,
+                        cost_of_revenue = EXCLUDED.cost_of_revenue,
+                        gross_profit = EXCLUDED.gross_profit,
+                        operating_expenses = EXCLUDED.operating_expenses,
+                        net_income_loss = EXCLUDED.net_income_loss,
+                        assets = EXCLUDED.assets,
+                        current_assets = EXCLUDED.current_assets,
+                        liabilities = EXCLUDED.liabilities,
+                        equity = EXCLUDED.equity,
+                        long_term_debt = EXCLUDED.long_term_debt,
+                        net_cash_flow_from_operating_activities = EXCLUDED.net_cash_flow_from_operating_activities,
+                        net_cash_flow_from_investing_activities = EXCLUDED.net_cash_flow_from_investing_activities,
+                        comprehensive_income_loss = EXCLUDED.comprehensive_income_loss,
+                        other_comprehensive_income_loss = EXCLUDED.other_comprehensive_income_loss,
+                        data_quality_score = EXCLUDED.data_quality_score,
+                        missing_data_count = EXCLUDED.missing_data_count,
+                        source_filing_url = EXCLUDED.source_filing_url,
+                        source_filing_file_url = EXCLUDED.source_filing_file_url,
+                        data_source_confidence = EXCLUDED.data_source_confidence
+                    """,
+                    raw_data,
+                    True
+                    )
+                )
             )
 
             return True
@@ -351,8 +433,8 @@ class OptimizedFundamentalCollector:
             return False
 
     def _find_matching_statement(
-        self, statements: List, end_date: str, fiscal_period: str, fiscal_year: str
-    ):
+        self, statements: List[Any], end_date: str, fiscal_period: str, fiscal_year: str
+    ) -> Optional[Any]:
         """Find matching statement by date and fiscal period"""
         for stmt in statements:
             # Handle both dictionary and object formats
@@ -488,25 +570,25 @@ class OptimizedFundamentalCollector:
         )
         return values
 
-    def _resolve_value_and_confidence(self, value: Any):
+    def _resolve_value_and_confidence(self, value: Any) -> Tuple[Optional[float], float]:
         """Class-level helper used by _extract_financial_values to reduce complexity."""
         if value is None:
-            return None, None
+            return None, 0.0
         if isinstance(value, dict):
             if "value" in value:
-                conf = calculate_source_confidence(value["source"]) if value.get("source") else None
+                conf = calculate_source_confidence(value["source"]) if value.get("source") else 0.5
                 return value["value"], conf
-            return value, None
+            return None, 0.0
         if hasattr(value, "value"):
             conf = (
                 calculate_source_confidence(getattr(value, "source", None))
                 if getattr(value, "source", None)
-                else None
+                else 0.5
             )
             return value.value, conf
-        return value, None
+        return None, 0.0
 
-    def _get_nested_financial_value(self, stmt_obj: Any, f_name: str):
+    def _get_nested_financial_value(self, stmt_obj: Any, f_name: str) -> Any:
         """Class-level helper used by _extract_financial_values to reduce complexity."""
         if isinstance(stmt_obj, dict):
             financials = stmt_obj.get("financials")

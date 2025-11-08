@@ -34,11 +34,11 @@ DIVIDEND_INGESTION_CONFIG = {
 
 
 class TransformError(Exception):
-    pass
+    """Exception raised when dividend data transformation fails."""
 
 
 class SkipRecord(Exception):
-    pass
+    """Exception raised when a dividend record should be skipped during processing."""
 
 
 BAD_STAGING_PATH = os.getenv("DIVIDENDS_BAD_STAGING", "./dividends_staging_bad.jsonl")

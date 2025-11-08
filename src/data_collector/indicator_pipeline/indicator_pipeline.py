@@ -7,7 +7,7 @@ for all tickers in the database and store results in the technical_features tabl
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Generator
 from datetime import datetime, date
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.feature_engineering.config import config
@@ -240,12 +240,14 @@ class ProcessingStats:
 
     @property
     def success_rate(self) -> float:
+        """Calculate the success rate as a percentage of processed tickers."""
         if self.total_tickers == 0:
             return 0.0
         return (self.processed_tickers / self.total_tickers) * 100
 
     @property
     def processing_time(self) -> float:
+        """Calculate total processing time in seconds."""
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds()
         return 0.0
@@ -539,6 +541,127 @@ class BatchFeatureProcessor:
         except Exception as e:
             logger.error(f"Error in batch processing: {str(e)}")
             raise
+
+    def chunk_tickers(self, tickers: List[str], chunk_size: int) -> Generator[List[str], None, None]:
+        """
+        Split a list of tickers into chunks for memory-efficient processing
+
+        Args:
+            tickers: List of ticker symbols
+            chunk_size: Number of tickers per chunk
+
+        Yields:
+            Chunks of ticker symbols
+        """
+        for i in range(0, len(tickers), chunk_size):
+            yield tickers[i:i + chunk_size]
+
+    def process_in_chunks(
+        self,
+        tickers: List[str],
+        config: BatchJobConfig,
+        chunk_size: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Process tickers in memory-efficient chunks instead of all at once
+
+        This method processes tickers in batches to reduce memory usage and provide
+        better progress tracking for large ticker lists.
+
+        Args:
+            tickers: List of ticker symbols to process
+            config: Batch processing configuration
+            chunk_size: Number of tickers to process per chunk
+
+        Returns:
+            Dictionary with processing results and statistics
+        """
+        total_chunks = (len(tickers) + chunk_size - 1) // chunk_size
+        all_results = []
+        all_failed_tickers = []
+
+        logger.info(f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})")
+
+        chunk_count = 0
+        for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
+            chunk_count += 1
+            logger.info(f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)")
+
+            # Process chunk
+            chunk_result = self.process_batch(ticker_chunk, config)
+
+            # Aggregate results
+            all_results.extend(chunk_result["results"])
+            all_failed_tickers.extend(chunk_result.get("failed_tickers", []))
+
+            # Log chunk summary
+            logger.info(f"Chunk {chunk_count} complete: {chunk_result['successful']}/{len(ticker_chunk)} successful")
+
+        # Create final aggregated summary
+        total_successful = sum(1 for result in all_results if result["success"])
+        total_failed = len(all_results) - total_successful
+        total_features = sum(result.get("features_calculated", 0) for result in all_results if result["success"])
+
+        final_summary = {
+            "total_tickers": len(tickers),
+            "successful": total_successful,
+            "failed": total_failed,
+            "success_rate": (total_successful / len(tickers) * 100) if tickers else 0,
+            "total_features": total_features,
+            "failed_tickers": all_failed_tickers,
+            "results": all_results,
+            "chunks_processed": total_chunks,
+            "chunk_size": chunk_size,
+        }
+
+        logger.info(f"All chunks processed. Final results: {total_successful}/{len(tickers)} successful")
+        return final_summary
+
+    def process_with_callback(
+        self,
+        tickers: List[str],
+        config: BatchJobConfig,
+        callback: Any,
+        chunk_size: int = 100,
+        **callback_kwargs: Any
+    ) -> int:
+        """
+        Process tickers in chunks and call a callback function for each chunk
+
+        This method allows processing large ticker lists with custom callback logic,
+        reducing memory usage by processing in batches.
+
+        Args:
+            tickers: List of ticker symbols to process
+            config: Batch processing configuration
+            callback: Function to call for each processed chunk
+            chunk_size: Number of tickers to process per chunk before calling callback
+            **callback_kwargs: Additional keyword arguments to pass to callback
+
+        Returns:
+            Total number of tickers processed
+        """
+        total_processed = 0
+        total_chunks = (len(tickers) + chunk_size - 1) // chunk_size
+
+        logger.info(f"Processing {len(tickers)} tickers with callback in {total_chunks} chunks")
+
+        chunk_count = 0
+        for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
+            chunk_count += 1
+            logger.debug(f"Processing callback chunk {chunk_count}/{total_chunks}")
+
+            # Process the chunk
+            chunk_result = self.process_batch(ticker_chunk, config)
+
+            # Call the callback with the results
+            callback(chunk_result, chunk_number=chunk_count, **callback_kwargs)
+
+            total_processed += len(ticker_chunk)
+            logger.debug(f"Callback chunk {chunk_count} complete. Processed: {total_processed}")
+
+        logger.info(f"Callback processing complete. Total tickers processed: {total_processed}")
+        return total_processed
 
     def _save_features_to_database(
         self, ticker: str, feature_result, overwrite: bool = False
