@@ -189,7 +189,7 @@ from src.data_collector.polygon_data.data_validator import OHLCVRecord
 
 If you encounter issues:
 
-1. Use the centralized logger in `src/utils/logger.py` for consistent logging
+1. Use the centralized logger in `src/utils/core/logger.py` for consistent logging
 2. Verify configuration: `uv run python -c "from src.data_collector.polygon_data.config import config; print(config.__dict__)"`
 3. Test components individually using the module examples
 4. Check API key validity

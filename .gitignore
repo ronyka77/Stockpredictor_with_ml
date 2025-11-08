@@ -44,3 +44,4 @@ check_coverage.py
 .spec-workflow/
 predictions/
 evaluation_reports/
+docs/Guides/
