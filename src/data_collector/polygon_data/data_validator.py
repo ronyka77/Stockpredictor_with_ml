@@ -29,26 +29,18 @@ class OHLCVRecord(BaseModel):
     This model ensures data integrity and consistency for stock market data.
     """
 
-    ticker: str = Field(
-        ..., min_length=1, max_length=10, description="Stock ticker symbol"
-    )
+    ticker: str = Field(..., min_length=1, max_length=10, description="Stock ticker symbol")
     timestamp: Union[datetime, date] = Field(..., description="Date/time of the record")
     open: float = Field(..., gt=0, description="Opening price")
     high: float = Field(..., gt=0, description="Highest price")
     low: float = Field(..., gt=0, description="Lowest price")
     close: float = Field(..., gt=0, description="Closing price")
     volume: int = Field(..., ge=0, description="Trading volume")
-    vwap: Optional[float] = Field(
-        None, ge=0, description="Volume weighted average price"
-    )
-    adjusted_close: Optional[float] = Field(
-        None, gt=0, description="Adjusted closing price"
-    )
+    vwap: Optional[float] = Field(None, ge=0, description="Volume weighted average price")
+    adjusted_close: Optional[float] = Field(None, gt=0, description="Adjusted closing price")
 
     # Pydantic V2 configuration
-    model_config = ConfigDict(
-        validate_assignment=True,
-    )
+    model_config = ConfigDict(validate_assignment=True)
 
     @field_serializer("timestamp")
     def _serialize_timestamp(self, v, _info):
@@ -81,14 +73,10 @@ class OHLCVRecord(BaseModel):
             raise ValueError(f"High price ({v}) must be >= Low price ({values['low']})")
 
         if "open" in values and v < values["open"]:
-            raise ValueError(
-                f"High price ({v}) must be >= Open price ({values['open']})"
-            )
+            raise ValueError(f"High price ({v}) must be >= Open price ({values['open']})")
 
         if "close" in values and v < values["close"]:
-            raise ValueError(
-                f"High price ({v}) must be >= Close price ({values['close']})"
-            )
+            raise ValueError(f"High price ({v}) must be >= Close price ({values['close']})")
 
         return v
 
@@ -98,14 +86,10 @@ class OHLCVRecord(BaseModel):
         values = info.data or {}
         """Validate that low price is the lowest among OHLC"""
         if "open" in values and v > values["open"]:
-            raise ValueError(
-                f"Low price ({v}) must be <= Open price ({values['open']})"
-            )
+            raise ValueError(f"Low price ({v}) must be <= Open price ({values['open']})")
 
         if "close" in values and v > values["close"]:
-            raise ValueError(
-                f"Low price ({v}) must be <= Close price ({values['close']})"
-            )
+            raise ValueError(f"Low price ({v}) must be <= Close price ({values['close']})")
 
         return v
 
@@ -138,9 +122,7 @@ class OHLCVRecord(BaseModel):
                 fallback_vwap = cls._calculate_fallback_vwap(
                     values["high"], values["low"], values["close"], volume
                 )
-                logger.warning(
-                    f"Invalid VWAP {v}, using fallback calculation: {fallback_vwap}"
-                )
+                logger.warning(f"Invalid VWAP {v}, using fallback calculation: {fallback_vwap}")
                 return fallback_vwap
             else:
                 raise ValueError("VWAP must be positive")
@@ -319,9 +301,7 @@ class DataValidator:
             strict_mode: Whether to use strict validation rules
         """
         self.strict_mode = strict_mode
-        self.logger = get_logger(
-            f"{__name__}.{self.__class__.__name__}", utility="data_collector"
-        )
+        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}", utility="data_collector")
 
     def validate_ohlcv_record(
         self, record: Dict[str, Any], ticker: Optional[str] = None
@@ -443,9 +423,7 @@ class DataValidator:
         # Remove None values
         return {k: v for k, v in transformed.items() if v is not None}
 
-    def _check_data_quality(
-        self, records: List[OHLCVRecord], metrics: DataQualityMetrics
-    ) -> None:
+    def _check_data_quality(self, records: List[OHLCVRecord], metrics: DataQualityMetrics) -> None:
         """
         Perform additional data quality checks
 
@@ -488,9 +466,7 @@ class DataValidator:
             # Check for gaps > 3 days (accounting for weekends)
             gap_days = (curr_date - prev_date).days
             if gap_days > 3:
-                gap_msg = (
-                    f"Data gap: {gap_days} days between {prev_date} and {curr_date}"
-                )
+                gap_msg = f"Data gap: {gap_days} days between {prev_date} and {curr_date}"
                 metrics.add_gap(gap_msg)
 
     def _detect_price_outliers(

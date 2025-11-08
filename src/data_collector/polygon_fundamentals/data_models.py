@@ -165,9 +165,7 @@ class CashFlowStatement(FinancialStatement):
     increase_decrease_in_accounts_receivable: Optional[FinancialValue] = None
     increase_decrease_in_inventory: Optional[FinancialValue] = None
     increase_decrease_in_accounts_payable: Optional[FinancialValue] = None
-    increase_decrease_in_other_operating_assets_liabilities: Optional[
-        FinancialValue
-    ] = None
+    increase_decrease_in_other_operating_assets_liabilities: Optional[FinancialValue] = None
 
     # Investing activities
     net_cash_flow_from_investing_activities: Optional[FinancialValue] = None
@@ -304,9 +302,7 @@ class FundamentalDataResponse(BaseModel):
 
     def calculate_data_quality(self) -> float:
         """Calculate overall data quality score based on essential fields only"""
-        if not any(
-            [self.income_statements, self.balance_sheets, self.cash_flow_statements]
-        ):
+        if not any([self.income_statements, self.balance_sheets, self.cash_flow_statements]):
             return 0.0
 
         # Define essential fields for fundamental calculations
@@ -339,18 +335,14 @@ class FundamentalDataResponse(BaseModel):
                 for field_name in field_list:
                     total_essential_fields += 1
                     value = stmt_dict.get(field_name)
-                    if value is None or (
-                        isinstance(value, dict) and value.get("value") is None
-                    ):
+                    if value is None or (isinstance(value, dict) and value.get("value") is None):
                         missing_essential_fields += 1
 
         if total_essential_fields == 0:
             return 0.0
 
         # Calculate quality based on essential fields only
-        completeness = (
-            total_essential_fields - missing_essential_fields
-        ) / total_essential_fields
+        completeness = (total_essential_fields - missing_essential_fields) / total_essential_fields
         self.data_quality_score = round(completeness, 4)
         self.missing_data_count = missing_essential_fields
         self.total_fields_count = total_essential_fields
@@ -373,18 +365,14 @@ def extract_financial_value(data: Dict[str, Any], field_name: str) -> Optional[f
     return None
 
 
-def safe_divide(
-    numerator: Optional[float], denominator: Optional[float]
-) -> Optional[float]:
+def safe_divide(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
     """Safely divide two numbers, handling None and zero values"""
     if numerator is None or denominator is None or denominator == 0:
         return None
     return numerator / denominator
 
 
-def calculate_growth_rate(
-    current: Optional[float], previous: Optional[float]
-) -> Optional[float]:
+def calculate_growth_rate(current: Optional[float], previous: Optional[float]) -> Optional[float]:
     """Calculate growth rate between two values"""
     if current is None or previous is None or previous == 0:
         return None
@@ -395,12 +383,7 @@ def calculate_cagr(
     ending_value: Optional[float], beginning_value: Optional[float], periods: int
 ) -> Optional[float]:
     """Calculate Compound Annual Growth Rate"""
-    if (
-        ending_value is None
-        or beginning_value is None
-        or beginning_value <= 0
-        or periods <= 0
-    ):
+    if ending_value is None or beginning_value is None or beginning_value <= 0 or periods <= 0:
         return None
 
     try:

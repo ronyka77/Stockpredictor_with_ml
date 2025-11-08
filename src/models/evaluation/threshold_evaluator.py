@@ -24,9 +24,7 @@ class ModelProtocol(Protocol):
         """Make predictions on features"""
         ...
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "leaf_depth"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "leaf_depth") -> np.ndarray:
         """Get confidence scores for predictions"""
         ...
 
@@ -52,7 +50,7 @@ class ThresholdEvaluator:
         self.investment_amount = investment_amount
         self.custom_metrics = CustomMetrics()
         self.min_samples_percentage = 0.002
-        self.max_samples_percentage = 0.10
+        self.max_samples_percentage = 0.30
 
     def _vectorized_profit_calculation(
         self,
@@ -97,9 +95,7 @@ class ThresholdEvaluator:
                 # For percentage returns: profit = shares * current_price * actual_return
                 profits_1d = np.zeros_like(y_true_1d)
                 profits_1d[invest_mask_1d] = (
-                    shares_bought
-                    * current_prices_1d[invest_mask_1d]
-                    * y_true_1d[invest_mask_1d]
+                    shares_bought * current_prices_1d[invest_mask_1d] * y_true_1d[invest_mask_1d]
                 )
 
                 # Map back to original shape
@@ -166,13 +162,9 @@ class ThresholdEvaluator:
 
             # Calculate metrics
             total_profit = filtered_profits.sum()
-            profit_per_investment = (
-                total_profit / samples_kept if samples_kept > 0 else 0
-            )
+            profit_per_investment = total_profit / samples_kept if samples_kept > 0 else 0
 
-            custom_accuracy = self.custom_metrics.custom_accuracy(
-                filtered_y_true, filtered_y_pred
-            )
+            custom_accuracy = self.custom_metrics.custom_accuracy(filtered_y_true, filtered_y_pred)
 
             investment_decisions = filtered_y_pred > 0
             if investment_decisions.sum() > 0:
@@ -183,9 +175,7 @@ class ThresholdEvaluator:
                         <= filtered_y_pred[investment_decisions]
                     )
                 ).sum()
-                investment_success_rate = (
-                    successful_investments / investment_decisions.sum()
-                )
+                investment_success_rate = successful_investments / investment_decisions.sum()
                 profitable_investments = successful_investments
             else:
                 investment_success_rate = 0.0
@@ -266,9 +256,7 @@ class ThresholdEvaluator:
 
         return profits.sum()
 
-    def calculate_custom_accuracy(
-        self, y_true: np.ndarray, y_pred: np.ndarray
-    ) -> float:
+    def calculate_custom_accuracy(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         """
         Calculate custom accuracy for filtered predictions using conservative prediction logic
 
@@ -323,9 +311,7 @@ class ThresholdEvaluator:
                 (y_true[investment_decisions] > 0)
                 & (y_true[investment_decisions] <= y_pred[investment_decisions])
             ).sum()
-            investment_success_rate = (
-                successful_investments / investment_decisions.sum()
-            )
+            investment_success_rate = successful_investments / investment_decisions.sum()
             profitable_investments = successful_investments
         else:
             investment_success_rate = 0.0
@@ -342,7 +328,7 @@ class ThresholdEvaluator:
     def optimize_prediction_threshold(
         self,
         model: ModelProtocol,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         confidence_method: str = "simple",
@@ -354,7 +340,7 @@ class ThresholdEvaluator:
 
         Args:
             model: Model instance with predict and get_prediction_confidence methods
-            X_test: Test features (unseen data)
+            x_test: Test features (unseen data)
             y_test: Test targets
             current_prices_test: Current prices for test set
             confidence_method: Method for calculating confidence scores
@@ -372,7 +358,7 @@ class ThresholdEvaluator:
         )
 
         try:
-            test_predictions = model.predict(X_test)
+            test_predictions = model.predict(x_test)
             logger.info(f"Predictions shape: {test_predictions.shape}")
             logger.info(
                 f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]"
@@ -386,9 +372,7 @@ class ThresholdEvaluator:
         min_required_diversity = len(test_predictions) / 100
 
         if len(unique_predictions) < min_required_diversity:
-            logger.error(
-                "🚨 CRITICAL: Model produced insufficient prediction diversity."
-            )
+            logger.error("🚨 CRITICAL: Model produced insufficient prediction diversity.")
             logger.error(f"   Unique predictions: {len(unique_predictions)}")
             logger.error(f"   Minimum required: {min_required_diversity:.1f}")
             logger.error(
@@ -402,9 +386,7 @@ class ThresholdEvaluator:
 
         # Phase 2: Get confidence scores
         try:
-            test_confidence = model.get_prediction_confidence(
-                X_test, method=confidence_method
-            )
+            test_confidence = model.get_prediction_confidence(x_test, method=confidence_method)
             logger.info(f"Confidence shape: {test_confidence.shape}")
             logger.info(
                 f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]"
@@ -414,48 +396,31 @@ class ThresholdEvaluator:
             )
         except Exception as e:
             logger.error(f"❌ Failed to get confidence scores: {e}")
-            return {
-                "status": "failed",
-                "message": f"Confidence calculation failed: {e}",
-            }
+            return {"status": "failed", "message": f"Confidence calculation failed: {e}"}
 
         # Validate confidence scores
         if np.isnan(test_confidence).any():
             logger.error("❌ Confidence scores contain NaN values")
-            return {
-                "status": "failed",
-                "message": "Confidence scores contain NaN values",
-            }
+            return {"status": "failed", "message": "Confidence scores contain NaN values"}
 
         if np.isinf(test_confidence).any():
             logger.error("❌ Confidence scores contain infinite values")
-            return {
-                "status": "failed",
-                "message": "Confidence scores contain infinite values",
-            }
+            return {"status": "failed", "message": "Confidence scores contain infinite values"}
 
         # For percentage returns: invest when predicted return > 0
         test_predictions_1d = (
-            test_predictions.flatten()
-            if test_predictions.ndim > 1
-            else test_predictions
+            test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
         )
         invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
         # logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")
         if invest_mask.sum() > 0:
             # Ensure y_test.values and test_predictions are 1D
-            y_test_1d = (
-                y_test.values.flatten() if y_test.values.ndim > 1 else y_test.values
-            )
+            y_test_1d = y_test.values.flatten() if y_test.values.ndim > 1 else y_test.values
             test_predictions_1d = (
-                test_predictions.flatten()
-                if test_predictions.ndim > 1
-                else test_predictions
+                test_predictions.flatten() if test_predictions.ndim > 1 else test_predictions
             )
-            actual_vs_predicted = (
-                y_test_1d[invest_mask] >= test_predictions_1d[invest_mask]
-            )
+            actual_vs_predicted = y_test_1d[invest_mask] >= test_predictions_1d[invest_mask]
             logger.info(
                 f"   Conservative success rate (all samples): {actual_vs_predicted.sum()}/{invest_mask.sum()} ({actual_vs_predicted.sum() / invest_mask.sum() * 100:.1f}%)"
             )
@@ -467,11 +432,7 @@ class ThresholdEvaluator:
 
         # Use vectorized threshold testing
         results_df = self._vectorized_threshold_testing(
-            test_predictions,
-            test_confidence,
-            y_test.values,
-            current_prices_test,
-            thresholds,
+            test_predictions, test_confidence, y_test.values, current_prices_test, thresholds
         )
 
         # Phase 4: Analyze results
@@ -494,22 +455,16 @@ class ThresholdEvaluator:
         best_idx = results_df["test_profit_per_investment"].idxmax()
         best_result = results_df.loc[best_idx]
 
-        logger.info(
-            "🎯 Threshold Optimization Results (Optimized for Profit Per Investment):"
-        )
+        logger.info("🎯 Threshold Optimization Results (Optimized for Profit Per Investment):")
         logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
         logger.info(
             f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})"
         )
-        logger.info(
-            f"   Investment success rate: {best_result['investment_success_rate']:.3f}"
-        )
+        logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
         logger.info(
             f"   Test profit per investment: ${best_result['test_profit_per_investment']:.2f}"
         )
-        logger.info(
-            f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}"
-        )
+        logger.info(f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
         logger.info(f"   Total test profit: ${best_result['test_profit']:.2f}")
         logger.info(
             f"   Average confidence of selected predictions: {best_result['average_confidence']:.3f}"
@@ -558,14 +513,17 @@ class ThresholdEvaluator:
         all_confidence = model.get_prediction_confidence(X, method=confidence_method)
 
         # Apply centralized ThresholdPolicy
-        from src.models.evaluation.threshold_policy import (
-            ThresholdPolicy,
-            ThresholdConfig,
-        )
+        from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
 
         policy = ThresholdPolicy()
         cfg = ThresholdConfig(method="ge", value=float(threshold))
         policy_result = policy.compute_mask(all_confidence, X, cfg)
+        if policy_result is None:
+            raise ValueError("ThresholdPolicy.compute_mask returned None")
+        from typing import cast
+        from src.models.evaluation.threshold_policy import ThresholdResult
+
+        policy_result = cast(ThresholdResult, policy_result)
         high_confidence_mask = policy_result.mask
 
         # Filter predictions
@@ -594,16 +552,14 @@ class ThresholdEvaluator:
         logger.info(
             f"   Samples kept: {len(filtered_predictions)}/{len(X)} ({result['samples_kept_ratio']:.1%})"
         )
-        logger.info(
-            f"   Average confidence of kept samples: {filtered_confidence.mean():.3f}"
-        )
+        logger.info(f"   Average confidence of kept samples: {filtered_confidence.mean():.3f}")
 
         return result
 
     def evaluate_threshold_performance(
         self,
         model: ModelProtocol,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         threshold: float,
@@ -614,7 +570,7 @@ class ThresholdEvaluator:
 
         Args:
             model: Model instance with predict and get_prediction_confidence methods
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
             current_prices_test: Current prices for test set
             threshold: Confidence threshold
@@ -625,7 +581,7 @@ class ThresholdEvaluator:
         """
         # Get filtered predictions
         prediction_result = self.predict_with_threshold(
-            model, X_test, threshold, confidence_method, return_confidence=True
+            model, x_test, threshold, confidence_method, return_confidence=True
         )
 
         # Extract filtered data
@@ -652,9 +608,7 @@ class ThresholdEvaluator:
         profit_per_investment = total_profit / len(filtered_predictions)
 
         # Custom accuracy calculation
-        custom_accuracy = self.calculate_custom_accuracy(
-            filtered_actual, filtered_predictions
-        )
+        custom_accuracy = self.calculate_custom_accuracy(filtered_actual, filtered_predictions)
 
         # Investment decision metrics
         investment_metrics = self.calculate_investment_metrics(
@@ -683,7 +637,7 @@ class ThresholdEvaluator:
             "investment_success_rate": investment_metrics["investment_success_rate"],
             "profitable_investments": investment_metrics["profitable_investments"],
             # Detailed breakdown
-            "total_test_samples": len(X_test),
+            "total_test_samples": len(x_test),
             "filtered_samples": len(filtered_predictions),
             "avg_confidence_all": prediction_result["all_confidence"].mean(),
             "avg_confidence_filtered": prediction_result["filtered_confidence"].mean(),
@@ -694,13 +648,9 @@ class ThresholdEvaluator:
             f"   Samples evaluated: {results['samples_evaluated']}/{results['total_test_samples']} ({results['samples_kept_ratio']:.1%})"
         )
         logger.info(f"   Total profit: ${results['total_profit']:.2f}")
-        logger.info(
-            f"   Profit per investment: ${results['profit_per_investment']:.2f}"
-        )
+        logger.info(f"   Profit per investment: ${results['profit_per_investment']:.2f}")
         logger.info(f"   Custom accuracy: {results['custom_accuracy']:.3f}")
-        logger.info(
-            f"   Investment success rate: {results['investment_success_rate']:.3f}"
-        )
+        logger.info(f"   Investment success rate: {results['investment_success_rate']:.3f}")
         logger.info(f"   Traditional R²: {results['r2_score']:.4f}")
 
         return results
@@ -765,9 +715,7 @@ class ThresholdEvaluator:
 
         # Log accuracy and precision metrics
         logger.info("📊 Prediction Accuracy & Conservative Investment Metrics:")
-        logger.info(
-            f"   Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)"
-        )
+        logger.info(f"   Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
         logger.info(f"   Total predictions: {total_predictions}")
         logger.info(
             f"   Positive predictions: {positive_predictions} ({positive_prediction_rate:.1f}%)"
@@ -794,9 +742,7 @@ class ThresholdEvaluator:
         logger.info(
             f"   Profitable investments: {total_profitable_count} ({(total_profitable_count / len(profits) * 100):.1f}%)"
         )
-        logger.info(
-            f"   Average profit per investment: ${average_profit_per_investment:.2f}"
-        )
+        logger.info(f"   Average profit per investment: ${average_profit_per_investment:.2f}")
 
         # Return total profit from selected investments
         total_profit = profits.sum()

@@ -10,6 +10,9 @@ Also exposes fit with (X, y, X_val, y_val) by reconstructing label columns
 for AutoGluon training.
 """
 
+import gc
+import os
+import psutil
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -17,12 +20,16 @@ import pandas as pd
 from autogluon.tabular import TabularPredictor
 from autogluon.core.metrics import make_scorer
 
+
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ModelProtocol, ThresholdEvaluator
 from src.utils.logger import get_logger
 
 
 logger = get_logger(__name__)
+
+# Standardized error messages
+PREDICTOR_NOT_TRAINED = "Predictor not trained/loaded"
 
 
 def default_mean_diff(y_true, y_pred, *args, **kwargs):
@@ -76,9 +83,7 @@ mae_scorer = make_scorer(
 
 
 class AutoGluonModel(BaseModel, ModelProtocol):
-    def __init__(
-        self, *, model_name: str = "autogluon", config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, *, model_name: str = "autogluon", config: Optional[Dict[str, Any]] = None):
         super().__init__(model_name=model_name, config=config or {})
         self.predictor: Optional[TabularPredictor] = None
         self.feature_names: Optional[list[str]] = None
@@ -93,7 +98,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        X_val: Optional[pd.DataFrame] = None,
+        x_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
         **kwargs,
     ) -> "AutoGluonModel":
@@ -103,28 +108,35 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         train_df = X.copy()
 
         train_df[label] = y.values
+        # Backwards-compatible handling for callers using the old keyword name `X_val`
+        if x_val is None and "X_val" in kwargs:
+            x_val = kwargs.pop("X_val")
+        if y_val is None and "y_val" in kwargs:
+            y_val = kwargs.pop("y_val")
+
         valid_df = None
-        if X_val is not None and y_val is not None:
-            valid_df = X_val.copy()
+        if x_val is not None and y_val is not None:
+            valid_df = x_val.copy()
             valid_df[label] = y_val.values
 
         hyperparams = {
-            # "FASTAI": {},
-            "GBM": {"verbosity": -1},
-            "XGB": {"verbosity": 0},
+            "FASTAI": {},
+            "GBM": {},
+            "XGB": {},
             # "TABM": {},
-            "RF": {"verbose": 0},
-            # "CAT": {'task_type': 'GPU'}
+            "RF": {},
+            "CAT": {"task_type": "GPU"},
             # "REALMLP": {},
         }
 
         logger.info(f"Training AutoGluon with label={label}, eval_metric={eval_metric}")
         self.predictor = TabularPredictor(
-            label=label,
-            eval_metric=eval_metric,
-            problem_type="regression",
-            verbosity=2,
+            label=label, eval_metric=eval_metric, problem_type="regression", verbosity=2
         )
+        collected = gc.collect()
+        logger.info(f"Garbage collected: {collected}")
+        proc = psutil.Process(os.getpid())
+        logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
 
         self.predictor.fit(
             time_limit=39600,
@@ -134,12 +146,10 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             hyperparameters=hyperparams,
             dynamic_stacking=False,
             num_gpus=1,
-            # auto_stack=True,
             num_stack_levels=2,
             num_bag_folds=4,
             use_bag_holdout=True,
-            fit_strategy="sequential",
-            ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+            ag_args_ensemble={"fold_fitting_strategy": "sequential"},
         )
         summary = self.predictor.fit_summary(show_plot=True)
         logger.info(summary)
@@ -154,7 +164,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
     # ModelProtocol requirement
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
         if self.feature_names is not None:
             X = X[self.feature_names]
 
@@ -166,11 +176,9 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         return preds.to_numpy() if hasattr(preds, "to_numpy") else np.asarray(preds)
 
     # ModelProtocol requirement
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "margin"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "margin") -> np.ndarray:
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
 
         if self.feature_names is not None:
             X = X[self.feature_names]
@@ -182,9 +190,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 p = p.to_numpy() if hasattr(p, "to_numpy") else np.asarray(p)
                 return p
             except Exception as e:
-                logger.warning(
-                    f"Failed to predict with model {self.selected_model_name}: {e}"
-                )
+                logger.warning(f"Failed to predict with model {self.selected_model_name}: {e}")
                 return np.ones(len(X))
         if method == "simple":
             base = self.predict(X)
@@ -197,9 +203,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
                 max_val = float(np.max(base_arr))
 
             # Determine output dtype: preserve float dtype, otherwise cast to float
-            out_dtype = (
-                base_arr.dtype if np.issubdtype(base_arr.dtype, np.floating) else float
-            )
+            out_dtype = base_arr.dtype if np.issubdtype(base_arr.dtype, np.floating) else float
 
             if np.isclose(max_val, 0):
                 # Return zeros with same shape and an appropriate dtype
@@ -212,46 +216,9 @@ class AutoGluonModel(BaseModel, ModelProtocol):
 
         raise ValueError(f"Unsupported confidence method: {method}")
 
-    # MLflow logging helper
-    def save_to_mlflow(
-        self,
-        params: Dict[str, Any],
-        metrics: Dict[str, float],
-        *,
-        experiment_name: Optional[str] = None,
-    ) -> str:
-        self.start_mlflow_run(experiment_name or f"stock_prediction_{self.model_name}")
-        try:
-            self.log_params(params)
-            self.log_metrics(metrics)
-            # Log leaderboard
-            try:
-                leaderboard = self.predictor.leaderboard(silent=True)
-                leaderboard_path = "leaderboard.csv"
-                leaderboard.to_csv(leaderboard_path, index=False)
-                self.mlflow_integration.log_artifact(leaderboard_path)
-            except Exception as e:
-                logger.warning(f"Failed to log leaderboard: {e}")
-
-            # Persist full AutoGluon predictor as artifact for downstream loading
-            try:
-                save_dir = "autogluon_model"
-                self.predictor.save(save_dir)
-                import mlflow as _mlflow
-
-                _mlflow.log_artifacts(save_dir, artifact_path="autogluon_model")
-                logger.info(
-                    "Logged AutoGluon predictor artifacts under autogluon_model/"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to log AutoGluon model artifacts: {e}")
-        finally:
-            self.end_mlflow_run()
-        return self.run_id or ""
-
     def run_threshold_evaluation(
         self,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         confidence_method: str = "margin",
         threshold_range: tuple = (0.01, 0.99),
@@ -263,17 +230,17 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         Returns the evaluator results dict.
         """
         if not self.predictor:
-            raise ValueError("Predictor not trained/loaded")
+            raise ValueError(PREDICTOR_NOT_TRAINED)
 
         evaluator = ThresholdEvaluator(investment_amount=investment_amount)
 
         # Determine current prices
-        if "close" in X_test.columns:
-            current_prices = X_test["close"].to_numpy()
-        elif "current_price" in X_test.columns:
-            current_prices = X_test["current_price"].to_numpy()
+        if "close" in x_test.columns:
+            current_prices = x_test["close"].to_numpy()
+        elif "current_price" in x_test.columns:
+            current_prices = x_test["current_price"].to_numpy()
         else:
-            current_prices = np.ones(len(X_test))
+            current_prices = np.ones(len(x_test))
 
         logger.info(
             f"Running threshold evaluation: method={confidence_method}, thresholds={str(threshold_range)}, n={n_thresholds}"
@@ -281,7 +248,7 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         try:
             results = evaluator.optimize_prediction_threshold(
                 model=self,
-                X_test=X_test,
+                x_test=x_test,
                 y_test=y_test,
                 current_prices_test=current_prices,
                 confidence_method=confidence_method,

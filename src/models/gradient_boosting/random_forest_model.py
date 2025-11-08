@@ -12,6 +12,7 @@ import ast
 import numpy as np
 import pandas as pd
 import optuna
+import mlflow
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
@@ -59,32 +60,41 @@ class RandomForestModel(BaseModel):
         params.update(kwargs)
         # Remove non-sklearn params
         params.pop("prediction_horizon", None)
+        # Set default hyperparameters if not specified
+        params.setdefault("min_samples_leaf", 1)
+        params.setdefault("max_features", "sqrt")
+        params.setdefault("random_state", 42)
         return RandomForestRegressor(**params)
 
-    def fit(self, X, y, X_val=None, y_val=None, **kwargs):
+    def fit(
+        self,
+        x: pd.DataFrame,
+        y: pd.Series,
+        x_val: Optional[pd.DataFrame] = None,
+        y_val: Optional[pd.Series] = None,
+        **kwargs,
+    ):
         """
         Train the Random Forest model
         Args:
-            X: Training features
+            x: Training features
             y: Training targets
-            X_val: Validation features (optional)
+            x_val: Validation features (optional)
             y_val: Validation targets (optional)
             **kwargs: Additional training parameters
         Returns:
             Self for method chaining
         """
         self.model = self._create_model(**kwargs)
-        self.model.fit(X, y)
+        self.model.fit(x, y)
         self.is_trained = True
-        self.feature_names = list(X.columns)
+        self.feature_names = list(x.columns)
         if hasattr(self.model, "feature_importances_"):
             self.feature_importance = self.model.feature_importances_
         else:
             self.feature_importance = None
         self.training_history = {}
-        logger.info(
-            f"RandomForestModel trained on {X.shape[0]} samples, {X.shape[1]} features."
-        )
+        logger.info(f"RandomForestModel trained on {x.shape[0]} samples, {x.shape[1]} features.")
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
@@ -109,9 +119,7 @@ class RandomForestModel(BaseModel):
         Raises:
             NotImplementedError
         """
-        raise NotImplementedError(
-            "RandomForestModel (regression) does not support predict_proba."
-        )
+        raise NotImplementedError("RandomForestModel (regression) does not support predict_proba.")
 
     def get_feature_importance(self) -> Optional[pd.DataFrame]:
         """
@@ -127,9 +135,7 @@ class RandomForestModel(BaseModel):
         logger.info("Feature importance extracted from RandomForestModel.")
         return importance_df
 
-    def get_prediction_confidence(
-        self, X: pd.DataFrame, method: str = "variance"
-    ) -> np.ndarray:
+    def get_prediction_confidence(self, X: pd.DataFrame, method: str = "variance") -> np.ndarray:
         """
         Calculate confidence scores for predictions using variance across trees (default).
         Args:
@@ -180,14 +186,12 @@ class RandomForestModel(BaseModel):
         metrics = {}
         if current_prices is not None:
             try:
-                threshold_results = (
-                    self.threshold_evaluator.optimize_prediction_threshold(
-                        model=self,
-                        X_test=X,
-                        y_test=y,
-                        current_prices_test=current_prices,
-                        confidence_method=confidence_method,
-                    )
+                threshold_results = self.threshold_evaluator.optimize_prediction_threshold(
+                    model=self,
+                    x_test=X,
+                    y_test=y,
+                    current_prices_test=current_prices,
+                    confidence_method=confidence_method,
                 )
                 if threshold_results.get("status") == "success":
                     best_result = threshold_results["best_result"]
@@ -195,9 +199,7 @@ class RandomForestModel(BaseModel):
                         {
                             "threshold_optimized": True,
                             "optimal_threshold": threshold_results["optimal_threshold"],
-                            "threshold_profit": best_result.get(
-                                "test_profit_per_investment", 0.0
-                            ),
+                            "threshold_profit": best_result.get("test_profit_per_investment", 0.0),
                             "threshold_custom_accuracy": best_result.get(
                                 "test_custom_accuracy", 0.0
                             ),
@@ -228,8 +230,16 @@ class RandomForestModel(BaseModel):
             self.experiment_name = experiment_name
         self.mlflow_integration.setup_experiment(self.experiment_name)
         if self.run_id is None:
-            run = self.mlflow_integration.start_run()
-            self.run_id = run.info.run_id
+            # Check if there's already an active run
+            active_run = mlflow.active_run()
+            if active_run is not None:
+                # Use the existing active run
+                self.run_id = active_run.info.run_id
+                logger.info(f"Using existing active MLflow run: {self.run_id}")
+            else:
+                # Start a new run
+                run = self.mlflow_integration.start_run()
+                self.run_id = run.info.run_id
         params = {
             "model_name": self.model_name,
             "config": str(self.config),
@@ -264,9 +274,7 @@ class RandomForestModel(BaseModel):
             parsed_config = ast.literal_eval(config_str) if config_str != "{}" else {}
             self.config = parsed_config if isinstance(parsed_config, dict) else {}
         except (ValueError, SyntaxError):
-            logger.warning(
-                "Failed to parse config from MLflow params; using empty dict"
-            )
+            logger.warning("Failed to parse config from MLflow params; using empty dict")
             self.config = {}
 
         # Secure parsing for feature_names
@@ -275,13 +283,9 @@ class RandomForestModel(BaseModel):
             parsed_features = (
                 ast.literal_eval(feature_names_str) if feature_names_str != "[]" else []
             )
-            self.feature_names = (
-                parsed_features if isinstance(parsed_features, list) else None
-            )
+            self.feature_names = parsed_features if isinstance(parsed_features, list) else None
         except (ValueError, SyntaxError):
-            logger.warning(
-                "Failed to parse feature_names from MLflow params; leaving as None"
-            )
+            logger.warning("Failed to parse feature_names from MLflow params; leaving as None")
             self.feature_names = []
         self.is_trained = params.get("is_trained", "True") == "True"
         self.run_id = run_id
@@ -303,13 +307,7 @@ class RandomForestModel(BaseModel):
             and self.best_trial_model is not None,
             "model_updated": self.model is not None,
         }
-        if (
-            hasattr(self, "best_threshold_info")
-            and self.best_threshold_info is not None
-        ):
-            base_info["threshold_optimization"] = self.best_threshold_info
-        else:
-            base_info["threshold_optimization"] = None
+        base_info["threshold_optimization"] = getattr(self, "best_threshold_info", None)
         return base_info
 
     def finalize_best_model(self) -> None:
@@ -320,26 +318,16 @@ class RandomForestModel(BaseModel):
         if hasattr(self, "best_trial_model") and self.best_trial_model is not None:
             self.model = self.best_trial_model.model
             self.feature_names = self.best_trial_model.feature_names
-            if (
-                hasattr(self, "best_threshold_info")
-                and self.best_threshold_info is not None
-            ):
-                if self.best_threshold_info.get("optimal_threshold") is not None:
-                    self.optimal_threshold = self.best_threshold_info[
-                        "optimal_threshold"
-                    ]
-                    self.confidence_method = getattr(
-                        self, "confidence_method", "variance"
-                    )
-            logger.info(
-                f"Best model finalized with score: {getattr(self, 'best_score', None)}"
-            )
+
+            best_threshold = getattr(self, "best_threshold_info", None)
+            if best_threshold and best_threshold.get("optimal_threshold") is not None:
+                self.optimal_threshold = best_threshold["optimal_threshold"]
+                self.confidence_method = getattr(self, "confidence_method", "variance")
+
+            logger.info(f"Best model finalized with score: {getattr(self, 'best_score', None)}")
             logger.info(f"Best parameters: {getattr(self, 'best_trial_params', None)}")
-            if (
-                hasattr(self, "best_threshold_info")
-                and self.best_threshold_info is not None
-            ):
-                logger.info(f"Best threshold info: {self.best_threshold_info}")
+            if best_threshold:
+                logger.info(f"Best threshold info: {best_threshold}")
         else:
             logger.warning("No best model found to finalize")
 
@@ -360,7 +348,7 @@ class RandomForestModel(BaseModel):
             f"Starting feature selection to find the best {n_features_to_select} features..."
         )
         prelim_model = RandomForestRegressor(
-            n_estimators=100, random_state=42, n_jobs=-1
+            n_estimators=100, random_state=42, n_jobs=-1, min_samples_leaf=1, max_features="sqrt"
         )
         prelim_model.fit(X, y)
         importance_df = pd.DataFrame(
@@ -378,27 +366,78 @@ class RandomForestModel(BaseModel):
                 )
                 removed_feature = selected_features.pop()
                 selected_features.append(column)
-                logger.info(
-                    f"   Removed '{removed_feature}' to make space for '{column}'."
-                )
-        logger.info(
-            f"Feature selection complete. Selected {len(selected_features)} features."
-        )
+                logger.info(f"   Removed '{removed_feature}' to make space for '{column}'.")
+        logger.info(f"Feature selection complete. Selected {len(selected_features)} features.")
         return selected_features
 
-    def objective(
+    def _evaluate_trial_on_test_set(
+        self, model_instance, x_test_df: pd.DataFrame, y_true: pd.Series
+    ):
+        """Evaluate a trial model on the provided test set and return (metric, threshold_results).
+
+        This helper isolates threshold optimization logic to keep the objective function small.
+        """
+        current_prices_local = x_test_df["close"].values if "close" in x_test_df.columns else None
+
+        if current_prices_local is not None:
+            results = model_instance.threshold_evaluator.optimize_prediction_threshold(
+                model=model_instance,
+                x_test=x_test_df,
+                y_test=y_true,
+                current_prices_test=current_prices_local,
+                confidence_method="variance",
+            )
+            if results.get("status") == "success":
+                best_res = results["best_result"]
+                return best_res.get("test_profit_per_investment", 0.0), results
+            return model_instance.model.score(x_test_df, y_true), results
+
+        return model_instance.model.score(x_test_df, y_true), None
+
+    def _create_and_evaluate_trial(
         self,
-        X_train: pd.DataFrame,
+        trial,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
+    ):
+        """Create a RandomForest trial model, train it, and evaluate on test set.
+
+        Returns (metric, trial_model, params, threshold_results).
+        """
+        params = {
+            "n_estimators": trial.suggest_int("n_estimators", 50, 500),
+            "max_depth": trial.suggest_int("max_depth", 3, 20),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 20),
+            "max_features": trial.suggest_categorical(
+                "max_features", ["auto", "sqrt", "log2", None]
+            ),
+            "random_state": 42,
+            "n_jobs": -1,
+        }
+
+        trial_model = RandomForestModel(
+            model_name=f"random_forest_trial_{trial.number}",
+            config=params,
+            prediction_horizon=self.prediction_horizon,
+            threshold_evaluator=self.threshold_evaluator,
+        )
+        trial_model.fit(x_train, y_train)
+
+        metric, threshold_results = self._evaluate_trial_on_test_set(trial_model, x_test, y_test)
+        return metric, trial_model, params, threshold_results
+
+    def objective(
+        self, x_train: pd.DataFrame, y_train: pd.Series, x_test: pd.DataFrame, y_test: pd.Series
     ) -> callable:
         """
         Create Optuna objective function for RandomForestRegressor hypertuning with optional threshold optimization.
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
         Returns:
             Objective function for Optuna optimization
@@ -421,54 +460,13 @@ class RandomForestModel(BaseModel):
                 "n_jobs": -1,
             }
             try:
-                trial_model = RandomForestModel(
-                    model_name=f"random_forest_trial_{trial.number}",
-                    config=params,
-                    prediction_horizon=self.prediction_horizon,
-                    threshold_evaluator=self.threshold_evaluator,
+                metric, trial_model, params, threshold_results = self._create_and_evaluate_trial(
+                    trial, x_train, y_train, x_test, y_test
                 )
-                trial_model.fit(X_train, y_train)
-                # Optionally run threshold optimization if current_prices available in X_test
-                if "close" in X_test.columns:
-                    current_prices = X_test["close"].values
-                else:
-                    current_prices = None
-                threshold_results = None
-                metric = None
-                if current_prices is not None:
-                    threshold_results = (
-                        trial_model.threshold_evaluator.optimize_prediction_threshold(
-                            model=trial_model,
-                            X_test=X_test,
-                            y_test=y_test,
-                            current_prices_test=current_prices,
-                            confidence_method="variance",
-                        )
-                    )
-                    if threshold_results.get("status") == "success":
-                        best_result = threshold_results["best_result"]
-                        metric = best_result.get("test_profit_per_investment", 0.0)
-                    else:
-                        metric = trial_model.model.score(X_test, y_test)
-                else:
-                    metric = trial_model.model.score(X_test, y_test)
                 if metric > self.best_score:
-                    self.best_score = metric
-                    self.best_trial_model = trial_model
-                    self.best_trial_params = params.copy()
-                    self.best_threshold_info = (
-                        threshold_results if threshold_results is not None else None
+                    self._update_best_trial(
+                        metric, trial_model, params, threshold_results, trial.number
                     )
-                    self.model = trial_model.model
-                    self.feature_names = trial_model.feature_names
-                    logger.info(f"NEW BEST TRIAL {trial.number}: Score = {metric:.4f}")
-                    if (
-                        threshold_results
-                        and threshold_results.get("status") == "success"
-                    ):
-                        logger.info(
-                            f"   Optimal threshold: {threshold_results['optimal_threshold']}"
-                        )
                 else:
                     logger.info(
                         f"Trial {trial.number}: Score = {metric:.4f} (Best: {self.best_score:.4f})"
@@ -479,6 +477,20 @@ class RandomForestModel(BaseModel):
                 return -1e6
 
         return objective
+
+    def _update_best_trial(
+        self, metric, trial_model, params, threshold_results, trial_number: int
+    ) -> None:
+        """Centralize updating state and logging when a new best trial is found."""
+        self.best_score = metric
+        self.best_trial_model = trial_model
+        self.best_trial_params = params.copy()
+        self.best_threshold_info = threshold_results if threshold_results is not None else None
+        self.model = trial_model.model
+        self.feature_names = trial_model.feature_names
+        logger.info(f"NEW BEST TRIAL {trial_number}: Score = {metric:.4f}")
+        if threshold_results and threshold_results.get("status") == "success":
+            logger.info(f"   Optimal threshold: {threshold_results['optimal_threshold']}")
 
     @staticmethod
     def load_and_prepare_data(
@@ -498,7 +510,7 @@ class RandomForestModel(BaseModel):
             clean_features: Whether to clean features
             **kwargs: Additional arguments for data preparation
         Returns:
-            dict: Contains X_train, X_test, y_train, y_test, and metadata
+            dict: Contains x_train, x_test, y_train, y_test, and metadata
         Note:
             If categorical features are present, ensure they are encoded (e.g., one-hot or ordinal) as required by sklearn.
             This method does not perform encoding itself but expects the pipeline or user to handle it per project convention.
@@ -522,13 +534,10 @@ def main():
     # 1. Data loading
     logger.info("Loading and preparing data...")
     data_result = RandomForestModel.load_and_prepare_data(
-        prediction_horizon=10,
-        split_date="2025-03-15",
-        ticker=None,
-        clean_features=True,
+        prediction_horizon=10, split_date="2025-06-15", ticker=None, clean_features=True
     )
-    X_train = data_result["X_train"]
-    X_test = data_result["X_test"]
+    x_train = data_result["x_train"]
+    x_test = data_result["x_test"]
     y_train = data_result["y_train"]
     y_test = data_result["y_test"]
     target_column = data_result.get("target_column", "target")
@@ -537,21 +546,17 @@ def main():
 
     # 2. Feature selection (optional)
     n_features_to_select = 60
-    rf_model = RandomForestModel(
-        model_name="random_forest_feature_selector", prediction_horizon=10
-    )
-    selected_features = rf_model.select_features(X_train, y_train, n_features_to_select)
-    X_train_selected = X_train[selected_features]
-    X_test_selected = X_test[selected_features]
+    rf_model = RandomForestModel(model_name="random_forest_feature_selector", prediction_horizon=10)
+    selected_features = rf_model.select_features(x_train, y_train, n_features_to_select)
+    x_train_selected = x_train[selected_features]
+    x_test_selected = x_test[selected_features]
     logger.info(f"DataFrames updated with {len(selected_features)} selected features.")
 
     # 3. Instantiate model for hypertuning
     rf_model = RandomForestModel(
         model_name="random_forest_standalone_hypertuned", prediction_horizon=10
     )
-    objective_function = rf_model.objective(
-        X_train_selected, y_train, X_test_selected, y_test
-    )
+    objective_function = rf_model.objective(x_train_selected, y_train, x_test_selected, y_test)
     sampler = optuna.samplers.TPESampler(seed=42)
     study = optuna.create_study(direction="maximize", sampler=sampler)
     n_trials = 50
@@ -564,13 +569,11 @@ def main():
     logger.info(f"Best trial info: {best_trial_info}")
 
     # 5. Evaluate and log results
-    if "close" in X_test_selected.columns:
-        current_prices = X_test_selected["close"].values
+    if "close" in x_test_selected.columns:
+        current_prices = x_test_selected["close"].values
     else:
         current_prices = None
-    eval_metrics = rf_model.evaluate(
-        X_test_selected, y_test, current_prices=current_prices
-    )
+    eval_metrics = rf_model.evaluate(x_test_selected, y_test, current_prices=current_prices)
     logger.info(f"Final evaluation metrics: {eval_metrics}")
 
     # 6. Save best model to MLflow
@@ -579,15 +582,13 @@ def main():
     #     **(eval_metrics if eval_metrics else {})
     # }
     # final_params = best_trial_info.get('best_trial_params', {})
-    run_id = rf_model.save_model(
-        experiment_name="random_forest_stock_predictor_experiment"
-    )
+    run_id = rf_model.save_model(experiment_name="random_forest_stock_predictor_experiment")
     logger.info(f"Model saved to MLflow run: {run_id}")
     logger.info("=" * 80)
     logger.info("🎉 STANDALONE RANDOM FOREST HYPERTUNING COMPLETED SUCCESSFULLY!")
     logger.info("=" * 80)
     logger.info(
-        f"Dataset: {len(y_train) + len(y_test):,} samples, {X_train_selected.shape[1]} features"
+        f"Dataset: {len(y_train) + len(y_test):,} samples, {x_train_selected.shape[1]} features"
     )
     logger.info(f"Target: {target_column} (10-day horizon)")
     logger.info(f"Train period: {train_date_range}")

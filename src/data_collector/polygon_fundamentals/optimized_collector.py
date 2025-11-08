@@ -5,16 +5,15 @@ This module handles fundamental data collection with complete pipeline execution
 per ticker and simplified rate limiting.
 """
 
-from typing import Dict, List, Optional, Any, AsyncGenerator
+import asyncio
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.data_collector.polygon_fundamentals.client import PolygonFundamentalsClient
 from src.data_collector.polygon_fundamentals.config import PolygonFundamentalsConfig
-from src.data_collector.polygon_fundamentals.cache_manager import (
-    FundamentalCacheManager,
-)
+from src.data_collector.polygon_fundamentals.cache_manager import FundamentalCacheManager
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.data_collector.polygon_data.rate_limiter import AdaptiveRateLimiter
 from src.data_collector.config import config
@@ -25,11 +24,7 @@ logger = get_logger(__name__)
 
 
 def calculate_source_confidence(source: str) -> float:
-    mapping = {
-        "direct_report": 1.0,
-        "intra_report_impute": 0.8,
-        "inter_report_derive": 0.6,
-    }
+    mapping = {"direct_report": 1.0, "intra_report_impute": 0.8, "inter_report_derive": 0.6}
     return mapping.get(source, 0.5)
 
 
@@ -42,8 +37,8 @@ class FundamentalRateLimiter:
     async def acquire(self):
         """Acquire rate limit using existing framework (skip if disabled)"""
         if not getattr(config, "DISABLE_RATE_LIMITING", False):
-            # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so we just call it
-            self.rate_limiter.wait_if_needed()
+            # The AdaptiveRateLimiter.wait_if_needed() is synchronous, so run in thread
+            await asyncio.to_thread(self.rate_limiter.wait_if_needed)
 
     def release(self):
         """Release rate limit using existing framework"""
@@ -63,9 +58,7 @@ class OptimizedFundamentalCollector:
         cfg = getattr(self.db_pool, "config", {})
         database_url = f"postgresql://{cfg.get('user', '')}:{cfg.get('password', '')}@{cfg.get('host', 'localhost')}:{cfg.get('port', 5432)}/{cfg.get('database', '')}"
         self.engine = create_engine(database_url)
-        self.SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=self.engine
-        )
+        self.session_local = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
         # Initialize data storage for ticker metadata
         self.data_storage = DataStorage()
@@ -96,9 +89,7 @@ class OptimizedFundamentalCollector:
             logger.info("Loading ticker metadata into cache...")
 
             # Get tickers from database using DataStorage
-            tickers_data = self.data_storage.get_tickers(
-                market="stocks", active=True, limit=None
-            )
+            tickers_data = self.data_storage.get_tickers()
 
             if tickers_data:
                 ticker_cache = {}
@@ -124,7 +115,7 @@ class OptimizedFundamentalCollector:
             logger.info("Loading existing data cache...")
 
             rows = fetch_all("SELECT ticker_id, date FROM raw_fundamental_data")
-            existing_data = set((r["ticker_id"], r["date"]) for r in (rows or []))
+            existing_data = {(r["ticker_id"], r["date"]) for r in (rows or [])}
             self.existing_data_cache = existing_data
             logger.info(f"Loaded {len(existing_data)} existing data points")
 
@@ -154,9 +145,7 @@ class OptimizedFundamentalCollector:
             logger.error(f"Error checking recent data for ticker_id {ticker_id}: {e}")
             return False
 
-    async def _process_cached_data(
-        self, ticker: str, cached_data: Dict[str, Any]
-    ) -> bool:
+    async def _process_cached_data(self, ticker: str, cached_data: Dict[str, Any]) -> bool:
         """Process cached data and store to database"""
         try:
             # Get ticker_id from cache
@@ -304,13 +293,12 @@ class OptimizedFundamentalCollector:
             )
 
             # Prepare raw data
-            raw_data = self._prepare_raw_data(
-                ticker_id, income_stmt, balance_sheet, cash_flow
-            )
+            raw_data = self._prepare_raw_data(ticker_id, income_stmt, balance_sheet, cash_flow)
 
             # Store to database using connection pool
             # Use centralized execute helper for single-statement upsert
-            execute(
+            await asyncio.to_thread(
+                execute,
                 """
                 INSERT INTO raw_fundamental_data (
                     ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
@@ -402,12 +390,8 @@ class OptimizedFundamentalCollector:
         # Helper function to get attribute safely
         def get_attr(obj, attr_name, default=None):
             if isinstance(obj, dict):
-                # Check if this is a cached data structure with nested financials
-                if "financials" in obj:
-                    # For cached data, metadata fields are at the top level
-                    return obj.get(attr_name, default)
-                else:
-                    return obj.get(attr_name, default)
+                # For cached data, metadata fields are at the top level
+                return obj.get(attr_name, default)
             else:
                 return getattr(obj, attr_name, default)
 
@@ -490,66 +474,13 @@ class OptimizedFundamentalCollector:
         values = {}
         confidences = []
 
-        # Helper function to get field value safely
-        def get_field_value(stmt, field_name):
-            if isinstance(stmt, dict):
-                return stmt.get(field_name)
-            else:
-                return getattr(stmt, field_name, None)
-
-        # Helper function to get nested financial value
-        def get_nested_financial_value(stmt, field_name):
-            if isinstance(stmt, dict):
-                # Check if this is a cached data structure with nested financials
-                if "financials" in stmt:
-                    financials = stmt["financials"]
-                    # Check each statement type for the field
-                    for stmt_type in [
-                        "income_statement",
-                        "balance_sheet",
-                        "cash_flow_statement",
-                    ]:
-                        if (
-                            stmt_type in financials
-                            and field_name in financials[stmt_type]
-                        ):
-                            return financials[stmt_type][field_name]
-                    return None
-                else:
-                    # Direct field access (legacy format)
-                    return stmt.get(field_name)
-            else:
-                # Object format (from API)
-                return getattr(stmt, field_name, None)
-
+        # Delegate nested value resolution and confidence extraction to class helpers
         for field in fields:
-            value = get_nested_financial_value(stmt, field)
-            if value is not None:
-                # Handle both dictionary and object formats for financial data
-                if isinstance(value, dict):
-                    # Dictionary format (from cache)
-                    if "value" in value:
-                        values[field] = value["value"]
-                        # Collect confidence if source is present
-                        if "source" in value and value["source"]:
-                            confidences.append(
-                                calculate_source_confidence(value["source"])
-                            )
-                    else:
-                        values[field] = value
-                else:
-                    # Object format (from API)
-                    if hasattr(value, "value"):
-                        values[field] = value.value
-                        # Collect confidence if source is present
-                        if hasattr(value, "source") and value.source:
-                            confidences.append(
-                                calculate_source_confidence(value.source)
-                            )
-                    else:
-                        values[field] = value
-            else:
-                values[field] = None
+            raw_val = self._get_nested_financial_value(stmt, field)
+            resolved, conf = self._resolve_value_and_confidence(raw_val)
+            values[field] = resolved
+            if conf is not None:
+                confidences.append(conf)
 
         # Set average confidence
         values["data_source_confidence"] = (
@@ -557,42 +488,35 @@ class OptimizedFundamentalCollector:
         )
         return values
 
-    async def collect_with_progress(
-        self, tickers: List[str]
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Collect fundamental data with real-time progress tracking"""
-        self.stats["start_time"] = datetime.now()
+    def _resolve_value_and_confidence(self, value: Any):
+        """Class-level helper used by _extract_financial_values to reduce complexity."""
+        if value is None:
+            return None, None
+        if isinstance(value, dict):
+            if "value" in value:
+                conf = calculate_source_confidence(value["source"]) if value.get("source") else None
+                return value["value"], conf
+            return value, None
+        if hasattr(value, "value"):
+            conf = (
+                calculate_source_confidence(getattr(value, "source", None))
+                if getattr(value, "source", None)
+                else None
+            )
+            return value.value, conf
+        return value, None
 
-        for i, ticker in enumerate(tickers):
-            logger.info(f"Processing ticker {i + 1}/{len(tickers)}: {ticker}")
-
-            try:
-                success = await self.collect_fundamental_data(ticker)
-                self.stats["total_processed"] += 1
-
-                yield {
-                    "ticker": ticker,
-                    "success": success,
-                    "progress": i + 1,
-                    "total": len(tickers),
-                    "stats": self.stats.copy(),
-                }
-
-            except Exception as e:
-                logger.error(f"Exception processing {ticker}: {e}")
-                self.stats["failed"] += 1
-                self.stats["total_processed"] += 1
-
-                yield {
-                    "ticker": ticker,
-                    "success": False,
-                    "error": str(e),
-                    "progress": i + 1,
-                    "total": len(tickers),
-                    "stats": self.stats.copy(),
-                }
-
-        self.stats["end_time"] = datetime.now()
+    def _get_nested_financial_value(self, stmt_obj: Any, f_name: str):
+        """Class-level helper used by _extract_financial_values to reduce complexity."""
+        if isinstance(stmt_obj, dict):
+            financials = stmt_obj.get("financials")
+            if financials:
+                for stmt_type in ("income_statement", "balance_sheet", "cash_flow_statement"):
+                    if stmt_type in financials and f_name in financials[stmt_type]:
+                        return financials[stmt_type][f_name]
+                return None
+            return stmt_obj.get(f_name)
+        return getattr(stmt_obj, f_name, None)
 
     def close(self):
         """Close the collector and cleanup resources"""

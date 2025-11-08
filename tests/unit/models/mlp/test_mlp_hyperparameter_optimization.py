@@ -7,47 +7,39 @@ from src.models.evaluation import ThresholdEvaluator
 
 
 def create_test_data(n_samples=1000, n_features=20):
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     X = pd.DataFrame(
-        np.random.randn(n_samples, n_features),
+        rng.standard_normal((n_samples, n_features)),
         columns=[f"feature_{i}" for i in range(n_features)],
     )
-    X["close"] = np.random.uniform(100, 200, n_samples)
-    y = pd.Series(np.random.binomial(1, 0.3, n_samples), name="target")
+    X["close"] = rng.uniform(100, 200, n_samples)
+    y = pd.Series(rng.binomial(1, 0.3, n_samples), name="target")
     train_size = int(0.8 * n_samples)
-    return (
-        X.iloc[:train_size],
-        y.iloc[:train_size],
-        X.iloc[train_size:],
-        y.iloc[train_size:],
-    )
+    return (X.iloc[:train_size], y.iloc[:train_size], X.iloc[train_size:], y.iloc[train_size:])
 
 
 def test_mlp_hyperparameter_objective_callable():
-    X_train, y_train, X_test, y_test = create_test_data(n_samples=200, n_features=10)
+    """Construct hyperparameter objective callable for MLP optimization."""
+    x_train, y_train, x_test, y_test = create_test_data(n_samples=200, n_features=10)
     threshold_evaluator = ThresholdEvaluator()
 
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-    cleaned_train = MLPDataUtils.validate_and_clean_data(X_train)
-    X_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-    cleaned_test = MLPDataUtils.validate_and_clean_data(X_test)
-    X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+    cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
+    _, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
+    x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
     from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
 
     opt_mixin = MLPPredictorWithOptimization(
         model_name="test_mlp",
-        config={
-            "input_size": X_train.shape[1],
-            "output_size": 1,
-            "task": "classification",
-        },
+        config={"input_size": x_train.shape[1], "output_size": 1, "task": "classification"},
         threshold_evaluator=threshold_evaluator,
     )
 
     objective = opt_mixin.objective(
-        X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler
+        x_train, y_train, x_test, x_test_scaled, y_test, fitted_scaler=scaler
     )
     if not callable(objective):
         raise AssertionError("Objective should be callable")
@@ -55,26 +47,27 @@ def test_mlp_hyperparameter_objective_callable():
 
 @pytest.mark.slow
 def test_mlp_hyperparameter_optimization_integration():
-    X_train, y_train, X_test, y_test = create_test_data(n_samples=400, n_features=12)
+    """Run a short hyperparameter optimization integration to validate study flow."""
+    x_train, y_train, x_test, y_test = create_test_data(n_samples=400, n_features=12)
     threshold_evaluator = ThresholdEvaluator()
 
     from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-    cleaned_train = MLPDataUtils.validate_and_clean_data(X_train)
-    X_train_scaled, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-    cleaned_test = MLPDataUtils.validate_and_clean_data(X_test)
-    X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+    cleaned_train = MLPDataUtils.validate_and_clean_data(x_train)
+    _, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+    cleaned_test = MLPDataUtils.validate_and_clean_data(x_test)
+    x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
     from src.models.time_series.mlp.mlp_optimization import MLPPredictorWithOptimization
 
     opt_mixin = MLPPredictorWithOptimization(
         model_name="test_mlp",
-        config={"input_size": X_train.shape[1]},
+        config={"input_size": x_train.shape[1]},
         threshold_evaluator=threshold_evaluator,
     )
 
     objective = opt_mixin.objective(
-        X_train, y_train, X_test, X_test_scaled, y_test, fitted_scaler=scaler
+        x_train, y_train, x_test, x_test_scaled, y_test, fitted_scaler=scaler
     )
     sampler = optuna.samplers.RandomSampler(seed=42)
     study = optuna.create_study(direction="maximize", sampler=sampler)
@@ -84,8 +77,6 @@ def test_mlp_hyperparameter_optimization_integration():
     if not isinstance(info, dict):
         raise AssertionError("Best trial info should be a dict")
     if "best_investment_success_rate" not in info:
-        raise AssertionError(
-            "Expected 'best_investment_success_rate' key in best trial info"
-        )
+        raise AssertionError("Expected 'best_investment_success_rate' key in best trial info")
     if "model_updated" not in info:
         raise AssertionError("Expected 'model_updated' key in best trial info")

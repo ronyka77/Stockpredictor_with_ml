@@ -79,11 +79,7 @@ class FundamentalDataValidator:
 
         # Check if we have any data at all
         if not any(
-            [
-                response.income_statements,
-                response.balance_sheets,
-                response.cash_flow_statements,
-            ]
+            [response.income_statements, response.balance_sheets, response.cash_flow_statements]
         ):
             errors.append("No financial statements found")
             return ValidationResult(
@@ -160,7 +156,6 @@ class FundamentalDataValidator:
 
         # Validate logical relationships
         revenues = self._get_value(stmt.revenues)
-        # net_income = self._get_value(stmt.net_income_loss)
         gross_profit = self._get_value(stmt.gross_profit)
         cost_of_revenue = self._get_value(stmt.cost_of_revenue)
 
@@ -171,9 +166,7 @@ class FundamentalDataValidator:
         # Gross profit should equal revenues minus cost of revenue
         if all(v is not None for v in [revenues, cost_of_revenue, gross_profit]):
             expected_gross = revenues - cost_of_revenue
-            if abs(gross_profit - expected_gross) > abs(
-                expected_gross * 0.01
-            ):  # 1% tolerance
+            if abs(gross_profit - expected_gross) > abs(expected_gross * 0.01):  # 1% tolerance
                 warnings.append("Gross profit calculation inconsistency")
 
         # Check for extreme values
@@ -272,13 +265,9 @@ class FundamentalDataValidator:
         financing_cf = self._get_value(stmt.net_cash_flow_from_financing_activities)
         net_cf = self._get_value(stmt.net_cash_flow)
 
-        if all(
-            v is not None for v in [operating_cf, investing_cf, financing_cf, net_cf]
-        ):
+        if all(v is not None for v in [operating_cf, investing_cf, financing_cf, net_cf]):
             calculated_net = operating_cf + investing_cf + financing_cf
-            if abs(net_cf - calculated_net) > abs(
-                calculated_net * 0.05
-            ):  # 5% tolerance
+            if abs(net_cf - calculated_net) > abs(calculated_net * 0.05):  # 5% tolerance
                 warnings.append("Cash flow components don't sum to net cash flow")
 
         return ValidationResult(
@@ -290,9 +279,7 @@ class FundamentalDataValidator:
             outliers=outliers,
         )
 
-    def _validate_cross_statements(
-        self, response: FundamentalDataResponse
-    ) -> ValidationResult:
+    def _validate_cross_statements(self, response: FundamentalDataResponse) -> ValidationResult:
         """Validate consistency across different statement types"""
         errors = []
         warnings = []

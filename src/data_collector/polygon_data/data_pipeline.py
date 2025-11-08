@@ -89,11 +89,7 @@ class DataPipeline:
     for efficient and reliable data acquisition from Polygon.io.
     """
 
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        requests_per_minute: int = 5,
-    ):
+    def __init__(self, api_key: Optional[str] = None, requests_per_minute: int = 5):
         """
         Initialize the data pipeline
 
@@ -137,10 +133,8 @@ class DataPipeline:
             Pipeline statistics
         """
         # Convert string dates to date objects if needed
-        if isinstance(start_date, str):
-            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-        if isinstance(end_date, str):
-            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        start_date = self._parse_date_input(start_date)
+        end_date = self._parse_date_input(end_date)
 
         logger.info(f"Starting grouped daily pipeline: {start_date} to {end_date}")
 
@@ -148,74 +142,25 @@ class DataPipeline:
             # Step 1: Health checks
             self._perform_health_checks()
 
-            # Step 2: Generate list of dates to process
-            current_date = start_date
-            dates_to_process = []
-
-            while current_date <= end_date:
-                # Skip weekends (Saturday=5, Sunday=6)
-                if current_date.weekday() < 5:
-                    dates_to_process.append(current_date)
-                current_date += timedelta(days=1)
-
+            # Step 2: Generate list of trading dates to process
+            dates_to_process = self._generate_trading_dates(start_date, end_date)
             logger.info(f"Processing {len(dates_to_process)} trading days")
 
             # Step 3: Process each date
             total_records_processed = 0
 
             for i, target_date in enumerate(dates_to_process, 1):
-                logger.info(
-                    f"Processing date {i}/{len(dates_to_process)}: {target_date}"
-                )
+                logger.info(f"Processing date {i}/{len(dates_to_process)}: {target_date}")
 
-                try:
-                    # Fetch grouped daily data for this date
-                    grouped_data = self.data_fetcher.get_grouped_daily_data(
-                        target_date=target_date, validate_data=validate_data
-                    )
+                records_count, _ = self._process_single_date(target_date, validate_data)
 
-                    if not grouped_data:
-                        logger.warning(f"No grouped data returned for {target_date}")
-                        self.stats.add_ticker_result(
-                            f"date_{target_date}", False, 0, "No data returned"
-                        )
-                        continue
-
-                    # Convert grouped data to list of records for storage
-                    records_to_store = list(grouped_data.values())
-
-                    if records_to_store:
-                        storage_result = self.storage.store_historical_data(
-                            records_to_store
-                        )
-                        stored_count = storage_result.get("stored_count", 0)
-
-                        self.stats.total_records_stored += stored_count
-                        total_records_processed += len(records_to_store)
-
-                        # Update stats - treat each date as a successful "ticker"
-                        self.stats.add_ticker_result(
-                            f"date_{target_date}", True, len(records_to_store)
-                        )
-
-                        logger.info(
-                            f"Stored {stored_count} records for {len(grouped_data)} tickers on {target_date}"
-                        )
-                    else:
-                        self.stats.add_ticker_result(
-                            f"date_{target_date}", False, 0, "No valid records"
-                        )
-
-                except Exception as e:
-                    logger.error(f"Error processing date {target_date}: {e}")
-                    self.stats.add_ticker_result(
-                        f"date_{target_date}", False, 0, str(e)
-                    )
+                total_records_processed += records_count
 
                 # Brief pause between dates – skip when rate limiting disabled
-                if i < len(dates_to_process):
-                    if not getattr(config, "DISABLE_RATE_LIMITING", False):
-                        time.sleep(0.5)
+                if i < len(dates_to_process) and not getattr(
+                    config, "DISABLE_RATE_LIMITING", False
+                ):
+                    time.sleep(0.5)
 
             # Step 4: Finalize
             self.stats.finish()
@@ -238,6 +183,61 @@ class DataPipeline:
             logger.error(f"Grouped daily pipeline failed: {e}")
             self.stats.finish()
             raise
+
+    def _parse_date_input(self, date_input: Union[str, date]) -> date:
+        """Normalize date input to a `date` object."""
+        if isinstance(date_input, str):
+            return datetime.strptime(date_input, "%Y-%m-%d").date()
+        return date_input
+
+    def _generate_trading_dates(self, start_date: date, end_date: date) -> list:
+        """Generate a list of trading dates (skip weekends) between two dates."""
+        current_date = start_date
+        dates = []
+        while current_date <= end_date:
+            # Skip weekends (Saturday=5, Sunday=6)
+            if current_date.weekday() < 5:
+                dates.append(current_date)
+            current_date += timedelta(days=1)
+        return dates
+
+    def _process_single_date(self, target_date: date, validate_data: bool) -> tuple:
+        """Fetch, validate, store grouped daily data for a single date.
+
+        Returns (records_processed, stored_count).
+        """
+        try:
+            grouped_data = self.data_fetcher.get_grouped_daily_data(
+                target_date=target_date, validate_data=validate_data
+            )
+
+            if not grouped_data:
+                logger.warning(f"No grouped data returned for {target_date}")
+                self.stats.add_ticker_result(f"date_{target_date}", False, 0, "No data returned")
+                return 0, 0
+
+            records_to_store = list(grouped_data.values())
+
+            if not records_to_store:
+                self.stats.add_ticker_result(f"date_{target_date}", False, 0, "No valid records")
+                return 0, 0
+
+            storage_result = self.storage.store_historical_data(records_to_store)
+            stored_count = storage_result.get("stored_count", 0)
+
+            self.stats.total_records_stored += stored_count
+            self.stats.add_ticker_result(f"date_{target_date}", True, len(records_to_store))
+
+            logger.info(
+                f"Stored {stored_count} records for {len(grouped_data)} tickers on {target_date}"
+            )
+
+            return len(records_to_store), stored_count
+
+        except Exception as e:
+            logger.error(f"Error processing date {target_date}: {e}")
+            self.stats.add_ticker_result(f"date_{target_date}", False, 0, str(e))
+            return 0, 0
 
     def _perform_health_checks(self) -> None:
         """Perform health checks on all components"""
@@ -295,8 +295,7 @@ if __name__ == "__main__":
 
     # Calculate last 1 week from today
     end_date = datetime.now().date()
-    start_date = datetime.now() - timedelta(days=7)
-    # start_date = datetime(2024, 1, 1).date()
+    start_date = datetime.now() - timedelta(days=720)
 
     pipeline.run_grouped_daily_pipeline(
         start_date=start_date.strftime("%Y-%m-%d"),

@@ -49,8 +49,10 @@ def freeze_time(mocker, start: float = 0.0):
         try:
             patch_time.stop()
         except Exception:
+            # ignore stop failures during teardown
             pass
         try:
             patch_sleep.stop()
         except Exception:
+            # ignore stop failures during teardown
             pass

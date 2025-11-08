@@ -27,11 +27,7 @@ class DefaultHyperparameterConfig:
 
     def get_default_params(self) -> dict:
         # Conservative defaults that work for lightweight tests
-        return {
-            "n_estimators": 100,
-            "learning_rate": 0.1,
-            "max_depth": 6,
-        }
+        return {"n_estimators": 100, "learning_rate": 0.1, "max_depth": 6}
 
 
 class BaseModel(ABC):
@@ -96,7 +92,7 @@ class BaseModel(ABC):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        X_val: Optional[pd.DataFrame] = None,
+        x_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
         **kwargs,
     ) -> "BaseModel":
@@ -106,7 +102,7 @@ class BaseModel(ABC):
         Args:
             X: Training features
             y: Training targets
-            X_val: Validation features (optional)
+            x_val: Validation features (optional)
             y_val: Validation targets (optional)
             **kwargs: Additional training parameters
 
@@ -238,9 +234,7 @@ class BaseModel(ABC):
             parsed_config = ast.literal_eval(config_str) if config_str != "{}" else {}
             self.config = parsed_config if isinstance(parsed_config, dict) else {}
         except (ValueError, SyntaxError):
-            logger.warning(
-                "Failed to parse config from MLflow params; using empty dict"
-            )
+            logger.warning("Failed to parse config from MLflow params; using empty dict")
             self.config = {}
 
         # Secure parsing for feature_names
@@ -248,15 +242,11 @@ class BaseModel(ABC):
         try:
             if feature_names_str != "[]":
                 parsed_features = ast.literal_eval(feature_names_str)
-                self.feature_names = (
-                    parsed_features if isinstance(parsed_features, list) else None
-                )
+                self.feature_names = parsed_features if isinstance(parsed_features, list) else None
             else:
                 self.feature_names = None
         except (ValueError, SyntaxError):
-            logger.warning(
-                "Failed to parse feature_names from MLflow params; leaving as None"
-            )
+            logger.warning("Failed to parse feature_names from MLflow params; leaving as None")
             self.feature_names = None
 
         self.is_trained = params.get("is_trained", "True") == "True"
@@ -295,14 +285,12 @@ class BaseModel(ABC):
         if current_prices is not None:
             try:
                 # Perform threshold optimization
-                threshold_results = (
-                    self.threshold_evaluator.optimize_prediction_threshold(
-                        model=self,
-                        X_test=X,
-                        y_test=y,
-                        current_prices_test=current_prices,
-                        confidence_method=confidence_method,
-                    )
+                threshold_results = self.threshold_evaluator.optimize_prediction_threshold(
+                    model=self,
+                    x_test=X,
+                    y_test=y,
+                    current_prices_test=current_prices,
+                    confidence_method=confidence_method,
                 )
 
                 if threshold_results.get("status") == "success":
@@ -314,9 +302,7 @@ class BaseModel(ABC):
                         {
                             "threshold_optimized": True,
                             "optimal_threshold": threshold_results["optimal_threshold"],
-                            "threshold_profit": best_result.get(
-                                "test_profit_per_investment", 0.0
-                            ),
+                            "threshold_profit": best_result.get("test_profit_per_investment", 0.0),
                             "threshold_custom_accuracy": best_result.get(
                                 "test_custom_accuracy", 0.0
                             ),
@@ -336,7 +322,7 @@ class BaseModel(ABC):
 
     def optimize_prediction_threshold(
         self,
-        X_test: pd.DataFrame,
+        x_test: pd.DataFrame,
         y_test: pd.Series,
         current_prices_test: np.ndarray,
         confidence_method: str = "leaf_depth",
@@ -348,7 +334,7 @@ class BaseModel(ABC):
         """
         results = self.threshold_evaluator.optimize_prediction_threshold(
             model=self,
-            X_test=X_test,
+            x_test=x_test,
             y_test=y_test,
             current_prices_test=current_prices_test,
             confidence_method=confidence_method,
@@ -373,14 +359,10 @@ class BaseModel(ABC):
         """
         # Defaults: prefer optimal_threshold if available to preserve behavior
         if threshold is None:
-            threshold = getattr(
-                self, "optimal_threshold", getattr(self, "base_threshold", 0.5)
-            )
+            threshold = getattr(self, "optimal_threshold", getattr(self, "base_threshold", 0.5))
         if confidence_method is None:
             confidence_method = getattr(
-                self,
-                "confidence_method",
-                getattr(self, "default_confidence_method", "leaf_depth"),
+                self, "confidence_method", getattr(self, "default_confidence_method", "leaf_depth")
             )
 
         return self.threshold_evaluator.predict_with_threshold(
@@ -426,9 +408,7 @@ class BaseModel(ABC):
         except Exception as e:
             logger.warning(f"MLflow param logging failed: {e}")
 
-    def log_metrics(
-        self, metrics: Dict[str, float], step: Optional[int] = None
-    ) -> None:
+    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None) -> None:
         """
         Log metrics to MLflow
 

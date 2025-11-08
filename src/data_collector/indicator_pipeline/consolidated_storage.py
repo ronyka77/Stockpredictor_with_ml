@@ -13,10 +13,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from dataclasses import dataclass
 
-from src.data_collector.indicator_pipeline.feature_storage import (
-    FeatureStorage,
-    StorageConfig,
-)
+from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage, StorageConfig
 from src.feature_engineering.config import config as fe_config
 from src.utils.logger import get_logger
 from src.utils.feature_categories import filter_columns_by_categories
@@ -53,20 +50,15 @@ class ConsolidatedFeatureStorage:
         self.consolidated_path = self.version_path / "consolidated"
         self.consolidated_path.mkdir(parents=True, exist_ok=True)
 
-        logger.info(
-            f"Initialized ConsolidatedFeatureStorage at {self.consolidated_path}"
-        )
+        logger.info(f"Initialized ConsolidatedFeatureStorage at {self.consolidated_path}")
         logger.info(f"Partitioning strategy: {self.config.partitioning_strategy}")
 
-    def save_multiple_tickers(
-        self, ticker_data: Dict[str, pd.DataFrame], metadata: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def save_multiple_tickers(self, ticker_data: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
         """
         Save features for multiple tickers in year-partitioned format
 
         Args:
             ticker_data: Dictionary mapping ticker -> features DataFrame
-            metadata: Metadata about the features
 
         Returns:
             Dictionary with storage information
@@ -78,7 +70,7 @@ class ConsolidatedFeatureStorage:
 
         # Apply year-based partitioning strategy
         if self.config.partitioning_strategy == "by_date":
-            files_created = self._save_by_year(combined_data, metadata)
+            files_created = self._save_by_year(combined_data)
         else:
             raise ValueError(
                 f"Only 'by_date' (year-based) partitioning is supported. Got: {self.config.partitioning_strategy}"
@@ -95,9 +87,7 @@ class ConsolidatedFeatureStorage:
             "total_rows": total_rows,
             "total_tickers": len(ticker_data),
             "files": files_created,
-            "compression_ratio": self._calculate_compression_ratio(
-                combined_data, total_size
-            ),
+            "compression_ratio": self._calculate_compression_ratio(combined_data, total_size),
         }
 
         logger.info("Consolidated storage completed:")
@@ -130,9 +120,7 @@ class ConsolidatedFeatureStorage:
         if ticker is None:
             logger.info("Loading features for ALL tickers from consolidated storage")
         else:
-            logger.info(
-                f"Loading features for ticker '{ticker}' from consolidated storage"
-            )
+            logger.info(f"Loading features for ticker '{ticker}' from consolidated storage")
 
         # Find relevant files
         parquet_files = list(self.consolidated_path.glob("*.parquet"))
@@ -174,9 +162,7 @@ class ConsolidatedFeatureStorage:
         if categories:
             category_columns = [
                 c
-                for c in filter_columns_by_categories(
-                    list(combined_data.columns), categories
-                )
+                for c in filter_columns_by_categories(list(combined_data.columns), categories)
                 if c not in ["ticker", "date"]
             ]
             keep_columns = ["ticker", "date"] + category_columns
@@ -193,51 +179,7 @@ class ConsolidatedFeatureStorage:
 
         return combined_data
 
-    def get_consolidated_stats(self) -> Dict[str, Any]:
-        """Get statistics about consolidated storage"""
-        parquet_files = list(self.consolidated_path.glob("*.parquet"))
-
-        if not parquet_files:
-            return {"files": 0, "total_size_mb": 0, "total_rows": 0}
-
-        total_size = 0
-        total_rows = 0
-        file_stats = []
-
-        for file_path in parquet_files:
-            try:
-                # Get file size
-                size_mb = file_path.stat().st_size / (1024 * 1024)
-                total_size += size_mb
-
-                # Get row count (read metadata only)
-                parquet_file = pq.ParquetFile(file_path)
-                rows = parquet_file.metadata.num_rows
-                total_rows += rows
-
-                file_stats.append(
-                    {
-                        "file": file_path.name,
-                        "size_mb": size_mb,
-                        "rows": rows,
-                        "columns": parquet_file.metadata.num_columns,
-                    }
-                )
-
-            except Exception as e:
-                logger.warning(f"Error reading stats for {file_path}: {str(e)}")
-
-        return {
-            "files": len(parquet_files),
-            "total_size_mb": total_size,
-            "total_rows": total_rows,
-            "file_stats": file_stats,
-            "storage_path": str(self.consolidated_path),
-        }
-
-    def _combine_ticker_data(
-        self, ticker_data: Dict[str, pd.DataFrame]
-    ) -> pd.DataFrame:
+    def _combine_ticker_data(self, ticker_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         """Combine multiple ticker DataFrames into single DataFrame"""
         combined_data = []
 
@@ -268,12 +210,9 @@ class ConsolidatedFeatureStorage:
         result = result.sort_values(["ticker", "date"]).reset_index(drop=True)
 
         logger.info(f"Combined data: {len(result)} rows, {len(result.columns)} columns")
-
         return result
 
-    def _save_by_year(
-        self, data: pd.DataFrame, metadata: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _save_by_year(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
         """Save data partitioned by date (year)"""
         files_created = []
 
@@ -314,10 +253,7 @@ class ConsolidatedFeatureStorage:
         return files_created
 
     def _build_parquet_filters(
-        self,
-        ticker: Optional[str],
-        start_date: Optional[date],
-        end_date: Optional[date],
+        self, ticker: Optional[str], start_date: Optional[date], end_date: Optional[date]
     ) -> Optional[List]:
         """Build Parquet filters for efficient loading - single ticker or all"""
         filters = []
@@ -333,15 +269,13 @@ class ConsolidatedFeatureStorage:
 
         return filters if filters else None
 
-    def _calculate_compression_ratio(
-        self, data: pd.DataFrame, compressed_size_mb: float
-    ) -> float:
+    def _calculate_compression_ratio(self, data: pd.DataFrame, compressed_size_mb: float) -> float:
         """Calculate compression ratio compared to uncompressed CSV"""
         # Estimate uncompressed CSV size (rough approximation)
         avg_chars_per_value = 8  # Average characters per numeric value
-        estimated_csv_size_mb = (
-            len(data) * len(data.columns) * avg_chars_per_value
-        ) / (1024 * 1024)
+        estimated_csv_size_mb = (len(data) * len(data.columns) * avg_chars_per_value) / (
+            1024 * 1024
+        )
 
         if compressed_size_mb > 0:
             return estimated_csv_size_mb / compressed_size_mb
@@ -350,15 +284,7 @@ class ConsolidatedFeatureStorage:
 
 # Convenience function
 def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
-    """
-    Consolidate existing individual Parquet files into year-partitioned format
-
-    Args:
-        strategy: Consolidation strategy (only "by_date" supported)
-
-    Returns:
-        Consolidation results
-    """
+    """Consolidate existing individual Parquet files into year-partitioned format"""
     if strategy != "by_date":
         logger.warning(
             f"Only 'by_date' strategy supported, using 'by_date' instead of '{strategy}'"
@@ -407,10 +333,7 @@ def consolidate_existing_features(strategy: str = "by_date") -> Dict[str, Any]:
     consolidated_storage = ConsolidatedFeatureStorage()
 
     # Save in consolidated format
-    result = consolidated_storage.save_multiple_tickers(
-        ticker_data,
-        {"source": "consolidation", "original_files": len(available_tickers)},
-    )
+    result = consolidated_storage.save_multiple_tickers(ticker_data)
 
     logger.info(
         f"Consolidation completed: {result['files_created']} files, {result['total_size_mb']:.2f} MB"

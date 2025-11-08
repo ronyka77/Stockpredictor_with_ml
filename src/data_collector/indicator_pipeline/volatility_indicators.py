@@ -53,24 +53,18 @@ def calculate_bollinger_bands(
     try:
         # Check minimum data requirements
         if len(data) < period:
-            warning_msg = f"Insufficient data for Bollinger Bands. Need {period} points, have {len(data)}"
+            warning_msg = (
+                f"Insufficient data for Bollinger Bands. Need {period} points, have {len(data)}"
+            )
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
         # Calculate Bollinger Bands using ta library
-        bb_upper = ta.volatility.bollinger_hband(
-            data["close"], window=period, window_dev=std_dev
-        )
+        bb_upper = ta.volatility.bollinger_hband(data["close"], window=period, window_dev=std_dev)
         bb_middle = ta.volatility.bollinger_mavg(data["close"], window=period)
-        bb_lower = ta.volatility.bollinger_lband(
-            data["close"], window=period, window_dev=std_dev
-        )
-        bb_width = ta.volatility.bollinger_wband(
-            data["close"], window=period, window_dev=std_dev
-        )
-        bb_percent = ta.volatility.bollinger_pband(
-            data["close"], window=period, window_dev=std_dev
-        )
+        bb_lower = ta.volatility.bollinger_lband(data["close"], window=period, window_dev=std_dev)
+        bb_width = ta.volatility.bollinger_wband(data["close"], window=period, window_dev=std_dev)
+        bb_percent = ta.volatility.bollinger_pband(data["close"], window=period, window_dev=std_dev)
 
         result_data = pd.DataFrame(index=data.index)
         result_data["BB_Lower"] = bb_lower
@@ -81,12 +75,8 @@ def calculate_bollinger_bands(
 
         # Calculate additional Bollinger Band features
         result_data["BB_Width"] = result_data["BB_Upper"] - result_data["BB_Lower"]
-        result_data["BB_Above_Upper"] = (
-            data["close"] > result_data["BB_Upper"]
-        ).astype(int)
-        result_data["BB_Below_Lower"] = (
-            data["close"] < result_data["BB_Lower"]
-        ).astype(int)
+        result_data["BB_Above_Upper"] = (data["close"] > result_data["BB_Upper"]).astype(int)
+        result_data["BB_Below_Lower"] = (data["close"] < result_data["BB_Lower"]).astype(int)
         result_data["BB_Squeeze"] = (
             result_data["BB_Width"] < result_data["BB_Width"].rolling(20).mean()
         ).astype(int)
@@ -151,9 +141,7 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
     try:
         # Check minimum data requirements
         if len(data) < period:
-            warning_msg = (
-                f"Insufficient data for ATR. Need {period} points, have {len(data)}"
-            )
+            warning_msg = f"Insufficient data for ATR. Need {period} points, have {len(data)}"
             warnings.append(warning_msg)
             logger.warning(warning_msg)
 
@@ -249,9 +237,7 @@ def calculate_custom_volatility(
             result_data[f"Volatility_Annualized_{period}"] = vol_std * np.sqrt(252)
 
             # High-Low volatility measure
-            hl_volatility = (
-                ((data["high"] - data["low"]) / data["close"]).rolling(period).mean()
-            )
+            hl_volatility = ((data["high"] - data["low"]) / data["close"]).rolling(period).mean()
             result_data[f"HL_Volatility_{period}"] = hl_volatility
 
             # Parkinson volatility estimator
@@ -345,9 +331,7 @@ class VolatilityIndicatorCalculator(BaseIndicator):
             )
 
             # Combine warnings
-            all_warnings = (
-                bb_result.warnings + atr_result.warnings + custom_vol_result.warnings
-            )
+            all_warnings = bb_result.warnings + atr_result.warnings + custom_vol_result.warnings
 
             # Create combined metadata
             metadata = {

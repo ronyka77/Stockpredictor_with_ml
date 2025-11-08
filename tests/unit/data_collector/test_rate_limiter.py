@@ -1,10 +1,7 @@
 import pytest
 
-from tests._fixtures.frozen_time import freeze_time
-from src.data_collector.polygon_data.rate_limiter import (
-    RateLimiter,
-    AdaptiveRateLimiter,
-)
+from tests.fixtures.frozen_time import freeze_time
+from src.data_collector.polygon_data.rate_limiter import RateLimiter, AdaptiveRateLimiter
 
 
 @pytest.mark.unit
@@ -16,9 +13,7 @@ def test_rate_limiter_sliding_window(mocker):
         for _ in range(3):
             rl.wait_if_needed()
         if rl.request_count != 3:
-            raise AssertionError(
-                "RateLimiter did not increment request_count as expected"
-            )
+            raise AssertionError("RateLimiter did not increment request_count as expected")
         remaining_before = rl.get_remaining_requests()
         if remaining_before != 0:
             raise AssertionError("Remaining requests before reset mismatch")
@@ -28,9 +23,7 @@ def test_rate_limiter_sliding_window(mocker):
         # wait_if_needed calls time.sleep(...) which advances clock via freeze_time
         # After sleep, a new window starts with count reset to 1
         if rl.request_count != 1:
-            raise AssertionError(
-                "RateLimiter request_count not reset after window rollover"
-            )
+            raise AssertionError("RateLimiter request_count not reset after window rollover")
         if rl.get_remaining_requests() != 2:
             raise AssertionError("Remaining requests after rollover mismatch")
 
@@ -65,15 +58,11 @@ def test_adaptive_rate_limiter_backoff_and_restore(mocker):
         before = arl.requests_per_minute
         arl.handle_rate_limit_error()
         if arl.requests_per_minute > before:
-            raise AssertionError(
-                "AdaptiveRateLimiter did not back off on rate limit error"
-            )
+            raise AssertionError("AdaptiveRateLimiter did not back off on rate limit error")
         # Ensure cooldown advanced time by 30s implicitly
         # Next successful requests reduce error counter and may restore
         arl.handle_successful_request()
         arl.handle_successful_request()
         # After clearing consecutive_errors, restore toward original limit
         if arl.requests_per_minute > arl.original_limit:
-            raise AssertionError(
-                "AdaptiveRateLimiter exceeded original limit after restores"
-            )
+            raise AssertionError("AdaptiveRateLimiter exceeded original limit after restores")

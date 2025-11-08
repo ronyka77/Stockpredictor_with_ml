@@ -5,6 +5,7 @@ from src.data_collector.polygon_news.news_pipeline import PolygonNewsCollector
 
 @pytest.mark.unit
 def test_collect_historical_news_respects_batching(mocker):
+    """collect_historical_news respects batching and returns stats dict"""
     collector = PolygonNewsCollector()
 
     # Provide prioritized tickers with 2 major tickers
@@ -17,9 +18,7 @@ def test_collect_historical_news_respects_batching(mocker):
     )
 
     # Ensure storage.get_articles_for_ticker returns empty for all periods so collection runs
-    mocker.patch.object(
-        collector.storage, "get_articles_for_ticker", lambda t, s, e, limit=1: []
-    )
+    mocker.patch.object(collector.storage, "get_articles_for_ticker", lambda t, s, e, limit=1: [])
 
     # stub _collect_ticker_news to return predictable stats
     mocker.patch.object(
@@ -34,9 +33,7 @@ def test_collect_historical_news_respects_batching(mocker):
         },
     )
 
-    stats = collector.collect_historical_news(
-        max_tickers=2, years_back=0, batch_size_days=1
-    )
+    stats = collector.collect_historical_news(max_tickers=2, years_back=0, batch_size_days=1)
 
     # years_back=0 will produce zero-day range; ensure function handles gracefully and returns stats
     assert isinstance(stats, dict)
@@ -44,6 +41,7 @@ def test_collect_historical_news_respects_batching(mocker):
 
 @pytest.mark.unit
 def test_main_handles_missing_database_url(mocker, tmp_path):
+    """main() returns False when API key is missing from config"""
     # mocker config to have no API key
     import importlib
     import src.data_collector.polygon_news.news_pipeline as np_mod

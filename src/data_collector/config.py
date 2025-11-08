@@ -57,12 +57,8 @@ class PolygonConfig:
             DB_NAME=os.getenv("DB_NAME", cls.DB_NAME),
             DB_USER=os.getenv("DB_USER", cls.DB_USER),
             DB_PASSWORD=os.getenv("DB_PASSWORD", cls.DB_PASSWORD),
-            REQUESTS_PER_MINUTE=int(
-                os.getenv("REQUESTS_PER_MINUTE", str(cls.REQUESTS_PER_MINUTE))
-            ),
-            DISABLE_RATE_LIMITING=os.getenv("DISABLE_RATE_LIMITING", "1")
-            .strip()
-            .lower()
+            REQUESTS_PER_MINUTE=int(os.getenv("REQUESTS_PER_MINUTE", str(cls.REQUESTS_PER_MINUTE))),
+            DISABLE_RATE_LIMITING=os.getenv("DISABLE_RATE_LIMITING", "1").strip().lower()
             in {"1", "true", "yes"},
         )
 
@@ -75,35 +71,22 @@ class FeatureEngineeringConfig:
     RSI_PERIODS: List[int] = field(default_factory=lambda: [14, 21])
     SMA_PERIODS: List[int] = field(default_factory=lambda: [5, 10, 20, 50, 100, 200])
     EMA_PERIODS: List[int] = field(default_factory=lambda: [5, 10, 20, 50, 100, 200])
-    MACD_PARAMS: Dict = field(
-        default_factory=lambda: {"fast": 12, "slow": 26, "signal": 9}
-    )
+    MACD_PARAMS: Dict = field(default_factory=lambda: {"fast": 12, "slow": 26, "signal": 9})
     BOLLINGER_PARAMS: Dict = field(default_factory=lambda: {"period": 20, "std": 2})
     ATR_PERIOD: int = 14
-    STOCHASTIC_PARAMS: Dict = field(
-        default_factory=lambda: {"k_period": 14, "d_period": 3}
-    )
+    STOCHASTIC_PARAMS: Dict = field(default_factory=lambda: {"k_period": 14, "d_period": 3})
 
     # Advanced Indicator Parameters
     ICHIMOKU_PARAMS: Dict = field(
-        default_factory=lambda: {
-            "tenkan": 9,
-            "kijun": 26,
-            "senkou_b": 52,
-            "displacement": 26,
-        }
+        default_factory=lambda: {"tenkan": 9, "kijun": 26, "senkou_b": 52, "displacement": 26}
     )
     FIBONACCI_LOOKBACK: int = 100
 
     # Storage Configuration
     FEATURES_STORAGE_PATH: str = os.getenv("FE_STORAGE_PATH", "data/features")
     FEATURE_VERSION: str = os.getenv("FEATURE_VERSION", "v1.0")
-    PARQUET_COMPRESSION: str = os.getenv(
-        "FE_PARQUET_COMPRESSION", "snappy"
-    )  # snappy, gzip, brotli
-    PARQUET_ENGINE: str = os.getenv(
-        "FE_PARQUET_ENGINE", "pyarrow"
-    )  # pyarrow, fastparquet
+    PARQUET_COMPRESSION: str = os.getenv("FE_PARQUET_COMPRESSION", "snappy")  # snappy, gzip, brotli
+    PARQUET_ENGINE: str = os.getenv("FE_PARQUET_ENGINE", "pyarrow")  # pyarrow, fastparquet
 
     # Validation Settings
     MAX_MISSING_PCT: float = 0.05  # 5% max missing data allowed

@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -62,5 +60,3 @@ def start_run_cm():
 def patch_mlflow_start(start_run_cm):
     with patch("mlflow.start_run", return_value=start_run_cm) as s:
         yield s
-
-

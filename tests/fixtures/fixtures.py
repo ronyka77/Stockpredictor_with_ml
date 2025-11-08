@@ -14,9 +14,7 @@ def small_market_df():
 
     Columns: close, SMA_5, open
     """
-    df = pd.DataFrame(
-        {"close": [100.0, 110.0], "SMA_5": [95.0, 105.0], "open": [99.0, 109.0]}
-    )
+    df = pd.DataFrame({"close": [100.0, 110.0], "SMA_5": [95.0, 105.0], "open": [99.0, 109.0]})
     return df
 
 

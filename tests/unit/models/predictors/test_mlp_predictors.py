@@ -3,6 +3,7 @@ from src.models.predictors.mlp_predictor import MLPPredictorWrapper
 
 
 def test_mlp_loads_model_from_mlflow():
+    """Load MLP predictor wrapper model from mlflow and assert model is attached."""
     with patch("src.models.predictors.mlp_predictor.MLPPredictorWithMLflow") as Mock:
         mock_inst = Mock.return_value
         mock_inst.load_model = MagicMock(return_value=True)
@@ -11,4 +12,3 @@ def test_mlp_loads_model_from_mlflow():
         p = MLPPredictorWrapper(run_id="r")
         p.load_model_from_mlflow()
         assert p.model is not None
-

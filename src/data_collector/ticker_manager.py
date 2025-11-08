@@ -17,9 +17,7 @@ class TickerManager:
     Manages ticker discovery, filtering, and caching for efficient data acquisition
     """
 
-    def __init__(
-        self, client: PolygonDataClient, storage: Optional[DataStorage] = None
-    ):
+    def __init__(self, client: PolygonDataClient, storage: Optional[DataStorage] = None):
         """
         Initialize the ticker manager
 
@@ -30,30 +28,6 @@ class TickerManager:
         self.client = client
         self.storage = storage or DataStorage()
         self.validator = DataValidator(strict_mode=False)
-
-    def get_all_active_tickers(self, market: str = "stocks") -> List[str]:
-        """
-        Get all active stock tickers from database
-
-        Args:
-            market: Market type (stocks, crypto, fx, etc.)
-
-        Returns:
-            List of active ticker symbols
-        """
-        try:
-            db_tickers = self.storage.get_ticker_symbols(market=market, active=True)
-            if db_tickers:
-                logger.info(
-                    f"Retrieved {len(db_tickers)} {market} tickers from database"
-                )
-                return db_tickers
-        except Exception as e:
-            logger.error(f"Failed to get tickers from database: {e}")
-            raise
-
-        logger.warning(f"No {market} tickers found in database")
-        return []
 
     def get_ticker_details(self, ticker: str) -> Optional[Dict]:
         """
@@ -88,9 +62,7 @@ class TickerManager:
         logger.warning(f"No details found for ticker {ticker}")
         return None
 
-    def refresh_ticker_details(
-        self, tickers: List[str], batch_size: int = 50
-    ) -> Dict[str, int]:
+    def refresh_ticker_details(self, tickers: List[str], batch_size: int = 50) -> Dict[str, int]:
         """
         Refresh detailed information for specific tickers
 
@@ -108,9 +80,7 @@ class TickerManager:
         try:
             for i in range(0, len(tickers), batch_size):
                 batch = tickers[i : i + batch_size]
-                logger.info(
-                    f"📋 Processing batch {i // batch_size + 1}: {len(batch)} tickers"
-                )
+                logger.info(f"📋 Processing batch {i // batch_size + 1}: {len(batch)} tickers")
 
                 for ticker in batch:
                     try:
@@ -198,8 +168,7 @@ def main():
         ticker_manager = TickerManager(client, storage)
 
         ticker_manager.refresh_ticker_details(
-            tickers=ticker_manager.get_all_active_tickers(market="stocks"),
-            batch_size=50,
+            tickers=[t["ticker"] for t in ticker_manager.storage.get_tickers()], batch_size=50
         )
 
         logger.info("🎉 Ticker refresh completed successfully!")

@@ -6,15 +6,26 @@ recomputing expensive cleaning operations.
 """
 
 import pandas as pd
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 import hashlib
 from pathlib import Path
 import json
 from datetime import datetime
 
+import psutil
+import os
+import gc
+
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__, utility="cleaned_data_cache")
+
+
+def collect_garbage():
+    collected = gc.collect()
+    logger.info(f"Garbage collected: {collected}")
+    proc = psutil.Process(os.getpid())
+    logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
 
 
 class CleanedDataCache:
@@ -48,9 +59,7 @@ class CleanedDataCache:
         cache_key = hashlib.md5(param_str.encode(), usedforsecurity=False).hexdigest()
         return cache_key
 
-    def _get_cache_paths(
-        self, cache_key: str, data_type: str = "training"
-    ) -> Dict[str, Path]:
+    def _get_cache_paths(self, cache_key: str, data_type: str = "training") -> Dict[str, Path]:
         """
         Get file paths for cached data components
 
@@ -64,18 +73,18 @@ class CleanedDataCache:
         base_path = self.cache_dir / f"{data_type}_{cache_key}"
 
         paths = {
-            "X_train": base_path.with_suffix(".X_train.parquet"),
-            "X_test": base_path.with_suffix(".X_test.parquet"),
+            "x_train": base_path.with_suffix(".x_train.parquet"),
+            "x_test": base_path.with_suffix(".x_test.parquet"),
             "y_train": base_path.with_suffix(".y_train.parquet"),
             "y_test": base_path.with_suffix(".y_test.parquet"),
             "metadata": base_path.with_suffix(".metadata.parquet"),
             "info": base_path.with_suffix(".info.json"),
         }
 
-        # For prediction data, we only need X_test and y_test
+        # For prediction data, we only need x_test and y_test
         if data_type == "prediction":
             paths = {
-                "X_test": base_path.with_suffix(".X_test.parquet"),
+                "x_test": base_path.with_suffix(".x_test.parquet"),
                 "y_test": base_path.with_suffix(".y_test.parquet"),
                 "metadata": base_path.with_suffix(".metadata.parquet"),
                 "info": base_path.with_suffix(".info.json"),
@@ -97,9 +106,9 @@ class CleanedDataCache:
         paths = self._get_cache_paths(cache_key, data_type)
 
         # Check if all required files exist
-        required_files = ["X_test", "y_test", "metadata", "info"]
+        required_files = ["x_test", "y_test", "metadata", "info"]
         if data_type == "training":
-            required_files.extend(["X_train", "y_train"])
+            required_files.extend(["x_train", "y_train"])
 
         return all(paths[file].exists() for file in required_files)
 
@@ -119,13 +128,11 @@ class CleanedDataCache:
         try:
             # Save DataFrames to parquet
             if data_type == "training":
-                data_result["X_train"].to_parquet(paths["X_train"])
+                data_result["x_train"].to_parquet(paths["x_train"])
                 data_result["y_train"].to_frame().to_parquet(paths["y_train"])
-                logger.info(
-                    f"   Saved training data: {len(data_result['X_train'])} samples"
-                )
+                logger.info(f"   Saved training data: {len(data_result['x_train'])} samples")
 
-            data_result["X_test"].to_parquet(paths["X_test"])
+            data_result["x_test"].to_parquet(paths["x_test"])
             data_result["y_test"].to_frame().to_parquet(paths["y_test"])
 
             # Save metadata
@@ -191,9 +198,7 @@ class CleanedDataCache:
             Dictionary containing loaded cleaned data
         """
         if not self.cache_exists(cache_key, data_type):
-            raise FileNotFoundError(
-                f"Cache not found for key: {cache_key}, type: {data_type}"
-            )
+            raise FileNotFoundError(f"Cache not found for key: {cache_key}, type: {data_type}")
 
         paths = self._get_cache_paths(cache_key, data_type)
 
@@ -202,13 +207,11 @@ class CleanedDataCache:
             result = {}
 
             if data_type == "training":
-                result["X_train"] = pd.read_parquet(paths["X_train"])
+                result["x_train"] = pd.read_parquet(paths["x_train"])
                 result["y_train"] = pd.read_parquet(paths["y_train"]).squeeze()
-                logger.info(
-                    f"   Loaded training data: {len(result['X_train'])} samples"
-                )
+                logger.info(f"   Loaded training data: {len(result['x_train'])} samples")
 
-            result["X_test"] = pd.read_parquet(paths["X_test"])
+            result["x_test"] = pd.read_parquet(paths["x_test"])
             result["y_test"] = pd.read_parquet(paths["y_test"]).squeeze()
 
             # Load metadata
@@ -219,9 +222,7 @@ class CleanedDataCache:
             if "removed_features" in metadata:
                 if isinstance(metadata["removed_features"], str):
                     try:
-                        metadata["removed_features"] = json.loads(
-                            metadata["removed_features"]
-                        )
+                        metadata["removed_features"] = json.loads(metadata["removed_features"])
                     except json.JSONDecodeError:
                         # If it's just '{}', convert to empty dict
                         metadata["removed_features"] = {}
@@ -229,9 +230,7 @@ class CleanedDataCache:
             if "diversity_analysis" in metadata:
                 if isinstance(metadata["diversity_analysis"], str):
                     try:
-                        metadata["diversity_analysis"] = json.loads(
-                            metadata["diversity_analysis"]
-                        )
+                        metadata["diversity_analysis"] = json.loads(metadata["diversity_analysis"])
                     except json.JSONDecodeError:
                         # If it's just '{}', convert to empty dict
                         metadata["diversity_analysis"] = {}
@@ -239,21 +238,18 @@ class CleanedDataCache:
             # Add metadata to result
             result.update(metadata)
 
+            logger.info(f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}")
             logger.info(
-                f"✅ Loaded cached cleaned {data_type} data with key: {cache_key}"
+                f"   Test data: {len(result['x_test'])} samples, {len(result['x_test'].columns)} features"
             )
-            logger.info(
-                f"   Test data: {len(result['X_test'])} samples, {len(result['X_test'].columns)} features"
-            )
+            collect_garbage()
             return result
 
         except Exception as e:
             logger.error(f"❌ Error loading cleaned data from cache: {str(e)}")
             raise
 
-    def clear_cache(
-        self, cache_key: Optional[str] = None, data_type: Optional[str] = None
-    ) -> None:
+    def clear_cache(self, cache_key: Optional[str] = None, data_type: Optional[str] = None) -> None:
         """
         Clear cached data
 
@@ -267,41 +263,24 @@ class CleanedDataCache:
             for path in paths.values():
                 if path.exists():
                     path.unlink()
+            collect_garbage()
             logger.info(f"Cleared cache for key: {cache_key}, type: {data_type}")
         else:
             # Clear all cache files
             for file in self.cache_dir.glob("*"):
                 if file.is_file():
                     file.unlink()
+            collect_garbage()
             logger.info("Cleared all cached data")
-
-    def list_cached_data(self) -> List[Dict]:
-        """
-        List all cached data entries
-
-        Returns:
-            List of cache information dictionaries
-        """
-        cached_entries = []
-
-        for info_file in self.cache_dir.glob("*.info.json"):
-            try:
-                with open(info_file, "r") as f:
-                    info = json.load(f)
-                cached_entries.append(info)
-            except Exception as e:
-                logger.warning(f"Could not read cache info file {info_file}: {str(e)}")
-
-        return cached_entries
 
     # Compatibility convenience methods
     def set(self, cache_key: str, df: pd.DataFrame) -> None:
-        """Compatibility wrapper: save a single DataFrame as prediction X_test cache.
+        """Compatibility wrapper: save a single DataFrame as prediction x_test cache.
 
         Creates a minimal data_result and stores it as a 'prediction' cache entry.
         """
         data_result = {
-            "X_test": df,
+            "x_test": df,
             "y_test": pd.Series([]),
             "target_column": "",
             "feature_count": df.shape[1] if hasattr(df, "shape") else 0,
@@ -315,17 +294,15 @@ class CleanedDataCache:
         self.save_cleaned_data(data_result, cache_key=cache_key, data_type="prediction")
 
     def get(self, cache_key: str) -> pd.DataFrame:
-        """Compatibility wrapper: load cached prediction X_test for given key."""
+        """Compatibility wrapper: load cached prediction x_test for given key."""
         result = self.load_cleaned_data(cache_key=cache_key, data_type="prediction")
-        # Expect X_test in result
-        if "X_test" not in result:
-            raise KeyError(f"Cached X_test not found for key: {cache_key}")
-        return result["X_test"]
+        # Expect x_test in result
+        if "x_test" not in result:
+            raise KeyError(f"Cached x_test not found for key: {cache_key}")
+        return result["x_test"]
 
     # Start Generation Here
-    def get_cache_age_hours(
-        self, cache_key: str, data_type: str = "training"
-    ) -> Optional[float]:
+    def get_cache_age_hours(self, cache_key: str, data_type: str = "training") -> Optional[float]:
         """
         Get the age of cached data in hours
 

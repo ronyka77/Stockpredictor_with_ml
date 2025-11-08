@@ -35,9 +35,7 @@ class NewsProcessor:
             processed = {
                 "polygon_id": article_metadata.get("polygon_id"),
                 "title": self._clean_text(article_metadata.get("title", "")),
-                "description": self._clean_text(
-                    article_metadata.get("description", "")
-                ),
+                "description": self._clean_text(article_metadata.get("description", "")),
                 "article_url": article_metadata.get("article_url", ""),
                 "amp_url": article_metadata.get("amp_url"),
                 "image_url": article_metadata.get("image_url"),
@@ -47,15 +45,11 @@ class NewsProcessor:
                 "tickers": article_metadata.get("tickers", []),
                 # Publisher information
                 "publisher_name": article_metadata.get("publisher_name", ""),
-                "publisher_homepage_url": article_metadata.get(
-                    "publisher_homepage_url"
-                ),
+                "publisher_homepage_url": article_metadata.get("publisher_homepage_url"),
                 "publisher_logo_url": article_metadata.get("publisher_logo_url"),
                 "publisher_favicon_url": article_metadata.get("publisher_favicon_url"),
                 # Process insights
-                "insights": self._process_insights(
-                    article_metadata.get("insights", [])
-                ),
+                "insights": self._process_insights(article_metadata.get("insights", [])),
             }
 
             return processed
@@ -73,9 +67,7 @@ class NewsProcessor:
         text = re.sub(r"\s+", " ", text.strip())
 
         # Remove common artifacts
-        text = re.sub(
-            r"\(Reuters\)|\(AP\)|\(Bloomberg\)", "", text, flags=re.IGNORECASE
-        )
+        text = re.sub(r"\(Reuters\)|\(AP\)|\(Bloomberg\)", "", text, flags=re.IGNORECASE)
 
         return text
 

@@ -29,9 +29,7 @@ def classify_feature_name(name: str) -> str:
     return "basic"
 
 
-def filter_columns_by_categories(
-    columns: List[str], categories: List[str]
-) -> List[str]:
+def filter_columns_by_categories(columns: List[str], categories: List[str]) -> List[str]:
     """Filter a list of column names to those whose inferred category is selected.
 
     Args:

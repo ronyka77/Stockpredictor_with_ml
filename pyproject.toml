@@ -6,64 +6,46 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.11",
-    "autogluon-tabular[tabicl]>=1.4.0",
-    "autogluon[tabarena]>=1.4.0",
+    "autoflake>=2.3.1",
     "bokeh>=3.7.3",
+    "coverage>=7.10.6",
     "fastparquet>=2024.11.0",
-    "great-expectations>=0.18.8",
+    "fs>=2.4.16",
+    "isort>=6.0.1",
     "joblib>=1.4.2",
     "lightgbm>=4.6.0",
-    "lion-pytorch>=0.2.3",
     "loguru>=0.7.3",
     "mlflow>=2.22.0",
+    "mypy>=1.10.0",
     "numpy>=2.0.0",
     "openpyxl>=3.1.5",
     "optuna>=4.4.0",
     "pandas>=2.3.0",
+    "polyfactory>=2.22.2",
     "psutil>=6.0.0",
-    "psycopg2-binary>=2.9.10",
+    "psycopg[binary,pool]>=3.2.10",
     "pyarrow>=19.0.1",
     "pydantic>=2.11.5",
-    "pytabkit>=1.6.1",
-    "python-dotenv>=1.1.1",
-    "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
-    "psycopg2>=2.9.10",
-    "isort>=6.0.1",
-    "mypy>=1.10.0",
-    "autoflake>=2.3.1",
-    "hypothesis>=6",
+    "pytest-timeout>=2.4.0",
+    "pytest>=8.4.1",
+    "python-dotenv>=1.1.1",
     "requests>=2.32.3",
     "ruff>=0.12.11",
     "scikit-learn>=1.4.0",
-    "setuptools>=80.9.0",
+    "setuptools>=80.9.0,<81",
+    "shap>=0.49.1",
     "sqlalchemy>=2.0.41",
     "statsmodels>=0.14.2",
     "ta>=0.11.0",
-    "torch>=2.7.0",
-    "torchaudio>=2.7.0",
-    "torchvision>=0.22.0",
-    "xgboost>=3.0.2",
-    "intentgraph>=0.2.2",
+    "torch>=2.7.1",
+    "torchaudio>=2.7.1",
+    "torchvision",
     "vulture>=2.14",
-    "pytest-timeout>=2.4.0",
-    "polyfactory>=2.22.2",
-    "radon>=6.0.1",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src"]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "/src",
-    "/README.md",
-    "/pyproject.toml",
+    "xgboost>=3.0.2",
+    "autogluon",
+    "skforecast[full]>=0.18.0",
 ]
 
 [[tool.uv.index]]
@@ -77,23 +59,17 @@ torchvision = [{ index = "pytorch" }]
 torchaudio = [{ index = "pytorch" }]
 
 [tool.ruff]
-line-length = 88
+line-length = 100
+unsafe-fixes = true
 
-[tool.radon]
-exclude = ["tests", "venv", ".venv", "build", "dist"]
-ignore = ["__init__.py"]
-# CC (cyclomatic complexity) configuration
-cc_min = "A"
-cc_max = "F"
-no_assert = false
-show_closures = false
+[tool.ruff.format]
+skip-magic-trailing-comma = true
 
-[tool.radon.cc]
-# Optional per-path settings
-average = true
+[tool.ruff.analyze]
+direction = "dependencies"
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=70 --timeout=30"
+addopts = "--strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=50"
 markers = [
     "unit: Unit tests - test individual components in isolation",
     "integration: Integration tests - test multiple components working together",

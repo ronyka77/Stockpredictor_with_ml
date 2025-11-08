@@ -12,7 +12,7 @@ from src.data_collector.polygon_fundamentals.optimized_collector import (
 )
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.utils.logger import get_logger
-from src.database.connection import fetch_all, get_global_pool
+from src.database.connection import get_global_pool
 
 logger = get_logger(__name__)
 
@@ -25,23 +25,6 @@ class OptimizedFundamentalProcessor:
         self.db_pool = get_global_pool()
         self.collector = OptimizedFundamentalCollector()
         self.data_storage = DataStorage()
-
-    def _get_tickers_from_cache(self, filter_active: bool = True) -> List[str]:
-        """Get tickers from database cache"""
-        tickers = []
-        try:
-            rows = fetch_all(
-                "SELECT ticker FROM tickers"
-                + (" WHERE active = true" if filter_active else "")
-            )
-            for row in rows or []:
-                tickers.append(row["ticker"])
-
-            logger.info(f"Loaded {len(tickers)} tickers from database")
-            return tickers
-        except Exception as e:
-            logger.error(f"Failed to load tickers: {e}")
-            return []
 
     async def process_with_progress(self, tickers: List[str]) -> Dict[str, bool]:
         """Process tickers with real-time progress tracking - one ticker at a time"""

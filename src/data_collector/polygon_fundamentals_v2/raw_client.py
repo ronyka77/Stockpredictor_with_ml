@@ -7,9 +7,7 @@ from src.data_collector.polygon_fundamentals.config import (
     PolygonFundamentalsConfig,
     polygon_fundamentals_config,
 )
-from src.data_collector.polygon_fundamentals.client import (
-    RateLimiter as BasicRateLimiter,
-)
+from src.data_collector.polygon_fundamentals.client import RateLimiter as BasicRateLimiter
 from src.utils.logger import get_logger
 
 
@@ -31,9 +29,7 @@ class RawPolygonFundamentalsClient:
         timeout = aiohttp.ClientTimeout(
             total=self.config.REQUEST_TIMEOUT, connect=self.config.CONNECTION_TIMEOUT
         )
-        self.session = aiohttp.ClientSession(
-            headers=self.config.headers, timeout=timeout
-        )
+        self.session = aiohttp.ClientSession(headers=self.config.headers, timeout=timeout)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -42,9 +38,7 @@ class RawPolygonFundamentalsClient:
 
     async def _get(self, url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not self.session:
-            raise RuntimeError(
-                "Client session not initialized. Use async context manager."
-            )
+            raise RuntimeError("Client session not initialized. Use async context manager.")
 
         await self.rate_limiter.wait_if_needed()
 
@@ -54,9 +48,7 @@ class RawPolygonFundamentalsClient:
                     if resp.status == 200:
                         return await resp.json()
                     if resp.status == 429:
-                        backoff = self.config.RETRY_DELAY * (
-                            self.config.BACKOFF_FACTOR**attempt
-                        )
+                        backoff = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
                         logger.warning(
                             f"429 rate limited. Sleeping {backoff:.2f}s (attempt {attempt + 1})"
                         )
@@ -69,15 +61,11 @@ class RawPolygonFundamentalsClient:
                 logger.error(f"HTTP failure attempt {attempt + 1}: {e}")
 
             if attempt < self.config.RETRY_ATTEMPTS - 1:
-                await asyncio.sleep(
-                    self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
-                )
+                await asyncio.sleep(self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt))
 
         return None
 
-    async def get_financials_raw(
-        self, ticker: str, **kwargs: Any
-    ) -> Optional[Dict[str, Any]]:
+    async def get_financials_raw(self, ticker: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
         url = self.config.get_financials_url(ticker)
         params = self.config.get_request_params(ticker, **kwargs)
         logger.info(f"Fetching fundamentals (raw) for {ticker}")

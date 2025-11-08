@@ -25,10 +25,10 @@ class MLPOptimizationMixin:
 
     def objective(
         self,
-        X_train: pd.DataFrame,
+        x_train: pd.DataFrame,
         y_train: pd.Series,
-        X_test: pd.DataFrame,
-        X_test_scaled: Optional[pd.DataFrame],
+        x_test: pd.DataFrame,
+        x_test_scaled: Optional[pd.DataFrame],
         y_test: pd.Series,
         fitted_scaler=StandardScaler,
     ) -> callable:
@@ -36,9 +36,9 @@ class MLPOptimizationMixin:
         Create Optuna objective function for hyperparameter optimization with threshold optimization
 
         Args:
-            X_train: Training features
+            x_train: Training features
             y_train: Training targets
-            X_test: Test features
+            x_test: Test features
             y_test: Test targets
             fitted_scaler: Pre-fitted StandardScaler instance (optional)
 
@@ -50,7 +50,7 @@ class MLPOptimizationMixin:
         self.best_trial_model = None
         self.best_trial_params = None
         self.best_threshold_info = None
-        self.feature_names = X_train.columns
+        self.feature_names = x_train.columns
 
         # Store the fitted scaler for use in trials
         if fitted_scaler is not None:
@@ -63,14 +63,7 @@ class MLPOptimizationMixin:
             # Get layer_sizes as string and convert to list
             layer_sizes_str = trial.suggest_categorical(
                 "layer_sizes",
-                (
-                    "64,32",
-                    "128,64",
-                    "256,128,64",
-                    "512,256,128,64",
-                    "128,64,32",
-                    "256,128,64,32",
-                ),
+                ("64,32", "128,64", "256,128,64", "512,256,128,64", "128,64,32", "256,128,64,32"),
             )
 
             # Convert string back to list of integers
@@ -78,16 +71,12 @@ class MLPOptimizationMixin:
 
             # Model creation parameters (relevant for _create_model)
             model_params = {
-                "input_size": len(X_train.columns),  # Add input_size from training data
+                "input_size": len(x_train.columns),  # Add input_size from training data
                 "layer_sizes": layer_sizes,
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 1e-4, 5e-2, log=True
-                ),
+                "learning_rate": trial.suggest_float("learning_rate", 1e-4, 5e-2, log=True),
                 "dropout": trial.suggest_float("dropout", 0.05, 0.5),
                 "optimizer": "adamw",  # Fixed - generally the best choice
-                "weight_decay": trial.suggest_float(
-                    "weight_decay", 1e-6, 1e-2, log=True
-                ),
+                "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
                 "activation": "relu",  # Fixed - most reliable activation
                 "epochs": trial.suggest_int("epochs", 5, 30),
                 "batch_norm": True,  # Fixed - generally beneficial
@@ -101,9 +90,7 @@ class MLPOptimizationMixin:
 
             # Data loading parameters (not relevant for model creation)
             data_params = {
-                "batch_size": trial.suggest_categorical(
-                    "batch_size", (256, 512, 1024, 2048)
-                ),
+                "batch_size": trial.suggest_categorical("batch_size", (256, 512, 1024, 2048)),
                 "num_workers": 4,  # Fixed based on CPU cores
                 # Only pin memory if CUDA is available to avoid warnings on CPU
                 "pin_memory": torch.cuda.is_available(),
@@ -125,9 +112,7 @@ class MLPOptimizationMixin:
                 trial_model.model.to(trial_model.device)
 
                 # Store the fitted scaler for later use in the trial model
-                self.current_trial_scaler = (
-                    getattr(self, "fitted_scaler", None) or fitted_scaler
-                )
+                self.current_trial_scaler = getattr(self, "fitted_scaler", None) or fitted_scaler
 
                 # Create DataLoaders using the cleaned and scaled data
                 num_workers = data_params.get("num_workers", 4)
@@ -139,7 +124,7 @@ class MLPOptimizationMixin:
 
                 # Create DataLoaders using the cleaned and scaled data
                 train_loader = MLPDataUtils.create_dataloader_from_dataframe(
-                    X_train,
+                    x_train,
                     y_train,
                     data_params["batch_size"],
                     shuffle=True,
@@ -147,7 +132,7 @@ class MLPOptimizationMixin:
                     pin_memory=pin_memory,
                 )
                 val_loader = MLPDataUtils.create_dataloader_from_dataframe(
-                    X_test_scaled,
+                    x_test_scaled,
                     y_test,
                     data_params["batch_size"],
                     shuffle=False,
@@ -165,16 +150,14 @@ class MLPOptimizationMixin:
 
                 # Extract current prices for test sets
                 test_current_prices = (
-                    X_test["close"].values
-                    if "close" in X_test.columns
-                    else np.ones(len(X_test))
+                    x_test["close"].values if "close" in x_test.columns else np.ones(len(x_test))
                 )
 
                 # Run threshold optimization for this trial
                 logger.info(f"Running threshold optimization for trial {trial.number}")
 
                 threshold_results = trial_model.optimize_prediction_threshold(
-                    X_test=X_test,
+                    x_test=x_test,
                     y_test=y_test,
                     current_prices_test=test_current_prices,
                     confidence_method="variance",
@@ -188,21 +171,15 @@ class MLPOptimizationMixin:
                 # Store additional threshold info for logging
                 threshold_info = {
                     "optimal_threshold": threshold_results["optimal_threshold"],
-                    "samples_kept_ratio": threshold_results["best_result"][
-                        "test_samples_ratio"
-                    ],
+                    "samples_kept_ratio": threshold_results["best_result"]["test_samples_ratio"],
                     "investment_success_rate": threshold_results["best_result"][
                         "investment_success_rate"
                     ],
                     "test_profit_per_investment": threshold_results["best_result"][
                         "test_profit_per_investment"
                     ],
-                    "custom_accuracy": threshold_results["best_result"][
-                        "test_custom_accuracy"
-                    ],
-                    "total_threshold_profit": threshold_results["best_result"][
-                        "test_profit"
-                    ],
+                    "custom_accuracy": threshold_results["best_result"]["test_custom_accuracy"],
+                    "total_threshold_profit": threshold_results["best_result"]["test_profit"],
                     "profitable_investments": threshold_results["best_result"][
                         "profitable_investments"
                     ],
@@ -210,15 +187,9 @@ class MLPOptimizationMixin:
 
                 # Log threshold optimization results for this trial
                 logger.info(f"Trial {trial.number} threshold optimization:")
-                logger.info(
-                    f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}"
-                )
-                logger.info(
-                    f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}"
-                )
-                logger.info(
-                    f"  Optimized profit per investment: {optimized_profit_score:.3f}"
-                )
+                logger.info(f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                logger.info(f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
+                logger.info(f"  Optimized profit per investment: {optimized_profit_score:.3f}")
 
                 # Check if this is the best trial so far
                 if optimized_profit_score > self.best_investment_success_rate:
@@ -311,34 +282,23 @@ class MLPOptimizationMixin:
             )
 
         # Add threshold optimization information if available
-        if (
-            hasattr(self, "best_threshold_info")
-            and self.best_threshold_info is not None
-        ):
+        if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
             base_info.update(
                 {
                     "threshold_optimization": {
-                        "optimal_threshold": self.best_threshold_info.get(
-                            "optimal_threshold"
-                        ),
-                        "samples_kept_ratio": self.best_threshold_info.get(
-                            "samples_kept_ratio"
-                        ),
+                        "optimal_threshold": self.best_threshold_info.get("optimal_threshold"),
+                        "samples_kept_ratio": self.best_threshold_info.get("samples_kept_ratio"),
                         "investment_success_rate": self.best_threshold_info.get(
                             "investment_success_rate"
                         ),
-                        "custom_accuracy": self.best_threshold_info.get(
-                            "custom_accuracy"
-                        ),
+                        "custom_accuracy": self.best_threshold_info.get("custom_accuracy"),
                         "total_threshold_profit": self.best_threshold_info.get(
                             "total_threshold_profit"
                         ),
                         "profitable_investments": self.best_threshold_info.get(
                             "profitable_investments"
                         ),
-                        "confidence_method": getattr(
-                            self, "confidence_method", "variance"
-                        ),
+                        "confidence_method": getattr(self, "confidence_method", "variance"),
                     }
                 }
             )
@@ -368,17 +328,10 @@ class MLPOptimizationMixin:
                 logger.warning("⚠️ No scaler found in best trial model")
 
             # Copy threshold optimization information if available
-            if (
-                hasattr(self, "best_threshold_info")
-                and self.best_threshold_info is not None
-            ):
+            if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
                 if self.best_threshold_info.get("optimal_threshold") is not None:
-                    self.optimal_threshold = self.best_threshold_info[
-                        "optimal_threshold"
-                    ]
-                    self.confidence_method = getattr(
-                        self, "confidence_method", "variance"
-                    )
+                    self.optimal_threshold = self.best_threshold_info["optimal_threshold"]
+                    self.confidence_method = getattr(self, "confidence_method", "variance")
 
             # Log the finalization
             logger.info(
@@ -387,15 +340,10 @@ class MLPOptimizationMixin:
             logger.info(f"✅ Best parameters: {self.best_trial_params}")
 
             # Log threshold information if available
-            if (
-                hasattr(self, "best_threshold_info")
-                and self.best_threshold_info is not None
-            ):
+            if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
                 threshold_info = self.best_threshold_info
                 if threshold_info.get("optimal_threshold") is not None:
-                    logger.info(
-                        f"✅ Optimal threshold: {threshold_info['optimal_threshold']:.3f}"
-                    )
+                    logger.info(f"✅ Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
                     logger.info(
                         f"✅ Samples kept ratio: {threshold_info.get('samples_kept_ratio', 0):.1%}"
                     )
@@ -409,16 +357,12 @@ class MLPOptimizationMixin:
                         f"✅ Profitable investments: {threshold_info.get('profitable_investments', 0)}"
                     )
                 else:
-                    logger.info(
-                        "✅ No threshold optimization was successful for the best trial"
-                    )
+                    logger.info("✅ No threshold optimization was successful for the best trial")
 
             # Log to MLflow if enabled
             if not getattr(self, "disable_mlflow", False):
                 # Log best hyperparameters
-                self.log_params(
-                    {f"best_{k}": v for k, v in self.best_trial_params.items()}
-                )
+                self.log_params({f"best_{k}": v for k, v in self.best_trial_params.items()})
 
                 # Log best metrics
                 metrics_to_log = {
@@ -428,35 +372,24 @@ class MLPOptimizationMixin:
 
                 # Add scaler information
                 if hasattr(self, "scaler") and self.scaler is not None:
-                    metrics_to_log.update(
-                        {"scaler_used": 1, "scaler_type": "StandardScaler"}
-                    )
+                    metrics_to_log.update({"scaler_used": 1, "scaler_type": "StandardScaler"})
                     logger.info("✅ StandardScaler information logged to MLflow")
                 else:
                     metrics_to_log.update({"scaler_used": 0, "scaler_type": "None"})
                     logger.warning("⚠️ No scaler information to log to MLflow")
 
                 # Add threshold metrics if available
-                if (
-                    hasattr(self, "best_threshold_info")
-                    and self.best_threshold_info is not None
-                ):
+                if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
                     threshold_info = self.best_threshold_info
                     if threshold_info.get("optimal_threshold") is not None:
                         metrics_to_log.update(
                             {
-                                "best_optimal_threshold": threshold_info[
-                                    "optimal_threshold"
-                                ],
-                                "best_samples_kept_ratio": threshold_info[
-                                    "samples_kept_ratio"
-                                ],
+                                "best_optimal_threshold": threshold_info["optimal_threshold"],
+                                "best_samples_kept_ratio": threshold_info["samples_kept_ratio"],
                                 "best_investment_success_rate": threshold_info[
                                     "investment_success_rate"
                                 ],
-                                "best_custom_accuracy": threshold_info[
-                                    "custom_accuracy"
-                                ],
+                                "best_custom_accuracy": threshold_info["custom_accuracy"],
                                 "best_total_threshold_profit": threshold_info[
                                     "total_threshold_profit"
                                 ],

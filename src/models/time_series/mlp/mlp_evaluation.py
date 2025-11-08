@@ -80,9 +80,7 @@ class MLPEvaluationMixin:
 
         return selected_features
 
-    def _clean_data_simple(
-        self, X: pd.DataFrame, y: pd.Series
-    ) -> Tuple[pd.DataFrame, pd.Series]:
+    def _clean_data_simple(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Simple data cleaning for feature selection.
 
@@ -101,9 +99,7 @@ class MLPEvaluationMixin:
         X_clean = X_clean[valid_mask]
         y_clean = y[valid_mask]
 
-        logger.info(
-            f"   Cleaned data: {len(y_clean)} samples, {len(X_clean.columns)} features"
-        )
+        logger.info(f"   Cleaned data: {len(y_clean)} samples, {len(X_clean.columns)} features")
 
         return X_clean, y_clean
 

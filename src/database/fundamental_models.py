@@ -21,6 +21,10 @@ from sqlalchemy.sql import func
 from datetime import date
 from typing import Optional
 
+# Database constraint constants
+TICKER_LENGTH_CONSTRAINT = "LENGTH(ticker) >= 1"
+MIN_DATE_CONSTRAINT = "date >= '2020-01-01'"
+
 Base = declarative_base()
 
 
@@ -70,8 +74,8 @@ class FundamentalRatios(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint("ticker", "date", name="unique_ticker_date_ratios"),
-        CheckConstraint("LENGTH(ticker) >= 1", name="valid_ticker_ratios"),
-        CheckConstraint("date >= '2020-01-01'", name="valid_date_ratios"),
+        CheckConstraint(TICKER_LENGTH_CONSTRAINT, name="valid_ticker_ratios"),
+        CheckConstraint(MIN_DATE_CONSTRAINT, name="valid_date_ratios"),
     )
 
     def __repr__(self):
@@ -126,8 +130,8 @@ class FundamentalGrowthMetrics(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint("ticker", "date", name="unique_ticker_date_growth"),
-        CheckConstraint("LENGTH(ticker) >= 1", name="valid_ticker_growth"),
-        CheckConstraint("date >= '2020-01-01'", name="valid_date_growth"),
+        CheckConstraint(TICKER_LENGTH_CONSTRAINT, name="valid_ticker_growth"),
+        CheckConstraint(MIN_DATE_CONSTRAINT, name="valid_date_growth"),
     )
 
     def __repr__(self):
@@ -188,11 +192,10 @@ class FundamentalScores(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint("ticker", "date", name="unique_ticker_date_scores"),
-        CheckConstraint("LENGTH(ticker) >= 1", name="valid_ticker_scores"),
-        CheckConstraint("date >= '2020-01-01'", name="valid_date_scores"),
+        CheckConstraint(TICKER_LENGTH_CONSTRAINT, name="valid_ticker_scores"),
+        CheckConstraint(MIN_DATE_CONSTRAINT, name="valid_date_scores"),
         CheckConstraint(
-            "piotroski_f_score >= 0 AND piotroski_f_score <= 9",
-            name="valid_piotroski_score",
+            "piotroski_f_score >= 0 AND piotroski_f_score <= 9", name="valid_piotroski_score"
         ),
     )
 
@@ -277,8 +280,8 @@ class FundamentalSectorAnalysis(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint("ticker", "date", name="unique_ticker_date_sector"),
-        CheckConstraint("LENGTH(ticker) >= 1", name="valid_ticker_sector"),
-        CheckConstraint("date >= '2020-01-01'", name="valid_date_sector"),
+        CheckConstraint(TICKER_LENGTH_CONSTRAINT, name="valid_ticker_sector"),
+        CheckConstraint(MIN_DATE_CONSTRAINT, name="valid_date_sector"),
         CheckConstraint(
             "pe_sector_percentile >= 0 AND pe_sector_percentile <= 100 AND "
             "pb_sector_percentile >= 0 AND pb_sector_percentile <= 100 AND "
@@ -333,30 +336,16 @@ def get_latest_fundamental_data(session, ticker: str) -> Optional[dict]:
     }
 
 
-def get_fundamental_data_by_date(
-    session, ticker: str, target_date: date
-) -> Optional[dict]:
+def get_fundamental_data_by_date(session, ticker: str, target_date: date) -> Optional[dict]:
     """Get fundamental data for a specific ticker and date"""
 
-    ratios = (
-        session.query(FundamentalRatios)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
-    )
+    ratios = session.query(FundamentalRatios).filter_by(ticker=ticker, date=target_date).first()
     growth = (
-        session.query(FundamentalGrowthMetrics)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
+        session.query(FundamentalGrowthMetrics).filter_by(ticker=ticker, date=target_date).first()
     )
-    scores = (
-        session.query(FundamentalScores)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
-    )
+    scores = session.query(FundamentalScores).filter_by(ticker=ticker, date=target_date).first()
     sector = (
-        session.query(FundamentalSectorAnalysis)
-        .filter_by(ticker=ticker, date=target_date)
-        .first()
+        session.query(FundamentalSectorAnalysis).filter_by(ticker=ticker, date=target_date).first()
     )
 
     if not ratios:

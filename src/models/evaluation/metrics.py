@@ -53,9 +53,7 @@ class CustomMetrics:
 
         # Ensure y_true and y_pred have same length
         if len(y_true) != len(y_pred):
-            logger.warning(
-                f"Array length mismatch: y_true={len(y_true)}, y_pred={len(y_pred)}"
-            )
+            logger.warning(f"Array length mismatch: y_true={len(y_true)}, y_pred={len(y_pred)}")
             min_length = min(len(y_true), len(y_pred))
             y_true = y_true[:min_length]
             y_pred = y_pred[:min_length]

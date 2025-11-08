@@ -5,9 +5,8 @@ from src.data_utils import feature_engineering as fe
 import pandas.testing as pdt
 
 
-def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
-    small_market_df,
-):
+def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(small_market_df):
+    """Ensure SMA_5_Ratio and Close_Open_Ratio are added and computed correctly."""
     df = small_market_df.copy()
 
     out = fe.add_price_normalized_features(df)
@@ -26,6 +25,7 @@ def test_add_price_normalized_features_creates_sma_ratio_and_close_open_ratio(
 
 
 def test_add_prediction_bounds_features_populates_expected_context_columns():
+    """Verify prediction-bounds features (Expected_10D_Move, RSI pressure, daily move) are added."""
     df = pd.DataFrame(
         {
             "ATR_Percent": [0.02, 0.04],
@@ -39,11 +39,7 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
     out = fe.add_prediction_bounds_features(df)
     import pandas.testing as pdt
 
-    expected_cols = [
-        "Expected_10D_Move",
-        "RSI_Mean_Reversion_Pressure",
-        "Expected_Daily_Move",
-    ]
+    expected_cols = ["Expected_10D_Move", "RSI_Mean_Reversion_Pressure", "Expected_Daily_Move"]
     for c in expected_cols:
         assert c in out.columns, f"Expected column {c} missing"
     pdt.assert_series_equal(
@@ -55,6 +51,7 @@ def test_add_prediction_bounds_features_populates_expected_context_columns():
 
 
 def test_clean_data_for_training_handles_inf_extreme_and_nan():
+    """Clean numeric columns: handle infinite/extreme values and remove NaNs, preserving non-numeric."""
     big = np.finfo(np.float32).max * 100.0
     df = pd.DataFrame(
         {
@@ -77,17 +74,14 @@ def test_clean_data_for_training_handles_inf_extreme_and_nan():
     assert not out[numeric_cols].isnull().any().any(), (
         f"NaNs remain after cleaning: {out[numeric_cols].isnull().sum().to_dict()}"
     )
-    if out["a"].dtype != np.float64:
-        raise AssertionError("Numeric dtype not converted to float64")
+    if out["a"].dtype != np.float32:
+        raise AssertionError("Numeric dtype not converted to float32")
 
 
 def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
+    """Detect constant and zero-variance features and report high-variance features."""
     df = pd.DataFrame(
-        {
-            "const": [1, 1, 1, 1],
-            "zero_var": [0.0, 0.0, 0.0, 0.0],
-            "varied": [1, 2, 3, 4],
-        }
+        {"const": [1, 1, 1, 1], "zero_var": [0.0, 0.0, 0.0, 0.0], "varied": [1, 2, 3, 4]}
     )
     res = fe.analyze_feature_diversity(df, min_variance_threshold=1e-6)
     if res["constant_feature_count"] < 1:
@@ -100,6 +94,7 @@ def test_analyze_feature_diversity_identifies_constant_and_zero_variance():
 
 def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves_essential():
     # essential columns must be preserved even if non-numeric/constant
+    """Remove non-numeric and highly correlated features while preserving essential columns like 'close'."""
     df = pd.DataFrame(
         {
             "close": ["100", "101", "102", "103"],  # object type but essential
@@ -112,15 +107,13 @@ def test_clean_features_for_training_removes_non_numeric_and_high_corr_preserves
     )
     y = pd.Series([0.1, 0.2, 0.3, 0.4])
 
-    X_clean, y_clean, removed = fe.clean_features_for_training(
-        df, y, correlation_threshold=0.9
-    )
-    if "cat" in X_clean.columns:
+    x_clean, y_clean, removed = fe.clean_features_for_training(df, y, correlation_threshold=0.9)
+    if "cat" in x_clean.columns:
         raise AssertionError("Non-numeric column not removed")
-    if not ("const" not in X_clean.columns or "const" in removed["constant"]):
+    if not ("const" not in x_clean.columns or "const" in removed["constant"]):
         raise AssertionError("Constant column removal mismatch")
     # keep1 or keep2 should remain but one of them likely removed due to high correlation (preserve essentials)
-    if "close" not in X_clean.columns:
+    if "close" not in x_clean.columns:
         raise AssertionError("Essential 'close' was removed unexpectedly")
-    if len(X_clean) != len(y_clean):
+    if len(x_clean) != len(y_clean):
         raise AssertionError("X and y lengths differ after cleaning")

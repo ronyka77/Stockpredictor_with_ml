@@ -3,7 +3,7 @@ import json
 from copy import deepcopy
 from datetime import datetime, timezone
 
-FIXTURE_DIR = "tests/_fixtures/data"
+FIXTURE_DIR = "tests/fixtures/data"
 
 
 def load_fixture(name: str) -> dict:
@@ -39,10 +39,7 @@ def make_raw_article(overrides: dict | None = None) -> dict:
             "favicon_url": "https://news.example.com/favicon.ico",
         },
         "insights": [
-            {
-                "sentiment": "positive",
-                "sentiment_reasoning": "Beat on revenue and margin expansion",
-            }
+            {"sentiment": "positive", "sentiment_reasoning": "Beat on revenue and margin expansion"}
         ],
     }
     if overrides:

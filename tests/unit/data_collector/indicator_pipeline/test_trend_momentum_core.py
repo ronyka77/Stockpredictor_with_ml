@@ -2,10 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data_collector.indicator_pipeline.trend_indicators import (
-    calculate_sma,
-    calculate_ema,
-)
+from src.data_collector.indicator_pipeline.trend_indicators import calculate_sma, calculate_ema
 from src.data_collector.indicator_pipeline.momentum_indicators import calculate_rsi
 
 
@@ -18,19 +15,13 @@ def make_ohlcv(n=60, seed=42):
     volume = rng.integers(1000, 5000, n)
     idx = pd.date_range("2024-01-01", periods=n, freq="D")
     return pd.DataFrame(
-        {
-            "open": opens,
-            "high": highs,
-            "low": lows,
-            "close": prices,
-            "volume": volume,
-        },
-        index=idx,
+        {"open": opens, "high": highs, "low": lows, "close": prices, "volume": volume}, index=idx
     )
 
 
 @pytest.mark.unit
 def test_sma_ema_column_naming_and_determinism():
+    """Validate SMA/EMA column names are present and outputs are deterministic."""
     df = make_ohlcv(n=100)
     sma = calculate_sma(df, periods=[5, 10, 20])
     ema = calculate_ema(df, periods=[5, 10, 20])
@@ -49,15 +40,11 @@ def test_sma_ema_column_naming_and_determinism():
 
 @pytest.mark.unit
 def test_rsi_bounds_and_signals():
+    """Ensure RSI produces expected signal columns and values stay within [0,100]."""
     df = make_ohlcv(n=100)
     rsi = calculate_rsi(df, periods=[14])
     cols = [c for c in rsi.data.columns if c.startswith("RSI_14")]
-    required = {
-        "RSI_14",
-        "RSI_14_Overbought",
-        "RSI_14_Oversold",
-        "RSI_14_Neutral",
-    }
+    required = {"RSI_14", "RSI_14_Overbought", "RSI_14_Oversold", "RSI_14_Neutral"}
     if not required.issubset(set(cols)):
         raise AssertionError("RSI output missing expected columns")
 

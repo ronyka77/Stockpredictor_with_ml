@@ -41,9 +41,7 @@ class MLPPredictorWrapper(BasePredictor):
         success = self.model.load_model(self.run_id)
 
         if not success:
-            raise RuntimeError(
-                f"Failed to load MLP model from MLflow run {self.run_id}"
-            )
+            raise RuntimeError(f"Failed to load MLP model from MLflow run {self.run_id}")
 
         # Set model to evaluation mode for prediction
         if hasattr(self.model, "model") and self.model.model is not None:
@@ -66,9 +64,7 @@ class MLPPredictorWrapper(BasePredictor):
             "   🔄 Single Instance Architecture: Using one MLPPredictorWithMLflow for prediction pipeline"
         )
 
-    def _reorder_features_for_inference(
-        self, features_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def _reorder_features_for_inference(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """
         Ensure incoming features strictly match the saved feature_names order.
         """
@@ -76,9 +72,7 @@ class MLPPredictorWrapper(BasePredictor):
             return features_df
         missing = [c for c in self.model.feature_names if c not in features_df.columns]
         if missing:
-            raise ValueError(
-                f"Missing required feature columns for inference: {missing}"
-            )
+            raise ValueError(f"Missing required feature columns for inference: {missing}")
         # Strict order and dtype
         return features_df.loc[:, self.model.feature_names].astype("float32")
 

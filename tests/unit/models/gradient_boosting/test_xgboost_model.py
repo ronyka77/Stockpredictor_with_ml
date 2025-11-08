@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import pytest
 from unittest.mock import Mock, patch
 
@@ -38,8 +37,10 @@ def test_get_prediction_confidence_leaf_and_margin(xgb_model_instance, sample_ta
         def get_label(self):
             return np.zeros(len(self._data))
 
-    with patch("src.models.gradient_boosting.xgboost_model.xgb.DMatrix", side_effect=lambda data, label=None, feature_names=None: FakeDMatrix(data)):
-
+    with patch(
+        "src.models.gradient_boosting.xgboost_model.xgb.DMatrix",
+        side_effect=lambda data, label=None, feature_names=None: FakeDMatrix(data),
+    ):
         # Execution: leaf_depth
         conf_leaf = xgb_model_instance.get_prediction_confidence(X, method="leaf_depth")
 
@@ -93,8 +94,12 @@ def test_predict_uses_dmatrix_and_returns_array(xgb_model_instance, sample_tabul
         def get_label(self):
             return np.zeros(len(self._data))
 
-    with patch("src.models.gradient_boosting.xgboost_model.xgb.DMatrix", side_effect=lambda data, label=None, feature_names=None: FakeDMatrix(data, label, feature_names)):
-
+    with patch(
+        "src.models.gradient_boosting.xgboost_model.xgb.DMatrix",
+        side_effect=lambda data, label=None, feature_names=None: FakeDMatrix(
+            data, label, feature_names
+        ),
+    ):
         # Execution
         preds = xgb_model_instance.predict(X)
 
@@ -106,15 +111,19 @@ def test_predict_uses_dmatrix_and_returns_array(xgb_model_instance, sample_tabul
 def test_log_model_to_mlflow_calls_helper(xgb_model_instance, sample_tabular_data):
     """Setup: patch module-level log_to_mlflow helper to avoid real MLflow calls."""
 
-    X_eval = sample_tabular_data["X"].iloc[:4]
+    x_eval = sample_tabular_data["X"].iloc[:4]
     metrics = {"mse": 0.2}
     params = {"param": 2}
 
-    with patch("src.models.gradient_boosting.xgboost_model.log_to_mlflow", return_value="xg-run-1") as mock_log:
+    with patch(
+        "src.models.gradient_boosting.xgboost_model.log_to_mlflow", return_value="xg-run-1"
+    ) as mock_log:
         xgb_model_instance.model = Mock()
 
         # Execution
-        run_id = xgb_model_instance.log_model_to_mlflow(metrics=metrics, params=params, X_eval=X_eval, experiment_name="exp")
+        run_id = xgb_model_instance.log_model_to_mlflow(
+            metrics=metrics, params=params, x_eval=x_eval, experiment_name="exp"
+        )
 
         # Verification
         mock_log.assert_called_once()
@@ -135,9 +144,16 @@ def test_load_model_handles_missing_artifacts_and_signature(xgb_model_instance):
     fake_client.get_run.return_value = fake_run_info
     fake_client.list_artifacts.return_value = []
 
-    with patch("src.models.gradient_boosting.xgboost_model.mlflow.tracking.MlflowClient", return_value=fake_client), \
-         patch("src.models.gradient_boosting.xgboost_model.mlflow.xgboost.load_model", return_value=Mock()):
-
+    with (
+        patch(
+            "src.models.gradient_boosting.xgboost_model.mlflow.tracking.MlflowClient",
+            return_value=fake_client,
+        ),
+        patch(
+            "src.models.gradient_boosting.xgboost_model.mlflow.xgboost.load_model",
+            return_value=Mock(),
+        ),
+    ):
         # Execution
         xgb_model_instance.load_model(fake_run_id)
 

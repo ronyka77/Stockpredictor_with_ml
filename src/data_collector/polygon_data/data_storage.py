@@ -8,14 +8,7 @@ import pandas as pd
 
 from src.utils.logger import get_logger
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
-from src.database.connection import (
-    get_global_pool,
-    init_global_pool,
-    fetch_all,
-    fetch_one,
-    execute,
-    execute_values,
-)
+from src.database.connection import init_global_pool, fetch_all, fetch_one, execute, execute_values
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -36,10 +29,7 @@ class DataStorage:
         init_global_pool()
 
     def store_historical_data(
-        self,
-        records: List[OHLCVRecord],
-        batch_size: int = 1000,
-        on_conflict: str = "update",
+        self, records: List[OHLCVRecord], batch_size: int = 5000
     ) -> Dict[str, Any]:
         """
         Store validated OHLCV data to PostgreSQL database
@@ -47,7 +37,6 @@ class DataStorage:
         Args:
             records: List of validated OHLCV records
             batch_size: Number of records to insert in each batch
-            on_conflict: How to handle conflicts ('update', 'ignore', 'error')
 
         Returns:
             Dictionary with storage statistics
@@ -82,22 +71,10 @@ class DataStorage:
                 batch_df = df.iloc[i : i + batch_size]
 
                 try:
-                    if on_conflict == "update":
-                        batch_stored, batch_updated = self._upsert_batch(batch_df)
-                        stored_count += batch_stored
-                        updated_count += batch_updated
-                    elif on_conflict == "ignore":
-                        batch_stored = self._insert_ignore_batch(batch_df)
-                        stored_count += batch_stored
-                    else:  # error
-                        batch_stored = self._insert_batch(batch_df)
-                        stored_count += batch_stored
-
-                    logger.info(
-                        f"Processed batch {i // batch_size + 1}: "
-                        f"{len(batch_df)} records"
-                    )
-
+                    batch_stored, batch_updated = self._upsert_batch(batch_df)
+                    stored_count += batch_stored
+                    updated_count += batch_updated
+                    logger.info(f"Processed batch {i // batch_size + 1}: {len(batch_df)} records")
                 except Exception as e:
                     logger.error(f"Error processing batch {i // batch_size + 1}: {e}")
                     error_count += len(batch_df)
@@ -129,7 +106,7 @@ class DataStorage:
         Returns:
             Tuple of (inserted_count, updated_count)
         """
-        # Use psycopg2.execute_values for performant batched upserts
+        # Use execute_values for performant batched upserts
         cols = [
             "ticker",
             "date",
@@ -191,28 +168,6 @@ class DataStorage:
             return len(batch_df)
         except Exception as e:
             logger.error(f"_insert_ignore_batch failed: {e}")
-            raise
-
-    def _insert_batch(self, batch_df: pd.DataFrame) -> int:
-        """
-        Insert batch without conflict handling
-
-        Args:
-            batch_df: DataFrame with batch data
-
-        Returns:
-            Number of records inserted
-        """
-        # Generic insert using execute_values
-        cols = list(batch_df.columns)
-        values = [tuple(row[col] for col in cols) for _, row in batch_df.iterrows()]
-        insert_sql = "INSERT INTO historical_prices (" + ",".join(cols) + ") VALUES %s"
-
-        try:
-            execute_values(insert_sql, values, page_size=1000)
-            return len(batch_df)
-        except Exception as e:
-            logger.error(f"_insert_batch failed: {e}")
             raise
 
     def get_historical_data(
@@ -385,9 +340,7 @@ class DataStorage:
             record_count = 0
             if table_exists:
                 rc = fetch_one("SELECT COUNT(*) as cnt FROM historical_prices")
-                record_count = (
-                    rc.get("cnt") if isinstance(rc, dict) else (rc[0] if rc else 0)
-                )
+                record_count = rc.get("cnt") if isinstance(rc, dict) else (rc[0] if rc else 0)
 
             return {
                 "status": "healthy",
@@ -399,11 +352,7 @@ class DataStorage:
 
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }
+            return {"status": "unhealthy", "error": str(e), "timestamp": datetime.now().isoformat()}
 
     def __enter__(self):
         """Context manager entry"""
@@ -466,9 +415,7 @@ class DataStorage:
                             "list_date": ticker_data.get("list_date"),
                         }
                         # Remove None values
-                        upsert_data = {
-                            k: v for k, v in upsert_data.items() if v is not None
-                        }
+                        upsert_data = {k: v for k, v in upsert_data.items() if v is not None}
 
                         if cols is None:
                             cols = list(upsert_data.keys())
@@ -483,14 +430,11 @@ class DataStorage:
                     insert_sql = (
                         f"INSERT INTO tickers ({insert_columns}) VALUES %s "
                         f"ON CONFLICT (ticker) DO UPDATE SET "
-                        + ", ".join(
-                            [f"{c}=EXCLUDED.{c}" for c in cols if c != "ticker"]
-                        )
+                        + ", ".join([f"{c}=EXCLUDED.{c}" for c in cols if c != "ticker"])
                     )
 
                     # use centralized helper for batched upsert
                     execute_values(insert_sql, rows, page_size=500)
-
                     stored_count += len(batch_data)
 
                     logger.info(
@@ -498,15 +442,11 @@ class DataStorage:
                     )
 
                 except Exception as e:
-                    logger.error(
-                        f"Error processing ticker batch {i // batch_size + 1}: {e}"
-                    )
+                    logger.error(f"Error processing ticker batch {i // batch_size + 1}: {e}")
                     error_count += len(batch_data)
                     continue
 
-            logger.info(
-                f"Ticker storage complete: {stored_count} processed, {error_count} errors"
-            )
+            logger.info(f"Ticker storage complete: {stored_count} processed, {error_count} errors")
 
             return {
                 "stored_count": stored_count,
@@ -519,97 +459,102 @@ class DataStorage:
             logger.error(f"Ticker storage failed: {e}")
             raise
 
-    def get_tickers(
-        self, market: str = "stocks", active: bool = True, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Get tickers from database
+    def get_tickers(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get tickers from database"""
 
-        Args:
-            market: Market type filter
-            active: Active status filter
-            limit: Maximum number of results
+        query = "SELECT * FROM tickers WHERE active = true"
+        params = []
 
-        Returns:
-            List of ticker dictionaries
-        """
-        query = "SELECT * FROM tickers WHERE 1=1"
-        params = {}
-
-        if market:
-            query += " AND market = :market"
-            params["market"] = market
-
-        if active is not None:
-            query += " AND active = :active"
-            params["active"] = active
+        if ticker:
+            query += " AND ticker = %s"
+            params.append(ticker)
 
         query += " ORDER BY ticker"
 
-        if limit:
-            query += f" LIMIT {limit}"
-
         try:
-            with get_global_pool().connection() as conn:
-                result = conn.execute(query, params)
-                tickers = []
+            result = fetch_all(query, tuple(params) if params else None, dict_cursor=True)
+            tickers = []
 
-                for row in result:
-                    ticker_dict = dict(row._mapping)
-                    tickers.append(ticker_dict)
+            for row in result:
+                tickers.append(row)
 
-                logger.info(f"Retrieved {len(tickers)} tickers from database")
-                return tickers
+            logger.info(f"Retrieved {len(tickers)} tickers from database")
+            return tickers
 
         except Exception as e:
             logger.error(f"Error retrieving tickers: {e}")
             raise
 
-    def get_ticker_symbols(
-        self, market: str = "stocks", active: bool = True, limit: Optional[int] = None
-    ) -> List[str]:
+    def load_dividends_for_ticker(
+        self, ticker: str, start_date: Optional[date] = None, end_date: Optional[date] = None
+    ) -> pd.DataFrame:
         """
-        Get ticker symbols only (for performance)
+        Load dividend data for a specific ticker within a date range.
 
         Args:
-            market: Market type filter
-            active: Active status filter
-            limit: Maximum number of results
+            ticker: Stock ticker symbol
+            start_date: Start date filter (ex_dividend_date >= start_date)
+            end_date: End date filter (ex_dividend_date <= end_date)
 
         Returns:
-            List of ticker symbols
+            DataFrame with columns: ex_dividend_date, cash_amount, pay_date, record_date, id, currency
         """
-        query = "SELECT ticker FROM tickers WHERE 1=1"
-        params = {}
+        query = """
+            SELECT
+                d.ex_dividend_date,
+                d.cash_amount,
+                d.pay_date,
+                d.record_date,
+                d.id,
+                d.currency
+            FROM dividends d
+            JOIN tickers t ON d.ticker_id = t.id
+            WHERE t.ticker = %s
+        """
+        params = [ticker.upper()]
 
-        if market:
-            query += " AND market = :market"
-            params["market"] = market
+        if start_date:
+            query += " AND d.ex_dividend_date >= %s"
+            params.append(start_date)
 
-        if active is not None:
-            query += " AND active = :active"
-            params["active"] = active
+        if end_date:
+            query += " AND d.ex_dividend_date <= %s"
+            params.append(end_date)
 
-        # Add type filter for common stock
-        query += " AND type = 'CS' AND market_cap is null"
-
-        query += " ORDER BY ticker"
-
-        if limit:
-            query += f" LIMIT {limit}"
+        query += " ORDER BY d.ex_dividend_date ASC"
 
         try:
-            with get_global_pool().connection() as conn:
-                result = conn.execute(query, params)
-                tickers = [row[0] for row in result]
+            rows = fetch_all(query, tuple(params), dict_cursor=True)
+            if not rows:
+                logger.info(f"No dividend data found for {ticker}")
+                return pd.DataFrame(
+                    columns=[
+                        "ex_dividend_date",
+                        "cash_amount",
+                        "pay_date",
+                        "record_date",
+                        "id",
+                        "currency",
+                    ]
+                )
 
-                logger.info(f"Retrieved {len(tickers)} ticker symbols from database")
-                return tickers
+            df = pd.DataFrame(rows)
+
+            # Ensure proper data types
+            df["ex_dividend_date"] = pd.to_datetime(df["ex_dividend_date"]).dt.date
+            df["cash_amount"] = df["cash_amount"].astype(float)
+            if "pay_date" in df.columns and df["pay_date"].notna().any():
+                df["pay_date"] = pd.to_datetime(df["pay_date"]).dt.date
+            if "record_date" in df.columns and df["record_date"].notna().any():
+                df["record_date"] = pd.to_datetime(df["record_date"]).dt.date
+
+            logger.info(f"Loaded {len(df)} dividend records for {ticker}")
+            return df
 
         except Exception as e:
-            logger.error(f"Error retrieving ticker symbols: {e}")
+            logger.error(f"Error loading dividend data for {ticker}: {e}")
             raise
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""
         pass

@@ -73,9 +73,7 @@ class PolygonFundamentalsClient:
         timeout = aiohttp.ClientTimeout(
             total=self.config.REQUEST_TIMEOUT, connect=self.config.CONNECTION_TIMEOUT
         )
-        self.session = aiohttp.ClientSession(
-            headers=self.config.headers, timeout=timeout
-        )
+        self.session = aiohttp.ClientSession(headers=self.config.headers, timeout=timeout)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -85,10 +83,7 @@ class PolygonFundamentalsClient:
 
     def _get_cache_path(self, ticker: str, endpoint: str) -> Path:
         """Get cache file path for a ticker and endpoint"""
-        return (
-            self.cache_dir
-            / f"{ticker}_{endpoint}_{datetime.now().strftime('%Y%m%d')}.json"
-        )
+        return self.cache_dir / f"{ticker}_{endpoint}_{datetime.now().strftime('%Y%m%d')}.json"
 
     def _is_cache_valid(self, cache_path: Path) -> bool:
         """Check if cache file is still valid"""
@@ -102,28 +97,32 @@ class PolygonFundamentalsClient:
         """Load data from cache file"""
         try:
             if self._is_cache_valid(cache_path):
-                with open(cache_path, "r") as f:
-                    return json.load(f)
+                return await asyncio.to_thread(self._sync_load_json, cache_path)
         except Exception as e:
             logger.warning(f"Failed to load cache from {cache_path}: {e}")
         return None
 
+    def _sync_load_json(self, cache_path: Path) -> Dict[str, Any]:
+        """Synchronous JSON loading"""
+        with open(cache_path, "r") as f:
+            return json.load(f)
+
     async def _save_to_cache(self, cache_path: Path, data: Dict[str, Any]):
         """Save data to cache file"""
         try:
-            with open(cache_path, "w") as f:
-                json.dump(data, f, default=str)
+            await asyncio.to_thread(self._sync_save_json, cache_path, data)
         except Exception as e:
             logger.warning(f"Failed to save cache to {cache_path}: {e}")
 
-    async def _make_request(
-        self, url: str, params: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _sync_save_json(self, cache_path: Path, data: Dict[str, Any]):
+        """Synchronous JSON saving"""
+        with open(cache_path, "w") as f:
+            json.dump(data, f, default=str)
+
+    async def _make_request(self, url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Make HTTP request with retry logic"""
         if not self.session:
-            raise RuntimeError(
-                "Client session not initialized. Use async context manager."
-            )
+            raise RuntimeError("Client session not initialized. Use async context manager.")
 
         # Skip rate limiting if globally disabled
         if not getattr(config, "DISABLE_RATE_LIMITING", False):
@@ -141,9 +140,7 @@ class PolygonFundamentalsClient:
                                 "Received 429 but rate limiting disabled. Retrying immediately."
                             )
                             continue
-                        wait_time = self.config.RETRY_DELAY * (
-                            self.config.BACKOFF_FACTOR**attempt
-                        )
+                        wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
                         logger.warning(f"Rate limited, waiting {wait_time} seconds")
                         await asyncio.sleep(wait_time)
                     else:
@@ -158,16 +155,12 @@ class PolygonFundamentalsClient:
                 if getattr(config, "DISABLE_RATE_LIMITING", False):
                     # No delay between retries when disabled
                     continue
-                wait_time = self.config.RETRY_DELAY * (
-                    self.config.BACKOFF_FACTOR**attempt
-                )
+                wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
                 await asyncio.sleep(wait_time)
 
         return None
 
-    async def get_financials(
-        self, ticker: str, **kwargs
-    ) -> Optional[FundamentalDataResponse]:
+    async def get_financials(self, ticker: str, **kwargs) -> Optional[FundamentalDataResponse]:
         """
         Get financial statements for a ticker
 
@@ -235,9 +228,7 @@ class PolygonFundamentalsClient:
                         legacy_data["income_statements"] = []
 
                     # Map new field names to expected names
-                    stmt = self._map_income_statement_fields(
-                        financials["income_statement"]
-                    )
+                    stmt = self._map_income_statement_fields(financials["income_statement"])
                     stmt.update(
                         {
                             "start_date": result.get("start_date"),
@@ -250,9 +241,7 @@ class PolygonFundamentalsClient:
                             "company_name": result.get("company_name"),
                             "ticker": ticker,
                             "source_filing_url": result.get("source_filing_url"),
-                            "source_filing_file_url": result.get(
-                                "source_filing_file_url"
-                            ),
+                            "source_filing_file_url": result.get("source_filing_file_url"),
                         }
                     )
                     legacy_data["income_statements"].append(stmt)
@@ -276,9 +265,7 @@ class PolygonFundamentalsClient:
                             "company_name": result.get("company_name"),
                             "ticker": ticker,
                             "source_filing_url": result.get("source_filing_url"),
-                            "source_filing_file_url": result.get(
-                                "source_filing_file_url"
-                            ),
+                            "source_filing_file_url": result.get("source_filing_file_url"),
                         }
                     )
                     legacy_data["balance_sheets"].append(stmt)
@@ -302,9 +289,7 @@ class PolygonFundamentalsClient:
                             "company_name": result.get("company_name"),
                             "ticker": ticker,
                             "source_filing_url": result.get("source_filing_url"),
-                            "source_filing_file_url": result.get(
-                                "source_filing_file_url"
-                            ),
+                            "source_filing_file_url": result.get("source_filing_file_url"),
                         }
                     )
                     legacy_data["cash_flow_statements"].append(stmt)
@@ -315,9 +300,7 @@ class PolygonFundamentalsClient:
             logger.error(f"Failed to parse financial response for {ticker}: {e}")
             return response
 
-    def _map_income_statement_fields(
-        self, income_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _map_income_statement_fields(self, income_data: Dict[str, Any]) -> Dict[str, Any]:
         """Map new API field names to expected field names for income statement"""
         field_mapping = {
             # New API field -> Expected field name
@@ -427,10 +410,7 @@ class PolygonFundamentalsClient:
                 financials = data.get("financials")
                 if isinstance(financials, dict) and statement_type in financials:
                     statement_section = financials.get(statement_type, {})
-                    if (
-                        isinstance(statement_section, dict)
-                        and field_name in statement_section
-                    ):
+                    if isinstance(statement_section, dict) and field_name in statement_section:
                         field_data = statement_section[field_name]
                         if isinstance(field_data, dict) and "value" in field_data:
                             return FinancialValue(**field_data)
@@ -555,9 +535,7 @@ class PolygonFundamentalsClient:
             logger.error(f"Failed to parse income statement direct format: {e}")
             return None
 
-    def _parse_balance_sheet_direct(
-        self, stmt_data: Dict[str, Any]
-    ) -> Optional[BalanceSheet]:
+    def _parse_balance_sheet_direct(self, stmt_data: Dict[str, Any]) -> Optional[BalanceSheet]:
         """Parse balance sheet from direct API format"""
         try:
             # Convert all financial fields to FinancialValue objects
@@ -620,9 +598,7 @@ class PolygonFundamentalsClient:
             ]
 
             for field in financial_fields:
-                financial_value = self._extract_financial_value(
-                    stmt_data, field, "balance_sheet"
-                )
+                financial_value = self._extract_financial_value(stmt_data, field, "balance_sheet")
                 if financial_value is not None:
                     parsed_data[field] = financial_value
 

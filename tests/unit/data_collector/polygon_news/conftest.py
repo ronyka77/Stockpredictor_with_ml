@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from tests.unit.data_collector.polygon_news.helpers import (
     load_fixture,
@@ -8,7 +6,7 @@ from tests.unit.data_collector.polygon_news.helpers import (
 
 
 @pytest.fixture(scope="function")
-def db_session():
+def news_db_session():
     """Compatibility fixture retained for tests that request `db_session`.
 
     After migration away from SQLAlchemy, tests should avoid using this fixture.
@@ -31,14 +29,6 @@ def db_session():
             raise RuntimeError("ORM query not supported in pool-based tests")
 
     yield DummySession()
-
-
-def _load_fixture(name: str):
-    path = f"tests/_fixtures/data/{name}.json"
-    with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-        # ensure published_utc strings are returned as ISO strings (validator will parse)
-        return data
 
 
 @pytest.fixture

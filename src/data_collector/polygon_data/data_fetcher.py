@@ -25,9 +25,7 @@ class HistoricalDataFetcher:
     Handles data transformation, validation, and quality checks for historical stock data.
     """
 
-    def __init__(
-        self, client: PolygonDataClient, validator: Optional[DataValidator] = None
-    ):
+    def __init__(self, client: PolygonDataClient, validator: Optional[DataValidator] = None):
         """
         Initialize the historical data fetcher
 
@@ -63,18 +61,10 @@ class HistoricalDataFetcher:
             Tuple of (validated_records, quality_metrics)
         """
         # Convert dates to strings if needed
-        start_str = (
-            start_date.strftime("%Y-%m-%d")
-            if isinstance(start_date, date)
-            else start_date
-        )
-        end_str = (
-            end_date.strftime("%Y-%m-%d") if isinstance(end_date, date) else end_date
-        )
+        start_str = start_date.strftime("%Y-%m-%d") if isinstance(start_date, date) else start_date
+        end_str = end_date.strftime("%Y-%m-%d") if isinstance(end_date, date) else end_date
 
-        logger.info(
-            f"Fetching {timespan} data for {ticker} from {start_str} to {end_str}"
-        )
+        logger.info(f"Fetching {timespan} data for {ticker} from {start_str} to {end_str}")
 
         try:
             # Fetch raw data from Polygon.io
@@ -192,9 +182,7 @@ class HistoricalDataFetcher:
                     time.sleep(delay_between_batches)
 
         successful_tickers = sum(1 for records, _ in results.values() if records)
-        logger.info(
-            f"Bulk fetch complete: {successful_tickers}/{len(tickers)} tickers successful"
-        )
+        logger.info(f"Bulk fetch complete: {successful_tickers}/{len(tickers)} tickers successful")
 
         return results
 
@@ -213,9 +201,7 @@ class HistoricalDataFetcher:
         """
         # Convert date to string if needed
         date_str = (
-            target_date.strftime("%Y-%m-%d")
-            if isinstance(target_date, date)
-            else target_date
+            target_date.strftime("%Y-%m-%d") if isinstance(target_date, date) else target_date
         )
 
         logger.info(f"Fetching grouped daily data for {date_str}")
@@ -240,9 +226,7 @@ class HistoricalDataFetcher:
                     transformed = self._transform_polygon_record(record, ticker)
                     if transformed:
                         if validate_data:
-                            validated_record = self.validator.validate_ohlcv_record(
-                                transformed
-                            )
+                            validated_record = self.validator.validate_ohlcv_record(transformed)
                             if validated_record:
                                 results[ticker] = validated_record
                         else:

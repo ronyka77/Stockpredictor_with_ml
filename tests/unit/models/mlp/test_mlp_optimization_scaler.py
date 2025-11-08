@@ -11,7 +11,7 @@ from src.models.time_series.mlp.mlp_predictor import MLPPredictor
 class TestMLPOptimizationScalerIntegration:
     def setup_method(self):
         rng = np.random.RandomState(42)
-        self.X_train = pd.DataFrame(
+        self.x_train = pd.DataFrame(
             {
                 "feature1": rng.randn(200),
                 "feature2": rng.randn(200),
@@ -20,7 +20,7 @@ class TestMLPOptimizationScalerIntegration:
             }
         )
         self.y_train = pd.Series(rng.randn(200))
-        self.X_test = pd.DataFrame(
+        self.x_test = pd.DataFrame(
             {
                 "feature1": rng.randn(50),
                 "feature2": rng.randn(50),
@@ -34,9 +34,7 @@ class TestMLPOptimizationScalerIntegration:
             model_name="test_mlp_optimization",
             config={"layer_sizes": [10, 5], "input_size": 4, "batch_size": 16},
         )
-        self.predictor.model = MLPModule(
-            input_size=4, layer_sizes=[10, 5], output_size=1
-        )
+        self.predictor.model = MLPModule(input_size=4, layer_sizes=[10, 5], output_size=1)
         self.predictor.device = torch.device("cpu")
         self.predictor.model = self.predictor.model.to("cpu")
 
@@ -46,13 +44,15 @@ class TestMLPOptimizationScalerIntegration:
         self.optimization_mixin.threshold_evaluator = None
 
     def test_prepare_data_for_training_with_scaler(self):
-        cleaned = MLPDataUtils.validate_and_clean_data(self.X_train)
+        """Prepare and scale training data, ensuring a StandardScaler is produced for trials."""
+        cleaned = MLPDataUtils.validate_and_clean_data(self.x_train)
         X_clean, scaler = MLPDataUtils.scale_data(cleaned, None, True)
         self.optimization_mixin.current_trial_scaler = scaler
         if not isinstance(self.optimization_mixin.current_trial_scaler, StandardScaler):
             raise AssertionError("current_trial_scaler should be a StandardScaler")
 
     def test_create_model_for_tuning_with_scaler(self):
+        """Set a scaler on a trial predictor and verify it's stored on the predictor."""
         trial_predictor = MLPPredictor(
             model_name="test_trial", config={"input_size": 4, "layer_sizes": [10, 5]}
         )
@@ -62,16 +62,17 @@ class TestMLPOptimizationScalerIntegration:
             raise AssertionError("Trial predictor scaler not set correctly")
 
     def test_objective_function_scaler_integration(self):
-        cleaned_train = MLPDataUtils.validate_and_clean_data(self.X_train)
-        X_train_clean, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
-        cleaned_test = MLPDataUtils.validate_and_clean_data(self.X_test)
-        X_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
+        """Objective callable should integrate with provided fitted scaler for trial evaluation."""
+        cleaned_train = MLPDataUtils.validate_and_clean_data(self.x_train)
+        x_train_clean, scaler = MLPDataUtils.scale_data(cleaned_train, None, True)
+        cleaned_test = MLPDataUtils.validate_and_clean_data(self.x_test)
+        x_test_scaled, _ = MLPDataUtils.scale_data(cleaned_test, scaler, False)
 
         objective_func = self.optimization_mixin.objective(
-            X_train=self.X_train,
+            x_train=self.x_train,
             y_train=self.y_train,
-            X_test=self.X_test,
-            X_test_scaled=X_test_scaled,
+            x_test=self.x_test,
+            x_test_scaled=x_test_scaled,
             y_test=self.y_test,
             fitted_scaler=scaler,
         )

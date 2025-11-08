@@ -72,9 +72,7 @@ class FundamentalCacheManager:
             most_recent_cache = max(valid_caches, key=lambda x: x[1])
             cache_file, file_date = most_recent_cache
 
-            logger.info(
-                f"Using cached data for {ticker} from {file_date.strftime('%Y-%m-%d')}"
-            )
+            logger.info(f"Using cached data for {ticker} from {file_date.strftime('%Y-%m-%d')}")
 
             # Read and parse JSON file
             with open(cache_file, "r") as f:
@@ -112,10 +110,7 @@ class FundamentalCacheManager:
             return 0
 
     def save_cache(
-        self,
-        ticker: str,
-        data: Dict[str, Any],
-        overwrite: bool = True,
+        self, ticker: str, data: Dict[str, Any], overwrite: bool = True
     ) -> Optional[Path]:
         """
         Save fundamental data to cache as JSON.
@@ -138,15 +133,11 @@ class FundamentalCacheManager:
                 return None
 
             cache_date = datetime.now()
-            filename = (
-                f"{normalized_ticker}_financials_{cache_date.strftime('%Y%m%d')}.json"
-            )
+            filename = f"{normalized_ticker}_financials_{cache_date.strftime('%Y%m%d')}.json"
             file_path = self.cache_dir / filename
 
             if file_path.exists() and not overwrite:
-                logger.info(
-                    f"Cache file already exists and overwrite is False: {file_path.name}"
-                )
+                logger.info(f"Cache file already exists and overwrite is False: {file_path.name}")
                 return None
 
             # Write JSON with UTF-8 encoding and readable formatting
@@ -154,13 +145,7 @@ class FundamentalCacheManager:
             from src.utils.serialization import json_fallback_serializer
 
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(
-                    data,
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                    default=json_fallback_serializer,
-                )
+                json.dump(data, f, ensure_ascii=False, indent=2, default=json_fallback_serializer)
 
             logger.info(f"Saved cache for {normalized_ticker} at {file_path.name}")
             return file_path

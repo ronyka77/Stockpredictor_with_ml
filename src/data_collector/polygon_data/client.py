@@ -18,10 +18,7 @@ class PolygonAPIError(Exception):
     """Custom exception for Polygon API errors"""
 
     def __init__(
-        self,
-        message: str,
-        status_code: Optional[int] = None,
-        response_data: Optional[Dict] = None,
+        self, message: str, status_code: Optional[int] = None, response_data: Optional[Dict] = None
     ):
         self.message = message
         self.status_code = status_code
@@ -50,13 +47,11 @@ class PolygonDataClient:
             {"User-Agent": "StockPredictor/1.0", "Accept": "application/json"}
         )
 
-        logger.info(
-            f"Polygon client initialized with {requests_per_minute} requests/minute limit"
-        )
+        # logger.info(
+        #     f"Polygon client initialized with {requests_per_minute} requests/minute limit"
+        # )
 
-    def _make_request(
-        self, endpoint: str, params: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+    def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Make an API request with comprehensive error handling and retries
 
@@ -85,9 +80,7 @@ class PolygonDataClient:
                     f"Making request to {endpoint} (attempt {attempt + 1}/{config.MAX_RETRIES})"
                 )
 
-                response = self.session.get(
-                    url, params=params, timeout=config.REQUEST_TIMEOUT
-                )
+                response = self.session.get(url, params=params, timeout=config.REQUEST_TIMEOUT)
 
                 # Handle different response status codes
                 if response.status_code == 200:
@@ -101,19 +94,13 @@ class PolygonDataClient:
                     try:
                         data = response.json()
                     except Exception as e:
-                        logger.error(
-                            f"Error parsing JSON response from {endpoint}: {e}"
-                        )
-                        raise PolygonAPIError(
-                            "Malformed JSON in response", response.status_code
-                        )
+                        logger.error(f"Error parsing JSON response from {endpoint}: {e}")
+                        raise PolygonAPIError("Malformed JSON in response", response.status_code)
 
                     # Check for API-level errors in response
                     if data.get("status") == "ERROR":
                         error_msg = data.get("error", "Unknown API error")
-                        raise PolygonAPIError(
-                            f"API Error: {error_msg}", response.status_code, data
-                        )
+                        raise PolygonAPIError(f"API Error: {error_msg}", response.status_code, data)
 
                     logger.info(f"Successful request to {endpoint}")
                     return data
@@ -121,9 +108,6 @@ class PolygonDataClient:
                 elif response.status_code == 429:  # Rate limited
                     if getattr(config, "DISABLE_RATE_LIMITING", False):
                         # If plan has no limits, treat as transient and retry immediately without sleeping
-                        logger.warning(
-                            "Received 429 but rate limiting disabled. Retrying immediately."
-                        )
                         continue
                     else:
                         # Backoff path when limiting enabled
@@ -134,9 +118,7 @@ class PolygonDataClient:
                             logger.error(f"Error handling rate limit error: {e}")
                             pass
                         wait_time = 2**attempt
-                        logger.warning(
-                            f"Rate limit exceeded. Waiting {wait_time}s before retry"
-                        )
+                        logger.warning(f"Rate limit exceeded. Waiting {wait_time}s before retry")
                         time.sleep(wait_time)
                         continue
 
@@ -145,15 +127,12 @@ class PolygonDataClient:
 
                 elif response.status_code == 403:  # Forbidden
                     raise PolygonAPIError(
-                        "Access forbidden - check subscription level",
-                        response.status_code,
+                        "Access forbidden - check subscription level", response.status_code
                     )
 
                 elif response.status_code >= 500:  # Server errors
                     wait_time = 2**attempt
-                    logger.warning(
-                        f"Server error {response.status_code}. Retrying in {wait_time}s"
-                    )
+                    logger.warning(f"Server error {response.status_code}. Retrying in {wait_time}s")
                     time.sleep(wait_time)
                     continue
 
@@ -161,9 +140,7 @@ class PolygonDataClient:
                     # Other client errors
                     try:
                         error_data = response.json()
-                        error_msg = error_data.get(
-                            "error", f"HTTP {response.status_code}"
-                        )
+                        error_msg = error_data.get("error", f"HTTP {response.status_code}")
                     except Exception as e:
                         logger.error(f"Error parsing response: {e}")
                         error_msg = f"HTTP {response.status_code}"
@@ -172,15 +149,10 @@ class PolygonDataClient:
 
             except requests.exceptions.Timeout:
                 wait_time = 2**attempt
-                if getattr(config, "DISABLE_RATE_LIMITING", False):
-                    logger.warning(
-                        "Request timeout. Retrying without delay (rate limiting disabled)"
-                    )
-                else:
-                    logger.warning(f"Request timeout. Retrying in {wait_time}s")
-                    if attempt < config.MAX_RETRIES - 1:
-                        time.sleep(wait_time)
-                        continue
+                logger.warning(f"Request timeout. Retrying in {wait_time}s")
+                if attempt < config.MAX_RETRIES - 1:
+                    time.sleep(wait_time)
+                    continue
                 raise PolygonAPIError("Request timeout after all retries")
 
             except requests.exceptions.ConnectionError:
@@ -201,21 +173,12 @@ class PolygonDataClient:
                     raise PolygonAPIError(f"Request failed: {str(e)}")
 
                 wait_time = 2**attempt
-                if getattr(config, "DISABLE_RATE_LIMITING", False):
-                    logger.warning(
-                        f"Request failed: {e}. Retrying without delay (rate limiting disabled)"
-                    )
-                else:
-                    logger.warning(f"Request failed: {e}. Retrying in {wait_time}s")
-                    time.sleep(wait_time)
+                logger.warning(f"Request failed: {e}. Retrying in {wait_time}s")
+                time.sleep(wait_time)
 
-        raise PolygonAPIError(
-            f"Failed to complete request after {config.MAX_RETRIES} attempts"
-        )
+        raise PolygonAPIError(f"Failed to complete request after {config.MAX_RETRIES} attempts")
 
-    def _fetch_paginated_data(
-        self, endpoint: str, params: Optional[Dict] = None
-    ) -> List[Dict]:
+    def _fetch_paginated_data(self, endpoint: str, params: Optional[Dict] = None) -> List[Dict]:
         """
         Fetch all data from a paginated endpoint
 
@@ -232,7 +195,8 @@ class PolygonDataClient:
 
         while True:
             page_count += 1
-            logger.info(f"Fetching page {page_count} from {endpoint}")
+            if page_count > 1:
+                logger.info(f"Fetching page {page_count} from {endpoint}")
 
             if next_url:
                 # Parse next_url to extract parameters
@@ -256,8 +220,7 @@ class PolygonDataClient:
                 results = response["results"]
                 all_results.extend(results)
                 logger.info(
-                    f"Page {page_count}: fetched {len(results)} records. "
-                    f"Total: {len(all_results)}"
+                    f"Page {page_count}: fetched {len(results)} records. Total: {len(all_results)}"
                 )
             else:
                 logger.info(f"Page {page_count}: no results found")
@@ -274,6 +237,28 @@ class PolygonDataClient:
             next_url = response["next_url"]
 
         return all_results
+
+    def get_dividends(
+        self, ticker: str, order: str = "desc", limit: int = 1000, sort: str = "ex_dividend_date"
+    ) -> List[Dict]:
+        """
+        Get dividends for a single ticker. Polygon's dividends endpoint only supports
+        querying one ticker at a time, so this method requires a ticker parameter.
+
+        Args:
+            ticker: Stock ticker symbol (required)
+            order: 'asc' or 'desc' ordering of results (default 'desc')
+            limit: Number of results per page (capped to API limits)
+            sort: Field to sort by (default 'ex_dividend_date')
+
+        Returns:
+            List of dividend records as returned by Polygon
+        """
+        if not ticker:
+            raise ValueError("ticker is required for get_dividends")
+
+        params = {"ticker": ticker, "order": order, "limit": min(limit, 1000), "sort": sort}
+        return self._fetch_paginated_data("/v3/reference/dividends", params)
 
     def get_tickers(
         self, market: str = "stocks", active: bool = True, limit: int = 1000, **kwargs
@@ -328,9 +313,7 @@ class PolygonDataClient:
 
         params = {"adjusted": "true", "sort": "asc", "limit": min(limit, 50000)}
 
-        logger.info(
-            f"Fetching {timespan} aggregates for {ticker} from {from_date} to {to_date}"
-        )
+        logger.info(f"Fetching {timespan} aggregates for {ticker} from {from_date} to {to_date}")
 
         response = self._make_request(endpoint, params)
         return response.get("results", [])

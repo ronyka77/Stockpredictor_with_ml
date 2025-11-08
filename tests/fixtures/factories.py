@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from faker import Faker
@@ -16,6 +16,7 @@ def set_factory_seed(seed: int = 42) -> None:
     try:
         faker.seed_instance(seed)
     except Exception:
+        # tolerate older Faker versions without seed_instance
         pass
     import random
 
@@ -25,6 +26,7 @@ def set_factory_seed(seed: int = 42) -> None:
 
         np.random.seed(seed)
     except Exception:
+        # numpy not available in some constrained test environments
         pass
 
 
@@ -63,10 +65,7 @@ def build_fundamental_scores(
 
 
 def build_fundamental_sector(
-    ticker: str = "AAPL",
-    date: date = date(2025, 1, 1),
-    gics_sector: str = "Tech",
-    **kwargs,
+    ticker: str = "AAPL", date: date = date(2025, 1, 1), gics_sector: str = "Tech", **kwargs
 ) -> fm.FundamentalSectorAnalysis:
     obj = fm.FundamentalSectorAnalysis()
     obj.ticker = ticker
@@ -117,17 +116,9 @@ class OHLCVRecordFactory(ModelFactory[OHLCVRecord]):
         base = round(faker.pyfloat(min_value=1.0, max_value=500.0, right_digits=4), 4)
 
         # Random spreads above/below base
-        up = round(
-            faker.pyfloat(
-                min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4
-            ),
-            4,
-        )
+        up = round(faker.pyfloat(min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4), 4)
         down = round(
-            faker.pyfloat(
-                min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4
-            ),
-            4,
+            faker.pyfloat(min_value=0.0, max_value=max(1.0, base * 0.2), right_digits=4), 4
         )
 
         high = round(base + up, 4)
@@ -139,13 +130,11 @@ class OHLCVRecordFactory(ModelFactory[OHLCVRecord]):
 
         volume = faker.pyint(min_value=0, max_value=10_000_000)
 
-        ticker = (
-            overrides.get("ticker") or faker.pystr(min_chars=1, max_chars=4).upper()
-        )
+        ticker = overrides.get("ticker") or faker.pystr(min_chars=1, max_chars=4).upper()
         timestamp = (
             overrides.get("timestamp")
             or (
-                datetime.utcnow().date()
+                datetime.now(timezone.utc).date()
                 - timedelta(days=faker.pyint(min_value=0, max_value=365))
             ).isoformat()
         )
@@ -197,11 +186,7 @@ class APIResponseFactory:
         status: str = "OK",
         next_url: Optional[str] = None,
     ):
-        self._payload = {
-            "status": status,
-            "results": results or [],
-            "next_url": next_url,
-        }
+        self._payload = {"status": status, "results": results or [], "next_url": next_url}
 
     def json(self) -> Dict[str, Any]:
         return self._payload
@@ -232,18 +217,18 @@ def polygon_payload_dict(**overrides) -> Dict[str, Any]:
 
             ts_dt = datetime.fromisoformat(ts)
         except Exception:
-            ts_dt = datetime.utcnow()
+            ts_dt = datetime.now(timezone.utc)
     elif hasattr(ts, "timestamp"):
         ts_dt = ts
     else:
         from datetime import datetime
 
-        ts_dt = datetime.utcnow()
+        ts_dt = datetime.now(timezone.utc)
 
     try:
         millis = int(ts_dt.timestamp() * 1000)
     except Exception:
-        millis = int(datetime.utcnow().timestamp() * 1000)
+        millis = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     poly = {
         "T": payload.get("ticker") or payload.get("ticker", "TST"),

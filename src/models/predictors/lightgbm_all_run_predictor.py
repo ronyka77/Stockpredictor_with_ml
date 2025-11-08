@@ -46,9 +46,7 @@ def get_active_run_ids_for_experiment(experiment_name: str) -> List[str]:
         [exp.experiment_id], run_view_type=mlflow.entities.ViewType.ACTIVE_ONLY
     )
     run_ids = [r.info.run_id for r in runs]
-    logger.info(
-        f"🔎 Found {len(run_ids)} active runs in experiment '{experiment_name}'"
-    )
+    logger.info(f"🔎 Found {len(run_ids)} active runs in experiment '{experiment_name}'")
     return run_ids
 
 
@@ -64,9 +62,7 @@ def run_all_and_export_best(
     if not run_ids:
         return None
 
-    best_tuple: Optional[Tuple[str, float, Tuple]] = (
-        None  # (run_id, avg_profit, cached_data)
-    )
+    best_tuple: Optional[Tuple[str, float, Tuple]] = None  # (run_id, avg_profit, cached_data)
 
     for run_id in run_ids:
         logger.info("=" * 80)
@@ -80,13 +76,9 @@ def run_all_and_export_best(
             logger.warning(f"   ❌ Skipping run due to error: {e}")
             continue
 
-        if best_tuple is None or (
-            avg_profit is not None and avg_profit > best_tuple[1]
-        ):
+        if best_tuple is None or (avg_profit is not None and avg_profit > best_tuple[1]):
             best_tuple = (run_id, avg_profit, (features_df, metadata_df, predictions))
-            logger.info(
-                f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}"
-            )
+            logger.info(f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
 
     if best_tuple is None:
         logger.warning("No valid runs produced predictions.")
@@ -101,9 +93,7 @@ def run_all_and_export_best(
     best_predictor.load_model_from_mlflow()
     best_predictor._load_metadata_from_mlflow()
     features_df, metadata_df, predictions = cached
-    output_file = best_predictor.save_predictions_to_excel(
-        features_df, metadata_df, predictions
-    )
+    output_file = best_predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
     logger.info(f"📄 Exported best predictions to: {output_file}")
 
     return best_run_id, best_avg_profit, output_file
@@ -112,10 +102,8 @@ def run_all_and_export_best(
 def main():
     # Default experiment name used by LightGBM training
     experiment_name = "lightgbm_stock_predictor"
-    days_back = 30
-    result = run_all_and_export_best(
-        experiment_name=experiment_name, days_back=days_back
-    )
+    days_back = 60
+    result = run_all_and_export_best(experiment_name=experiment_name, days_back=days_back)
     if result is None:
         logger.warning("No predictions were exported.")
     else:

@@ -5,8 +5,9 @@ from src.data_collector.polygon_news.ticker_integration import NewsTickerIntegra
 
 @pytest.mark.unit
 def test_get_prioritized_tickers_fallback_and_filters():
+    """get_prioritized_tickers filters out ETFs and limits results by max_tickers"""
     nti = NewsTickerIntegration()
-    tickers = nti.get_prioritized_tickers(max_tickers=5, include_etfs=False)
+    tickers = nti.get_prioritized_tickers(max_tickers=5)
     assert isinstance(tickers, list)
     assert len(tickers) <= 5
     # No ETFs should be present (ETF names like SPY should be skipped if include_etfs=False)
@@ -15,6 +16,7 @@ def test_get_prioritized_tickers_fallback_and_filters():
 
 @pytest.mark.unit
 def test_validate_ticker_list_filters_invalid():
+    """validate_ticker_list separates valid and invalid ticker inputs"""
     nti = NewsTickerIntegration()
     valid, invalid = nti.validate_ticker_list(["AAPL", "", "BAD$", None, "GOOGL"])
     assert "AAPL" in valid
@@ -24,23 +26,19 @@ def test_validate_ticker_list_filters_invalid():
 
 @pytest.mark.unit
 def test_get_ticker_info_from_manager(mocker):
-    # Provide a fake ticker manager
-    class FakeManager:
-        def get_active_tickers(self):
+    """Pull ticker info from manager and compute priority list entries"""
+
+    # Patch self.ticker_manager.storage.get_tickers() to return fake ticker data
+    class FakeStorage:
+        def get_tickers(self):
             return [
-                {
-                    "ticker": "XYZ",
-                    "market_cap": 200e9,
-                    "avg_volume": 30e6,
-                    "sector": "Technology",
-                },
-                {
-                    "ticker": "ABC",
-                    "market_cap": 5e8,
-                    "avg_volume": 100000,
-                    "sector": "Small",
-                },
+                {"ticker": "XYZ", "market_cap": 200e9, "avg_volume": 30e6, "sector": "Technology"},
+                {"ticker": "ABC", "market_cap": 5e8, "avg_volume": 100000, "sector": "Small"},
             ]
+
+    class FakeManager:
+        def __init__(self):
+            self.storage = FakeStorage()
 
     nti = NewsTickerIntegration(ticker_manager=FakeManager())
     pri = nti.get_prioritized_tickers(max_tickers=10)

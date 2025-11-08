@@ -27,10 +27,6 @@ class FakeResponse:
             raise ValueError("malformed json")
         return self._payload
 
-    def raise_for_status(self) -> None:
-        if not (200 <= self.status_code < 300):
-            raise Exception(f"HTTP {self.status_code}")
-
 
 def canned_api_factory(
     kind: str = "grouped_daily", status: int = 200, raise_on_json: bool = False

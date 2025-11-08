@@ -28,11 +28,7 @@ class PolygonNewsCollector:
     3. Targeted Collection: Specific tickers and date ranges
     """
 
-    def __init__(
-        self,
-        polygon_api_key: Optional[str] = None,
-        requests_per_minute: int = 5,
-    ):
+    def __init__(self, polygon_api_key: Optional[str] = None, requests_per_minute: int = 5):
         """
         Initialize the news collector
 
@@ -85,9 +81,7 @@ class PolygonNewsCollector:
 
         try:
             # Get high-priority tickers for historical collection
-            ticker_info_list = self.ticker_integration.get_prioritized_tickers(
-                max_tickers
-            )
+            ticker_info_list = self.ticker_integration.get_prioritized_tickers(max_tickers)
             major_tickers = [info for info in ticker_info_list if info["is_major"]][:20]
 
             self.logger.info(
@@ -102,13 +96,9 @@ class PolygonNewsCollector:
             current_date = start_date
 
             while current_date < end_date:
-                batch_end = min(
-                    current_date + timedelta(days=batch_size_days), end_date
-                )
+                batch_end = min(current_date + timedelta(days=batch_size_days), end_date)
 
-                self.logger.info(
-                    f"Processing batch: {current_date.date()} to {batch_end.date()}"
-                )
+                self.logger.info(f"Processing batch: {current_date.date()} to {batch_end.date()}")
 
                 for ticker_info in major_tickers:
                     ticker = ticker_info["ticker"]
@@ -124,10 +114,7 @@ class PolygonNewsCollector:
 
                         # Collect news for this ticker and date range
                         ticker_stats = self._collect_ticker_news(
-                            ticker,
-                            current_date,
-                            batch_end,
-                            ticker_info["priority_score"],
+                            ticker, current_date, batch_end, ticker_info["priority_score"]
                         )
 
                         # Update overall stats
@@ -137,9 +124,7 @@ class PolygonNewsCollector:
                         self.logger.error(
                             f"Error processing ticker {ticker} for {current_date.date()}: {e}"
                         )
-                        self.stats["failed_tickers"].append(
-                            f"{ticker}_{current_date.date()}"
-                        )
+                        self.stats["failed_tickers"].append(f"{ticker}_{current_date.date()}")
                         self.stats["processing_errors"].append(
                             f"{ticker}_{current_date.date()}: {str(e)}"
                         )
@@ -181,9 +166,7 @@ class PolygonNewsCollector:
 
         try:
             # Validate tickers
-            valid_tickers, invalid_tickers = (
-                self.ticker_integration.validate_ticker_list(tickers)
-            )
+            valid_tickers, invalid_tickers = self.ticker_integration.validate_ticker_list(tickers)
 
             if invalid_tickers:
                 self.logger.warning(f"Invalid tickers skipped: {invalid_tickers}")
@@ -255,10 +238,7 @@ class PolygonNewsCollector:
             )
 
             raw_articles = self.news_client.get_news_for_ticker(
-                ticker=ticker,
-                published_utc_gte=start_date,
-                published_utc_lte=end_date,
-                limit=limit,
+                ticker=ticker, published_utc_gte=start_date, published_utc_lte=end_date, limit=limit
             )
 
             ticker_stats["api_calls"] = 1
@@ -274,9 +254,7 @@ class PolygonNewsCollector:
             for raw_article in raw_articles:
                 try:
                     # Extract metadata
-                    article_metadata = self.news_client.extract_article_metadata(
-                        raw_article
-                    )
+                    article_metadata = self.news_client.extract_article_metadata(raw_article)
 
                     # Process content
                     processed_article = self.processor.process_article(article_metadata)
@@ -292,9 +270,7 @@ class PolygonNewsCollector:
                                 processed_article["keywords"] = [str(parsed)]
                         except Exception:
                             processed_article["keywords"] = [
-                                k.strip()
-                                for k in keywords.strip("[]").split(",")
-                                if k.strip()
+                                k.strip() for k in keywords.strip("[]").split(",") if k.strip()
                             ]
                     elif keywords is None:
                         processed_article["keywords"] = []
@@ -381,9 +357,7 @@ class PolygonNewsCollector:
             )
 
             return {
-                "status": "healthy"
-                if health_check["status"] == "healthy"
-                else "unhealthy",
+                "status": "healthy" if health_check["status"] == "healthy" else "unhealthy",
                 "database_health": health_check,
                 "latest_article_date": latest_date.isoformat() if latest_date else None,
                 "recent_statistics": recent_stats,
@@ -391,11 +365,7 @@ class PolygonNewsCollector:
             }
 
         except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "last_collection_stats": self.stats,
-            }
+            return {"status": "error", "error": str(e), "last_collection_stats": self.stats}
 
     def __enter__(self):
         """Context manager entry"""
@@ -439,8 +409,7 @@ def main():
             logger.info("Initializing Polygon News Collector...")
 
             collector = PolygonNewsCollector(
-                polygon_api_key=config.API_KEY,
-                requests_per_minute=config.REQUESTS_PER_MINUTE,
+                polygon_api_key=config.API_KEY, requests_per_minute=config.REQUESTS_PER_MINUTE
             )
         except Exception as e:
             logger.error(f"Failed to initialize news collector: {e}")
@@ -449,9 +418,7 @@ def main():
         # Run incremental news collection
         try:
             logger.info("Starting incremental news collection...")
-            logger.info(
-                "This will collect news from the last stored date to current date"
-            )
+            logger.info("This will collect news from the last stored date to current date")
 
             # Configuration for incremental collection from centralized config
             max_tickers = config.NEWS_MAX_TICKERS
@@ -474,32 +441,18 @@ def main():
             logger.info("=" * 60)
             logger.info("Collection Statistics:")
             logger.info(f"  - Total API calls: {stats_historical['total_api_calls']}")
-            logger.info(
-                f"  - Articles fetched: {stats_historical['total_articles_fetched']}"
-            )
-            logger.info(
-                f"  - Articles stored: {stats_historical['total_articles_stored']}"
-            )
-            logger.info(
-                f"  - Articles updated: {stats_historical['total_articles_updated']}"
-            )
-            logger.info(
-                f"  - Articles skipped: {stats_historical['total_articles_skipped']}"
-            )
-            logger.info(
-                f"  - Failed tickers: {len(stats_historical['failed_tickers'])}"
-            )
+            logger.info(f"  - Articles fetched: {stats_historical['total_articles_fetched']}")
+            logger.info(f"  - Articles stored: {stats_historical['total_articles_stored']}")
+            logger.info(f"  - Articles updated: {stats_historical['total_articles_updated']}")
+            logger.info(f"  - Articles skipped: {stats_historical['total_articles_skipped']}")
+            logger.info(f"  - Failed tickers: {len(stats_historical['failed_tickers'])}")
 
             if stats_historical["failed_tickers"]:
                 logger.warning(f"Failed tickers: {stats_historical['failed_tickers']}")
 
             if stats_historical["processing_errors"]:
-                logger.warning(
-                    f"Processing errors: {len(stats_historical['processing_errors'])}"
-                )
-                for error in stats_historical["processing_errors"][
-                    :5
-                ]:  # Show first 5 errors
+                logger.warning(f"Processing errors: {len(stats_historical['processing_errors'])}")
+                for error in stats_historical["processing_errors"][:5]:  # Show first 5 errors
                     logger.warning(f"  - {error}")
 
             # Duration
@@ -512,9 +465,7 @@ def main():
                 status = collector.get_collection_status()
                 logger.info("System Status:")
                 logger.info(f"  - Database health: {status.get('status', 'unknown')}")
-                logger.info(
-                    f"  - Latest article date: {status.get('latest_article_date', 'None')}"
-                )
+                logger.info(f"  - Latest article date: {status.get('latest_article_date', 'None')}")
 
                 if "recent_statistics" in status:
                     recent_stats = status["recent_statistics"]
@@ -524,9 +475,7 @@ def main():
 
                     top_tickers = recent_stats.get("top_tickers", {})
                     if top_tickers:
-                        logger.info(
-                            f"  - Top tickers count: {dict(list(top_tickers.items())[:5])}"
-                        )
+                        logger.info(f"  - Top tickers count: {dict(list(top_tickers.items())[:5])}")
 
                     sentiment_dist = recent_stats.get("sentiment_distribution", {})
                     if sentiment_dist:

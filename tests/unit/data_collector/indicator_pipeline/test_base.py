@@ -26,12 +26,10 @@ def simple_price_df():
 
 
 def test_indicatorresult_post_init_warns_on_empty(mocker):
-    # Warns when IndicatorResult is created with an empty DataFrame
+    """Warn when IndicatorResult is created with an empty DataFrame"""
     empty = pd.DataFrame()
     mock_warn = mocker.patch.object(base_mod.logger, "warning")
-    IndicatorResult(
-        data=empty, metadata={}, quality_score=0.0, warnings=[], calculation_time=0.0
-    )
+    IndicatorResult(data=empty, metadata={}, quality_score=0.0, warnings=[], calculation_time=0.0)
     mock_warn.assert_called()
     # Ensure expected warning message is included in the call args
     assert any(
@@ -42,20 +40,16 @@ def test_indicatorresult_post_init_warns_on_empty(mocker):
 
 @pytest.mark.parametrize("bad_score", (-1.0, 150.0))
 def test_indicatorresult_quality_bounds_raise(bad_score):
-    # Rejects quality_score values outside [0,100]
+    """Reject invalid quality_score values outside the allowed range"""
     df = pd.DataFrame({"a": [1, 2]})
     with pytest.raises(ValueError):
         IndicatorResult(
-            data=df,
-            metadata={},
-            quality_score=bad_score,
-            warnings=[],
-            calculation_time=0.0,
+            data=df, metadata={}, quality_score=bad_score, warnings=[], calculation_time=0.0
         )
 
 
 def test_create_indicator_result_quality_calculation(simple_price_df):
-    # Computes quality score and adjusts for missing values
+    """Compute quality score and adjust for missing values"""
     res = create_indicator_result(data=simple_price_df, metadata={})
     assert isinstance(res.quality_score, float)
     assert pytest.approx(100.0, rel=1e-3) == res.quality_score
@@ -68,7 +62,7 @@ def test_create_indicator_result_quality_calculation(simple_price_df):
 
 
 def test_indicator_validator_detects_empty_low_quality_and_infinite():
-    # Validator identifies empty, low-quality, and infinite-valued results
+    """Validator rejects empty, low-quality, or infinite-valued results"""
     empty = pd.DataFrame()
     ir_empty = IndicatorResult(
         data=empty, metadata={}, quality_score=0.0, warnings=[], calculation_time=0.0
@@ -91,7 +85,8 @@ def test_indicator_validator_detects_empty_low_quality_and_infinite():
 
 
 def test_baseindicator_validate_and_standardize_columns(mocker):
-    # Ensures BaseIndicator validates required columns and lowercases names
+    """Ensure BaseIndicator validates required columns and lowercases names"""
+
     # Minimal concrete subclass to exercise BaseIndicator.__init__
     class DummyIndicator(base_mod.BaseIndicator):
         def calculate(self):
@@ -123,7 +118,8 @@ def test_baseindicator_validate_and_standardize_columns(mocker):
 
 
 def test_validate_data_rejects_too_many_missing(mocker):
-    # Rejects data with too many missing values based on MAX_MISSING_PCT
+    """Reject data having too many missing values per configuration"""
+
     class DummyIndicator(base_mod.BaseIndicator):
         def calculate(self):
             return create_indicator_result(self.data, metadata={})

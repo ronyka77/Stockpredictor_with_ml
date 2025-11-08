@@ -7,7 +7,6 @@ from unittest.mock import Mock
 
 # polyfactory not required for the deterministic SimpleDataFactory
 from src.models.gradient_boosting.random_forest_model import RandomForestModel
-from src.models.gradient_boosting.xgboost_model import XGBoostModel
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 
 

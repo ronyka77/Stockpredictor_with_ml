@@ -3,7 +3,7 @@ from datetime import date
 from unittest.mock import MagicMock
 
 from src.database import fundamental_models as fm
-from tests._fixtures.factories import (
+from tests.fixtures.factories import (
     FundamentalRatiosFactory,
     FundamentalGrowthMetricsFactory,
     FundamentalScoresFactory,
@@ -20,16 +20,12 @@ def db_session_mock():
 
 @pytest.mark.parametrize(
     "has_growth,has_scores,has_sector",
-    [
-        (True, True, True),
-        (True, False, False),
-        (False, False, False),
-    ],
+    [(True, True, True), (True, False, False), (False, False, False)],
 )
 def test_get_latest_fundamental_data_various_combinations(
     db_session_mock, has_growth, has_scores, has_sector
 ):
-    # Setup: create model instances or None depending on parameters
+    """Return latest fundamental data combining optional growth/scores/sector sections"""
     ratios = FundamentalRatiosFactory.build(ticker="AAPL", date=date(2025, 1, 1))
     growth = (
         FundamentalGrowthMetricsFactory.build(ticker="AAPL", date=date(2025, 1, 1))
@@ -37,14 +33,10 @@ def test_get_latest_fundamental_data_various_combinations(
         else None
     )
     scores = (
-        FundamentalScoresFactory.build(ticker="AAPL", date=date(2025, 1, 1))
-        if has_scores
-        else None
+        FundamentalScoresFactory.build(ticker="AAPL", date=date(2025, 1, 1)) if has_scores else None
     )
     sector = (
-        build_fundamental_sector.build(ticker="AAPL", date=date(2025, 1, 1))
-        if has_sector
-        else None
+        build_fundamental_sector.build(ticker="AAPL", date=date(2025, 1, 1)) if has_sector else None
     )
 
     # Configure session mock to return these objects in sequence for the four queries
@@ -85,22 +77,18 @@ def test_get_latest_fundamental_data_various_combinations(
 
 
 def test_get_fundamental_data_by_date_returns_none_when_no_ratios(db_session_mock):
-    # Setup
+    """Return None when no ratios exist for given date"""
     db_session_mock.query.return_value.filter_by.return_value.first.return_value = None
 
     # Execution
-    result = fm.get_fundamental_data_by_date(
-        db_session_mock, "MSFT", date(2024, 12, 31)
-    )
+    result = fm.get_fundamental_data_by_date(db_session_mock, "MSFT", date(2024, 12, 31))
 
     # Verification
     assert result is None
 
 
-def test_get_fundamental_data_by_date_returns_all_sections_when_present(
-    db_session_mock,
-):
-    # Setup
+def test_get_fundamental_data_by_date_returns_all_sections_when_present(db_session_mock):
+    """Return all fundamental sections when ratios, growth, scores and sector present"""
     target = date(2025, 6, 30)
     ratios = FundamentalRatiosFactory.build(ticker="MSFT", date=target)
     growth = FundamentalGrowthMetricsFactory.build(ticker="MSFT", date=target)
@@ -113,9 +101,7 @@ def test_get_fundamental_data_by_date_returns_all_sections_when_present(
         return first_side_effect.values.pop(0)
 
     first_side_effect.values = [ratios, growth, scores, sector]
-    db_session_mock.query.return_value.filter_by.return_value.first.side_effect = (
-        first_side_effect
-    )
+    db_session_mock.query.return_value.filter_by.return_value.first.side_effect = first_side_effect
 
     # Execution
     result = fm.get_fundamental_data_by_date(db_session_mock, "MSFT", target)
@@ -130,12 +116,9 @@ def test_get_fundamental_data_by_date_returns_all_sections_when_present(
 
 
 def test_get_sector_companies_returns_list(db_session_mock):
-    # Setup
+    """Return list of FundamentalSectorAnalysis items for a sector and date"""
     target = date(2025, 1, 1)
-    items = [
-        build_fundamental_sector.build(gics_sector="Tech", date=target)
-        for _ in range(3)
-    ]
+    items = [build_fundamental_sector.build(gics_sector="Tech", date=target) for _ in range(3)]
     db_session_mock.query.return_value.filter_by.return_value.all.return_value = items
 
     # Execution
@@ -148,16 +131,10 @@ def test_get_sector_companies_returns_list(db_session_mock):
 
 
 @pytest.mark.parametrize(
-    "missing,total,expected",
-    [
-        (0, 10, 1.0),
-        (5, 10, 0.5),
-        (10, 10, 0.0),
-        (0, 0, 0.0),
-    ],
+    "missing,total,expected", [(0, 10, 1.0), (5, 10, 0.5), (10, 10, 0.0), (0, 0, 0.0)]
 )
 def test_calculate_data_quality_score_variants(missing, total, expected):
-    # Execution
+    """Calculate data quality score for various missing/total combinations"""
     result = fm.calculate_data_quality_score(missing, total)
 
     # Verification

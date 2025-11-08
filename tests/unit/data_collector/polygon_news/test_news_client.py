@@ -8,6 +8,7 @@ from tests.unit.data_collector.polygon_news.helpers import make_raw_article
 
 @pytest.mark.unit
 def test_extract_article_metadata_maps_fields_correctly():
+    """Extract and map raw article fields into normalized metadata dict"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     raw = make_raw_article(
@@ -40,6 +41,7 @@ def test_extract_article_metadata_maps_fields_correctly():
 
 @pytest.mark.unit
 def test_get_news_for_ticker_passes_date_params_and_returns_articles(mocker):
+    """get_news_for_ticker passes date params to API and returns article list"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     captured = {}
@@ -65,20 +67,18 @@ def test_get_news_for_ticker_passes_date_params_and_returns_articles(mocker):
 
 @pytest.mark.unit
 def test_get_news_for_ticker_handles_empty_api_response(mocker):
+    """Return empty list when API returns no articles for ticker"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
-    mocker.patch.object(
-        PolygonNewsClient, "_fetch_paginated_data", lambda self, e, p: []
-    )
+    mocker.patch.object(PolygonNewsClient, "_fetch_paginated_data", lambda self, e, p: [])
 
     res = client.get_news_for_ticker("ACME")
     assert res == []
 
 
 @pytest.mark.unit
-def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
-    mocker, caplog, capsys
-):
+def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(mocker, caplog, capsys):
+    """Handle per-ticker API failures while returning successful results"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     def fake_get(ticker, **kwargs):
@@ -87,9 +87,7 @@ def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
         return [{"id": f"ok-{ticker}"}]
 
     mocker.patch.object(
-        PolygonNewsClient,
-        "get_news_for_ticker",
-        lambda self, **kw: fake_get(kw.get("ticker")),
+        PolygonNewsClient, "get_news_for_ticker", lambda self, **kw: fake_get(kw.get("ticker"))
     )
 
     caplog.clear()
@@ -101,6 +99,7 @@ def test_get_news_for_multiple_tickers_handles_failure_and_partial_success(
 
 @pytest.mark.unit
 def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, capsys):
+    """Filter articles by date range and skip malformed published_utc values"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
 
     articles = [
@@ -109,9 +108,7 @@ def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, 
         make_raw_article({"id": "3", "published_utc": "2025-09-01T00:00:00Z"}),
     ]
 
-    mocker.patch.object(
-        PolygonNewsClient, "get_recent_market_news", lambda self, **kw: articles
-    )
+    mocker.patch.object(PolygonNewsClient, "get_recent_market_news", lambda self, **kw: articles)
 
     start = datetime(2025, 8, 1, tzinfo=timezone.utc)
     end = datetime(2025, 8, 31, tzinfo=timezone.utc)
@@ -125,18 +122,12 @@ def test_get_news_by_date_range_filters_and_skips_invalid_dates(mocker, caplog, 
 
 @pytest.mark.unit
 def test_validate_news_response():
+    """Validate presence of required fields in a raw article payload"""
     client = PolygonNewsClient(api_key="test", requests_per_minute=10)
     good = make_raw_article(
-        {
-            "id": "x",
-            "title": "t",
-            "article_url": "u",
-            "published_utc": "2025-08-14T13:45:00Z",
-        }
+        {"id": "x", "title": "t", "article_url": "u", "published_utc": "2025-08-14T13:45:00Z"}
     )
-    bad = make_raw_article(
-        {"id": None, "title": "t", "article_url": "u", "published_utc": None}
-    )
+    bad = make_raw_article({"id": None, "title": "t", "article_url": "u", "published_utc": None})
 
     assert client.validate_news_response(good) is True
     assert client.validate_news_response(bad) is False

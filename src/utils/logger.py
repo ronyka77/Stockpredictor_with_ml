@@ -33,9 +33,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        _loguru_logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        _loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def _ensure_utility_dir(utility: str) -> Path:
@@ -59,7 +57,7 @@ def get_logger(name: str, utility: Optional[str] = None):
             utility = "polygon"
         elif "predictor" in lower_name:
             utility = "predictor"
-        elif "data_collector" in lower_name or "data_collector" in lower_name:
+        elif "data_collector" in lower_name:
             utility = "data_collector"
         elif "feature_engineering" in lower_name:
             utility = "feature_engineering"
@@ -91,13 +89,7 @@ def get_logger(name: str, utility: Optional[str] = None):
 
 def init_logging_structure():
     """Initialize the logging directory structure"""
-    utilities = [
-        "polygon",
-        "predictor",
-        "data_collector",
-        "feature_engineering",
-        "general",
-    ]
+    utilities = ["polygon", "predictor", "data_collector", "feature_engineering", "general"]
     for u in utilities:
         _ensure_utility_dir(u)
 
@@ -121,9 +113,7 @@ def _initialize_sinks_once() -> None:
     _loguru_logger.remove()
 
     # Console sink: write to stdout, non-blocking queue enabled
-    console_format = (
-        "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
-    )
+    console_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
     _console_sink_id = _loguru_logger.add(
         sys.stdout, level="INFO", enqueue=True, format=console_format
     )
@@ -145,9 +135,7 @@ def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = util_dir / f"{utility}_{timestamp}.log"
 
-    file_format = (
-        "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
-    )
+    file_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
     sink_id = _loguru_logger.add(
         str(log_file),
         level="INFO",
@@ -184,13 +172,9 @@ def shutdown_logging() -> None:
             _loguru_logger.remove(_console_sink_id)
     except Exception as e:
         try:
-            logger.debug(
-                f"Error removing console sink id={_console_sink_id}", exc_info=True
-            )
+            logger.debug(f"Error removing console sink id={_console_sink_id}", exc_info=True)
         except Exception:
-            sys.stderr.write(
-                f"Error removing console sink id={_console_sink_id}: {e}\n"
-            )
+            sys.stderr.write(f"Error removing console sink id={_console_sink_id}: {e}\n")
     finally:
         _console_sink_id = None
 
