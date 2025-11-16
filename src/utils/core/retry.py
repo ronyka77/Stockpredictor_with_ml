@@ -15,7 +15,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class RetryError(Exception):
@@ -29,6 +29,7 @@ class RetryError(Exception):
 
 class CircuitBreakerState(Enum):
     """Circuit breaker states."""
+
     CLOSED = "closed"  # Normal operation
     OPEN = "open"  # Failing, requests rejected
     HALF_OPEN = "half_open"  # Testing if service recovered
@@ -49,7 +50,9 @@ class RetryConfig:
         OSError,  # Covers various network-related errors
     )
     non_retryable_exceptions: tuple[Type[Exception], ...] = ()
-    retry_on_result: Optional[Callable[[Any], bool]] = None  # Function to check if result should trigger retry
+    retry_on_result: Optional[Callable[[Any], bool]] = (
+        None  # Function to check if result should trigger retry
+    )
 
 
 @dataclass
@@ -148,16 +151,18 @@ class CircuitBreaker:
 
 class CircuitBreakerOpenError(Exception):
     """Exception raised when circuit breaker is open."""
+
     pass
 
 
 def calculate_delay(attempt: int, config: RetryConfig) -> float:
     """Calculate delay for exponential backoff with optional jitter."""
-    delay = min(config.base_delay * (config.backoff_factor ** attempt), config.max_delay)
+    delay = min(config.base_delay * (config.backoff_factor**attempt), config.max_delay)
 
     if config.jitter:
         # Add random jitter (±25% of delay)
         import random
+
         jitter_range = delay * 0.25
         delay += random.uniform(-jitter_range, jitter_range)
 
@@ -175,7 +180,7 @@ def is_retryable_exception(exception: Exception, config: RetryConfig) -> bool:
         return True
 
     # Special handling for exceptions with error_category attribute (like PolygonAPIError)
-    if hasattr(exception, 'error_category') and exception.error_category == 'retryable':
+    if hasattr(exception, "error_category") and exception.error_category == "retryable":
         return True
 
     return False
@@ -186,7 +191,7 @@ def _execute_with_retry(
     config: RetryConfig,
     circuit_breaker: Optional[CircuitBreaker],
     *args,
-    **kwargs
+    **kwargs,
 ) -> T:
     """Execute function with retry logic (helper function to reduce complexity)."""
     last_exception = None
@@ -223,13 +228,12 @@ def _execute_with_retry(
     raise RetryError(
         f"Operation failed after {config.max_attempts} attempts",
         last_exception,
-        config.max_attempts
+        config.max_attempts,
     )
 
 
 def retry(
-    config: Optional[RetryConfig] = None,
-    circuit_breaker: Optional[CircuitBreaker] = None
+    config: Optional[RetryConfig] = None, circuit_breaker: Optional[CircuitBreaker] = None
 ) -> Callable:
     """
     Decorator for synchronous functions with retry logic and circuit breaker.
@@ -252,13 +256,20 @@ def retry(
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         # Check if function is async (coroutine function)
         if inspect.iscoroutinefunction(func):
+
             async def async_wrapper(*args, **kwargs) -> T:
-                return await _execute_with_async_retry(func, config, circuit_breaker, *args, **kwargs)
+                return await _execute_with_async_retry(
+                    func, config, circuit_breaker, *args, **kwargs
+                )
+
             return async_wrapper
         else:
+
             def wrapper(*args, **kwargs) -> T:
                 return _execute_with_retry(func, config, circuit_breaker, *args, **kwargs)
+
             return wrapper
+
     return decorator
 
 
@@ -267,7 +278,7 @@ async def _execute_with_async_retry(
     config: RetryConfig,
     circuit_breaker: Optional[CircuitBreaker],
     *args,
-    **kwargs
+    **kwargs,
 ) -> T:
     """Execute async function with retry logic (helper function to reduce complexity)."""
     last_exception = None
@@ -304,13 +315,12 @@ async def _execute_with_async_retry(
     raise RetryError(
         f"Async operation failed after {config.max_attempts} attempts",
         last_exception,
-        config.max_attempts
+        config.max_attempts,
     )
 
 
 def async_retry(
-    config: Optional[RetryConfig] = None,
-    circuit_breaker: Optional[CircuitBreaker] = None
+    config: Optional[RetryConfig] = None, circuit_breaker: Optional[CircuitBreaker] = None
 ) -> Callable:
     """
     Decorator for asynchronous functions with retry logic and circuit breaker.
@@ -333,7 +343,9 @@ def async_retry(
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         async def wrapper(*args, **kwargs) -> T:
             return await _execute_with_async_retry(func, config, circuit_breaker, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -346,7 +358,7 @@ API_RETRY_CONFIG = RetryConfig(
     max_delay=30.0,
     backoff_factor=2.0,
     retryable_exceptions=(ConnectionError, TimeoutError, OSError),
-    non_retryable_exceptions=()  # API errors like 401, 403 might not be retryable
+    non_retryable_exceptions=(),  # API errors like 401, 403 might not be retryable
 )
 
 # Database retry configuration - handles temporary connection issues
@@ -356,7 +368,7 @@ DATABASE_RETRY_CONFIG = RetryConfig(
     max_delay=10.0,
     backoff_factor=2.0,
     retryable_exceptions=(ConnectionError, TimeoutError, OSError),
-    non_retryable_exceptions=()
+    non_retryable_exceptions=(),
 )
 
 # File operation retry configuration - handles temporary file system issues
@@ -366,23 +378,15 @@ FILE_RETRY_CONFIG = RetryConfig(
     max_delay=1.0,
     backoff_factor=1.5,
     retryable_exceptions=(OSError, IOError),
-    non_retryable_exceptions=()
+    non_retryable_exceptions=(),
 )
 
 
 # Convenience circuit breaker configurations
 API_CIRCUIT_BREAKER = CircuitBreaker(
-    CircuitBreakerConfig(
-        failure_threshold=5,
-        success_threshold=2,
-        timeout=60.0
-    )
+    CircuitBreakerConfig(failure_threshold=5, success_threshold=2, timeout=60.0)
 )
 
 DATABASE_CIRCUIT_BREAKER = CircuitBreaker(
-    CircuitBreakerConfig(
-        failure_threshold=3,
-        success_threshold=1,
-        timeout=30.0
-    )
+    CircuitBreakerConfig(failure_threshold=3, success_threshold=1, timeout=30.0)
 )

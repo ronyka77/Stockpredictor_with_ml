@@ -72,17 +72,40 @@ class CodeQualityAnalyzer:
         self.findings: List[CodeQualityFinding] = []
 
         # Naming convention patterns
-        self.function_pattern = re.compile(r'^_?[a-z][a-z0-9_]*$')
-        self.variable_pattern = re.compile(r'^_?[a-z][a-z0-9_]*$')
-        self.class_pattern = re.compile(r'^[A-Z][a-zA-Z0-9]*$')
-        self.constant_pattern = re.compile(r'^[A-Z][A-Z0-9_]*$')
+        self.function_pattern = re.compile(r"^_?[a-z][a-z0-9_]*$")
+        self.variable_pattern = re.compile(r"^_?[a-z][a-z0-9_]*$")
+        self.class_pattern = re.compile(r"^[A-Z][a-zA-Z0-9]*$")
+        self.constant_pattern = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
         # Common Python keywords and built-ins to exclude from naming checks
         self.python_keywords = {
-            'self', 'cls', 'super', 'None', 'True', 'False',
-            'and', 'or', 'not', 'if', 'elif', 'else', 'for', 'while',
-            'try', 'except', 'finally', 'with', 'as', 'def', 'class',
-            'return', 'yield', 'import', 'from', 'lambda', 'pass'
+            "self",
+            "cls",
+            "super",
+            "None",
+            "True",
+            "False",
+            "and",
+            "or",
+            "not",
+            "if",
+            "elif",
+            "else",
+            "for",
+            "while",
+            "try",
+            "except",
+            "finally",
+            "with",
+            "as",
+            "def",
+            "class",
+            "return",
+            "yield",
+            "import",
+            "from",
+            "lambda",
+            "pass",
         }
 
     def analyze_file(self, file_path: Path) -> List[CodeQualityFinding]:
@@ -98,7 +121,7 @@ class CodeQualityAnalyzer:
         findings = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 source_code = f.read()
 
             # Parse the AST
@@ -115,73 +138,89 @@ class CodeQualityAnalyzer:
             findings.extend(self._analyze_imports(tree, file_path))
 
         except SyntaxError as e:
-            findings.append(CodeQualityFinding(
-                severity="critical",
-                category="syntax",
-                file_path=str(file_path),
-                line_number=e.lineno,
-                description=f"Syntax error in file: {e.msg}",
-                recommendation="Fix the syntax error before proceeding with quality analysis"
-            ))
+            findings.append(
+                CodeQualityFinding(
+                    severity="critical",
+                    category="syntax",
+                    file_path=str(file_path),
+                    line_number=e.lineno,
+                    description=f"Syntax error in file: {e.msg}",
+                    recommendation="Fix the syntax error before proceeding with quality analysis",
+                )
+            )
         except Exception as e:
-            findings.append(CodeQualityFinding(
-                severity="high",
-                category="analysis",
-                file_path=str(file_path),
-                description=f"Failed to analyze file: {str(e)}",
-                recommendation="Review file structure and ensure it's valid Python code"
-            ))
+            findings.append(
+                CodeQualityFinding(
+                    severity="high",
+                    category="analysis",
+                    file_path=str(file_path),
+                    description=f"Failed to analyze file: {str(e)}",
+                    recommendation="Review file structure and ensure it's valid Python code",
+                )
+            )
 
         return findings
 
-    def _analyze_naming_conventions(self, tree: ast.AST, file_path: Path) -> List[CodeQualityFinding]:
+    def _analyze_naming_conventions(
+        self, tree: ast.AST, file_path: Path
+    ) -> List[CodeQualityFinding]:
         """Analyze naming convention compliance"""
         findings = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 # Skip dunder methods and common special methods
-                if (node.name.startswith('__') and node.name.endswith('__')) or node.name in ['main']:
+                if (node.name.startswith("__") and node.name.endswith("__")) or node.name in [
+                    "main"
+                ]:
                     continue
                 if not self.function_pattern.match(node.name):
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="naming",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Function '{node.name}' does not follow snake_case convention",
-                        code_sample=f"def {node.name}(",
-                        recommendation="Rename function to use snake_case (e.g., 'calculate_total' instead of 'calculateTotal')"
-                    ))
-
-            elif isinstance(node, ast.ClassDef):
-                if not self.class_pattern.match(node.name):
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="naming",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Class '{node.name}' does not follow PascalCase convention",
-                        code_sample=f"class {node.name}:",
-                        recommendation="Rename class to use PascalCase (e.g., 'DataProcessor' instead of 'data_processor')"
-                    ))
-
-            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-                # Check variable assignments (this is a simplified check)
-                if (node.id not in self.python_keywords and
-                    not self.variable_pattern.match(node.id) and
-                    not self.constant_pattern.match(node.id)):
-                    # Get the assignment context
-                    parent = getattr(node, '_parent', None)
-                    if parent and isinstance(parent, ast.Assign):
-                        findings.append(CodeQualityFinding(
-                            severity="low",
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
                             category="naming",
                             file_path=str(file_path),
                             line_number=node.lineno,
-                            description=f"Variable '{node.id}' naming is inconsistent",
-                            recommendation="Use snake_case for variables, UPPER_CASE for constants"
-                        ))
+                            description=f"Function '{node.name}' does not follow snake_case convention",
+                            code_sample=f"def {node.name}(",
+                            recommendation="Rename function to use snake_case (e.g., 'calculate_total' instead of 'calculateTotal')",
+                        )
+                    )
+
+            elif isinstance(node, ast.ClassDef):
+                if not self.class_pattern.match(node.name):
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="naming",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Class '{node.name}' does not follow PascalCase convention",
+                            code_sample=f"class {node.name}:",
+                            recommendation="Rename class to use PascalCase (e.g., 'DataProcessor' instead of 'data_processor')",
+                        )
+                    )
+
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                # Check variable assignments (this is a simplified check)
+                if (
+                    node.id not in self.python_keywords
+                    and not self.variable_pattern.match(node.id)
+                    and not self.constant_pattern.match(node.id)
+                ):
+                    # Get the assignment context
+                    parent = getattr(node, "_parent", None)
+                    if parent and isinstance(parent, ast.Assign):
+                        findings.append(
+                            CodeQualityFinding(
+                                severity="low",
+                                category="naming",
+                                file_path=str(file_path),
+                                line_number=node.lineno,
+                                description=f"Variable '{node.id}' naming is inconsistent",
+                                recommendation="Use snake_case for variables, UPPER_CASE for constants",
+                            )
+                        )
 
         return findings
 
@@ -194,31 +233,35 @@ class CodeQualityAnalyzer:
                 # Check function parameter type hints
                 missing_params = []
                 for arg in node.args.args:
-                    if arg.arg != 'self' and not arg.annotation:
+                    if arg.arg != "self" and not arg.annotation:
                         missing_params.append(arg.arg)
 
                 if missing_params:
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="types",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Function '{node.name}' missing type hints for parameters: {', '.join(missing_params)}",
-                        code_sample=f"def {node.name}({', '.join(missing_params)}):",
-                        recommendation="Add type hints to all function parameters (e.g., 'param: str')"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="types",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Function '{node.name}' missing type hints for parameters: {', '.join(missing_params)}",
+                            code_sample=f"def {node.name}({', '.join(missing_params)}):",
+                            recommendation="Add type hints to all function parameters (e.g., 'param: str')",
+                        )
+                    )
 
                 # Check return type hint
-                if not node.returns and node.name != '__init__':
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="types",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Function '{node.name}' missing return type hint",
-                        code_sample=f"def {node.name}(...",
-                        recommendation="Add return type hint (e.g., '-> None' or '-> Dict[str, Any]')"
-                    ))
+                if not node.returns and node.name != "__init__":
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="types",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Function '{node.name}' missing return type hint",
+                            code_sample=f"def {node.name}(...",
+                            recommendation="Add return type hint (e.g., '-> None' or '-> Dict[str, Any]')",
+                        )
+                    )
 
             elif isinstance(node, ast.ClassDef):
                 # Check class attribute type hints (simplified)
@@ -227,19 +270,23 @@ class CodeQualityAnalyzer:
                         continue  # Already has type annotation
                     elif isinstance(item, ast.Assign) and len(item.targets) == 1:
                         target = item.targets[0]
-                        if isinstance(target, ast.Name) and not target.id.startswith('_'):
-                            findings.append(CodeQualityFinding(
-                                severity="low",
-                                category="types",
-                                file_path=str(file_path),
-                                line_number=item.lineno,
-                                description=f"Class attribute '{target.id}' missing type hint",
-                                recommendation="Add type hints to class attributes (e.g., 'self.value: int = 0')"
-                            ))
+                        if isinstance(target, ast.Name) and not target.id.startswith("_"):
+                            findings.append(
+                                CodeQualityFinding(
+                                    severity="low",
+                                    category="types",
+                                    file_path=str(file_path),
+                                    line_number=item.lineno,
+                                    description=f"Class attribute '{target.id}' missing type hint",
+                                    recommendation="Add type hints to class attributes (e.g., 'self.value: int = 0')",
+                                )
+                            )
 
         return findings
 
-    def _analyze_documentation(self, tree: ast.AST, file_path: Path, lines: List[str]) -> List[CodeQualityFinding]:
+    def _analyze_documentation(
+        self, tree: ast.AST, file_path: Path, lines: List[str]
+    ) -> List[CodeQualityFinding]:
         """Analyze documentation quality"""
         findings = []
 
@@ -247,47 +294,55 @@ class CodeQualityAnalyzer:
             if isinstance(node, ast.FunctionDef):
                 docstring = ast.get_docstring(node)
                 if not docstring:
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="documentation",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Function '{node.name}' missing docstring",
-                        code_sample=f"def {node.name}(",
-                        recommendation="Add comprehensive docstring with Args, Returns, and description"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="documentation",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Function '{node.name}' missing docstring",
+                            code_sample=f"def {node.name}(",
+                            recommendation="Add comprehensive docstring with Args, Returns, and description",
+                        )
+                    )
                 elif len(docstring.strip()) < 20:
-                    findings.append(CodeQualityFinding(
-                        severity="low",
-                        category="documentation",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Function '{node.name}' has minimal docstring",
-                        recommendation="Expand docstring to include parameter descriptions and return value details"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="low",
+                            category="documentation",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Function '{node.name}' has minimal docstring",
+                            recommendation="Expand docstring to include parameter descriptions and return value details",
+                        )
+                    )
 
             elif isinstance(node, ast.ClassDef):
                 docstring = ast.get_docstring(node)
                 if not docstring:
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="documentation",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description=f"Class '{node.name}' missing docstring",
-                        code_sample=f"class {node.name}:",
-                        recommendation="Add class docstring describing its purpose and functionality"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="documentation",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description=f"Class '{node.name}' missing docstring",
+                            code_sample=f"class {node.name}:",
+                            recommendation="Add class docstring describing its purpose and functionality",
+                        )
+                    )
 
         # Check module-level docstring
         if lines and not lines[0].startswith('"""'):
-            findings.append(CodeQualityFinding(
-                severity="medium",
-                category="documentation",
-                file_path=str(file_path),
-                description="Module missing module-level docstring",
-                recommendation="Add module docstring at the top of the file describing the module's purpose"
-            ))
+            findings.append(
+                CodeQualityFinding(
+                    severity="medium",
+                    category="documentation",
+                    file_path=str(file_path),
+                    description="Module missing module-level docstring",
+                    recommendation="Add module docstring at the top of the file describing the module's purpose",
+                )
+            )
 
         return findings
 
@@ -299,40 +354,44 @@ class CodeQualityAnalyzer:
         for node in ast.walk(tree):
             if isinstance(node, ast.ExceptHandler):
                 if not node.type:  # Bare except clause
-                    findings.append(CodeQualityFinding(
-                        severity="high",
-                        category="error_handling",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description="Bare 'except:' clause catches all exceptions",
-                        code_sample="except:",
-                        recommendation="Specify exception types (e.g., 'except ValueError:' or 'except Exception:')"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="high",
+                            category="error_handling",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description="Bare 'except:' clause catches all exceptions",
+                            code_sample="except:",
+                            recommendation="Specify exception types (e.g., 'except ValueError:' or 'except Exception:')",
+                        )
+                    )
 
             elif isinstance(node, ast.Try):
                 # Check if try blocks have appropriate exception handling
                 has_broad_catch = any(
-                    handler.type is None or
-                    (isinstance(handler.type, ast.Name) and handler.type.id == 'Exception')
+                    handler.type is None
+                    or (isinstance(handler.type, ast.Name) and handler.type.id == "Exception")
                     for handler in node.handlers
                 )
 
                 if has_broad_catch and not any(
-                    isinstance(stmt, ast.Expr) and
-                    isinstance(stmt.value, ast.Call) and
-                    isinstance(stmt.value.func, ast.Attribute) and
-                    stmt.value.func.attr in ['error', 'warning']
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Call)
+                    and isinstance(stmt.value.func, ast.Attribute)
+                    and stmt.value.func.attr in ["error", "warning"]
                     for handler in node.handlers
                     for stmt in handler.body
                 ):
-                    findings.append(CodeQualityFinding(
-                        severity="medium",
-                        category="error_handling",
-                        file_path=str(file_path),
-                        line_number=node.lineno,
-                        description="Broad exception handling without proper logging",
-                        recommendation="Add appropriate logging in exception handlers (e.g., logger.error())"
-                    ))
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="medium",
+                            category="error_handling",
+                            file_path=str(file_path),
+                            line_number=node.lineno,
+                            description="Broad exception handling without proper logging",
+                            recommendation="Add appropriate logging in exception handlers (e.g., logger.error())",
+                        )
+                    )
 
         return findings
 
@@ -350,21 +409,23 @@ class CodeQualityAnalyzer:
                 from_imports.append(node)
 
         # Check for unused imports (simplified check - just look for import names in the file)
-        source_text = ast.unparse(tree) if hasattr(ast, 'unparse') else ""
+        source_text = ast.unparse(tree) if hasattr(ast, "unparse") else ""
 
         for import_node in imports:
             for alias in import_node.names:
                 name = alias.asname or alias.name
-                if name not in source_text and name != '*':
-                    findings.append(CodeQualityFinding(
-                        severity="low",
-                        category="imports",
-                        file_path=str(file_path),
-                        line_number=import_node.lineno,
-                        description=f"Potentially unused import: '{alias.name}'",
-                        code_sample=f"import {alias.name}",
-                        recommendation="Remove unused imports or ensure they are actually used in the code"
-                    ))
+                if name not in source_text and name != "*":
+                    findings.append(
+                        CodeQualityFinding(
+                            severity="low",
+                            category="imports",
+                            file_path=str(file_path),
+                            line_number=import_node.lineno,
+                            description=f"Potentially unused import: '{alias.name}'",
+                            code_sample=f"import {alias.name}",
+                            recommendation="Remove unused imports or ensure they are actually used in the code",
+                        )
+                    )
 
         return findings
 
@@ -412,7 +473,7 @@ class CodeQualityAnalyzer:
                 "line_number": f.line_number,
                 "description": f.description,
                 "code_sample": f.code_sample,
-                "recommendation": f.recommendation
+                "recommendation": f.recommendation,
             }
             for f in all_findings
         ]
@@ -427,18 +488,24 @@ class CodeQualityAnalyzer:
 
         return score, findings_dict, recommendations
 
-    def _calculate_metrics(self, findings: List[CodeQualityFinding], total_files: int, files_with_issues: int) -> CodeQualityMetrics:
+    def _calculate_metrics(
+        self, findings: List[CodeQualityFinding], total_files: int, files_with_issues: int
+    ) -> CodeQualityMetrics:
         """Calculate aggregated quality metrics"""
         metrics = CodeQualityMetrics(
             total_files=total_files,
             files_with_issues=files_with_issues,
-            total_findings=len(findings)
+            total_findings=len(findings),
         )
 
         # Count findings by severity and category
         for finding in findings:
-            metrics.findings_by_severity[finding.severity] = metrics.findings_by_severity.get(finding.severity, 0) + 1
-            metrics.findings_by_category[finding.category] = metrics.findings_by_category.get(finding.category, 0) + 1
+            metrics.findings_by_severity[finding.severity] = (
+                metrics.findings_by_severity.get(finding.severity, 0) + 1
+            )
+            metrics.findings_by_category[finding.category] = (
+                metrics.findings_by_category.get(finding.category, 0) + 1
+            )
 
         # Calculate component scores (inverse of issues found, but more reasonable)
         total_possible_score = 100
@@ -467,18 +534,13 @@ class CodeQualityAnalyzer:
             return 100.0
 
         # Weighted average of component scores
-        weights = {
-            'naming': 0.2,
-            'types': 0.3,
-            'documentation': 0.25,
-            'error_handling': 0.25
-        }
+        weights = {"naming": 0.2, "types": 0.3, "documentation": 0.25, "error_handling": 0.25}
 
         overall_score = (
-            metrics.naming_conventions_score * weights['naming'] +
-            metrics.type_hints_score * weights['types'] +
-            metrics.documentation_score * weights['documentation'] +
-            metrics.error_handling_score * weights['error_handling']
+            metrics.naming_conventions_score * weights["naming"]
+            + metrics.type_hints_score * weights["types"]
+            + metrics.documentation_score * weights["documentation"]
+            + metrics.error_handling_score * weights["error_handling"]
         )
 
         # Penalty for critical and high severity issues
@@ -489,7 +551,9 @@ class CodeQualityAnalyzer:
 
         return min(100, final_score)
 
-    def _generate_recommendations(self, metrics: CodeQualityMetrics, findings: List[CodeQualityFinding]) -> List[str]:
+    def _generate_recommendations(
+        self, metrics: CodeQualityMetrics, findings: List[CodeQualityFinding]
+    ) -> List[str]:
         """Generate actionable recommendations based on analysis"""
         recommendations = []
 
@@ -498,30 +562,46 @@ class CodeQualityAnalyzer:
         high_findings = [f for f in findings if f.severity == "high"]
 
         if critical_findings:
-            recommendations.append("CRITICAL: Fix syntax errors and critical issues immediately before proceeding")
+            recommendations.append(
+                "CRITICAL: Fix syntax errors and critical issues immediately before proceeding"
+            )
 
         if high_findings:
-            recommendations.append("HIGH PRIORITY: Address error handling issues, particularly bare except clauses")
+            recommendations.append(
+                "HIGH PRIORITY: Address error handling issues, particularly bare except clauses"
+            )
 
         # Component-specific recommendations
         if metrics.naming_conventions_score < 80:
-            recommendations.append("Improve naming conventions: Use snake_case for functions/variables, PascalCase for classes")
+            recommendations.append(
+                "Improve naming conventions: Use snake_case for functions/variables, PascalCase for classes"
+            )
 
         if metrics.type_hints_score < 80:
-            recommendations.append("Add comprehensive type hints to all function parameters and return values")
+            recommendations.append(
+                "Add comprehensive type hints to all function parameters and return values"
+            )
 
         if metrics.documentation_score < 80:
-            recommendations.append("Enhance documentation: Add docstrings to all classes and functions with parameter descriptions")
+            recommendations.append(
+                "Enhance documentation: Add docstrings to all classes and functions with parameter descriptions"
+            )
 
         if metrics.error_handling_score < 80:
-            recommendations.append("Strengthen error handling: Replace bare except clauses with specific exception types and add logging")
+            recommendations.append(
+                "Strengthen error handling: Replace bare except clauses with specific exception types and add logging"
+            )
 
         # General recommendations
         if metrics.files_with_issues / max(metrics.total_files, 1) > 0.5:
-            recommendations.append("Consider implementing automated code quality checks (e.g., pre-commit hooks with ruff/mypy)")
+            recommendations.append(
+                "Consider implementing automated code quality checks (e.g., pre-commit hooks with ruff/mypy)"
+            )
 
         if not recommendations:
-            recommendations.append("Code quality is generally good. Continue maintaining current standards.")
+            recommendations.append(
+                "Code quality is generally good. Continue maintaining current standards."
+            )
 
         return recommendations
 
@@ -561,16 +641,24 @@ class Evaluator:
             )
 
             self.logger.info(f"Code quality evaluation completed with score: {score:.1f}")
-            self.logger.info(f"Found {len(findings)} issues across {len(set(f['file_path'] for f in findings))} files")
+            self.logger.info(
+                f"Found {len(findings)} issues across {len(set(f['file_path'] for f in findings))} files"
+            )
 
             return score, findings, recommendations
 
         except Exception as e:
             self.logger.error(f"Code quality evaluation failed: {e}")
-            return 0.0, [{
-                "severity": "critical",
-                "category": "evaluation",
-                "file_path": self.config.target_directory,
-                "description": f"Evaluation failed: {str(e)}",
-                "recommendation": "Check directory access and file permissions"
-            }], ["Fix evaluation setup issues before re-running"]
+            return (
+                0.0,
+                [
+                    {
+                        "severity": "critical",
+                        "category": "evaluation",
+                        "file_path": self.config.target_directory,
+                        "description": f"Evaluation failed: {str(e)}",
+                        "recommendation": "Check directory access and file permissions",
+                    }
+                ],
+                ["Fix evaluation setup issues before re-running"],
+            )

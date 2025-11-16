@@ -14,8 +14,12 @@ import pytest
 
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.polygon_fundamentals.client import PolygonFundamentalsClient
-from src.data_collector.polygon_fundamentals.optimized_collector import OptimizedFundamentalCollector
-from src.data_collector.polygon_fundamentals.optimized_processor import OptimizedFundamentalProcessor
+from src.data_collector.polygon_fundamentals.optimized_collector import (
+    OptimizedFundamentalCollector,
+)
+from src.data_collector.polygon_fundamentals.optimized_processor import (
+    OptimizedFundamentalProcessor,
+)
 from src.utils.retry import (
     RetryConfig,
     CircuitBreaker,
@@ -25,7 +29,7 @@ from src.utils.retry import (
     API_RETRY_CONFIG,
     API_CIRCUIT_BREAKER,
     async_retry,
-    retry
+    retry,
 )
 from tests.fixtures.remote_api_responses import FakeResponse, canned_api_factory
 
@@ -42,6 +46,7 @@ class TestPolygonDataClientReliability:
         """Test that client retries on network failures."""
         # Mock network failure (ConnectionError) followed by success
         call_count = 0
+
         def mock_session_get(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -50,10 +55,12 @@ class TestPolygonDataClientReliability:
             # Return a proper response for success
             response = Mock()
             response.status_code = 200
-            response.json.return_value = {"results": [{"T": "TST", "c": 1.5, "o": 1.0, "h": 2.0, "l": 0.5, "v": 100}]}
+            response.json.return_value = {
+                "results": [{"T": "TST", "c": 1.5, "o": 1.0, "h": 2.0, "l": 0.5, "v": 100}]
+            }
             return response
 
-        with patch.object(self.client.session, 'get', side_effect=mock_session_get):
+        with patch.object(self.client.session, "get", side_effect=mock_session_get):
             # Should succeed after retries
             result = self.client.get_grouped_daily("2024-01-01")
 
@@ -68,7 +75,7 @@ class TestPolygonDataClientReliability:
         circuit_breaker = CircuitBreaker(config)
         test_client = PolygonDataClient(api_key="TEST", circuit_breaker=circuit_breaker)
 
-        with patch.object(test_client.session, 'get') as mock_get:
+        with patch.object(test_client.session, "get") as mock_get:
             mock_get.side_effect = ConnectionError("Persistent network failure")
 
             # Exhaust retry attempts multiple times to trigger circuit breaker
@@ -92,6 +99,7 @@ class TestPolygonDataClientReliability:
 
         # Simulate failures to open circuit
         call_count = 0
+
         def failing_function():
             nonlocal call_count
             call_count += 1
@@ -120,7 +128,7 @@ class TestPolygonDataClientReliability:
 
     def test_non_retryable_errors_not_retried(self):
         """Test that non-retryable errors (like auth failures) are not retried."""
-        with patch.object(self.client.session, 'get') as mock_get:
+        with patch.object(self.client.session, "get") as mock_get:
             # Mock 401 Unauthorized (authentication error - should not retry)
             mock_response = Mock()
             mock_response.status_code = 401
@@ -139,6 +147,7 @@ class TestPolygonDataClientReliability:
         """Test that rate limit errors are handled appropriately."""
         # Mock rate limit response (429) followed by success
         call_count = 0
+
         def mock_session_get(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -153,10 +162,12 @@ class TestPolygonDataClientReliability:
                 # Second call succeeds
                 response = Mock()
                 response.status_code = 200
-                response.json.return_value = {"results": [{"T": "TST", "c": 1.5, "o": 1.0, "h": 2.0, "l": 0.5, "v": 100}]}
+                response.json.return_value = {
+                    "results": [{"T": "TST", "c": 1.5, "o": 1.0, "h": 2.0, "l": 0.5, "v": 100}]
+                }
                 return response
 
-        with patch.object(self.client.session, 'get', side_effect=mock_session_get):
+        with patch.object(self.client.session, "get", side_effect=mock_session_get):
             # Should eventually succeed
             result = self.client.get_grouped_daily("2024-01-01")
             assert len(result) == 1
@@ -169,6 +180,7 @@ class TestPolygonDataClientReliability:
 
         # Mock async network failure followed by success
         call_count = 0
+
         async def mock_async_request(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -177,7 +189,9 @@ class TestPolygonDataClientReliability:
             return {"results": []}
 
         async with fundamentals_client:  # Use async context manager to initialize session
-            with patch.object(fundamentals_client, '_make_single_request', side_effect=mock_async_request):
+            with patch.object(
+                fundamentals_client, "_make_single_request", side_effect=mock_async_request
+            ):
                 result = await fundamentals_client._make_request("test_url", {})
                 assert result == {"results": []}
                 assert call_count == 3  # 2 failures + 1 success
@@ -190,9 +204,11 @@ class TestOptimizedFundamentalCollectorReliability:
     def setup_method(self):
         """Set up test fixtures."""
         # Mock database initialization to avoid psycopg2 dependency
-        with patch('src.data_collector.polygon_fundamentals.optimized_collector.create_engine'), \
-             patch('src.data_collector.polygon_fundamentals.optimized_collector.sessionmaker'), \
-             patch('src.database.connection.get_global_pool', return_value=Mock()):
+        with (
+            patch("src.data_collector.polygon_fundamentals.optimized_collector.create_engine"),
+            patch("src.data_collector.polygon_fundamentals.optimized_collector.sessionmaker"),
+            patch("src.database.connection.get_global_pool", return_value=Mock()),
+        ):
             self.collector = OptimizedFundamentalCollector()
 
     @pytest.mark.asyncio
@@ -206,15 +222,19 @@ class TestOptimizedFundamentalCollectorReliability:
             if call_count < 3:
                 raise TimeoutError("API timeout")
             # Return a mock response object with results
-            mock_response = type('MockResponse', (), {'results': [{'test': 'data'}]})()
+            mock_response = type("MockResponse", (), {"results": [{"test": "data"}]})()
             return mock_response
 
         # Mock the ticker cache to return a valid ticker_id for AAPL
         self.collector.ticker_cache = {"AAPL": 1}
 
         # Mock _has_recent_data to return False so it proceeds to API call
-        with patch.object(self.collector, '_has_recent_data', return_value=False), \
-             patch('src.data_collector.polygon_fundamentals.optimized_collector.PolygonFundamentalsClient') as mock_client_class:
+        with (
+            patch.object(self.collector, "_has_recent_data", return_value=False),
+            patch(
+                "src.data_collector.polygon_fundamentals.optimized_collector.PolygonFundamentalsClient"
+            ) as mock_client_class,
+        ):
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.get_financials = mock_get_financials
 
@@ -270,7 +290,10 @@ class TestOptimizedFundamentalProcessorReliability:
     def setup_method(self):
         """Set up test fixtures."""
         # Mock database initialization to avoid psycopg2 dependency
-        with patch('src.data_collector.polygon_fundamentals.optimized_collector.OptimizedFundamentalCollector.__init__', return_value=None):
+        with patch(
+            "src.data_collector.polygon_fundamentals.optimized_collector.OptimizedFundamentalCollector.__init__",
+            return_value=None,
+        ):
             self.processor = OptimizedFundamentalProcessor()
             # Manually set the collector attribute to avoid database initialization
             self.processor.collector = Mock()
@@ -309,7 +332,7 @@ class TestOptimizedFundamentalProcessorReliability:
             else:
                 raise ValueError(f"Invalid ticker: {ticker}")
 
-        with patch.object(self.processor, '_process_ticker_with_retry', side_effect=mock_collect):
+        with patch.object(self.processor, "_process_ticker_with_retry", side_effect=mock_collect):
             # Should handle mixed success/failure gracefully
             all_tickers = success_tickers + failure_tickers
             results = asyncio.run(self.processor.process_with_progress(all_tickers))
@@ -338,7 +361,7 @@ class TestSystemWideFaultTolerance:
 
         client = PolygonDataClient(api_key="TEST")
 
-        with patch.object(client.session, 'get') as mock_get:
+        with patch.object(client.session, "get") as mock_get:
             mock_get.side_effect = call_sequence
 
             # Should eventually succeed
@@ -349,6 +372,7 @@ class TestSystemWideFaultTolerance:
     @pytest.mark.asyncio
     async def test_concurrent_failure_handling(self):
         """Test system handles concurrent failures appropriately."""
+
         # Test that multiple concurrent operations don't overwhelm retry mechanisms
         async def failing_async_operation(delay: float):
             await asyncio.sleep(delay)
@@ -370,12 +394,17 @@ class TestSystemWideFaultTolerance:
     def test_resource_cleanup_on_failure(self):
         """Test that resources are properly cleaned up during failures."""
         # Mock database initialization to avoid psycopg2 dependency
-        with patch('src.data_collector.polygon_fundamentals.optimized_collector.OptimizedFundamentalCollector.__init__', return_value=None):
+        with patch(
+            "src.data_collector.polygon_fundamentals.optimized_collector.OptimizedFundamentalCollector.__init__",
+            return_value=None,
+        ):
             processor = OptimizedFundamentalProcessor()
             processor.collector = Mock()
 
             # Ensure cleanup happens even when processing fails
-            with patch.object(processor, 'process_with_progress', side_effect=Exception("Processing failed")):
+            with patch.object(
+                processor, "process_with_progress", side_effect=Exception("Processing failed")
+            ):
                 with pytest.raises(Exception):
                     asyncio.run(processor.process_with_progress(["AAPL"]))
 
@@ -397,7 +426,7 @@ class TestSystemWideFaultTolerance:
         assert all(delay <= 12.5 for delay in delays)  # Allow some jitter over max_delay
 
         # Check that delays generally increase (allowing for jitter randomness)
-        increasing_count = sum(1 for i in range(1, len(delays)) if delays[i] >= delays[i-1])
+        increasing_count = sum(1 for i in range(1, len(delays)) if delays[i] >= delays[i - 1])
         assert increasing_count >= 3  # At least 3 out of 4 should be increasing
 
 

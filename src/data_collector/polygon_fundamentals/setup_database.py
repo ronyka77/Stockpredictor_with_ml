@@ -37,7 +37,7 @@ def setup_fundamental_database() -> bool:
         except Exception as e:
             logger.warning(f"Schema execution failed (may already exist): {e}")
 
-        logger.info("✅ Fundamental database setup completed successfully")
+        logger.info("Fundamental database setup completed successfully")
 
         # Verify the table exists using helpers
         result = fetch_one(
@@ -51,23 +51,23 @@ def setup_fundamental_database() -> bool:
         )
 
         if result and result.get("exists"):
-            logger.info("✅ raw_fundamental_data table created successfully")
+            logger.info("raw_fundamental_data table created successfully")
 
             # Check indexes
             indexes = fetch_all(
                 "SELECT indexname FROM pg_indexes WHERE tablename = 'raw_fundamental_data'"
             )
-            logger.info(f"📊 Created {len(indexes)} indexes:")
+            logger.info(f"Created {len(indexes)} indexes:")
             for index in indexes or []:
-                logger.info(f"   - {index['indexname']}")
+                logger.info(f"- {index['indexname']}")
 
             return True
         else:
-            logger.error("❌ raw_fundamental_data table not found after setup")
+            logger.error("raw_fundamental_data table not found after setup")
             return False
 
     except Exception as e:
-        logger.error(f"❌ Failed to set up fundamental database: {e}")
+        logger.error(f"Failed to set up fundamental database: {e}")
         if conn:
             conn.rollback()
         return False
@@ -83,31 +83,31 @@ def verify_database_setup() -> bool:
         table_exists = result.get("exists") if result else False
 
         if not table_exists:
-            logger.error("❌ raw_fundamental_data table does not exist")
+            logger.error("raw_fundamental_data table does not exist")
             return False
 
         columns = fetch_all(
             "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'raw_fundamental_data' ORDER BY ordinal_position"
         )
-        logger.info(f"📋 Table has {len(columns)} columns:")
+        logger.info(f"Table has {len(columns)} columns:")
         for column in columns or []:
-            logger.info(f"   - {column['column_name']}: {column['data_type']}")
+            logger.info(f"- {column['column_name']}: {column['data_type']}")
 
         constraints = fetch_all(
             "SELECT constraint_name, constraint_type FROM information_schema.table_constraints WHERE table_name = 'raw_fundamental_data'"
         )
         logger.info(f"🔒 Table has {len(constraints)} constraints:")
         for constraint in constraints or []:
-            logger.info(f"   - {constraint['constraint_name']}: {constraint['constraint_type']}")
+            logger.info(f"- {constraint['constraint_name']}: {constraint['constraint_type']}")
 
         indexes = fetch_all(
             "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'raw_fundamental_data'"
         )
-        logger.info(f"📊 Table has {len(indexes)} indexes:")
+        logger.info(f"Table has {len(indexes)} indexes:")
         for index in indexes or []:
-            logger.info(f"   - {index['indexname']}")
+            logger.info(f"- {index['indexname']}")
 
-        logger.info("✅ Database setup verification complete!")
+        logger.info("Database setup verification complete!")
         return True
 
     except Exception as e:
@@ -138,18 +138,18 @@ def validate_table_structure():
         missing_columns = [col for col in required_columns if col not in existing_columns]
 
         if missing_columns:
-            logger.error(f"❌ Missing required columns: {missing_columns}")
+            logger.error(f"Missing required columns: {missing_columns}")
             return False
 
         column_types = fetch_all(
             "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'raw_fundamental_data' AND column_name IN ('ticker_id', 'date', 'filing_date', 'revenues', 'net_income_loss')"
         )
 
-        logger.info("📋 Key column data types:")
+        logger.info("Key column data types:")
         for col in column_types or []:
-            logger.info(f"   - {col['column_name']}: {col['data_type']}")
+            logger.info(f"- {col['column_name']}: {col['data_type']}")
 
-        logger.info("✅ Table structure validation complete!")
+        logger.info("Table structure validation complete!")
         return True
 
     except Exception as e:
@@ -171,8 +171,8 @@ def main():
             logger.info("Validating table structure...")
             success = validate_table_structure()
 
-        logger.info("✅ Database setup completed successfully")
+        logger.info("Database setup completed successfully")
         return True
     else:
-        logger.error("❌ Database setup failed")
+        logger.error("Database setup failed")
         return False

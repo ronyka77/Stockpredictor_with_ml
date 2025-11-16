@@ -15,13 +15,8 @@ The evaluation covers:
 
 import time
 import psutil
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Callable
+from typing import Dict, List, Any, Tuple, Callable
 from pathlib import Path
-import inspect
-import ast
-import importlib.util
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
 
@@ -33,6 +28,7 @@ logger = get_logger(__name__)
 
 class PerformanceMetric(Enum):
     """Performance metrics that can be measured"""
+
     EXECUTION_TIME = "execution_time"
     MEMORY_USAGE = "memory_usage"
     CPU_USAGE = "cpu_usage"
@@ -45,6 +41,7 @@ class PerformanceMetric(Enum):
 @dataclass
 class BenchmarkResult:
     """Result of a performance benchmark"""
+
     metric: PerformanceMetric
     value: float
     unit: str
@@ -98,8 +95,11 @@ class PerformanceEvaluator:
             # Discover data collector modules
             modules = self._discover_modules()
             if not modules:
-                return 0.0, [{"type": "error", "message": "No data collector modules found"}], \
-                       ["Ensure data collector modules exist in the target directory"]
+                return (
+                    0.0,
+                    [{"type": "error", "message": "No data collector modules found"}],
+                    ["Ensure data collector modules exist in the target directory"],
+                )
 
             # Run performance assessments
             findings = []
@@ -144,8 +144,11 @@ class PerformanceEvaluator:
 
         except Exception as e:
             self.logger.error(f"Performance evaluation failed: {e}")
-            return 0.0, [{"type": "error", "message": f"Evaluation failed: {str(e)}"}], \
-                   ["Fix evaluation setup and retry"]
+            return (
+                0.0,
+                [{"type": "error", "message": f"Evaluation failed: {str(e)}"}],
+                ["Fix evaluation setup and retry"],
+            )
 
     def _discover_modules(self) -> List[Dict[str, Any]]:
         """
@@ -162,7 +165,7 @@ class PerformanceEvaluator:
             "polygon_fundamentals",
             "polygon_fundamentals_v2",
             "polygon_news",
-            "indicator_pipeline"
+            "indicator_pipeline",
         ]
 
         for dir_name in eval_dirs:
@@ -171,17 +174,22 @@ class PerformanceEvaluator:
                 # Find Python files in the directory
                 py_files = list(dir_path.glob("*.py"))
                 if py_files:
-                    modules.append({
-                        "name": dir_name,
-                        "path": dir_path,
-                        "files": py_files,
-                        "main_file": dir_path / f"{dir_name.split('_')[0]}.py" if "_" in dir_name
-                                   else dir_path / f"{dir_name}.py"
-                    })
+                    modules.append(
+                        {
+                            "name": dir_name,
+                            "path": dir_path,
+                            "files": py_files,
+                            "main_file": dir_path / f"{dir_name.split('_')[0]}.py"
+                            if "_" in dir_name
+                            else dir_path / f"{dir_name}.py",
+                        }
+                    )
 
         return modules
 
-    def _assess_rate_limiting(self, modules: List[Dict[str, Any]]) -> Tuple[float, List[Dict[str, Any]], List[str]]:
+    def _assess_rate_limiting(
+        self, modules: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict[str, Any]], List[str]]:
         """
         Assess API rate limiting implementation.
 
@@ -203,20 +211,29 @@ class PerformanceEvaluator:
 
             for file_path in module["files"]:
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for rate limiting patterns
-                    if any(pattern in content.lower() for pattern in [
-                        "rate_limit", "rate_limiter", "backoff", "exponential_backoff",
-                        "sleep", "delay", "throttle"
-                    ]):
+                    if any(
+                        pattern in content.lower()
+                        for pattern in [
+                            "rate_limit",
+                            "rate_limiter",
+                            "backoff",
+                            "exponential_backoff",
+                            "sleep",
+                            "delay",
+                            "throttle",
+                        ]
+                    ):
                         rate_limiter_found = True
 
                     # Check for backoff implementation
-                    if any(pattern in content.lower() for pattern in [
-                        "backoff", "exponential", "retry", "wait_time"
-                    ]):
+                    if any(
+                        pattern in content.lower()
+                        for pattern in ["backoff", "exponential", "retry", "wait_time"]
+                    ):
                         backoff_found = True
 
                     # Check for time.sleep usage (basic rate limiting)
@@ -229,32 +246,40 @@ class PerformanceEvaluator:
             # Evaluate rate limiting
             if rate_limiter_found:
                 module_score += 0.6
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Rate limiting implementation detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Rate limiting implementation detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "No rate limiting implementation found"
-                })
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "No rate limiting implementation found",
+                    }
+                )
                 recommendations.append(f"Implement rate limiting in {module['name']} module")
 
             if backoff_found:
                 module_score += 0.4
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Backoff strategy implementation detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Backoff strategy implementation detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "No backoff strategy implementation found"
-                })
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "No backoff strategy implementation found",
+                    }
+                )
                 recommendations.append(f"Implement backoff strategies in {module['name']} module")
 
             total_score += module_score
@@ -264,7 +289,9 @@ class PerformanceEvaluator:
         final_score = total_score / assessed_modules if assessed_modules > 0 else 0.0
         return final_score, findings, recommendations
 
-    def _assess_memory_usage(self, modules: List[Dict[str, Any]]) -> Tuple[float, List[Dict[str, Any]], List[str]]:
+    def _assess_memory_usage(
+        self, modules: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict[str, Any]], List[str]]:
         """
         Assess memory usage and batch processing efficiency.
 
@@ -286,21 +313,37 @@ class PerformanceEvaluator:
 
             for file_path in module["files"]:
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for batch processing
-                    if any(pattern in content.lower() for pattern in [
-                        "batch", "chunk", "paginate", "yield", "generator",
-                        "itertools.islice", "enumerate"
-                    ]):
+                    if any(
+                        pattern in content.lower()
+                        for pattern in [
+                            "batch",
+                            "chunk",
+                            "paginate",
+                            "yield",
+                            "generator",
+                            "itertools.islice",
+                            "enumerate",
+                        ]
+                    ):
                         batch_processing_found = True
 
                     # Check for memory efficient patterns
-                    if any(pattern in content for pattern in [
-                        "yield", "iter(", "itertools.", "gc.collect",
-                        "del ", "__del__", "weakref"
-                    ]):
+                    if any(
+                        pattern in content
+                        for pattern in [
+                            "yield",
+                            "iter(",
+                            "itertools.",
+                            "gc.collect",
+                            "del ",
+                            "__del__",
+                            "weakref",
+                        ]
+                    ):
                         memory_efficient_patterns = True
 
                 except Exception as e:
@@ -309,32 +352,42 @@ class PerformanceEvaluator:
             # Evaluate memory usage patterns
             if batch_processing_found:
                 module_score += 0.5
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Batch processing patterns detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Batch processing patterns detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "No batch processing patterns found"
-                })
-                recommendations.append(f"Implement batch processing in {module['name']} for large datasets")
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "No batch processing patterns found",
+                    }
+                )
+                recommendations.append(
+                    f"Implement batch processing in {module['name']} for large datasets"
+                )
 
             if memory_efficient_patterns:
                 module_score += 0.5
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Memory efficient patterns detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Memory efficient patterns detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "info",
-                    "module": module["name"],
-                    "message": "Consider implementing memory efficient patterns"
-                })
+                module_findings.append(
+                    {
+                        "type": "info",
+                        "module": module["name"],
+                        "message": "Consider implementing memory efficient patterns",
+                    }
+                )
 
             total_score += module_score
             assessed_modules += 1
@@ -343,7 +396,9 @@ class PerformanceEvaluator:
         final_score = total_score / assessed_modules if assessed_modules > 0 else 0.0
         return final_score, findings, recommendations
 
-    def _assess_error_handling(self, modules: List[Dict[str, Any]]) -> Tuple[float, List[Dict[str, Any]], List[str]]:
+    def _assess_error_handling(
+        self, modules: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict[str, Any]], List[str]]:
         """
         Assess error handling and retry mechanisms.
 
@@ -366,25 +421,34 @@ class PerformanceEvaluator:
 
             for file_path in module["files"]:
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for retry mechanisms
-                    if any(pattern in content.lower() for pattern in [
-                        "retry", "tenacity", "backoff", "while true", "max_retries"
-                    ]):
+                    if any(
+                        pattern in content.lower()
+                        for pattern in ["retry", "tenacity", "backoff", "while true", "max_retries"]
+                    ):
                         retry_mechanism = True
 
                     # Check for graceful degradation
-                    if any(pattern in content.lower() for pattern in [
-                        "fallback", "default", "graceful", "degrade", "circuit_breaker"
-                    ]):
+                    if any(
+                        pattern in content.lower()
+                        for pattern in [
+                            "fallback",
+                            "default",
+                            "graceful",
+                            "degrade",
+                            "circuit_breaker",
+                        ]
+                    ):
                         graceful_degradation = True
 
                     # Check for exception handling
-                    if any(pattern in content for pattern in [
-                        "try:", "except", "finally:", "with ", "contextmanager"
-                    ]):
+                    if any(
+                        pattern in content
+                        for pattern in ["try:", "except", "finally:", "with ", "contextmanager"]
+                    ):
                         exception_handling = True
 
                 except Exception as e:
@@ -393,46 +457,58 @@ class PerformanceEvaluator:
             # Evaluate error handling
             if retry_mechanism:
                 module_score += 0.4
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Retry mechanism implementation detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Retry mechanism implementation detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "No retry mechanism found"
-                })
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "No retry mechanism found",
+                    }
+                )
                 recommendations.append(f"Implement retry mechanisms in {module['name']} module")
 
             if graceful_degradation:
                 module_score += 0.3
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Graceful degradation patterns detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Graceful degradation patterns detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "info",
-                    "module": module["name"],
-                    "message": "Consider implementing graceful degradation"
-                })
+                module_findings.append(
+                    {
+                        "type": "info",
+                        "module": module["name"],
+                        "message": "Consider implementing graceful degradation",
+                    }
+                )
 
             if exception_handling:
                 module_score += 0.3
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Exception handling patterns detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Exception handling patterns detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "Limited exception handling found"
-                })
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "Limited exception handling found",
+                    }
+                )
                 recommendations.append(f"Improve exception handling in {module['name']} module")
 
             total_score += module_score
@@ -442,7 +518,9 @@ class PerformanceEvaluator:
         final_score = total_score / assessed_modules if assessed_modules > 0 else 0.0
         return final_score, findings, recommendations
 
-    def _assess_concurrent_safety(self, modules: List[Dict[str, Any]]) -> Tuple[float, List[Dict[str, Any]], List[str]]:
+    def _assess_concurrent_safety(
+        self, modules: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict[str, Any]], List[str]]:
         """
         Assess concurrent operation safety and resource management.
 
@@ -465,29 +543,52 @@ class PerformanceEvaluator:
 
             for file_path in module["files"]:
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for thread safety
-                    if any(pattern in content for pattern in [
-                        "threading.Lock", "threading.RLock", "threading.Semaphore",
-                        "asyncio.Lock", "multiprocessing.Lock", "concurrent.futures",
-                        "@thread_safe", "thread_local", "threading.local"
-                    ]):
+                    if any(
+                        pattern in content
+                        for pattern in [
+                            "threading.Lock",
+                            "threading.RLock",
+                            "threading.Semaphore",
+                            "asyncio.Lock",
+                            "multiprocessing.Lock",
+                            "concurrent.futures",
+                            "@thread_safe",
+                            "thread_local",
+                            "threading.local",
+                        ]
+                    ):
                         thread_safety = True
 
                     # Check for resource management
-                    if any(pattern in content for pattern in [
-                        "with ", "__enter__", "__exit__", "contextmanager",
-                        "resource", "cleanup", "close()"
-                    ]):
+                    if any(
+                        pattern in content
+                        for pattern in [
+                            "with ",
+                            "__enter__",
+                            "__exit__",
+                            "contextmanager",
+                            "resource",
+                            "cleanup",
+                            "close()",
+                        ]
+                    ):
                         resource_management = True
 
                     # Check for lock mechanisms
-                    if any(pattern in content for pattern in [
-                        "threading.Lock", "threading.RLock", "asyncio.Lock",
-                        "multiprocessing.Lock", "semaphore"
-                    ]):
+                    if any(
+                        pattern in content
+                        for pattern in [
+                            "threading.Lock",
+                            "threading.RLock",
+                            "asyncio.Lock",
+                            "multiprocessing.Lock",
+                            "semaphore",
+                        ]
+                    ):
                         lock_mechanisms = True
 
                 except Exception as e:
@@ -496,40 +597,52 @@ class PerformanceEvaluator:
             # Evaluate concurrent safety
             if thread_safety:
                 module_score += 0.4
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Thread safety mechanisms detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Thread safety mechanisms detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "info",
-                    "module": module["name"],
-                    "message": "Thread safety mechanisms not detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "info",
+                        "module": module["name"],
+                        "message": "Thread safety mechanisms not detected",
+                    }
+                )
 
             if resource_management:
                 module_score += 0.4
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Resource management patterns detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Resource management patterns detected",
+                    }
+                )
             else:
-                module_findings.append({
-                    "type": "warning",
-                    "module": module["name"],
-                    "message": "Resource management may be insufficient"
-                })
-                recommendations.append(f"Implement proper resource management in {module['name']} module")
+                module_findings.append(
+                    {
+                        "type": "warning",
+                        "module": module["name"],
+                        "message": "Resource management may be insufficient",
+                    }
+                )
+                recommendations.append(
+                    f"Implement proper resource management in {module['name']} module"
+                )
 
             if lock_mechanisms:
                 module_score += 0.2
-                module_findings.append({
-                    "type": "success",
-                    "module": module["name"],
-                    "message": "Lock mechanisms detected"
-                })
+                module_findings.append(
+                    {
+                        "type": "success",
+                        "module": module["name"],
+                        "message": "Lock mechanisms detected",
+                    }
+                )
 
             total_score += module_score
             assessed_modules += 1
@@ -557,14 +670,16 @@ class PerformanceEvaluator:
 
             recommendations = []
             if execution_time > self.max_execution_time:
-                recommendations.append(f"Execution time ({execution_time:.2f}s) exceeds threshold ({self.max_execution_time}s)")
+                recommendations.append(
+                    f"Execution time ({execution_time:.2f}s) exceeds threshold ({self.max_execution_time}s)"
+                )
 
             return BenchmarkResult(
                 metric=PerformanceMetric.EXECUTION_TIME,
                 value=execution_time,
                 unit="seconds",
                 description=f"Function execution completed in {execution_time:.2f} seconds",
-                recommendations=recommendations
+                recommendations=recommendations,
             )
         except Exception as e:
             execution_time = time.perf_counter() - start_time
@@ -573,7 +688,7 @@ class PerformanceEvaluator:
                 value=execution_time,
                 unit="seconds",
                 description=f"Function failed after {execution_time:.2f} seconds: {str(e)}",
-                recommendations=["Fix function errors to enable proper benchmarking"]
+                recommendations=["Fix function errors to enable proper benchmarking"],
             )
 
     def _benchmark_memory_usage(self, func: Callable, *args, **kwargs) -> BenchmarkResult:
@@ -599,14 +714,16 @@ class PerformanceEvaluator:
 
             recommendations = []
             if memory_used > self.max_memory_mb:
-                recommendations.append(f"Memory usage ({memory_used:.1f}MB) exceeds threshold ({self.max_memory_mb}MB)")
+                recommendations.append(
+                    f"Memory usage ({memory_used:.1f}MB) exceeds threshold ({self.max_memory_mb}MB)"
+                )
 
             return BenchmarkResult(
                 metric=PerformanceMetric.MEMORY_USAGE,
                 value=memory_used,
                 unit="MB",
                 description=f"Function used {memory_used:.1f} MB of memory",
-                recommendations=recommendations
+                recommendations=recommendations,
             )
         except Exception as e:
             final_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -617,7 +734,7 @@ class PerformanceEvaluator:
                 value=memory_used,
                 unit="MB",
                 description=f"Function failed using {memory_used:.1f} MB of memory: {str(e)}",
-                recommendations=["Fix function errors to enable proper memory profiling"]
+                recommendations=["Fix function errors to enable proper memory profiling"],
             )
 
 

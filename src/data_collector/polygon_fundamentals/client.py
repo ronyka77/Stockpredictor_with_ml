@@ -31,7 +31,7 @@ from src.utils.core.retry import (
     RetryError,
     CircuitBreakerOpenError,
     CircuitBreaker,
-    CircuitBreakerConfig
+    CircuitBreakerConfig,
 )
 from src.data_collector.config import config
 
@@ -77,11 +77,9 @@ class PolygonFundamentalsClient:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize circuit breaker for fault tolerance
-        self.circuit_breaker = CircuitBreaker(CircuitBreakerConfig(
-            failure_threshold=5,
-            success_threshold=2,
-            timeout=60.0
-        ))
+        self.circuit_breaker = CircuitBreaker(
+            CircuitBreakerConfig(failure_threshold=5, success_threshold=2, timeout=60.0)
+        )
 
     async def __aenter__(self) -> "PolygonFundamentalsClient":
         """Async context manager entry"""
@@ -208,7 +206,9 @@ class PolygonFundamentalsClient:
             return await _execute_request()
         except RetryError as e:
             # Wrap retry exhaustion in a more descriptive error
-            logger.error(f"Request to {url} failed after {e.attempts} attempts. Last error: {e.last_exception}")
+            logger.error(
+                f"Request to {url} failed after {e.attempts} attempts. Last error: {e.last_exception}"
+            )
             return None
         except CircuitBreakerOpenError:
             # Circuit breaker is open - service is failing

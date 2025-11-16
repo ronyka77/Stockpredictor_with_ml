@@ -137,7 +137,9 @@ def test_connection_replaces_broken_conn_and_calls_putconn_close(patched_threade
     pc._health_check_interval = 30.0
 
     # Mock the validation methods for this unit test
-    pc.validate_connection = MagicMock(side_effect=[False, True])  # First conn invalid, second valid
+    pc.validate_connection = MagicMock(
+        side_effect=[False, True]
+    )  # First conn invalid, second valid
 
     with pc.connection() as conn:
         assert conn is good_conn

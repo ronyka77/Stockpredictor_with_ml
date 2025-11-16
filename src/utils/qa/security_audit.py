@@ -20,6 +20,7 @@ except ImportError:
     # Allow running as standalone script
     import sys
     import os
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     from src.utils.core.logger import get_logger
 
@@ -101,10 +102,10 @@ class SecurityEvent(BaseModel):
             datetime: lambda v: v.isoformat(),
             SecurityEventType: lambda v: v.value,
             SecurityEventSeverity: lambda v: v.value,
-        }
+        },
     )
 
-    @field_validator('integrity_hash', mode='before')
+    @field_validator("integrity_hash", mode="before")
     @classmethod
     def compute_integrity_hash(cls, v, info):
         """Compute tamper-evident hash of the event data."""
@@ -116,49 +117,49 @@ class SecurityEvent(BaseModel):
 
         # Create hash of key event fields (excluding the hash itself)
         event_data = {
-            'event_id': data.get('event_id', ''),
-            'event_type': str(data.get('event_type', '')),
-            'timestamp': data.get('timestamp', '').isoformat() if data.get('timestamp') else '',
-            'service': data.get('service', ''),
-            'severity': str(data.get('severity', '')),
-            'user_id': data.get('user_id', ''),
-            'session_id': data.get('session_id', ''),
-            'resource': data.get('resource', ''),
-            'action': data.get('action', ''),
-            'outcome': data.get('outcome', ''),
-            'details': json.dumps(data.get('details', {}), sort_keys=True),
+            "event_id": data.get("event_id", ""),
+            "event_type": str(data.get("event_type", "")),
+            "timestamp": data.get("timestamp", "").isoformat() if data.get("timestamp") else "",
+            "service": data.get("service", ""),
+            "severity": str(data.get("severity", "")),
+            "user_id": data.get("user_id", ""),
+            "session_id": data.get("session_id", ""),
+            "resource": data.get("resource", ""),
+            "action": data.get("action", ""),
+            "outcome": data.get("outcome", ""),
+            "details": json.dumps(data.get("details", {}), sort_keys=True),
         }
 
         # Create deterministic string representation
-        data_string = json.dumps(event_data, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(data_string.encode('utf-8')).hexdigest()
+        data_string = json.dumps(event_data, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(data_string.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary with integrity verification."""
         data = self.model_dump()
 
         # Verify integrity hash by recomputing it
-        timestamp = data.get('timestamp', '')
+        timestamp = data.get("timestamp", "")
         if isinstance(timestamp, datetime):
             timestamp = timestamp.isoformat()
 
         event_data = {
-            'event_id': data.get('event_id', ''),
-            'event_type': str(data.get('event_type', '')),
-            'timestamp': timestamp,
-            'service': data.get('service', ''),
-            'severity': str(data.get('severity', '')),
-            'user_id': data.get('user_id', ''),
-            'session_id': data.get('session_id', ''),
-            'resource': data.get('resource', ''),
-            'action': data.get('action', ''),
-            'outcome': data.get('outcome', ''),
-            'details': json.dumps(data.get('details', {}), sort_keys=True),
+            "event_id": data.get("event_id", ""),
+            "event_type": str(data.get("event_type", "")),
+            "timestamp": timestamp,
+            "service": data.get("service", ""),
+            "severity": str(data.get("severity", "")),
+            "user_id": data.get("user_id", ""),
+            "session_id": data.get("session_id", ""),
+            "resource": data.get("resource", ""),
+            "action": data.get("action", ""),
+            "outcome": data.get("outcome", ""),
+            "details": json.dumps(data.get("details", {}), sort_keys=True),
         }
-        data_string = json.dumps(event_data, sort_keys=True, separators=(',', ':'))
-        computed_hash = hashlib.sha256(data_string.encode('utf-8')).hexdigest()
+        data_string = json.dumps(event_data, sort_keys=True, separators=(",", ":"))
+        computed_hash = hashlib.sha256(data_string.encode("utf-8")).hexdigest()
 
-        stored_hash = data.get('integrity_hash')
+        stored_hash = data.get("integrity_hash")
         if stored_hash and stored_hash != computed_hash:
             security_logger.warning(
                 f"Security event integrity violation detected for event {self.event_id}"
@@ -304,7 +305,11 @@ class SecurityAuditLogger:
         if details:
             event_details.update(details)
 
-        severity = SecurityEventSeverity.HIGH if len(validation_errors) > 3 else SecurityEventSeverity.MEDIUM
+        severity = (
+            SecurityEventSeverity.HIGH
+            if len(validation_errors) > 3
+            else SecurityEventSeverity.MEDIUM
+        )
 
         return self.log_security_event(
             event_type=SecurityEventType.INPUT_VALIDATION_FAILURE,
@@ -327,10 +332,7 @@ class SecurityAuditLogger:
         details: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Log credential validation event."""
-        event_details = {
-            "credential_type": credential_type,
-            "service": service,
-        }
+        event_details = {"credential_type": credential_type, "service": service}
         if details:
             event_details.update(details)
 
@@ -371,9 +373,19 @@ class SecurityAuditLogger:
         """Sanitize sensitive data from event details."""
         sanitized = {}
         sensitive_keys = {
-            'password', 'api_key', 'secret', 'token', 'key', 'credential',
-            'auth_token', 'access_token', 'refresh_token', 'bearer_token',
-            'authorization', 'cookie', 'session_token'
+            "password",
+            "api_key",
+            "secret",
+            "token",
+            "key",
+            "credential",
+            "auth_token",
+            "access_token",
+            "refresh_token",
+            "bearer_token",
+            "authorization",
+            "cookie",
+            "session_token",
         }
 
         for key, value in details.items():
@@ -390,7 +402,7 @@ class SecurityAuditLogger:
         if not user_id:
             return None
         # Hash user IDs to prevent exposure while maintaining uniqueness for correlation
-        return hashlib.sha256(user_id.encode('utf-8')).hexdigest()[:16]
+        return hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:16]
 
     def _sanitize_session_id(self, session_id: Optional[str]) -> Optional[str]:
         """Sanitize session identifier."""
@@ -404,14 +416,14 @@ class SecurityAuditLogger:
         if not ip_address:
             return None
         # For IPv4, mask last octet; for IPv6, mask last segment
-        if ':' in ip_address:  # IPv6
-            parts = ip_address.split(':')
+        if ":" in ip_address:  # IPv6
+            parts = ip_address.split(":")
             if len(parts) > 4:
-                return ':'.join(parts[:-2]) + '::masked'
+                return ":".join(parts[:-2]) + "::masked"
         else:  # IPv4
-            parts = ip_address.split('.')
+            parts = ip_address.split(".")
             if len(parts) == 4:
-                return '.'.join(parts[:-1]) + '.***'
+                return ".".join(parts[:-1]) + ".***"
         return ip_address
 
     def _sanitize_user_agent(self, user_agent: Optional[str]) -> Optional[str]:
@@ -426,7 +438,7 @@ class SecurityAuditLogger:
         if not resource:
             return None
         # Remove potential sensitive path information
-        if 'password' in resource.lower() or 'secret' in resource.lower():
+        if "password" in resource.lower() or "secret" in resource.lower():
             return "sensitive_resource"
         return resource
 
@@ -472,7 +484,7 @@ audit_logger = SecurityAuditLogger()
 def log_security_event(
     event_type: Union[SecurityEventType, str],
     severity: SecurityEventSeverity = SecurityEventSeverity.MEDIUM,
-    **kwargs
+    **kwargs,
 ) -> str:
     """
     Convenience function to log security events.
@@ -517,7 +529,7 @@ if __name__ == "__main__":
         user_id="user123",
         session_id="session_abc123",
         ip_address="192.168.1.100",
-        details={"method": "password"}
+        details={"method": "password"},
     )
     print(f"Logged auth success event: {event_id}")
 
@@ -526,7 +538,7 @@ if __name__ == "__main__":
         resource="api/stocks",
         validation_errors=["Invalid ticker symbol format", "Missing required field"],
         ip_address="10.0.0.1",
-        details={"input_length": 1500}
+        details={"input_length": 1500},
     )
     print(f"Logged validation failure event: {event_id}")
 
@@ -535,6 +547,6 @@ if __name__ == "__main__":
         service="polygon_api",
         validation_result=False,
         credential_type="api_key",
-        details={"reason": "invalid_format"}
+        details={"reason": "invalid_format"},
     )
     print(f"Logged credential validation event: {event_id}")

@@ -31,9 +31,9 @@ class XGBoostPredictor(BasePredictor):
         Load the XGBoost model from MLflow using the specified run ID
         """
         self.model = XGBoostModel.load_from_mlflow(self.run_id)
-        logger.info(f"✅ XGBoost model loaded: {self.model.model_name}")
+        logger.info(f"XGBoost model loaded: {self.model.model_name}")
         logger.info(
-            f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
+            f"Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
 

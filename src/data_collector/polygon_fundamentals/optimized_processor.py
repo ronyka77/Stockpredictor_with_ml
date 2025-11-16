@@ -12,12 +12,7 @@ from src.data_collector.polygon_fundamentals.optimized_collector import (
 )
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.utils.core.logger import get_logger
-from src.utils.core.retry import (
-    async_retry,
-    API_RETRY_CONFIG,
-    RetryError,
-    CircuitBreakerOpenError
-)
+from src.utils.core.retry import async_retry, API_RETRY_CONFIG, RetryError, CircuitBreakerOpenError
 from src.database.connection import get_global_pool
 
 logger = get_logger(__name__)
@@ -48,12 +43,14 @@ class OptimizedFundamentalProcessor:
 
                 # Log individual ticker results
                 if success:
-                    logger.info(f"✓ {ticker} - Success")
+                    logger.info(f"{ticker} - Success")
                 else:
                     logger.warning(f"✗ {ticker} - Failed after retries")
 
             except RetryError as e:
-                logger.error(f"Failed to process {ticker} after {e.attempts} attempts. Last error: {e.last_exception}")
+                logger.error(
+                    f"Failed to process {ticker} after {e.attempts} attempts. Last error: {e.last_exception}"
+                )
                 results[ticker] = False
             except CircuitBreakerOpenError:
                 logger.error(f"Circuit breaker open for {ticker} - service temporarily unavailable")
@@ -64,7 +61,9 @@ class OptimizedFundamentalProcessor:
 
         return results
 
-    def chunk_tickers(self, tickers: List[str], chunk_size: int) -> Generator[List[str], None, None]:
+    def chunk_tickers(
+        self, tickers: List[str], chunk_size: int
+    ) -> Generator[List[str], None, None]:
         """
         Split a list of tickers into chunks for memory-efficient processing
 
@@ -76,14 +75,9 @@ class OptimizedFundamentalProcessor:
             Chunks of ticker symbols
         """
         for i in range(0, len(tickers), chunk_size):
-            yield tickers[i:i + chunk_size]
+            yield tickers[i : i + chunk_size]
 
-    async def process_in_chunks(
-        self,
-        tickers: List[str],
-        chunk_size: int = 50,
-        max_concurrent_chunks: int = 2
-    ) -> Dict[str, bool]:
+    async def process_in_chunks(self, tickers: List[str], chunk_size: int = 50) -> Dict[str, bool]:
         """
         Process tickers in memory-efficient chunks instead of all at once
 
@@ -93,7 +87,6 @@ class OptimizedFundamentalProcessor:
         Args:
             tickers: List of ticker symbols to process
             chunk_size: Number of tickers to process per chunk
-            max_concurrent_chunks: Maximum number of chunks to process concurrently
 
         Returns:
             Dictionary mapping ticker symbols to success status
@@ -101,12 +94,16 @@ class OptimizedFundamentalProcessor:
         all_results = {}
         total_chunks = (len(tickers) + chunk_size - 1) // chunk_size
 
-        logger.info(f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})")
+        logger.info(
+            f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})"
+        )
 
         chunk_count = 0
         for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
             chunk_count += 1
-            logger.info(f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)")
+            logger.info(
+                f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)"
+            )
 
             # Process chunk sequentially to avoid overwhelming the API
             chunk_results = await self.process_with_progress(ticker_chunk)
@@ -121,11 +118,7 @@ class OptimizedFundamentalProcessor:
         return all_results
 
     async def process_with_callback(
-        self,
-        tickers: List[str],
-        callback: Any,
-        chunk_size: int = 100,
-        **callback_kwargs: Any
+        self, tickers: List[str], callback: Any, chunk_size: int = 100, **callback_kwargs: Any
     ) -> int:
         """
         Process tickers in chunks and call a callback function for each chunk
@@ -164,7 +157,9 @@ class OptimizedFundamentalProcessor:
         logger.info(f"Callback processing complete. Total tickers processed: {total_processed}")
         return total_processed
 
-    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # Circuit breaker handled at collector level
+    @async_retry(
+        config=API_RETRY_CONFIG, circuit_breaker=None
+    )  # Circuit breaker handled at collector level
     async def _process_ticker_with_retry(self, ticker: str) -> bool:
         """
         Process a single ticker with retry logic

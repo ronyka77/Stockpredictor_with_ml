@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 
 class ReliabilityTest(Enum):
     """Types of reliability tests that can be performed"""
+
     NETWORK_FAILURE = "network_failure"
     API_ERROR_HANDLING = "api_error_handling"
     ERROR_HANDLING = "error_handling"
@@ -42,6 +43,7 @@ class ReliabilityTest(Enum):
 @dataclass
 class ReliabilityFinding:
     """Represents a single reliability finding"""
+
     test_type: ReliabilityTest
     severity: str  # "critical", "warning", "info", "success"
     module: str
@@ -52,6 +54,7 @@ class ReliabilityFinding:
 @dataclass
 class ReliabilityMetrics:
     """Aggregated reliability metrics"""
+
     total_tests: int = 0
     passed_tests: int = 0
     critical_failures: int = 0
@@ -96,20 +99,26 @@ class ReliabilityTester:
 
         for module_info in modules:
             try:
-                module_score, findings, recommendations = self._assess_module_reliability(module_info)
+                module_score, findings, recommendations = self._assess_module_reliability(
+                    module_info
+                )
                 total_score += module_score
                 all_findings.extend(findings)
                 all_recommendations.extend(recommendations)
 
-                self.logger.info(f"Completed reliability assessment for {module_info['name']}: score={module_score:.2f}")
+                self.logger.info(
+                    f"Completed reliability assessment for {module_info['name']}: score={module_score:.2f}"
+                )
 
             except Exception as e:
                 self.logger.error(f"Failed to assess reliability for {module_info['name']}: {e}")
-                all_findings.append({
-                    "type": "error",
-                    "module": module_info["name"],
-                    "message": f"Assessment failed: {str(e)}"
-                })
+                all_findings.append(
+                    {
+                        "type": "error",
+                        "module": module_info["name"],
+                        "message": f"Assessment failed: {str(e)}",
+                    }
+                )
 
         final_score = total_score / len(modules) if modules else 0.0
 
@@ -119,12 +128,14 @@ class ReliabilityTester:
             if isinstance(finding, dict):
                 findings_dict.append(finding)
             elif isinstance(finding, ReliabilityFinding):
-                findings_dict.append({
-                    "type": finding.severity,
-                    "module": finding.module,
-                    "message": finding.message,
-                    "recommendation": finding.recommendation
-                })
+                findings_dict.append(
+                    {
+                        "type": finding.severity,
+                        "module": finding.module,
+                        "message": finding.message,
+                        "recommendation": finding.recommendation,
+                    }
+                )
 
         self.logger.info(f"Reliability assessment completed. Final score: {final_score:.2f}")
         return final_score, findings_dict, all_recommendations
@@ -154,12 +165,16 @@ class ReliabilityTester:
 
                         # Check if this looks like a data collector module
                         if self._is_data_collector_module(module):
-                            modules.append({
-                                "name": py_file.stem,
-                                "path": py_file,
-                                "module": module,
-                                "relative_path": py_file.relative_to(Path(self.config.target_directory).parent.parent)
-                            })
+                            modules.append(
+                                {
+                                    "name": py_file.stem,
+                                    "path": py_file,
+                                    "module": module,
+                                    "relative_path": py_file.relative_to(
+                                        Path(self.config.target_directory).parent.parent
+                                    ),
+                                }
+                            )
 
                     except Exception as e:
                         self.logger.debug(f"Could not load module {py_file}: {e}")
@@ -167,7 +182,9 @@ class ReliabilityTester:
             except Exception as e:
                 self.logger.debug(f"Could not process file {py_file}: {e}")
 
-        self.logger.info(f"Discovered {len(modules)} data collector modules for reliability testing")
+        self.logger.info(
+            f"Discovered {len(modules)} data collector modules for reliability testing"
+        )
         return modules
 
     def _is_data_collector_module(self, module) -> bool:
@@ -177,26 +194,36 @@ class ReliabilityTester:
 
         # Check for common data collector class names or functions
         collector_indicators = [
-            'Client', 'Collector', 'Fetcher', 'Pipeline', 'Processor',
-            'Service', 'Manager', 'Handler', 'Validator'
+            "Client",
+            "Collector",
+            "Fetcher",
+            "Pipeline",
+            "Processor",
+            "Service",
+            "Manager",
+            "Handler",
+            "Validator",
         ]
 
         has_collector_class = any(
-            attr for attr in module_attrs
+            attr
+            for attr in module_attrs
             if any(indicator in attr for indicator in collector_indicators)
         )
 
         # Check for async functions (common in data collectors)
         has_async_functions = any(
-            callable(getattr(module, attr, None)) and
-            inspect.iscoroutinefunction(getattr(module, attr, None))
+            callable(getattr(module, attr, None))
+            and inspect.iscoroutinefunction(getattr(module, attr, None))
             for attr in module_attrs
-            if not attr.startswith('_')
+            if not attr.startswith("_")
         )
 
         return has_collector_class or has_async_functions
 
-    def _assess_module_reliability(self, module_info: Dict[str, Any]) -> Tuple[float, List[ReliabilityFinding], List[str]]:
+    def _assess_module_reliability(
+        self, module_info: Dict[str, Any]
+    ) -> Tuple[float, List[ReliabilityFinding], List[str]]:
         """
         Assess the reliability of a single module.
 
@@ -215,19 +242,25 @@ class ReliabilityTester:
         findings.extend(error_findings)
 
         # Test 2: Fault injection and recovery
-        recovery_score, recovery_findings, recovery_recs = self._test_fault_injection_recovery(module, module_name)
+        recovery_score, recovery_findings, recovery_recs = self._test_fault_injection_recovery(
+            module, module_name
+        )
         score += recovery_score * 0.3
         findings.extend(recovery_findings)
         recommendations.extend(recovery_recs)
 
         # Test 3: Network resilience
-        network_score, network_findings, network_recs = self._test_network_resilience(module, module_name)
+        network_score, network_findings, network_recs = self._test_network_resilience(
+            module, module_name
+        )
         score += network_score * 0.2
         findings.extend(network_findings)
         recommendations.extend(network_recs)
 
         # Test 4: Data validation robustness
-        validation_score, validation_findings = self._test_data_validation_robustness(module, module_name)
+        validation_score, validation_findings = self._test_data_validation_robustness(
+            module, module_name
+        )
         score += validation_score * 0.2
         findings.extend(validation_findings)
 
@@ -236,7 +269,9 @@ class ReliabilityTester:
 
         return score, findings, recommendations
 
-    def _test_error_handling_patterns(self, module, module_name: str) -> Tuple[float, List[ReliabilityFinding]]:
+    def _test_error_handling_patterns(
+        self, module, module_name: str
+    ) -> Tuple[float, List[ReliabilityFinding]]:
         """Test error handling patterns in the module."""
         score = 0.0
         findings = []
@@ -244,7 +279,7 @@ class ReliabilityTester:
         try:
             # Parse the module's source code
             source_file = inspect.getfile(module)
-            with open(source_file, 'r', encoding='utf-8') as f:
+            with open(source_file, "r", encoding="utf-8") as f:
                 source_code = f.read()
 
             tree = ast.parse(source_code)
@@ -263,47 +298,58 @@ class ReliabilityTester:
                     raise_count += 1
 
             # Analyze error handling coverage
-            total_functions = len([
-                node for node in ast.walk(tree)
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            ])
+            total_functions = len(
+                [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                ]
+            )
 
             if total_functions > 0:
                 error_handling_ratio = try_count / total_functions
 
                 if error_handling_ratio >= 0.7:
                     score += 0.8
-                    findings.append(ReliabilityFinding(
-                        ReliabilityTest.ERROR_HANDLING,
-                        "success",
-                        module_name,
-                        f"Excellent error handling coverage ({error_handling_ratio:.1%})"
-                    ))
+                    findings.append(
+                        ReliabilityFinding(
+                            ReliabilityTest.ERROR_HANDLING,
+                            "success",
+                            module_name,
+                            f"Excellent error handling coverage ({error_handling_ratio:.1%})",
+                        )
+                    )
                 elif error_handling_ratio >= 0.4:
                     score += 0.5
-                    findings.append(ReliabilityFinding(
-                        ReliabilityTest.ERROR_HANDLING,
-                        "info",
-                        module_name,
-                        f"Good error handling coverage ({error_handling_ratio:.1%})"
-                    ))
+                    findings.append(
+                        ReliabilityFinding(
+                            ReliabilityTest.ERROR_HANDLING,
+                            "info",
+                            module_name,
+                            f"Good error handling coverage ({error_handling_ratio:.1%})",
+                        )
+                    )
                 elif error_handling_ratio >= 0.2:
                     score += 0.3
-                    findings.append(ReliabilityFinding(
-                        ReliabilityTest.ERROR_HANDLING,
-                        "warning",
-                        module_name,
-                        f"Basic error handling coverage ({error_handling_ratio:.1%})"
-                    ))
+                    findings.append(
+                        ReliabilityFinding(
+                            ReliabilityTest.ERROR_HANDLING,
+                            "warning",
+                            module_name,
+                            f"Basic error handling coverage ({error_handling_ratio:.1%})",
+                        )
+                    )
                 else:
                     score += 0.1
-                    findings.append(ReliabilityFinding(
-                        ReliabilityTest.ERROR_HANDLING,
-                        "warning",
-                        module_name,
-                        f"Poor error handling coverage ({error_handling_ratio:.1%})",
-                        "Add try-except blocks around critical operations"
-                    ))
+                    findings.append(
+                        ReliabilityFinding(
+                            ReliabilityTest.ERROR_HANDLING,
+                            "warning",
+                            module_name,
+                            f"Poor error handling coverage ({error_handling_ratio:.1%})",
+                            "Add try-except blocks around critical operations",
+                        )
+                    )
 
             # Check for specific error types being handled
             error_types_handled = set()
@@ -315,38 +361,53 @@ class ReliabilityTester:
                         elif isinstance(node.type, ast.Attribute):
                             error_types_handled.add(f"{node.type.value.id}.{node.type.attr}")
 
-            common_errors = {'Exception', 'ValueError', 'TypeError', 'ConnectionError', 'TimeoutError', 'HTTPError'}
+            common_errors = {
+                "Exception",
+                "ValueError",
+                "TypeError",
+                "ConnectionError",
+                "TimeoutError",
+                "HTTPError",
+            }
             handled_common_errors = error_types_handled.intersection(common_errors)
 
             if handled_common_errors:
                 score += 0.2
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.ERROR_HANDLING,
-                    "success",
-                    module_name,
-                    f"Handles common errors: {', '.join(handled_common_errors)}"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.ERROR_HANDLING,
+                        "success",
+                        module_name,
+                        f"Handles common errors: {', '.join(handled_common_errors)}",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.ERROR_HANDLING,
-                    "warning",
-                    module_name,
-                    "No handling of common error types detected",
-                    "Add handling for common exceptions like ValueError, ConnectionError, TimeoutError"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.ERROR_HANDLING,
+                        "warning",
+                        module_name,
+                        "No handling of common error types detected",
+                        "Add handling for common exceptions like ValueError, ConnectionError, TimeoutError",
+                    )
+                )
 
         except Exception as e:
             self.logger.warning(f"Could not analyze error handling for {module_name}: {e}")
-            findings.append(ReliabilityFinding(
-                ReliabilityTest.ERROR_HANDLING,
-                "error",
-                module_name,
-                f"Error handling analysis failed: {str(e)}"
-            ))
+            findings.append(
+                ReliabilityFinding(
+                    ReliabilityTest.ERROR_HANDLING,
+                    "error",
+                    module_name,
+                    f"Error handling analysis failed: {str(e)}",
+                )
+            )
 
         return score, findings
 
-    def _test_fault_injection_recovery(self, module, module_name: str) -> Tuple[float, List[ReliabilityFinding], List[str]]:
+    def _test_fault_injection_recovery(
+        self, module, module_name: str
+    ) -> Tuple[float, List[ReliabilityFinding], List[str]]:
         """Test fault injection and recovery mechanisms."""
         score = 0.0
         findings = []
@@ -354,13 +415,19 @@ class ReliabilityTester:
 
         # Look for recovery patterns in the code
         recovery_patterns = [
-            'retry', 'backoff', 'circuit_breaker', 'fallback',
-            'recovery', 'reconnect', 'restore', 'reset'
+            "retry",
+            "backoff",
+            "circuit_breaker",
+            "fallback",
+            "recovery",
+            "reconnect",
+            "restore",
+            "reset",
         ]
 
         try:
             source_file = inspect.getfile(module)
-            with open(source_file, 'r', encoding='utf-8') as f:
+            with open(source_file, "r", encoding="utf-8") as f:
                 source_code = f.read()
 
             source_lower = source_code.lower()
@@ -370,76 +437,102 @@ class ReliabilityTester:
 
             if found_patterns:
                 score += 0.6
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.FAULT_INJECTION,
-                    "success",
-                    module_name,
-                    f"Recovery mechanisms detected: {', '.join(found_patterns)}"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.FAULT_INJECTION,
+                        "success",
+                        module_name,
+                        f"Recovery mechanisms detected: {', '.join(found_patterns)}",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.FAULT_INJECTION,
-                    "warning",
-                    module_name,
-                    "No explicit recovery mechanisms found",
-                    "Implement retry logic, circuit breakers, or fallback mechanisms"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.FAULT_INJECTION,
+                        "warning",
+                        module_name,
+                        "No explicit recovery mechanisms found",
+                        "Implement retry logic, circuit breakers, or fallback mechanisms",
+                    )
+                )
 
             # Check for timeout handling
-            timeout_indicators = ['timeout', 'time_out', 'deadline', 'expires']
+            timeout_indicators = ["timeout", "time_out", "deadline", "expires"]
             has_timeout = any(indicator in source_lower for indicator in timeout_indicators)
 
             if has_timeout:
                 score += 0.2
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.TIMEOUT_HANDLING,
-                    "success",
-                    module_name,
-                    "Timeout handling mechanisms detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.TIMEOUT_HANDLING,
+                        "success",
+                        module_name,
+                        "Timeout handling mechanisms detected",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.TIMEOUT_HANDLING,
-                    "warning",
-                    module_name,
-                    "No timeout handling detected",
-                    "Add timeout parameters to network requests and long-running operations"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.TIMEOUT_HANDLING,
+                        "warning",
+                        module_name,
+                        "No timeout handling detected",
+                        "Add timeout parameters to network requests and long-running operations",
+                    )
+                )
 
             # Check for rate limiting handling
-            rate_limit_indicators = ['rate_limit', 'rate limit', 'throttle', '429', 'too_many_requests']
-            has_rate_limiting = any(indicator in source_lower for indicator in rate_limit_indicators)
+            rate_limit_indicators = [
+                "rate_limit",
+                "rate limit",
+                "throttle",
+                "429",
+                "too_many_requests",
+            ]
+            has_rate_limiting = any(
+                indicator in source_lower for indicator in rate_limit_indicators
+            )
 
             if has_rate_limiting:
                 score += 0.2
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.RATE_LIMIT_HANDLING,
-                    "success",
-                    module_name,
-                    "Rate limiting handling detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.RATE_LIMIT_HANDLING,
+                        "success",
+                        module_name,
+                        "Rate limiting handling detected",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.RATE_LIMIT_HANDLING,
-                    "warning",
-                    module_name,
-                    "No rate limiting handling detected",
-                    "Implement rate limiting detection and backoff strategies"
-                ))
-                recommendations.append(f"Add rate limiting detection and retry with backoff in {module_name}")
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.RATE_LIMIT_HANDLING,
+                        "warning",
+                        module_name,
+                        "No rate limiting handling detected",
+                        "Implement rate limiting detection and backoff strategies",
+                    )
+                )
+                recommendations.append(
+                    f"Add rate limiting detection and retry with backoff in {module_name}"
+                )
 
         except Exception as e:
             self.logger.warning(f"Could not analyze fault injection for {module_name}: {e}")
-            findings.append(ReliabilityFinding(
-                ReliabilityTest.FAULT_INJECTION,
-                "error",
-                module_name,
-                f"Fault injection analysis failed: {str(e)}"
-            ))
+            findings.append(
+                ReliabilityFinding(
+                    ReliabilityTest.FAULT_INJECTION,
+                    "error",
+                    module_name,
+                    f"Fault injection analysis failed: {str(e)}",
+                )
+            )
 
         return score, findings, recommendations
 
-    def _test_network_resilience(self, module, module_name: str) -> Tuple[float, List[ReliabilityFinding], List[str]]:
+    def _test_network_resilience(
+        self, module, module_name: str
+    ) -> Tuple[float, List[ReliabilityFinding], List[str]]:
         """Test network resilience and error handling."""
         score = 0.0
         findings = []
@@ -447,127 +540,165 @@ class ReliabilityTester:
 
         try:
             source_file = inspect.getfile(module)
-            with open(source_file, 'r', encoding='utf-8') as f:
+            with open(source_file, "r", encoding="utf-8") as f:
                 source_code = f.read()
 
             source_lower = source_code.lower()
 
             # Check for network-related error handling
-            network_errors = ['connectionerror', 'timeouterror', 'httperror', 'urlerror',
-                            'requests.exceptions', 'aiohttp.clienterror']
+            network_errors = [
+                "connectionerror",
+                "timeouterror",
+                "httperror",
+                "urlerror",
+                "requests.exceptions",
+                "aiohttp.clienterror",
+            ]
 
             network_error_handling = any(error in source_lower for error in network_errors)
 
             if network_error_handling:
                 score += 0.5
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.NETWORK_FAILURE,
-                    "success",
-                    module_name,
-                    "Network error handling detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.NETWORK_FAILURE,
+                        "success",
+                        module_name,
+                        "Network error handling detected",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.NETWORK_FAILURE,
-                    "warning",
-                    module_name,
-                    "No specific network error handling detected",
-                    "Add handling for ConnectionError, TimeoutError, and HTTPError"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.NETWORK_FAILURE,
+                        "warning",
+                        module_name,
+                        "No specific network error handling detected",
+                        "Add handling for ConnectionError, TimeoutError, and HTTPError",
+                    )
+                )
 
             # Check for retry mechanisms
-            retry_indicators = ['retry', 'tenacity', 'backoff', ' exponential_backoff']
+            retry_indicators = ["retry", "tenacity", "backoff", " exponential_backoff"]
             has_retry = any(indicator in source_lower for indicator in retry_indicators)
 
             if has_retry:
                 score += 0.3
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.RECOVERY_MECHANISMS,
-                    "success",
-                    module_name,
-                    "Retry mechanisms detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.RECOVERY_MECHANISMS,
+                        "success",
+                        module_name,
+                        "Retry mechanisms detected",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.RECOVERY_MECHANISMS,
-                    "info",
-                    module_name,
-                    "No retry mechanisms detected",
-                    "Consider adding retry logic for transient network failures"
-                ))
-                recommendations.append(f"Implement retry logic with exponential backoff for network operations in {module_name}")
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.RECOVERY_MECHANISMS,
+                        "info",
+                        module_name,
+                        "No retry mechanisms detected",
+                        "Consider adding retry logic for transient network failures",
+                    )
+                )
+                recommendations.append(
+                    f"Implement retry logic with exponential backoff for network operations in {module_name}"
+                )
 
             # Check for connection pooling or reuse
-            connection_indicators = ['session', 'pool', 'connection_pool', 'keep_alive']
-            has_connection_management = any(indicator in source_lower for indicator in connection_indicators)
+            connection_indicators = ["session", "pool", "connection_pool", "keep_alive"]
+            has_connection_management = any(
+                indicator in source_lower for indicator in connection_indicators
+            )
 
             if has_connection_management:
                 score += 0.2
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.NETWORK_FAILURE,
-                    "success",
-                    module_name,
-                    "Connection management detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.NETWORK_FAILURE,
+                        "success",
+                        module_name,
+                        "Connection management detected",
+                    )
+                )
 
         except Exception as e:
             self.logger.warning(f"Could not analyze network resilience for {module_name}: {e}")
-            findings.append(ReliabilityFinding(
-                ReliabilityTest.NETWORK_FAILURE,
-                "error",
-                module_name,
-                f"Network resilience analysis failed: {str(e)}"
-            ))
+            findings.append(
+                ReliabilityFinding(
+                    ReliabilityTest.NETWORK_FAILURE,
+                    "error",
+                    module_name,
+                    f"Network resilience analysis failed: {str(e)}",
+                )
+            )
 
         return score, findings, recommendations
 
-    def _test_data_validation_robustness(self, module, module_name: str) -> Tuple[float, List[ReliabilityFinding]]:
+    def _test_data_validation_robustness(
+        self, module, module_name: str
+    ) -> Tuple[float, List[ReliabilityFinding]]:
         """Test data validation robustness."""
         score = 0.0
         findings = []
 
         try:
             source_file = inspect.getfile(module)
-            with open(source_file, 'r', encoding='utf-8') as f:
+            with open(source_file, "r", encoding="utf-8") as f:
                 source_code = f.read()
 
             source_lower = source_code.lower()
 
             # Check for validation patterns
-            validation_indicators = ['validate', 'validation', 'check', 'verify',
-                                   'schema', 'pydantic', 'marshmallow', 'jsonschema']
+            validation_indicators = [
+                "validate",
+                "validation",
+                "check",
+                "verify",
+                "schema",
+                "pydantic",
+                "marshmallow",
+                "jsonschema",
+            ]
 
             has_validation = any(indicator in source_lower for indicator in validation_indicators)
 
             if has_validation:
                 score += 0.6
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.DATA_VALIDATION,
-                    "success",
-                    module_name,
-                    "Data validation mechanisms detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.DATA_VALIDATION,
+                        "success",
+                        module_name,
+                        "Data validation mechanisms detected",
+                    )
+                )
             else:
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.DATA_VALIDATION,
-                    "warning",
-                    module_name,
-                    "No data validation mechanisms detected",
-                    "Add input validation to prevent processing of malformed data"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.DATA_VALIDATION,
+                        "warning",
+                        module_name,
+                        "No data validation mechanisms detected",
+                        "Add input validation to prevent processing of malformed data",
+                    )
+                )
 
             # Check for type checking
-            type_indicators = ['isinstance', 'type(', 'typing', 'mypy', 'typeguard']
+            type_indicators = ["isinstance", "type(", "typing", "mypy", "typeguard"]
             has_type_checking = any(indicator in source_lower for indicator in type_indicators)
 
             if has_type_checking:
                 score += 0.4
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.DATA_VALIDATION,
-                    "success",
-                    module_name,
-                    "Type checking mechanisms detected"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.DATA_VALIDATION,
+                        "success",
+                        module_name,
+                        "Type checking mechanisms detected",
+                    )
+                )
 
             # Parse AST to check for validation in function bodies
             tree = ast.parse(source_code)
@@ -576,30 +707,40 @@ class ReliabilityTester:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     if isinstance(node.func, ast.Name):
-                        if node.func.id in ['isinstance', 'hasattr', 'getattr']:
+                        if node.func.id in ["isinstance", "hasattr", "getattr"]:
                             validation_calls += 1
                     elif isinstance(node.func, ast.Attribute):
-                        func_name = f"{node.func.value.id}.{node.func.attr}" if isinstance(node.func.value, ast.Name) else ""
-                        if any(val_func in func_name for val_func in ['validate', 'check', 'verify']):
+                        func_name = (
+                            f"{node.func.value.id}.{node.func.attr}"
+                            if isinstance(node.func.value, ast.Name)
+                            else ""
+                        )
+                        if any(
+                            val_func in func_name for val_func in ["validate", "check", "verify"]
+                        ):
                             validation_calls += 1
 
             if validation_calls > 0:
                 score += min(0.3, validation_calls * 0.05)  # Cap at 0.3
-                findings.append(ReliabilityFinding(
-                    ReliabilityTest.DATA_VALIDATION,
-                    "info",
-                    module_name,
-                    f"Found {validation_calls} validation calls in code"
-                ))
+                findings.append(
+                    ReliabilityFinding(
+                        ReliabilityTest.DATA_VALIDATION,
+                        "info",
+                        module_name,
+                        f"Found {validation_calls} validation calls in code",
+                    )
+                )
 
         except Exception as e:
             self.logger.warning(f"Could not analyze data validation for {module_name}: {e}")
-            findings.append(ReliabilityFinding(
-                ReliabilityTest.DATA_VALIDATION,
-                "error",
-                module_name,
-                f"Data validation analysis failed: {str(e)}"
-            ))
+            findings.append(
+                ReliabilityFinding(
+                    ReliabilityTest.DATA_VALIDATION,
+                    "error",
+                    module_name,
+                    f"Data validation analysis failed: {str(e)}",
+                )
+            )
 
         return score, findings
 

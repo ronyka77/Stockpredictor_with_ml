@@ -46,6 +46,7 @@ dependencies = [
     "xgboost>=3.0.2",
     "autogluon",
     "skforecast[full]>=0.18.0",
+    "torch-geometric>=2.7.0",
 ]
 
 [[tool.uv.index]]

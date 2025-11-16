@@ -31,9 +31,9 @@ class LightGBMPredictor(BasePredictor):
         Load the LightGBM model from MLflow using the specified run ID
         """
         self.model = LightGBMModel.load_from_mlflow(self.run_id)
-        logger.info(f"✅ LightGBM model loaded: {self.model.model_name}")
+        logger.info(f"LightGBM model loaded: {self.model.model_name}")
         logger.info(
-            f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
+            f"Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
 

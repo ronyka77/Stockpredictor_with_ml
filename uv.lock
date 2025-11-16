@@ -5275,6 +5275,7 @@ dependencies = [
     { name = "statsmodels" },
     { name = "ta" },
     { name = "torch" },
+    { name = "torch-geometric" },
     { name = "torchaudio", version = "2.7.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
     { name = "torchaudio", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine != 'aarch64' or sys_platform != 'linux'" },
     { name = "torchvision", version = "0.22.1", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
@@ -5328,6 +5329,7 @@ requires-dist = [
     { name = "statsmodels", specifier = ">=0.14.2" },
     { name = "ta", specifier = ">=0.11.0" },
     { name = "torch", specifier = ">=2.7.1", index = "https://download.pytorch.org/whl/cu128" },
+    { name = "torch-geometric", specifier = ">=2.7.0" },
     { name = "torchaudio", specifier = ">=2.7.1", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torchvision", index = "https://download.pytorch.org/whl/cu128" },
     { name = "vulture", specifier = ">=2.14" },
@@ -5587,6 +5589,26 @@ wheels = [
     { url = "https://download.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:f112465fdf42eb1297c6dddda1a8b7f411914428b704e1b8a47870c52e290909" },
     { url = "https://download.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:c355db49c218ada70321d5c5c9bb3077312738b99113c8f3723ef596b554a7b9" },
     { url = "https://download.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp313-cp313t-win_amd64.whl", hash = "sha256:e27e5f7e74179fb5d814a0412e5026e4b50c9e0081e9050bc4c28c992a276eb1" },
+]
+
+[[package]]
+name = "torch-geometric"
+version = "2.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "fsspec" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "psutil" },
+    { name = "pyparsing" },
+    { name = "requests" },
+    { name = "tqdm" },
+    { name = "xxhash" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/63/b210152635902da7fe79fcdd16517fae108f457a0ed22c737e702a9afbae/torch_geometric-2.7.0.tar.gz", hash = "sha256:f9099e4aece1a9f618c84dbaac33a77f43139736698c7e8bddf3301ef1f2e8d4", size = 876725 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/d3/4dffd7300500465e0b4a2ae917dcb2ce771de0b9a772670365799a27c024/torch_geometric-2.7.0-py3-none-any.whl", hash = "sha256:6e0cd3ad824d484651ef5d308fc66c687bfcf5ba040d56d1e0fe0f81f365e292", size = 1275346 },
 ]
 
 [[package]]

@@ -80,7 +80,7 @@ class TickerManager:
         try:
             for i in range(0, len(tickers), batch_size):
                 batch = tickers[i : i + batch_size]
-                logger.info(f"📋 Processing batch {i // batch_size + 1}: {len(batch)} tickers")
+                logger.info(f"Processing batch {i // batch_size + 1}: {len(batch)} tickers")
 
                 for ticker in batch:
                     try:
@@ -119,14 +119,14 @@ class TickerManager:
                             result = self.storage.store_tickers([ticker_data])
                             if result["stored_count"] > 0:
                                 stats["updated"] += 1
-                                logger.info(f"✅ Updated details for {ticker}")
+                                logger.info(f"Updated details for {ticker}")
                         else:
                             stats["not_found"] += 1
-                            logger.warning(f"⚠️ No details found for {ticker}")
+                            logger.warning(f"No details found for {ticker}")
 
                     except Exception as e:
                         stats["errors"] += 1
-                        logger.error(f"❌ Error refreshing {ticker}: {e}")
+                        logger.error(f"Error refreshing {ticker}: {e}")
                         continue
 
                 # Add small delay between batches to respect rate limits
@@ -135,16 +135,16 @@ class TickerManager:
                 time.sleep(0.1)
 
             logger.info("🎉 Ticker details refresh completed!")
-            logger.info("📊 Details Refresh Summary:")
-            logger.info(f"   Processed: {stats['processed']}")
-            logger.info(f"   Updated: {stats['updated']}")
-            logger.info(f"   Not found: {stats['not_found']}")
-            logger.info(f"   Errors: {stats['errors']}")
+            logger.info("Details Refresh Summary:")
+            logger.info(f"Processed: {stats['processed']}")
+            logger.info(f"Updated: {stats['updated']}")
+            logger.info(f"Not found: {stats['not_found']}")
+            logger.info(f"Errors: {stats['errors']}")
 
             return stats
 
         except Exception as e:
-            logger.error(f"❌ Ticker details refresh failed: {e}")
+            logger.error(f"Ticker details refresh failed: {e}")
             raise
 
 
@@ -175,7 +175,7 @@ def main():
         return 0
 
     except Exception as e:
-        logger.error(f"❌ Ticker refresh failed: {e}")
+        logger.error(f"Ticker refresh failed: {e}")
         return 1
 
 

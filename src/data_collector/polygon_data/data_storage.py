@@ -561,7 +561,7 @@ class DataStorage:
         ticker: str,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        chunk_size: int = 10000
+        chunk_size: int = 10000,
     ) -> Iterator[pd.DataFrame]:
         """
         Load dividend data for a specific ticker in chunks using pandas chunking
@@ -608,10 +608,7 @@ class DataStorage:
 
             with get_connection() as conn:
                 chunk_iter = pd.read_sql_query(
-                    query,
-                    conn,
-                    params=tuple(params),
-                    chunksize=chunk_size
+                    query, conn, params=tuple(params), chunksize=chunk_size
                 )
 
                 for chunk in chunk_iter:
@@ -635,7 +632,7 @@ class DataStorage:
         ticker: str,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        chunk_size: int = 50000
+        chunk_size: int = 50000,
     ) -> Iterator[pd.DataFrame]:
         """
         Retrieve historical data in chunks for memory-efficient processing
@@ -670,18 +667,17 @@ class DataStorage:
 
             with get_connection() as conn:
                 chunk_iter = pd.read_sql_query(
-                    query,
-                    conn,
-                    params=tuple(params),
-                    chunksize=chunk_size
+                    query, conn, params=tuple(params), chunksize=chunk_size
                 )
 
                 for chunk in chunk_iter:
                     # Ensure proper data types
-                    if 'date' in chunk.columns:
-                        chunk['date'] = pd.to_datetime(chunk['date']).dt.date
+                    if "date" in chunk.columns:
+                        chunk["date"] = pd.to_datetime(chunk["date"]).dt.date
 
-                    logger.debug(f"Yielded historical data chunk with {len(chunk)} records for {ticker}")
+                    logger.debug(
+                        f"Yielded historical data chunk with {len(chunk)} records for {ticker}"
+                    )
                     yield chunk
 
         except Exception as e:
@@ -692,7 +688,7 @@ class DataStorage:
         self,
         data_loader: Callable[[], Iterator[pd.DataFrame]],
         processor_func: Callable[[pd.DataFrame], pd.DataFrame],
-        output_chunk_size: Optional[int] = None
+        output_chunk_size: Optional[int] = None,
     ) -> Iterator[pd.DataFrame]:
         """
         Process large datasets using chunked operations
@@ -718,14 +714,11 @@ class DataStorage:
             yield processed_chunk
 
             # Memory monitoring
-            if hasattr(processor, 'memory_monitor') and processor.memory_monitor.should_cleanup():
+            if hasattr(processor, "memory_monitor") and processor.memory_monitor.should_cleanup():
                 processor.memory_monitor.force_cleanup()
 
     def create_streaming_dataframe_from_query(
-        self,
-        query: str,
-        params: Optional[tuple] = None,
-        chunk_size: int = 10000
+        self, query: str, params: Optional[tuple] = None, chunk_size: int = 10000
     ) -> StreamingDataFrame:
         """
         Create a streaming DataFrame from a SQL query
@@ -741,16 +734,12 @@ class DataStorage:
         Returns:
             StreamingDataFrame for memory-efficient processing
         """
+
         def data_iterator():
             from src.database.connection import get_connection
 
             with get_connection() as conn:
-                chunk_iter = pd.read_sql_query(
-                    query,
-                    conn,
-                    params=params,
-                    chunksize=chunk_size
-                )
+                chunk_iter = pd.read_sql_query(query, conn, params=params, chunksize=chunk_size)
 
                 for chunk in chunk_iter:
                     # Convert DataFrame rows to dict for StreamingDataFrame

@@ -31,8 +31,9 @@ class CredentialValidationError(Exception):
     Never exposes sensitive credential data in error messages.
     """
 
-    def __init__(self, message: str, credential_type: str = "credential",
-                 validation_error: bool = True):
+    def __init__(
+        self, message: str, credential_type: str = "credential", validation_error: bool = True
+    ):
         self.message = message
         self.credential_type = credential_type
         self.validation_error = validation_error
@@ -40,8 +41,10 @@ class CredentialValidationError(Exception):
 
         # Log validation failures without sensitive data
         if validation_error:
-            logger.warning(f"Credential validation failed for {credential_type}: {message}",
-                          extra={"credential_type": credential_type, "validation_failed": True})
+            logger.warning(
+                f"Credential validation failed for {credential_type}: {message}",
+                extra={"credential_type": credential_type, "validation_failed": True},
+            )
 
 
 @dataclass
@@ -99,12 +102,21 @@ class APIKeyValidator(CredentialValidator):
     MAX_LENGTH = 128
 
     # Characters that should not appear in API keys
-    DANGEROUS_CHARS = ['<', '>', '&', '"', "'", '\n', '\r', '\t']
+    DANGEROUS_CHARS = ["<", ">", "&", '"', "'", "\n", "\r", "\t"]
 
     # Common weak/placeholder values
     WEAK_VALUES = [
-        'password', 'admin', 'test', 'key', 'token', 'api_key',
-        'apikey', 'secret', 'credential', 'auth', 'bearer'
+        "password",
+        "admin",
+        "test",
+        "key",
+        "token",
+        "api_key",
+        "apikey",
+        "secret",
+        "credential",
+        "auth",
+        "bearer",
     ]
 
     def __init__(self, provider_name: str = "generic"):
@@ -181,16 +193,19 @@ class APIKeyValidator(CredentialValidator):
         # Check for sequential numbers
         for i in range(len(credential) - 2):
             try:
-                if (int(credential[i+1]) == int(credential[i]) + 1 and
-                    int(credential[i+2]) == int(credential[i]) + 2):
+                if (
+                    int(credential[i + 1]) == int(credential[i]) + 1
+                    and int(credential[i + 2]) == int(credential[i]) + 2
+                ):
                     return True
             except ValueError:
                 continue
 
         # Check for sequential letters
         for i in range(len(credential) - 2):
-            if (credential[i+1] == chr(ord(credential[i]) + 1) and
-                credential[i+2] == chr(ord(credential[i]) + 2)):
+            if credential[i + 1] == chr(ord(credential[i]) + 1) and credential[i + 2] == chr(
+                ord(credential[i]) + 2
+            ):
                 return True
 
         return False
@@ -230,15 +245,15 @@ class DatabasePasswordValidator(CredentialValidator):
             return False
 
         # Must contain at least one uppercase, lowercase, digit
-        has_upper = bool(re.search(r'[A-Z]', credential))
-        has_lower = bool(re.search(r'[a-z]', credential))
-        has_digit = bool(re.search(r'\d', credential))
+        has_upper = bool(re.search(r"[A-Z]", credential))
+        has_lower = bool(re.search(r"[a-z]", credential))
+        has_digit = bool(re.search(r"\d", credential))
 
         if not (has_upper and has_lower and has_digit):
             return False
 
         # Check for common weak passwords
-        if credential.lower() in ['password', 'admin', 'root', 'postgres', 'database']:
+        if credential.lower() in ["password", "admin", "root", "postgres", "database"]:
             return False
 
         return True
@@ -259,9 +274,9 @@ class DatabasePasswordValidator(CredentialValidator):
         if len(credential) > self.MAX_LENGTH:
             errors.append(f"Password too long (maximum {self.MAX_LENGTH} characters)")
 
-        has_upper = bool(re.search(r'[A-Z]', credential))
-        has_lower = bool(re.search(r'[a-z]', credential))
-        has_digit = bool(re.search(r'\d', credential))
+        has_upper = bool(re.search(r"[A-Z]", credential))
+        has_lower = bool(re.search(r"[a-z]", credential))
+        has_digit = bool(re.search(r"\d", credential))
 
         if not has_upper:
             errors.append("Password must contain at least one uppercase letter")
@@ -270,7 +285,7 @@ class DatabasePasswordValidator(CredentialValidator):
         if not has_digit:
             errors.append("Password must contain at least one digit")
 
-        if credential.lower() in ['password', 'admin', 'root', 'postgres', 'database']:
+        if credential.lower() in ["password", "admin", "root", "postgres", "database"]:
             errors.append("Password is too common or weak")
 
         return errors
@@ -305,8 +320,10 @@ class SecureCredential:
     @property
     def value(self) -> str:
         """Get the actual credential value (use with caution)"""
-        logger.debug(f"Credential accessed: {self.metadata.credential_type}",
-                    extra={"credential_type": self.metadata.credential_type, "access_time": datetime.now()})
+        logger.debug(
+            f"Credential accessed: {self.metadata.credential_type}",
+            extra={"credential_type": self.metadata.credential_type, "access_time": datetime.now()},
+        )
         return self._value
 
     @property
@@ -321,10 +338,14 @@ class SecureCredential:
 
         if not is_valid:
             errors = self.validator.get_validation_errors(self._value)
-            logger.warning(f"Credential validation failed: {self.metadata.credential_type}",
-                          extra={"credential_type": self.metadata.credential_type,
-                                "errors": errors,
-                                "validation_count": self.metadata.validation_count})
+            logger.warning(
+                f"Credential validation failed: {self.metadata.credential_type}",
+                extra={
+                    "credential_type": self.metadata.credential_type,
+                    "errors": errors,
+                    "validation_count": self.metadata.validation_count,
+                },
+            )
 
         return is_valid
 
@@ -335,7 +356,9 @@ class SecureCredential:
     def rotate(self, new_value: str) -> bool:
         """Rotate credential to new value"""
         if not self.validator.validate(new_value):
-            logger.error(f"Cannot rotate credential - new value invalid: {self.metadata.credential_type}")
+            logger.error(
+                f"Cannot rotate credential - new value invalid: {self.metadata.credential_type}"
+            )
             return False
 
         # Create hash of old value for audit trail (without storing the actual value)
@@ -347,10 +370,14 @@ class SecureCredential:
         self.metadata.rotation_required = False
         self.metadata.rotation_deadline = None
 
-        logger.info(f"Credential rotated successfully: {self.metadata.credential_type}",
-                   extra={"credential_type": self.metadata.credential_type,
-                         "old_hash_prefix": old_hash,
-                         "rotation_time": datetime.now()})
+        logger.info(
+            f"Credential rotated successfully: {self.metadata.credential_type}",
+            extra={
+                "credential_type": self.metadata.credential_type,
+                "old_hash_prefix": old_hash,
+                "rotation_time": datetime.now(),
+            },
+        )
 
         return True
 
@@ -361,13 +388,14 @@ class CredentialManager:
     def __init__(self):
         self._credentials: Dict[str, SecureCredential] = {}
         self._validators = {
-            'api_key': APIKeyValidator(),
-            'polygon_api_key': APIKeyValidator('polygon'),
-            'database_password': DatabasePasswordValidator(),
+            "api_key": APIKeyValidator(),
+            "polygon_api_key": APIKeyValidator("polygon"),
+            "database_password": DatabasePasswordValidator(),
         }
 
-    def add_credential(self, name: str, value: str, credential_type: str,
-                      rotation_days: Optional[int] = None) -> SecureCredential:
+    def add_credential(
+        self, name: str, value: str, credential_type: str, rotation_days: Optional[int] = None
+    ) -> SecureCredential:
         """
         Add a credential to the manager
 
@@ -384,8 +412,9 @@ class CredentialManager:
             CredentialValidationError: If credential is invalid
         """
         if credential_type not in self._validators:
-            raise CredentialValidationError(f"Unknown credential type: {credential_type}",
-                                          credential_type=credential_type)
+            raise CredentialValidationError(
+                f"Unknown credential type: {credential_type}", credential_type=credential_type
+            )
 
         validator = self._validators[credential_type]
 
@@ -401,23 +430,21 @@ class CredentialManager:
             created_at=datetime.now(),
             last_validated=datetime.now(),
             validation_count=1,
-            last_validation_result=True
+            last_validation_result=True,
         )
 
         if rotation_days:
             metadata.rotation_deadline = datetime.now() + timedelta(days=rotation_days)
 
         # Create secure credential
-        credential = SecureCredential(
-            _value=value,
-            metadata=metadata,
-            validator=validator
-        )
+        credential = SecureCredential(_value=value, metadata=metadata, validator=validator)
 
         self._credentials[name] = credential
 
-        logger.info(f"Credential added successfully: {name} ({credential_type})",
-                   extra={"credential_name": name, "credential_type": credential_type})
+        logger.info(
+            f"Credential added successfully: {name} ({credential_type})",
+            extra={"credential_name": name, "credential_type": credential_type},
+        )
 
         return credential
 
@@ -425,11 +452,15 @@ class CredentialManager:
         """Get a credential by name"""
         credential = self._credentials.get(name)
         if credential:
-            logger.debug(f"Credential retrieved: {name}",
-                        extra={"credential_name": name, "credential_type": credential.metadata.credential_type})
+            logger.debug(
+                f"Credential retrieved: {name}",
+                extra={
+                    "credential_name": name,
+                    "credential_type": credential.metadata.credential_type,
+                },
+            )
         else:
-            logger.warning(f"Credential not found: {name}",
-                          extra={"credential_name": name})
+            logger.warning(f"Credential not found: {name}", extra={"credential_name": name})
 
         return credential
 
@@ -441,8 +472,10 @@ class CredentialManager:
 
         invalid_count = sum(1 for valid in results.values() if not valid)
         if invalid_count > 0:
-            logger.warning(f"Credential validation completed: {invalid_count} invalid out of {len(results)} total",
-                          extra={"total_credentials": len(results), "invalid_count": invalid_count})
+            logger.warning(
+                f"Credential validation completed: {invalid_count} invalid out of {len(results)} total",
+                extra={"total_credentials": len(results), "invalid_count": invalid_count},
+            )
 
         return results
 
@@ -450,8 +483,10 @@ class CredentialManager:
         """Get list of credential names that require rotation"""
         candidates = [name for name, cred in self._credentials.items() if cred.requires_rotation()]
         if candidates:
-            logger.info(f"Credentials requiring rotation: {candidates}",
-                       extra={"rotation_candidates": candidates})
+            logger.info(
+                f"Credentials requiring rotation: {candidates}",
+                extra={"rotation_candidates": candidates},
+            )
         return candidates
 
     def rotate_credential(self, name: str, new_value: str) -> bool:
@@ -469,16 +504,18 @@ class EnvironmentCredentialLoader:
 
     # Mapping of environment variables to credential types
     ENV_MAPPING = {
-        'POLYGON_API_KEY': 'polygon_api_key',
-        'DB_PASSWORD': 'database_password',
-        'POSTGRES_PASSWORD': 'database_password',
-        'DATABASE_PASSWORD': 'database_password',
+        "POLYGON_API_KEY": "polygon_api_key",
+        "DB_PASSWORD": "database_password",
+        "POSTGRES_PASSWORD": "database_password",
+        "DATABASE_PASSWORD": "database_password",
     }
 
     def __init__(self, credential_manager: CredentialManager):
         self.manager = credential_manager
 
-    def load_from_environment(self, prefix: str = "", rotation_days: Optional[int] = 90) -> Dict[str, bool]:
+    def load_from_environment(
+        self, prefix: str = "", rotation_days: Optional[int] = 90
+    ) -> Dict[str, bool]:
         """
         Load credentials from environment variables
 
@@ -504,15 +541,19 @@ class EnvironmentCredentialLoader:
                     results[cred_name] = True
                     logger.debug(f"Loaded credential from environment: {cred_name}")
                 except CredentialValidationError as e:
-                    logger.error(f"Failed to load credential {env_var}: {e.message}",
-                               extra={"env_var": env_var, "error": e.message})
+                    logger.error(
+                        f"Failed to load credential {env_var}: {e.message}",
+                        extra={"env_var": env_var, "error": e.message},
+                    )
                     results[env_var.lower()] = False
             else:
                 logger.debug(f"Environment variable not set: {env_var}")
 
         loaded_count = sum(1 for success in results.values() if success)
-        logger.info(f"Environment credential loading completed: {loaded_count} loaded, {len(results) - loaded_count} failed",
-                   extra={"loaded_count": loaded_count, "failed_count": len(results) - loaded_count})
+        logger.info(
+            f"Environment credential loading completed: {loaded_count} loaded, {len(results) - loaded_count} failed",
+            extra={"loaded_count": loaded_count, "failed_count": len(results) - loaded_count},
+        )
 
         return results
 

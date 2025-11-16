@@ -26,6 +26,7 @@ logger = get_logger(__name__, utility="database")
 @dataclass
 class PoolStats:
     """Connection pool statistics for monitoring."""
+
     min_size: int
     max_size: int
     current_size: int
@@ -153,18 +154,18 @@ class PostgresConnection:
         # Get basic pool information
         try:
             # Try to get stats from psycopg_pool if available
-            if hasattr(self._pool, 'get_stats'):
+            if hasattr(self._pool, "get_stats"):
                 stats = self._pool.get_stats()
-                current_size = getattr(stats, 'size', self._maxconn)
-                available = getattr(stats, 'available', 0)
+                current_size = getattr(stats, "size", self._maxconn)
+                available = getattr(stats, "available", 0)
                 used = current_size - available
-                waiting = getattr(stats, 'waiting', 0)
-                created = getattr(stats, 'connections_created', 0)
-                destroyed = getattr(stats, 'connections_destroyed', 0)
+                waiting = getattr(stats, "waiting", 0)
+                created = getattr(stats, "connections_created", 0)
+                destroyed = getattr(stats, "connections_destroyed", 0)
             else:
                 # Fallback estimates
                 current_size = self._maxconn  # Conservative estimate
-                available = self._sem._value if hasattr(self._sem, '_value') else 0
+                available = self._sem._value if hasattr(self._sem, "_value") else 0
                 used = max(0, current_size - available)
                 waiting = max(0, self._maxconn - available)
                 created = 0  # Not available
@@ -188,7 +189,7 @@ class PostgresConnection:
             total_connections_created=created,
             total_connections_destroyed=destroyed,
             last_health_check=self._last_health_check,
-            health_check_success=self._health_check_success
+            health_check_success=self._health_check_success,
         )
 
     @contextmanager
@@ -225,7 +226,9 @@ class PostgresConnection:
                     conn = self._pool.getconn()
                     # Validate the new connection
                     if not self.validate_connection(conn):
-                        raise RuntimeError("Failed to obtain valid connection after recovery attempt")
+                        raise RuntimeError(
+                            "Failed to obtain valid connection after recovery attempt"
+                        )
 
                 yield conn
             except Exception as exc:
@@ -265,7 +268,9 @@ class PostgresConnection:
                     try:
                         # Enhanced validation with health monitoring
                         if not self.validate_connection(conn):
-                            raise RuntimeError("Acquired invalid connection from pool - health check failed")
+                            raise RuntimeError(
+                                "Acquired invalid connection from pool - health check failed"
+                            )
                         yield conn
                     except Exception:
                         try:
@@ -392,7 +397,7 @@ def get_database_stats() -> PoolStats:
             total_connections_created=0,
             total_connections_destroyed=0,
             last_health_check=time.time(),
-            health_check_success=False
+            health_check_success=False,
         )
 
 
@@ -419,7 +424,9 @@ def fetch_one(
         return cur.fetchone()
 
 
-def execute(query: str, params: Optional[Union[Tuple, Dict[str, Any]]] = None, commit: bool = True) -> None:
+def execute(
+    query: str, params: Optional[Union[Tuple, Dict[str, Any]]] = None, commit: bool = True
+) -> None:
     pool = get_global_pool()
     with pool.connection() as conn:
         with conn.cursor() as cur:

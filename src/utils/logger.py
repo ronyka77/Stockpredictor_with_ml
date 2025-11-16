@@ -3,4 +3,4 @@
 
 from .core.logger import get_logger, init_logging_structure, shutdown_logging
 
-__all__ = ['get_logger', 'init_logging_structure', 'shutdown_logging']
+__all__ = ["get_logger", "init_logging_structure", "shutdown_logging"]

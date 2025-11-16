@@ -406,7 +406,7 @@ class XGBoostModel(BaseModel):
             metrics=metrics, params=params, x_eval=x_eval, experiment_name=experiment_name
         )
 
-        logger.info(f"✅ XGBoost model saved using universal logging function. Run ID: {run_id}")
+        logger.info(f"XGBoost model saved using universal logging function. Run ID: {run_id}")
         return run_id
 
     def load_model(self, run_id: str) -> None:
@@ -443,12 +443,12 @@ class XGBoostModel(BaseModel):
             # Default to "model" (the standard MLflow artifact path)
             if model_artifact_path is None:
                 model_artifact_path = "model"
-                logger.warning("⚠️ No model artifact found, defaulting to 'model' path")
+                logger.warning("No model artifact found, defaulting to 'model' path")
 
             # Log available artifacts for debugging
             logger.info(f"Available artifacts in run {run_id}:")
             for artifact in artifacts:
-                logger.info(f"  - {artifact.path} ({'dir' if artifact.is_dir else 'file'})")
+                logger.info(f"- {artifact.path} ({'dir' if artifact.is_dir else 'file'})")
 
             # Construct model URI and load
             model_uri = f"runs:/{run_id}/{model_artifact_path}"
@@ -461,10 +461,10 @@ class XGBoostModel(BaseModel):
             # Load additional metadata from run
             self._load_metadata_from_run(run_info)
 
-            logger.info(f"✅ XGBoost model loaded successfully from MLflow run: {run_id}")
+            logger.info(f"XGBoost model loaded successfully from MLflow run: {run_id}")
 
         except Exception as e:
-            logger.error(f"❌ Error loading XGBoost model from MLflow run {run_id}: {str(e)}")
+            logger.error(f"Error loading XGBoost model from MLflow run {run_id}: {str(e)}")
             raise
 
     def _load_metadata_from_run(self, run_info) -> None:
@@ -533,18 +533,18 @@ class XGBoostModel(BaseModel):
                         if feature_names:
                             self.feature_names = feature_names
                             logger.info(
-                                f"✅ Loaded {len(self.feature_names)} feature names from MLflow signature"
+                                f"Loaded {len(self.feature_names)} feature names from MLflow signature"
                             )
                         else:
-                            logger.warning("⚠️ No feature names found in model signature inputs")
+                            logger.warning("No feature names found in model signature inputs")
                     else:
-                        logger.warning("⚠️ Model signature has no inputs")
+                        logger.warning("Model signature has no inputs")
                 else:
-                    logger.warning("⚠️ No model signature found in model info")
+                    logger.warning("No model signature found in model info")
 
             except Exception as signature_error:
                 logger.warning(
-                    f"⚠️ Could not extract feature names from signature: {str(signature_error)}"
+                    f"Could not extract feature names from signature: {str(signature_error)}"
                 )
                 logger.info(
                     f"Signature error details: {type(signature_error).__name__}: {signature_error}"
@@ -564,7 +564,7 @@ class XGBoostModel(BaseModel):
                                 with open(feature_file, "r") as f:
                                     self.feature_names = [line.strip() for line in f.readlines()]
                                 logger.info(
-                                    f"✅ Loaded {len(self.feature_names)} feature names from artifact file"
+                                    f"Loaded {len(self.feature_names)} feature names from artifact file"
                                 )
                                 break
                 except Exception as artifact_error:
@@ -575,7 +575,7 @@ class XGBoostModel(BaseModel):
             logger.info("Model metadata loaded successfully")
 
         except Exception as e:
-            logger.warning(f"⚠ Could not load all metadata: {str(e)}")
+            logger.warning(f"Could not load all metadata: {str(e)}")
 
     @classmethod
     def load_from_mlflow(cls, run_id: str) -> "XGBoostModel":
@@ -775,9 +775,9 @@ class XGBoostModel(BaseModel):
 
                     # Log threshold optimization results for this trial
                     logger.info(f"Trial {trial.number} threshold optimization:")
-                    logger.info(f"  Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
-                    logger.info(f"  Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                    logger.info(f"  Optimized {objective_column}: {optimized_profit_score:.3f}")
+                    logger.info(f"Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                    logger.info(f"Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
+                    logger.info(f"Optimized {objective_column}: {optimized_profit_score:.3f}")
 
                 # Check if this is the best trial so far
                 if optimized_profit_score > self.best_investment_success_rate:
@@ -796,14 +796,12 @@ class XGBoostModel(BaseModel):
                         self.confidence_method = "leaf_depth"
 
                     logger.info(
-                        f"🎯 NEW BEST TRIAL {trial.number}: {objective_column} = {optimized_profit_score:.3f}"
+                        f"NEW BEST TRIAL {trial.number}: {objective_column} = {optimized_profit_score:.3f}"
                     )
                     if threshold_info["optimal_threshold"] is not None:
-                        logger.info(
-                            f"   Optimal threshold: {threshold_info['optimal_threshold']:.3f}"
-                        )
-                        logger.info(f"   Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                        logger.info(f"   Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
+                        logger.info(f"Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                        logger.info(f"Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
+                        logger.info(f"Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
 
                     self.previous_best = optimized_profit_score
                 else:
@@ -880,27 +878,25 @@ class XGBoostModel(BaseModel):
 
             # Log the finalization
             logger.info(
-                f"✅ Best model finalized with investment success rate: {self.best_investment_success_rate:.3f}"
+                f"Best model finalized with investment success rate: {self.best_investment_success_rate:.3f}"
             )
-            logger.info(f"✅ Best parameters: {self.best_trial_params}")
+            logger.info(f"Best parameters: {self.best_trial_params}")
 
             # Log threshold information if available
             if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
                 threshold_info = self.best_threshold_info
                 if threshold_info.get("optimal_threshold") is not None:
-                    logger.info(f"✅ Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                    logger.info(f"Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                    logger.info(f"Samples kept ratio: {threshold_info['samples_kept_ratio']:.1%}")
                     logger.info(
-                        f"✅ Samples kept ratio: {threshold_info['samples_kept_ratio']:.1%}"
+                        f"Investment success rate: {threshold_info['investment_success_rate']:.3f}"
                     )
+                    logger.info(f"Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
                     logger.info(
-                        f"✅ Investment success rate: {threshold_info['investment_success_rate']:.3f}"
-                    )
-                    logger.info(f"✅ Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
-                    logger.info(
-                        f"✅ Profitable investments: {threshold_info['profitable_investments']}"
+                        f"Profitable investments: {threshold_info['profitable_investments']}"
                     )
                 else:
-                    logger.info("✅ No threshold optimization was successful for the best trial")
+                    logger.info("No threshold optimization was successful for the best trial")
 
             # Log to MLflow if enabled
             if not getattr(self, "disable_mlflow", False):
@@ -936,7 +932,7 @@ class XGBoostModel(BaseModel):
 
                 self.log_metrics(metrics_to_log)
         else:
-            logger.warning("⚠ No best model found to finalize")
+            logger.warning("No best model found to finalize")
 
     def log_model_to_mlflow(
         self,
@@ -972,7 +968,7 @@ class XGBoostModel(BaseModel):
             x_eval=x_eval,
         )
 
-        logger.info(f"✅ Model logged to MLflow using universal function. Run ID: {run_id}")
+        logger.info(f"Model logged to MLflow using universal function. Run ID: {run_id}")
         return run_id
 
 
@@ -981,7 +977,7 @@ def main():
     Standalone XGBoost hypertuning and evaluation using load_all_data
     """
     logger.info("=" * 80)
-    logger.info("🎯 STANDALONE XGBOOST HYPERTUNING & EVALUATION")
+    logger.info("STANDALONE XGBOOST HYPERTUNING & EVALUATION")
     logger.info("=" * 80)
 
     try:
@@ -990,8 +986,8 @@ def main():
         mlflow_manager = MLFlowManager()
         experiment_id = mlflow_manager.setup_experiment(experiment_name)
 
-        logger.info(f"✅ MLflow experiment setup completed: {experiment_id}")
-        logger.info(f"✅ MLflow tracking URI: {mlflow.get_tracking_uri()}")
+        logger.info(f"MLflow experiment setup completed: {experiment_id}")
+        logger.info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
         # Define prediction horizon
         prediction_horizon = 10
@@ -1015,7 +1011,7 @@ def main():
         train_date_range = data_result["train_date_range"]
         test_date_range = data_result["test_date_range"]
 
-        logger.info(f"✅ Data preparation completed using target: {target_column}")
+        logger.info(f"Data preparation completed using target: {target_column}")
 
         # 2. Initialize XGBoost model
         logger.info("2. Initializing XGBoost model...")
@@ -1038,16 +1034,16 @@ def main():
         best_params = study.best_params
         best_profit = study.best_value  # This is now threshold-optimized profit per investment
 
-        logger.info("🎯 Hyperparameter optimization with threshold optimization completed!")
-        logger.info(f"✅ Best Threshold-Optimized Profit per Investment: ${best_profit:.2f}")
-        logger.info(f"✅ Best parameters: {best_params}")
+        logger.info("Hyperparameter optimization with threshold optimization completed!")
+        logger.info(f"Best Threshold-Optimized Profit per Investment: ${best_profit:.2f}")
+        logger.info(f"Best parameters: {best_params}")
 
         # Finalize the best model (ensure xgb_model contains the best performing model)
         xgb_model.finalize_best_model()
 
         # Get best trial info for verification (now includes threshold info)
         best_trial_info = xgb_model.get_best_trial_info()
-        logger.info(f"✅ Best trial info: {best_trial_info}")
+        logger.info(f"Best trial info: {best_trial_info}")
 
         # 4. Use the automatically selected best model for final evaluation
         logger.info("4. Making final evaluation with automatically selected best model...")
@@ -1063,7 +1059,7 @@ def main():
         )
 
         if has_threshold_optimization:
-            logger.info("✅ Best model includes threshold optimization results")
+            logger.info("Best model includes threshold optimization results")
 
             # Extract current prices for evaluation
             if "close" in x_test.columns:
@@ -1094,21 +1090,21 @@ def main():
             )
             baseline_profit_per_investment = baseline_profit / len(y_test)
 
-            logger.info("📊 Final Results Comparison:")
+            logger.info("Final Results Comparison:")
             logger.info(
-                f"   Baseline (unfiltered) profit per investment: ${baseline_profit_per_investment:.2f}"
+                f"Baseline (unfiltered) profit per investment: ${baseline_profit_per_investment:.2f}"
             )
             logger.info(
-                f"   Threshold-optimized profit per investment: ${threshold_performance['profit_per_investment']:.2f}"
+                f"Threshold-optimized profit per investment: ${threshold_performance['profit_per_investment']:.2f}"
             )
             logger.info(
-                f"   Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
+                f"Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
             )
             logger.info(
-                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test)} ({threshold_performance['samples_kept_ratio']:.1%})"
+                f"Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test)} ({threshold_performance['samples_kept_ratio']:.1%})"
             )
             logger.info(
-                f"   Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
+                f"Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
             )
 
             # Use threshold-optimized metrics for final evaluation
@@ -1135,7 +1131,7 @@ def main():
             }
         else:
             logger.info(
-                "⚠️ Best model does not have threshold optimization results, using standard evaluation"
+                "Best model does not have threshold optimization results, using standard evaluation"
             )
 
             # Standard evaluation without threshold optimization
@@ -1165,25 +1161,25 @@ def main():
 
             threshold_metrics = {}
 
-        logger.info("📊 Final Optimized Results:")
-        logger.info(f"   Total Profit: ${final_total_profit:.2f}")
-        logger.info(f"   Profit per Investment: ${final_profit_per_investment:.2f}")
+        logger.info("Final Optimized Results:")
+        logger.info(f"Total Profit: ${final_total_profit:.2f}")
+        logger.info(f"Profit per Investment: ${final_profit_per_investment:.2f}")
         if has_threshold_optimization:
-            logger.info(f"   Samples Used: {final_samples_kept}/{len(y_test)} (threshold-filtered)")
+            logger.info(f"Samples Used: {final_samples_kept}/{len(y_test)} (threshold-filtered)")
         else:
-            logger.info(f"   Samples Used: {final_samples_kept}/{len(y_test)} (all samples)")
-        logger.info(f"   Traditional MSE: {final_mse:.4f}")
-        logger.info(f"   Traditional MAE: {final_mae:.4f}")
-        logger.info(f"   Traditional R²: {final_r2:.4f}")
+            logger.info(f"Samples Used: {final_samples_kept}/{len(y_test)} (all samples)")
+        logger.info(f"Traditional MSE: {final_mse:.4f}")
+        logger.info(f"Traditional MAE: {final_mae:.4f}")
+        logger.info(f"Traditional R²: {final_r2:.4f}")
 
         # 5. Feature importance analysis
         logger.info("5. Analyzing feature importance...")
 
         feature_importance = final_model.get_feature_importance("gain")
 
-        logger.info("📊 Top 30 Most Important Features:")
+        logger.info("Top 30 Most Important Features:")
         for idx, row in feature_importance.head(30).iterrows():
-            logger.info(f"   {row['feature']}: {row['importance']:.2f}")
+            logger.info(f"{row['feature']}: {row['importance']:.2f}")
 
         # 6. Log model to MLflow using universal function
         logger.info("6. Logging model to MLflow using universal function...")
@@ -1251,22 +1247,22 @@ def main():
         logger.info("🎉 STANDALONE XGBOOST HYPERTUNING COMPLETED SUCCESSFULLY!")
         logger.info("=" * 80)
         logger.info(
-            f"📊 Dataset: {data_result['train_samples'] + data_result['test_samples']:,} samples, {data_result['feature_count']} features"
+            f"Dataset: {data_result['train_samples'] + data_result['test_samples']:,} samples, {data_result['feature_count']} features"
         )
-        logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
-        logger.info(f"📅 Train period: {train_date_range}")
-        logger.info(f"📅 Test period: {test_date_range}")
-        logger.info(f"🔧 Hypertuning: {number_of_trials} trials completed (optimizing for profit)")
+        logger.info(f"Target: {target_column} ({prediction_horizon}-day horizon)")
+        logger.info(f"Train period: {train_date_range}")
+        logger.info(f"Test period: {test_date_range}")
+        logger.info(f" Hypertuning: {number_of_trials} trials completed (optimizing for profit)")
         logger.info(f"📈 Final Total Profit: ${final_total_profit:.2f}")
         logger.info(f"📈 Average Profit per Investment: ${final_profit_per_investment:.2f}")
         logger.info(f"📈 Traditional MSE: {final_mse:.4f}")
-        logger.info("🎯 Threshold optimization included for prediction filtering")
-        logger.info(f"💾 Model saved to MLflow run: {saved_run_id}")
-        logger.info("📊 Used updated save_model method with universal logging function")
+        logger.info("Threshold optimization included for prediction filtering")
+        logger.info(f"Model saved to MLflow run: {saved_run_id}")
+        logger.info("Used updated save_model method with universal logging function")
         logger.info("=" * 80)
 
     except Exception as e:
-        logger.error(f"❌ CRITICAL ERROR in standalone XGBoost hypertuning: {str(e)}")
+        logger.error(f"CRITICAL ERROR in standalone XGBoost hypertuning: {str(e)}")
         import traceback
 
         traceback.print_exc()

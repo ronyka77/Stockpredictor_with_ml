@@ -68,7 +68,7 @@ def prepare_ml_data_for_training(
     creates temporal train/test splits, and performs data cleaning.
     """
     logger.info("=" * 80)
-    logger.info("🎯 COMPREHENSIVE ML DATA PREPARATION")
+    logger.info("COMPREHENSIVE ML DATA PREPARATION")
     logger.info("=" * 80)
 
     try:
@@ -84,7 +84,7 @@ def prepare_ml_data_for_training(
             raise ValueError("'date' column not found in data. Cannot perform date-based split.")
 
         logger.info(
-            f"✅ Data loaded: {combined_data.shape[0]:,} records, {combined_data.shape[1]} features"
+            f"Data loaded: {combined_data.shape[0]:,} records, {combined_data.shape[1]} features"
         )
 
         # 2. Prepare features and targets
@@ -93,7 +93,7 @@ def prepare_ml_data_for_training(
         # Early numeric downcast to reduce peak memory usage on large datasets
         try:
             _maybe_downcast_numeric(combined_data)
-            logger.info("✅ Applied early numeric downcast to reduce memory usage")
+            logger.info("Applied early numeric downcast to reduce memory usage")
         except Exception as e:
             logger.warning(f"Early downcast skipped: {e}")
 
@@ -157,7 +157,7 @@ def prepare_ml_data_for_training(
         X = add_date_features(X, "date")
 
         # Remove the date column after temporal features are created
-        logger.info(f"📋 Total features: {len(X.columns)}")
+        logger.info(f"Total features: {len(X.columns)}")
 
         # 5. Clean data
         logger.info("5. Cleaning and preprocessing data...")
@@ -167,7 +167,7 @@ def prepare_ml_data_for_training(
         x_clean = X[valid_mask].copy()
         y_clean = y[valid_mask].copy()
 
-        logger.info(f"✅ After target cleaning: {len(x_clean)} valid samples")
+        logger.info(f"After target cleaning: {len(x_clean)} valid samples")
 
         # Replace infinite values with NaN first
         x_clean = x_clean.replace([np.inf, -np.inf], np.nan)
@@ -233,8 +233,8 @@ def prepare_ml_data_for_training(
             else "No test data"
         )
 
-        logger.info(f"✅ Train set: {len(x_train)} samples ({train_date_range})")
-        logger.info(f"✅ Test set: {len(x_test)} samples ({test_date_range})")
+        logger.info(f"Train set: {len(x_train)} samples ({train_date_range})")
+        logger.info(f"Test set: {len(x_test)} samples ({test_date_range})")
 
         # Validation checks
         if len(x_test) == 0:
@@ -265,18 +265,18 @@ def prepare_ml_data_for_training(
 
         # 8. Summary logging
         logger.info("=" * 80)
-        logger.info("✅ ML DATA PREPARATION COMPLETED SUCCESSFULLY!")
+        logger.info("ML DATA PREPARATION COMPLETED SUCCESSFULLY!")
         logger.info("=" * 80)
-        logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
-        logger.info(f"📊 Features: {result['feature_count']} total")
-        logger.info(f"📏 Train date range: {test_date_range}")
-        logger.info(f"📏 Split date: {split_date}")
+        logger.info(f"Target: {target_column} ({prediction_horizon}-day horizon)")
+        logger.info(f"Features: {result['feature_count']} total")
+        logger.info(f"Train date range: {test_date_range}")
+        logger.info(f"Split date: {split_date}")
         logger.info("=" * 80)
         collect_garbage()
         return result
 
     except Exception as e:
-        logger.error(f"❌ CRITICAL ERROR in prepare_ml_data_for_training: {str(e)}")
+        logger.error(f"CRITICAL ERROR in prepare_ml_data_for_training: {str(e)}")
         import traceback
 
         traceback.print_exc()
@@ -301,7 +301,7 @@ def prepare_ml_data_for_prediction(
         - 'feature_count': Number of features
     """
     logger.info("=" * 80)
-    logger.info("🎯 COMPREHENSIVE ML DATA PREPARATION FOR PREDICTION")
+    logger.info("COMPREHENSIVE ML DATA PREPARATION FOR PREDICTION")
     logger.info("=" * 80)
 
     try:
@@ -356,7 +356,7 @@ def prepare_ml_data_for_prediction(
         X = X.replace([np.nan, np.inf, -np.inf], 0)
 
         if not filtered_dates.empty:
-            logger.info("📅 Filtering prediction set to include only Fridays/Mondays.")
+            logger.info("Filtering prediction set to include only Fridays/Mondays.")
             X = X[filtered_mask]
             split_date_dt = pd.to_datetime("2025-06-15")
             test_mask = date_col >= split_date_dt
@@ -369,7 +369,7 @@ def prepare_ml_data_for_prediction(
             else "No test data"
         )
 
-        logger.info(f"✅ Test set: {len(x_test)} samples ({test_date_range})")
+        logger.info(f"Test set: {len(x_test)} samples ({test_date_range})")
 
         # 6. Prepare return dictionary
         result = {
@@ -383,16 +383,16 @@ def prepare_ml_data_for_prediction(
 
         # 7. Summary logging
         logger.info("=" * 80)
-        logger.info("✅ ML DATA PREPARATION COMPLETED SUCCESSFULLY!")
+        logger.info("ML DATA PREPARATION COMPLETED SUCCESSFULLY!")
         logger.info("=" * 80)
-        logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
-        logger.info(f"📊 Features: {result['feature_count']} total")
+        logger.info(f"Target: {target_column} ({prediction_horizon}-day horizon)")
+        logger.info(f"Features: {result['feature_count']} total")
         logger.info("=" * 80)
         collect_garbage()
         return result
 
     except Exception as e:
-        logger.error(f"❌ CRITICAL ERROR in prepare_ml_data_for_prediction: {str(e)}")
+        logger.error(f"CRITICAL ERROR in prepare_ml_data_for_prediction: {str(e)}")
         import traceback
 
         traceback.print_exc()
@@ -410,7 +410,7 @@ def prepare_ml_data_for_training_with_cleaning(
     Enhanced version of prepare_ml_data_for_training with integrated data cleaning and caching
     """
     logger.info(
-        f"📊 [START] Preparing ML data with cleaning (horizon: {prediction_horizon}d, split: {split_date})"
+        f"[START] Preparing ML data with cleaning (horizon: {prediction_horizon}d, split: {split_date})"
     )
     # Generate cache key based on parameters
     cache_params = {
@@ -425,15 +425,15 @@ def prepare_ml_data_for_training_with_cleaning(
     if _cleaned_data_cache.cache_exists(cache_key, "training"):
         cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "training")
         if cache_age_hours is not None and cache_age_hours > 24:
-            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
+            logger.info(f"Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
             _cleaned_data_cache.clear_cache(cache_key, "training")
         else:
-            logger.info(f"💾 Loading cached cleaned training data (key: {cache_key[:8]}...)")
+            logger.info(f"Loading cached cleaned training data (key: {cache_key[:8]}...)")
             try:
                 return _cleaned_data_cache.load_cleaned_data(cache_key, "training")
             except Exception as e:
-                logger.warning(f"⚠️ Failed to load cached data: {str(e)}")
-                logger.info("🔄 Falling back to fresh data preparation...")
+                logger.warning(f"Failed to load cached data: {str(e)}")
+                logger.info("Falling back to fresh data preparation...")
 
     # 1. Use original data preparation function
     logger.info("Step 1: Running original data preparation pipeline...")
@@ -441,7 +441,7 @@ def prepare_ml_data_for_training_with_cleaning(
         prediction_horizon=prediction_horizon, split_date=split_date, ticker=ticker
     )
     logger.info(
-        f"   Loaded: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
+        f"Loaded: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
     )
     # 2. Apply data cleaning (always performed)
     logger.info("Step 2: Applying data cleaning to combined train/test set...")
@@ -449,7 +449,7 @@ def prepare_ml_data_for_training_with_cleaning(
     combined_y = pd.concat([data_result["y_train"], data_result["y_test"]], ignore_index=True)
     combined_x_clean = clean_data_for_training(combined_x)
     logger.info(
-        f"   After cleaning: {len(combined_x_clean)} samples, {combined_x_clean.shape[1]} features"
+        f"After cleaning: {len(combined_x_clean)} samples, {combined_x_clean.shape[1]} features"
     )
     # Split back into train/test
     train_size = len(data_result["x_train"])
@@ -467,7 +467,7 @@ def prepare_ml_data_for_training_with_cleaning(
         x_test_clean = data_result["x_test"][features_to_keep]
         y_test_clean = data_result["y_test"]
         logger.info(
-            f"   After feature cleaning: {len(x_train_clean)} train, {len(x_test_clean)} test samples, {len(features_to_keep)} features"
+            f"After feature cleaning: {len(x_train_clean)} train, {len(x_test_clean)} test samples, {len(features_to_keep)} features"
         )
         data_result["x_train"] = x_train_clean
         data_result["y_train"] = y_train_clean
@@ -480,22 +480,22 @@ def prepare_ml_data_for_training_with_cleaning(
     diversity_analysis = analyze_feature_diversity(data_result["x_train"])
     data_result["diversity_analysis"] = diversity_analysis
     logger.info(
-        f"   Diversity: {diversity_analysis['useful_feature_count']} useful, {diversity_analysis['constant_feature_count']} constant, {diversity_analysis['zero_variance_count']} zero-variance features"
+        f"Diversity: {diversity_analysis['useful_feature_count']} useful, {diversity_analysis['constant_feature_count']} constant, {diversity_analysis['zero_variance_count']} zero-variance features"
     )
     if diversity_analysis["constant_feature_count"] > 10:
         logger.warning(
-            f"⚠️ Still {diversity_analysis['constant_feature_count']} constant features after cleaning"
+            f"Still {diversity_analysis['constant_feature_count']} constant features after cleaning"
         )
-        logger.warning("💡 Consider expanding date range or checking feature engineering")
+        logger.warning("Consider expanding date range or checking feature engineering")
     # 5. Cache the cleaned data
     try:
-        logger.info(f"💾 [CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
+        logger.info(f"[CACHE] Caching cleaned training data (key: {cache_key[:8]}...)")
         _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "training")
-        logger.info("✅ [CACHE] Data cached successfully.")
+        logger.info("[CACHE] Data cached successfully.")
     except Exception as e:
-        logger.warning(f"⚠️ [CACHE] Failed to cache cleaned data: {str(e)}")
+        logger.warning(f"[CACHE] Failed to cache cleaned data: {str(e)}")
     logger.info(
-        f"✅ [END] Enhanced data preparation completed: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
+        f"[END] Enhanced data preparation completed: {len(data_result['x_train'])} train, {len(data_result['x_test'])} test samples, {data_result['feature_count']} features"
     )
     collect_garbage()
     return data_result
@@ -514,7 +514,7 @@ def prepare_ml_data_for_prediction_with_cleaning(
         Dictionary with cleaned prediction data
     """
     logger.info(
-        f"📊 Preparing prediction data with cleaning (horizon: {prediction_horizon}d, days_back: {days_back})"
+        f"Preparing prediction data with cleaning (horizon: {prediction_horizon}d, days_back: {days_back})"
     )
 
     # Generate cache key based on parameters
@@ -529,15 +529,15 @@ def prepare_ml_data_for_prediction_with_cleaning(
     if _cleaned_data_cache.cache_exists(cache_key, "prediction"):
         cache_age_hours = _cleaned_data_cache.get_cache_age_hours(cache_key, "prediction")
         if cache_age_hours is not None and cache_age_hours > 24:
-            logger.info(f"🗑️ Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
+            logger.info(f"Cache too old ({cache_age_hours:.1f}h), deleting stale cache...")
             _cleaned_data_cache.clear_cache(cache_key, "prediction")
         else:
-            logger.info(f"💾 Loading cached cleaned prediction data (key: {cache_key[:8]}...)")
+            logger.info(f"Loading cached cleaned prediction data (key: {cache_key[:8]}...)")
             try:
                 return _cleaned_data_cache.load_cleaned_data(cache_key, "prediction")
             except Exception as e:
-                logger.warning(f"⚠️ Failed to load cached data: {str(e)}")
-                logger.info("🔄 Falling back to fresh data preparation...")
+                logger.warning(f"Failed to load cached data: {str(e)}")
+                logger.info("Falling back to fresh data preparation...")
 
     # 1. Use original data preparation function
     data_result = prepare_ml_data_for_prediction(prediction_horizon=prediction_horizon)
@@ -560,19 +560,19 @@ def prepare_ml_data_for_prediction_with_cleaning(
     # Warning if too many constant features (common in prediction with narrow date range)
     if diversity_analysis["constant_feature_count"] > 10:
         logger.warning(
-            f"⚠️ {diversity_analysis['constant_feature_count']} constant features in prediction data"
+            f"{diversity_analysis['constant_feature_count']} constant features in prediction data"
         )
-        logger.warning(f"💡 Consider increasing days_back from {days_back} to add date diversity")
+        logger.warning(f"Consider increasing days_back from {days_back} to add date diversity")
 
     # 4. Cache the cleaned data
     try:
         _cleaned_data_cache.save_cleaned_data(data_result, cache_key, "prediction")
-        logger.info("✅ [CACHE] Data cached successfully.")
+        logger.info("[CACHE] Data cached successfully.")
     except Exception as e:
-        logger.warning(f"⚠️ Failed to cache cleaned data: {str(e)}")
+        logger.warning(f"Failed to cache cleaned data: {str(e)}")
 
     logger.info(
-        f"   Prediction data: {len(data_result['x_test'])} samples, {len(data_result['x_test'].columns)} features"
+        f"Prediction data: {len(data_result['x_test'])} samples, {len(data_result['x_test'].columns)} features"
     )
     collect_garbage()
     return data_result

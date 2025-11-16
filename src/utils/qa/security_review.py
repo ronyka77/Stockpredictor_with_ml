@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 class SecurityIssue(Enum):
     """Types of security issues that can be detected."""
+
     HARDCODED_CREDENTIALS = "hardcoded_credentials"
     INSECURE_LOGGING = "insecure_logging"
     WEAK_INPUT_VALIDATION = "weak_input_validation"
@@ -32,6 +33,7 @@ class SecurityIssue(Enum):
 @dataclass
 class SecurityFinding:
     """Represents an individual security finding."""
+
     issue_type: SecurityIssue
     severity: str  # 'critical', 'high', 'medium', 'low', 'info'
     description: str
@@ -43,6 +45,7 @@ class SecurityFinding:
 @dataclass
 class SecurityMetrics:
     """Aggregated security assessment metrics."""
+
     overall_score: float  # 0.0 to 1.0
     critical_issues: int
     high_issues: int
@@ -54,6 +57,7 @@ class SecurityMetrics:
 @dataclass
 class SecurityAssessment:
     """Complete security assessment results."""
+
     findings: List[SecurityFinding]
     metrics: SecurityMetrics
     recommendations: List[str]
@@ -113,20 +117,24 @@ class SecurityReviewer:
             assessment = self._generate_assessment(findings)
             recommendations = self._generate_recommendations(findings)
 
-            self.logger.info(f"Security review completed. Score: {assessment.metrics.overall_score:.2f}, "
-                           f"Findings: {len(findings)}")
+            self.logger.info(
+                f"Security review completed. Score: {assessment.metrics.overall_score:.2f}, "
+                f"Findings: {len(findings)}"
+            )
 
             # Convert findings to dictionaries for JSON serialization
             findings_dict = []
             for finding in findings:
-                findings_dict.append({
-                    "type": finding.issue_type.value,
-                    "severity": finding.severity,
-                    "message": finding.description,
-                    "location": finding.location,
-                    "code_snippet": finding.code_snippet,
-                    "recommendation": finding.recommendation
-                })
+                findings_dict.append(
+                    {
+                        "type": finding.issue_type.value,
+                        "severity": finding.severity,
+                        "message": finding.description,
+                        "location": finding.location,
+                        "code_snippet": finding.code_snippet,
+                        "recommendation": finding.recommendation,
+                    }
+                )
 
             return assessment.metrics.overall_score, findings_dict, recommendations
 
@@ -154,7 +162,7 @@ class SecurityReviewer:
         findings = []
 
         try:
-            with open(module_path, 'r', encoding='utf-8') as f:
+            with open(module_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             tree = ast.parse(content, filename=str(module_path))
@@ -176,39 +184,47 @@ class SecurityReviewer:
 
         except Exception as e:
             self.logger.error(f"Failed to assess {module_path}: {str(e)}")
-            findings.append(SecurityFinding(
-                issue_type=SecurityIssue.EXPOSED_SENSITIVE_DATA,
-                severity="high",
-                description=f"Could not parse module for security analysis: {str(e)}",
-                location=str(module_path),
-                code_snippet=None,
-                recommendation="Review module manually for syntax errors and security issues"
-            ))
+            findings.append(
+                SecurityFinding(
+                    issue_type=SecurityIssue.EXPOSED_SENSITIVE_DATA,
+                    severity="high",
+                    description=f"Could not parse module for security analysis: {str(e)}",
+                    location=str(module_path),
+                    code_snippet=None,
+                    recommendation="Review module manually for syntax errors and security issues",
+                )
+            )
 
         return findings
 
-    def _check_hardcoded_credentials(self, content: str, module_path: Path) -> List[SecurityFinding]:
+    def _check_hardcoded_credentials(
+        self, content: str, module_path: Path
+    ) -> List[SecurityFinding]:
         """Check for hardcoded credentials in the source code."""
         findings = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
             for pattern in self.credential_patterns:
                 if re.search(pattern, line, re.IGNORECASE):
                     # Skip if it's clearly an environment variable access
-                    if not re.search(r'os\.getenv|os\.environ', line):
-                        findings.append(SecurityFinding(
-                            issue_type=SecurityIssue.HARDCODED_CREDENTIALS,
-                            severity="critical",
-                            description="Potential hardcoded credential detected",
-                            location=f"{module_path}:{i}",
-                            code_snippet=line.strip(),
-                            recommendation="Use environment variables for sensitive configuration. Never hardcode API keys, passwords, or tokens."
-                        ))
+                    if not re.search(r"os\.getenv|os\.environ", line):
+                        findings.append(
+                            SecurityFinding(
+                                issue_type=SecurityIssue.HARDCODED_CREDENTIALS,
+                                severity="critical",
+                                description="Potential hardcoded credential detected",
+                                location=f"{module_path}:{i}",
+                                code_snippet=line.strip(),
+                                recommendation="Use environment variables for sensitive configuration. Never hardcode API keys, passwords, or tokens.",
+                            )
+                        )
 
         return findings
 
-    def _check_insecure_logging(self, tree: ast.AST, content: str, module_path: Path) -> List[SecurityFinding]:
+    def _check_insecure_logging(
+        self, tree: ast.AST, content: str, module_path: Path
+    ) -> List[SecurityFinding]:
         """Check for insecure logging practices that might expose sensitive data."""
         findings = []
 
@@ -219,15 +235,20 @@ class SecurityReviewer:
                     if isinstance(arg, ast.Name):
                         # Check if logging variables that might contain sensitive data
                         var_name = arg.id.lower()
-                        if any(keyword in var_name for keyword in ['password', 'token', 'key', 'secret', 'credential']):
-                            findings.append(SecurityFinding(
-                                issue_type=SecurityIssue.INSECURE_LOGGING,
-                                severity="high",
-                                description=f"Potential logging of sensitive data: {arg.id}",
-                                location=f"{module_path}:{node.lineno}",
-                                code_snippet=self._get_code_snippet(content, node.lineno),
-                                recommendation="Never log sensitive information. Use logger.info/warning/error without exposing credentials, tokens, or personal data."
-                            ))
+                        if any(
+                            keyword in var_name
+                            for keyword in ["password", "token", "key", "secret", "credential"]
+                        ):
+                            findings.append(
+                                SecurityFinding(
+                                    issue_type=SecurityIssue.INSECURE_LOGGING,
+                                    severity="high",
+                                    description=f"Potential logging of sensitive data: {arg.id}",
+                                    location=f"{module_path}:{node.lineno}",
+                                    code_snippet=self._get_code_snippet(content, node.lineno),
+                                    recommendation="Never log sensitive information. Use logger.info/warning/error without exposing credentials, tokens, or personal data.",
+                                )
+                            )
 
         return findings
 
@@ -242,39 +263,47 @@ class SecurityReviewer:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 # Check if function handles input (parameters, API calls, etc.)
-                if any(param.arg in ['data', 'input', 'request', 'params', 'payload']
-                      for param in node.args.args):
+                if any(
+                    param.arg in ["data", "input", "request", "params", "payload"]
+                    for param in node.args.args
+                ):
                     input_functions.append(node)
 
                     # Check if function has validation logic
                     has_validation_in_func = self._function_has_validation(node)
 
                     if not has_validation_in_func:
-                        findings.append(SecurityFinding(
-                            issue_type=SecurityIssue.WEAK_INPUT_VALIDATION,
-                            severity="medium",
-                            description=f"Function '{node.name}' handles input but lacks validation",
-                            location=f"{module_path}:{node.lineno}",
-                            code_snippet=None,
-                            recommendation="Implement input validation for all external data. Validate data types, ranges, and sanitize inputs to prevent injection attacks."
-                        ))
+                        findings.append(
+                            SecurityFinding(
+                                issue_type=SecurityIssue.WEAK_INPUT_VALIDATION,
+                                severity="medium",
+                                description=f"Function '{node.name}' handles input but lacks validation",
+                                location=f"{module_path}:{node.lineno}",
+                                code_snippet=None,
+                                recommendation="Implement input validation for all external data. Validate data types, ranges, and sanitize inputs to prevent injection attacks.",
+                            )
+                        )
                     else:
                         has_validation = True
 
         # Overall assessment of input validation coverage
         if input_functions and not has_validation:
-            findings.append(SecurityFinding(
-                issue_type=SecurityIssue.WEAK_INPUT_VALIDATION,
-                severity="high",
-                description="Module lacks comprehensive input validation",
-                location=str(module_path),
-                code_snippet=None,
-                recommendation="Implement systematic input validation using libraries like pydantic or marshmallow for all external data sources."
-            ))
+            findings.append(
+                SecurityFinding(
+                    issue_type=SecurityIssue.WEAK_INPUT_VALIDATION,
+                    severity="high",
+                    description="Module lacks comprehensive input validation",
+                    location=str(module_path),
+                    code_snippet=None,
+                    recommendation="Implement systematic input validation using libraries like pydantic or marshmallow for all external data sources.",
+                )
+            )
 
         return findings
 
-    def _check_sql_injection_risks(self, tree: ast.AST, content: str, module_path: Path) -> List[SecurityFinding]:
+    def _check_sql_injection_risks(
+        self, tree: ast.AST, content: str, module_path: Path
+    ) -> List[SecurityFinding]:
         """Check for potential SQL injection vulnerabilities."""
         findings = []
 
@@ -284,19 +313,23 @@ class SecurityReviewer:
                 if self._is_sql_related_call(node):
                     # Look for f-strings or % formatting which could be vulnerable
                     sql_code = self._get_code_snippet(content, node.lineno)
-                    if sql_code and ('%' in sql_code or 'f"' in sql_code or "f'" in sql_code):
-                        findings.append(SecurityFinding(
-                            issue_type=SecurityIssue.SQL_INJECTION_RISK,
-                            severity="critical",
-                            description="Potential SQL injection vulnerability detected",
-                            location=f"{module_path}:{node.lineno}",
-                            code_snippet=sql_code,
-                            recommendation="Use parameterized queries or ORM methods instead of string formatting. Never concatenate user input into SQL queries."
-                        ))
+                    if sql_code and ("%" in sql_code or 'f"' in sql_code or "f'" in sql_code):
+                        findings.append(
+                            SecurityFinding(
+                                issue_type=SecurityIssue.SQL_INJECTION_RISK,
+                                severity="critical",
+                                description="Potential SQL injection vulnerability detected",
+                                location=f"{module_path}:{node.lineno}",
+                                code_snippet=sql_code,
+                                recommendation="Use parameterized queries or ORM methods instead of string formatting. Never concatenate user input into SQL queries.",
+                            )
+                        )
 
         return findings
 
-    def _check_data_protection(self, tree: ast.AST, content: str, module_path: Path) -> List[SecurityFinding]:
+    def _check_data_protection(
+        self, tree: ast.AST, content: str, module_path: Path
+    ) -> List[SecurityFinding]:
         """Check for data protection and privacy practices."""
         findings = []
 
@@ -310,15 +343,23 @@ class SecurityReviewer:
                             if self._is_logging_call(stmt.value):
                                 # Check if logging full exceptions
                                 for arg in stmt.value.args:
-                                    if isinstance(arg, ast.Name) and arg.id in ['e', 'exception', 'error']:
-                                        findings.append(SecurityFinding(
-                                            issue_type=SecurityIssue.EXPOSED_SENSITIVE_DATA,
-                                            severity="medium",
-                                            description="Exception logging may expose sensitive information",
-                                            location=f"{module_path}:{stmt.lineno}",
-                                            code_snippet=self._get_code_snippet(content, stmt.lineno),
-                                            recommendation="Log exception messages without sensitive details. Use logger.exception() for full traceback in development only."
-                                        ))
+                                    if isinstance(arg, ast.Name) and arg.id in [
+                                        "e",
+                                        "exception",
+                                        "error",
+                                    ]:
+                                        findings.append(
+                                            SecurityFinding(
+                                                issue_type=SecurityIssue.EXPOSED_SENSITIVE_DATA,
+                                                severity="medium",
+                                                description="Exception logging may expose sensitive information",
+                                                location=f"{module_path}:{stmt.lineno}",
+                                                code_snippet=self._get_code_snippet(
+                                                    content, stmt.lineno
+                                                ),
+                                                recommendation="Log exception messages without sensitive details. Use logger.exception() for full traceback in development only.",
+                                            )
+                                        )
 
         return findings
 
@@ -326,8 +367,8 @@ class SecurityReviewer:
         """Check if a call node is a logging call."""
         if isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
-                if node.func.value.id in ['logger', 'logging']:
-                    return node.func.attr in ['debug', 'info', 'warning', 'error', 'critical']
+                if node.func.value.id in ["logger", "logging"]:
+                    return node.func.attr in ["debug", "info", "warning", "error", "critical"]
         return False
 
     def _is_sql_related_call(self, node: ast.Call) -> bool:
@@ -335,13 +376,13 @@ class SecurityReviewer:
         if isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 # Check for database connections or query methods
-                if node.func.value.id in ['cursor', 'conn', 'db', 'connection']:
-                    return node.func.attr in ['execute', 'executemany', 'query']
+                if node.func.value.id in ["cursor", "conn", "db", "connection"]:
+                    return node.func.attr in ["execute", "executemany", "query"]
         return False
 
     def _function_has_validation(self, func_node: ast.FunctionDef) -> bool:
         """Check if a function contains validation logic."""
-        validation_keywords = ['validate', 'check', 'assert', 'isinstance', 'is_valid']
+        validation_keywords = ["validate", "check", "assert", "isinstance", "is_valid"]
 
         for node in ast.walk(func_node):
             if isinstance(node, ast.Call):
@@ -356,23 +397,17 @@ class SecurityReviewer:
 
     def _get_code_snippet(self, content: str, lineno: int, context: int = 1) -> Optional[str]:
         """Get a code snippet around a specific line number."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         if 1 <= lineno <= len(lines):
             start = max(1, lineno - context)
             end = min(len(lines), lineno + context)
-            return '\n'.join(lines[start-1:end])
+            return "\n".join(lines[start - 1 : end])
         return None
 
     def _generate_assessment(self, findings: List[SecurityFinding]) -> SecurityAssessment:
         """Generate overall security assessment from findings."""
         # Count issues by severity
-        severity_counts = {
-            'critical': 0,
-            'high': 0,
-            'medium': 0,
-            'low': 0,
-            'info': 0
-        }
+        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
 
         credential_patterns = []
 
@@ -383,23 +418,25 @@ class SecurityReviewer:
                     credential_patterns.append(finding.code_snippet[:50] + "...")
 
         # Calculate score based on issue severity and count
-        weights = {'critical': 1.0, 'high': 0.8, 'medium': 0.6, 'low': 0.3, 'info': 0.1}
+        weights = {"critical": 1.0, "high": 0.8, "medium": 0.6, "low": 0.3, "info": 0.1}
         total_weighted_score = sum(severity_counts[sev] * weights[sev] for sev in severity_counts)
 
         # Base score of 1.0, reduce based on issues found
         overall_score = max(0.0, 1.0 - (total_weighted_score * 0.1))
 
         # Estimate input validation coverage (simplified heuristic)
-        input_validation_findings = [f for f in findings if f.issue_type == SecurityIssue.WEAK_INPUT_VALIDATION]
+        input_validation_findings = [
+            f for f in findings if f.issue_type == SecurityIssue.WEAK_INPUT_VALIDATION
+        ]
         input_validation_coverage = max(0.0, 1.0 - (len(input_validation_findings) * 0.2))
 
         metrics = SecurityMetrics(
             overall_score=overall_score,
-            critical_issues=severity_counts['critical'],
-            high_issues=severity_counts['high'],
-            medium_issues=severity_counts['medium'],
-            low_issues=severity_counts['low'],
-            info_findings=severity_counts['info']
+            critical_issues=severity_counts["critical"],
+            high_issues=severity_counts["high"],
+            medium_issues=severity_counts["medium"],
+            low_issues=severity_counts["low"],
+            info_findings=severity_counts["info"],
         )
 
         return SecurityAssessment(
@@ -407,7 +444,7 @@ class SecurityReviewer:
             metrics=metrics,
             recommendations=[],  # Will be filled by separate method
             credential_patterns_found=credential_patterns,
-            input_validation_coverage=input_validation_coverage
+            input_validation_coverage=input_validation_coverage,
         )
 
     def _generate_recommendations(self, findings: List[SecurityFinding]) -> List[str]:

@@ -91,10 +91,10 @@ class ConsolidatedFeatureStorage:
         }
 
         logger.info("Consolidated storage completed:")
-        logger.info(f"  Files created: {len(files_created)}")
-        logger.info(f"  Total size: {total_size:.2f} MB")
-        logger.info(f"  Total rows: {total_rows:,}")
-        logger.info(f"  Compression ratio: {storage_info['compression_ratio']:.1f}x")
+        logger.info(f"Files created: {len(files_created)}")
+        logger.info(f"Total size: {total_size:.2f} MB")
+        logger.info(f"Total rows: {total_rows:,}")
+        logger.info(f"Compression ratio: {storage_info['compression_ratio']:.1f}x")
 
         return storage_info
 
@@ -352,23 +352,23 @@ def main():
 
         # log results
         logger.info("\n🎉 Feature Consolidation Completed!")
-        logger.info(f"   Files created: {result['files_created']}")
-        logger.info(f"   Total size: {result['total_size_mb']:.2f} MB")
-        logger.info(f"   Compression ratio: {result['compression_ratio']:.1f}x")
+        logger.info(f"Files created: {result['files_created']}")
+        logger.info(f"Total size: {result['total_size_mb']:.2f} MB")
+        logger.info(f"Compression ratio: {result['compression_ratio']:.1f}x")
 
         # Show file breakdown
         if "files" in result:
             logger.info("\n📁 Consolidated Files:")
             for file_info in result["files"]:
                 logger.info(
-                    f"   {file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}"
+                    f"{file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}"
                 )
 
-        logger.info("✅ Consolidation completed successfully")
+        logger.info("Consolidation completed successfully")
         return 0
 
     except Exception as e:
-        logger.error(f"❌ Consolidation failed: {str(e)}")
+        logger.error(f"Consolidation failed: {str(e)}")
         import traceback
 
         traceback.print_exc()

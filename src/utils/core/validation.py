@@ -25,50 +25,52 @@ from .logger import get_logger
 logger = get_logger(__name__, utility="validation")
 
 # Type variables for generic validation
-T = TypeVar('T')
+T = TypeVar("T")
 ValidationResult = Union[T, None]
 
 # Security constants
 MAX_STRING_LENGTH = 10000  # Maximum string length to prevent DoS
-MAX_LIST_LENGTH = 1000     # Maximum list length
-MAX_DICT_KEYS = 100        # Maximum dictionary keys
+MAX_LIST_LENGTH = 1000  # Maximum list length
+MAX_DICT_KEYS = 100  # Maximum dictionary keys
 
 # Regex patterns for validation
 SQL_INJECTION_PATTERNS = [
-    r';\s*--',  # SQL comment injection
-    r';\s*/\*',  # SQL block comment injection
-    r'union\s+select',  # UNION SELECT injection
-    r';\s*drop\s+',  # DROP statement injection
-    r';\s*delete\s+',  # DELETE statement injection
-    r';\s*update\s+',  # UPDATE statement injection
-    r';\s*insert\s+',  # INSERT statement injection
+    r";\s*--",  # SQL comment injection
+    r";\s*/\*",  # SQL block comment injection
+    r"union\s+select",  # UNION SELECT injection
+    r";\s*drop\s+",  # DROP statement injection
+    r";\s*delete\s+",  # DELETE statement injection
+    r";\s*update\s+",  # UPDATE statement injection
+    r";\s*insert\s+",  # INSERT statement injection
 ]
 
 XSS_PATTERNS = [
-    r'<script[^>]*>.*?</script>',  # Script tags
-    r'javascript:',  # JavaScript URLs
-    r'on\w+\s*=',  # Event handlers
-    r'<iframe[^>]*>.*?</iframe>',  # Iframe injection
-    r'<object[^>]*>.*?</object>',  # Object injection
+    r"<script[^>]*>.*?</script>",  # Script tags
+    r"javascript:",  # JavaScript URLs
+    r"on\w+\s*=",  # Event handlers
+    r"<iframe[^>]*>.*?</iframe>",  # Iframe injection
+    r"<object[^>]*>.*?</object>",  # Object injection
 ]
 
 PATH_TRAVERSAL_PATTERNS = [
-    r'\.\./',  # Directory traversal
-    r'\.\.\\',  # Windows directory traversal
-    r'~',  # Home directory access
-    r'\.\.',  # Double dot patterns
+    r"\.\./",  # Directory traversal
+    r"\.\.\\",  # Windows directory traversal
+    r"~",  # Home directory access
+    r"\.\.",  # Double dot patterns
 ]
 
 # Compiled regex patterns for performance
-SQL_INJECTION_REGEX = re.compile('|'.join(SQL_INJECTION_PATTERNS), re.IGNORECASE)
-XSS_REGEX = re.compile('|'.join(XSS_PATTERNS), re.IGNORECASE | re.DOTALL)
-PATH_TRAVERSAL_REGEX = re.compile('|'.join(PATH_TRAVERSAL_PATTERNS))
+SQL_INJECTION_REGEX = re.compile("|".join(SQL_INJECTION_PATTERNS), re.IGNORECASE)
+XSS_REGEX = re.compile("|".join(XSS_PATTERNS), re.IGNORECASE | re.DOTALL)
+PATH_TRAVERSAL_REGEX = re.compile("|".join(PATH_TRAVERSAL_PATTERNS))
 
 
 class SecurityValidationError(Exception):
     """Custom validation error with security context"""
 
-    def __init__(self, message: str, field: str = None, value: Any = None, security_threat: bool = False):
+    def __init__(
+        self, message: str, field: str = None, value: Any = None, security_threat: bool = False
+    ):
         self.message = message
         self.field = field
         self.value = value
@@ -77,8 +79,10 @@ class SecurityValidationError(Exception):
 
         # Log security threats
         if security_threat:
-            logger.warning(f"Security threat detected in field '{field}': {message}",
-                          extra={"field": field, "value": str(value)[:100], "threat_type": "validation"})
+            logger.warning(
+                f"Security threat detected in field '{field}': {message}",
+                extra={"field": field, "value": str(value)[:100], "threat_type": "validation"},
+            )
 
 
 class SecureBaseModel(BaseModel):
@@ -89,14 +93,10 @@ class SecureBaseModel(BaseModel):
     and comprehensive error handling.
     """
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        str_strip_whitespace=True,
-        strict=True
-    )
+    model_config = ConfigDict(validate_assignment=True, str_strip_whitespace=True, strict=True)
 
     @classmethod
-    def validate_security(cls, data: Dict[str, Any]) -> 'SecureBaseModel':
+    def validate_security(cls, data: Dict[str, Any]) -> "SecureBaseModel":
         """
         Validate data with security checks
 
@@ -122,10 +122,10 @@ class SecureBaseModel(BaseModel):
             raise
         except Exception as e:
             # Convert Pydantic errors to security-aware errors
-            if hasattr(e, 'errors'):
+            if hasattr(e, "errors"):
                 for error in e.errors():
-                    field = '.'.join(str(loc) for loc in error['loc'])
-                    message = error['msg']
+                    field = ".".join(str(loc) for loc in error["loc"])
+                    message = error["msg"]
                     raise SecurityValidationError(message, field=field, security_threat=False)
             else:
                 logger.error(f"Unexpected validation error: {e}")
@@ -142,6 +142,7 @@ class SecureBaseModel(BaseModel):
         Raises:
             SecurityValidationError: If security threat detected
         """
+
         def _check_value(value: Any, field_path: str = "") -> None:
             if isinstance(value, str):
                 # Check for SQL injection
@@ -150,7 +151,7 @@ class SecureBaseModel(BaseModel):
                         "Potential SQL injection detected",
                         field=field_path,
                         value=value,
-                        security_threat=True
+                        security_threat=True,
                     )
 
                 # Check for XSS
@@ -159,7 +160,7 @@ class SecureBaseModel(BaseModel):
                         "Potential XSS attack detected",
                         field=field_path,
                         value=value,
-                        security_threat=True
+                        security_threat=True,
                     )
 
                 # Check for path traversal
@@ -168,7 +169,7 @@ class SecureBaseModel(BaseModel):
                         "Potential path traversal attack detected",
                         field=field_path,
                         value=value,
-                        security_threat=True
+                        security_threat=True,
                     )
 
                 # Check string length limits
@@ -176,7 +177,7 @@ class SecureBaseModel(BaseModel):
                     raise SecurityValidationError(
                         f"String length exceeds maximum allowed ({MAX_STRING_LENGTH})",
                         field=field_path,
-                        value=f"length: {len(value)}"
+                        value=f"length: {len(value)}",
                     )
 
             elif isinstance(value, (list, tuple)):
@@ -185,7 +186,7 @@ class SecureBaseModel(BaseModel):
                     raise SecurityValidationError(
                         f"List length exceeds maximum allowed ({MAX_LIST_LENGTH})",
                         field=field_path,
-                        value=f"length: {len(value)}"
+                        value=f"length: {len(value)}",
                     )
 
                 # Recursively check list items
@@ -198,16 +199,14 @@ class SecureBaseModel(BaseModel):
                     raise SecurityValidationError(
                         f"Dictionary has too many keys ({MAX_DICT_KEYS} max)",
                         field=field_path,
-                        value=f"keys: {len(value)}"
+                        value=f"keys: {len(value)}",
                     )
 
                 # Recursively check dict values
                 for key, val in value.items():
                     if not isinstance(key, str) or len(key) > 100:
                         raise SecurityValidationError(
-                            "Invalid dictionary key",
-                            field=field_path,
-                            value=f"key: {key}"
+                            "Invalid dictionary key", field=field_path, value=f"key: {key}"
                         )
                     _check_value(val, f"{field_path}.{key}")
 
@@ -274,8 +273,12 @@ class SecureNumeric:
             raise SecurityValidationError(f"Invalid numeric value for {field_name}")
 
     @staticmethod
-    def validate_range(value: Any, min_val: Optional[float] = None,
-                      max_val: Optional[float] = None, field_name: str = "value") -> Union[int, float]:
+    def validate_range(
+        value: Any,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+        field_name: str = "value",
+    ) -> Union[int, float]:
         """Validate numeric value within specified range"""
         num = SecureNumeric.validate_positive_number(value, field_name)
 
@@ -293,19 +296,19 @@ class SecureNumeric:
         try:
             if isinstance(value, str):
                 # Handle string representations of currency
-                value = value.replace('$', '').replace(',', '').strip()
+                value = value.replace("$", "").replace(",", "").strip()
 
             amount = Decimal(str(value))
 
             # Validate reasonable currency ranges
-            if abs(amount) > Decimal('999999999.99'):  # $999M upper bound
+            if abs(amount) > Decimal("999999999.99"):  # $999M upper bound
                 raise SecurityValidationError(f"{field_name} amount is unreasonably large")
 
-            if amount < Decimal('-999999999.99'):  # Large negative bound
+            if amount < Decimal("-999999999.99"):  # Large negative bound
                 raise SecurityValidationError(f"{field_name} amount is unreasonably small")
 
             # Round to 2 decimal places for currency
-            return amount.quantize(Decimal('0.01'))
+            return amount.quantize(Decimal("0.01"))
 
         except (InvalidOperation, ValueError):
             raise SecurityValidationError(f"Invalid currency amount for {field_name}")
@@ -314,12 +317,13 @@ class SecureNumeric:
 class SecureURL:
     """Security-enhanced URL validation"""
 
-    ALLOWED_SCHEMES = {'http', 'https'}
+    ALLOWED_SCHEMES = {"http", "https"}
     MAX_URL_LENGTH = 2048
 
     @staticmethod
-    def validate_url(value: Any, field_name: str = "url",
-                    allowed_schemes: Optional[set] = None) -> str:
+    def validate_url(
+        value: Any, field_name: str = "url", allowed_schemes: Optional[set] = None
+    ) -> str:
         """
         Validate URL with security checks
 
@@ -353,21 +357,24 @@ class SecureURL:
         # Validate scheme
         schemes = allowed_schemes or SecureURL.ALLOWED_SCHEMES
         if parsed.scheme not in schemes:
-            raise SecurityValidationError(f"URL scheme not allowed for {field_name}: {parsed.scheme}")
+            raise SecurityValidationError(
+                f"URL scheme not allowed for {field_name}: {parsed.scheme}"
+            )
 
         # Validate netloc exists for network URLs
-        if not parsed.netloc and parsed.scheme in {'http', 'https'}:
+        if not parsed.netloc and parsed.scheme in {"http", "https"}:
             raise SecurityValidationError(f"URL must have a valid domain for {field_name}")
 
         # Check for suspicious patterns
-        if '..' in url or url.startswith('//'):
+        if ".." in url or url.startswith("//"):
             raise SecurityValidationError(f"Suspicious URL pattern detected in {field_name}")
 
         return url
 
     @staticmethod
-    def validate_api_endpoint(value: Any, base_url: Optional[str] = None,
-                             field_name: str = "endpoint") -> str:
+    def validate_api_endpoint(
+        value: Any, base_url: Optional[str] = None, field_name: str = "endpoint"
+    ) -> str:
         """
         Validate API endpoint URL
 
@@ -388,9 +395,9 @@ class SecureURL:
             raise SecurityValidationError(f"{field_name} cannot be empty")
 
         # If base_url provided and endpoint is a path, join them
-        if base_url and not endpoint.startswith(('http://', 'https://')):
+        if base_url and not endpoint.startswith(("http://", "https://")):
             try:
-                full_url = urljoin(base_url.rstrip('/') + '/', endpoint.lstrip('/'))
+                full_url = urljoin(base_url.rstrip("/") + "/", endpoint.lstrip("/"))
                 return SecureURL.validate_url(full_url, field_name)
             except Exception:
                 raise SecurityValidationError(f"Invalid endpoint path for {field_name}")
@@ -403,8 +410,9 @@ class SecureDateTime:
     """Security-enhanced date/time validation"""
 
     @staticmethod
-    def validate_datetime(value: Any, field_name: str = "datetime",
-                         future_allowed: bool = True) -> datetime:
+    def validate_datetime(
+        value: Any, field_name: str = "datetime", future_allowed: bool = True
+    ) -> datetime:
         """
         Validate datetime with security checks
 
@@ -421,7 +429,7 @@ class SecureDateTime:
         elif isinstance(value, str):
             try:
                 # Try ISO format first
-                dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError:
                 raise SecurityValidationError(f"Invalid datetime format for {field_name}")
         else:
@@ -438,8 +446,7 @@ class SecureDateTime:
         return dt
 
     @staticmethod
-    def validate_date(value: Any, field_name: str = "date",
-                     future_allowed: bool = True) -> date:
+    def validate_date(value: Any, field_name: str = "date", future_allowed: bool = True) -> date:
         """
         Validate date with security checks
 
@@ -457,7 +464,7 @@ class SecureDateTime:
             d = value.date()
         elif isinstance(value, str):
             try:
-                d = datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+                d = datetime.fromisoformat(value.replace("Z", "+00:00")).date()
             except ValueError:
                 raise SecurityValidationError(f"Invalid date format for {field_name}")
         else:
@@ -491,8 +498,8 @@ class ValidationUtils:
 
         # Basic email regex (RFC 5322 compliant)
         email_pattern = re.compile(
-            r'^[a-zA-Z0-9](?:[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+)*'
-            r'@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+            r"^[a-zA-Z0-9](?:[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+)*"
+            r"@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
         )
 
         if not email_pattern.match(email):
@@ -513,18 +520,19 @@ class ValidationUtils:
         ticker = ticker.strip().upper()
 
         # Ticker validation: alphanumeric, dots, hyphens, max 10 chars
-        if not re.match(r'^[A-Z0-9.-]{1,10}$', ticker):
+        if not re.match(r"^[A-Z0-9.-]{1,10}$", ticker):
             raise SecurityValidationError(f"Invalid ticker symbol format for {field_name}")
 
         # Security check: prevent path traversal in ticker names
-        if '..' in ticker or '/' in ticker or '\\' in ticker:
-            raise SecurityValidationError(f"Invalid characters in {field_name}", security_threat=True)
+        if ".." in ticker or "/" in ticker or "\\" in ticker:
+            raise SecurityValidationError(
+                f"Invalid characters in {field_name}", security_threat=True
+            )
 
         return ticker
 
     @staticmethod
-    def validate_api_key(api_key: str, field_name: str = "api_key",
-                        min_length: int = 20) -> str:
+    def validate_api_key(api_key: str, field_name: str = "api_key", min_length: int = 20) -> str:
         """Validate API key format and security"""
         if not isinstance(api_key, str):
             raise SecurityValidationError(f"{field_name} must be a string")
@@ -532,18 +540,24 @@ class ValidationUtils:
         api_key = api_key.strip()
 
         if len(api_key) < min_length:
-            raise SecurityValidationError(f"{field_name} is too short (minimum {min_length} characters)")
+            raise SecurityValidationError(
+                f"{field_name} is too short (minimum {min_length} characters)"
+            )
 
         if len(api_key) > 128:  # Reasonable maximum
             raise SecurityValidationError(f"{field_name} is too long")
 
         # Check for suspicious patterns
-        if any(char in api_key for char in ['<', '>', '&', '"', "'"]):
-            raise SecurityValidationError(f"Invalid characters in {field_name}", security_threat=True)
+        if any(char in api_key for char in ["<", ">", "&", '"', "'"]):
+            raise SecurityValidationError(
+                f"Invalid characters in {field_name}", security_threat=True
+            )
 
         # Check for common weak patterns
-        if api_key.lower() in ['password', 'admin', 'test', 'key', 'token']:
-            raise SecurityValidationError(f"{field_name} appears to be a placeholder value", security_threat=True)
+        if api_key.lower() in ["password", "admin", "test", "key", "token"]:
+            raise SecurityValidationError(
+                f"{field_name} appears to be a placeholder value", security_threat=True
+            )
 
         return api_key
 
@@ -554,14 +568,14 @@ class ValidationUtils:
             raise SecurityValidationError(f"{field_name} must be a string")
 
         # Remove path separators and dangerous characters
-        dangerous_chars = ['/', '\\', '..', '<', '>', ':', '*', '?', '"', '|']
+        dangerous_chars = ["/", "\\", "..", "<", ">", ":", "*", "?", '"', "|"]
         sanitized = filename
 
         for char in dangerous_chars:
-            sanitized = sanitized.replace(char, '_')
+            sanitized = sanitized.replace(char, "_")
 
         # Remove leading/trailing whitespace and dots
-        sanitized = sanitized.strip(' .')
+        sanitized = sanitized.strip(" .")
 
         # Ensure non-empty result
         if not sanitized:
@@ -574,8 +588,9 @@ class ValidationUtils:
         return sanitized
 
     @staticmethod
-    def validate_batch_size(batch_size: int, field_name: str = "batch_size",
-                           min_size: int = 1, max_size: int = 10000) -> int:
+    def validate_batch_size(
+        batch_size: int, field_name: str = "batch_size", min_size: int = 1, max_size: int = 10000
+    ) -> int:
         """Validate batch size parameters"""
         try:
             size = int(batch_size)
@@ -604,8 +619,9 @@ class ValidationMetrics:
         self.validation_errors = 0
         self.average_validation_time = 0.0
 
-    def record_validation(self, security_threat: bool = False, error: bool = False,
-                         duration: float = 0.0) -> None:
+    def record_validation(
+        self, security_threat: bool = False, error: bool = False, duration: float = 0.0
+    ) -> None:
         """Record a validation operation"""
         self.validations_performed += 1
 
@@ -629,13 +645,15 @@ class ValidationMetrics:
             "validation_errors": self.validation_errors,
             "threat_rate": (
                 self.security_threats_detected / self.validations_performed
-                if self.validations_performed > 0 else 0
+                if self.validations_performed > 0
+                else 0
             ),
             "error_rate": (
                 self.validation_errors / self.validations_performed
-                if self.validations_performed > 0 else 0
+                if self.validations_performed > 0
+                else 0
             ),
-            "average_validation_time_ms": self.average_validation_time * 1000
+            "average_validation_time_ms": self.average_validation_time * 1000,
         }
 
 
@@ -656,18 +674,19 @@ def validate_input_data(data: Any, schema: type = None, strict: bool = True) -> 
         Validated data or None if validation fails
     """
     import time
+
     start_time = time.time()
 
     try:
         if schema and issubclass(schema, BaseModel):
-            if hasattr(schema, 'validate_security'):
+            if hasattr(schema, "validate_security"):
                 result = schema.validate_security(data)
             else:
                 result = schema(**data)
         else:
             # Basic type validation
             if strict:
-                SecureBaseModel._check_security_threats({'data': data})
+                SecureBaseModel._check_security_threats({"data": data})
             result = data
 
         validation_metrics.record_validation(duration=time.time() - start_time)

@@ -77,7 +77,7 @@ def convert_absolute_to_percentage_returns(
     new_target_column = f"Future_Return_{prediction_horizon}D"
 
     logger.info(
-        f"🎯 Converting absolute targets to percentage returns (horizon: {prediction_horizon}D)"
+        f"Converting absolute targets to percentage returns (horizon: {prediction_horizon}D)"
     )
     # Look for any Future_High_XD column as fallback
     if target_column not in combined_data.columns:
@@ -87,7 +87,7 @@ def convert_absolute_to_percentage_returns(
                 f"No future price target columns found. Expected '{target_column}' or similar."
             )
         target_column = future_cols[0]
-        logger.warning(f"⚠ Using fallback target column: {target_column}")
+        logger.warning(f"Using fallback target column: {target_column}")
         new_target_column = target_column.replace("Future_High_", "Future_Return_")
 
     if "close" not in combined_data.columns:
@@ -102,18 +102,16 @@ def convert_absolute_to_percentage_returns(
     # Log transformation statistics using the newly created column
     valid_returns = combined_data[new_target_column].dropna()
     if not valid_returns.empty:
-        logger.info("✅ Target transformation completed:")
+        logger.info("Target transformation completed:")
         # Use safe aggregations on the DataFrame to avoid creating large temporaries
         orig_min = combined_data["close"].min()
         fut_max = combined_data[target_column].max()
-        logger.info(f"   Original target range: ${orig_min:.2f} - ${fut_max:.2f}")
+        logger.info(f"Original target range: ${orig_min:.2f} - ${fut_max:.2f}")
         logger.info(
-            f"   New percentage returns: {valid_returns.min():.4f} to {valid_returns.max():.4f} (decimal format)"
+            f"New percentage returns: {valid_returns.min():.4f} to {valid_returns.max():.4f} (decimal format)"
         )
-        logger.info(
-            f"   Mean return: {valid_returns.mean():.4f} ({valid_returns.mean() * 100:.2f}%)"
-        )
-        logger.info(f"   Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)")
+        logger.info(f"Mean return: {valid_returns.mean():.4f} ({valid_returns.mean() * 100:.2f}%)")
+        logger.info(f"Std return: {valid_returns.std():.4f} ({valid_returns.std() * 100:.2f}%)")
 
     return combined_data, new_target_column
 
@@ -160,8 +158,8 @@ def convert_percentage_predictions_to_prices(
         capped_low = (predicted_prices < lower_bound).sum()
 
         if capped_high > 0 or capped_low > 0:
-            logger.info(f"   Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
-            logger.info(f"   Capped high: {capped_high} times and capped low: {capped_low} times")
+            logger.info(f"Bounds: ±{max_10d_move:.1f}% for 10-day horizon")
+            logger.info(f"Capped high: {capped_high} times and capped low: {capped_low} times")
 
         return bounded_predictions
     else:

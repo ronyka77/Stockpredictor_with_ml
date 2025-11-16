@@ -4,13 +4,16 @@ Data validation schemas and validators for OHLCV stock market data
 
 from datetime import datetime, date
 from typing import List, Dict, Optional, Any, Union, Tuple
-from pydantic import BaseModel, field_validator, field_serializer, Field, ConfigDict
+from pydantic import BaseModel, field_validator, field_serializer, Field
 from enum import Enum
 
 from src.utils.core.logger import get_logger
 from src.utils.core.validation import (
-    SecureBaseModel, SecurityValidationError, ValidationUtils,
-    SecureNumeric, validate_input_data
+    SecureBaseModel,
+    SecurityValidationError,
+    ValidationUtils,
+    SecureNumeric,
+    validate_input_data,
 )
 from src.utils.qa.security_audit import log_input_validation_failure
 
@@ -61,10 +64,7 @@ class OHLCVRecord(SecureBaseModel):
         except SecurityValidationError as e:
             # Log security event and re-raise as ValueError for compatibility
             log_input_validation_failure(
-                field="ticker",
-                value=str(v)[:100],
-                validation_error=str(e),
-                severity="medium"
+                field="ticker", value=str(v)[:100], validation_error=str(e), severity="medium"
             )
             raise ValueError(f"Ticker validation failed: {e.message}")
 
@@ -78,10 +78,7 @@ class OHLCVRecord(SecureBaseModel):
             return SecureNumeric.validate_positive_number(v, field_name=info.field_name)
         except SecurityValidationError as e:
             log_input_validation_failure(
-                field=info.field_name,
-                value=str(v),
-                validation_error=str(e),
-                severity="low"
+                field=info.field_name, value=str(v), validation_error=str(e), severity="low"
             )
             raise ValueError(f"Price validation failed for {info.field_name}: {e.message}")
 
@@ -123,10 +120,7 @@ class OHLCVRecord(SecureBaseModel):
             return SecureNumeric.validate_range(v, min_val=0, max_val=1e12, field_name="volume")
         except SecurityValidationError as e:
             log_input_validation_failure(
-                field="volume",
-                value=str(v),
-                validation_error=str(e),
-                severity="low"
+                field="volume", value=str(v), validation_error=str(e), severity="low"
             )
             raise ValueError(f"Volume validation failed: {e.message}")
 
@@ -362,7 +356,7 @@ class DataValidator:
                 field="ohlcv_record",
                 value=str(record)[:200],  # Limit logged data
                 validation_error=str(e),
-                severity="high" if e.security_threat else "medium"
+                severity="high" if e.security_threat else "medium",
             )
             self.logger.warning(f"Security validation failed for OHLCV record: {e.message}")
             if self.strict_mode:
@@ -395,7 +389,7 @@ class DataValidator:
                 field="ohlcv_batch",
                 value=f"batch_size={len(records)}, ticker={ticker}",
                 validation_error=str(e),
-                severity="high" if e.security_threat else "medium"
+                severity="high" if e.security_threat else "medium",
             )
             self.logger.warning(f"Security validation failed for OHLCV batch: {e.message}")
             if self.strict_mode:
@@ -474,9 +468,13 @@ class DataValidator:
                     if timestamp > 0 and timestamp < 2147483647000:  # Valid until year 2038
                         timestamp = datetime.fromtimestamp(timestamp / 1000)
                     else:
-                        raise SecurityValidationError(f"Invalid timestamp value: {timestamp}", security_threat=True)
+                        raise SecurityValidationError(
+                            f"Invalid timestamp value: {timestamp}", security_threat=True
+                        )
                 else:
-                    raise SecurityValidationError(f"Invalid timestamp type: {type(timestamp)}", security_threat=False)
+                    raise SecurityValidationError(
+                        f"Invalid timestamp type: {type(timestamp)}", security_threat=False
+                    )
 
             # Get ticker from record or use provided ticker with validation
             record_ticker = polygon_record.get("T", "")
@@ -485,13 +483,12 @@ class DataValidator:
 
             # Validate ticker symbol
             if record_ticker:
-                record_ticker = ValidationUtils.validate_ticker_symbol(record_ticker, "polygon_ticker")
+                record_ticker = ValidationUtils.validate_ticker_symbol(
+                    record_ticker, "polygon_ticker"
+                )
 
             # Extract and validate numeric fields with security checks
-            transformed = {
-                "ticker": record_ticker,
-                "timestamp": timestamp,
-            }
+            transformed = {"ticker": record_ticker, "timestamp": timestamp}
 
             # Validate price fields
             price_fields = ["o", "h", "l", "c"]  # Open, High, Low, Close
@@ -503,12 +500,14 @@ class DataValidator:
                         SecureNumeric.validate_positive_number(value, f"polygon_{internal_name}")
                         transformed[internal_name] = value
                     except SecurityValidationError as e:
-                        self.logger.warning(f"Invalid {internal_name} price in API response: {value}")
+                        self.logger.warning(
+                            f"Invalid {internal_name} price in API response: {value}"
+                        )
                         log_input_validation_failure(
                             field=f"polygon_{internal_name}",
                             value=str(value),
                             validation_error=str(e),
-                            severity="low"
+                            severity="low",
                         )
                         transformed[internal_name] = 0  # Default to 0 for invalid prices
 
@@ -516,7 +515,9 @@ class DataValidator:
             volume = polygon_record.get("v", 0)
             if volume is not None:
                 try:
-                    SecureNumeric.validate_range(volume, min_val=0, max_val=1e12, field_name="polygon_volume")
+                    SecureNumeric.validate_range(
+                        volume, min_val=0, max_val=1e12, field_name="polygon_volume"
+                    )
                     transformed["volume"] = volume
                 except SecurityValidationError as e:
                     self.logger.warning(f"Invalid volume in API response: {volume}")
@@ -524,7 +525,7 @@ class DataValidator:
                         field="polygon_volume",
                         value=str(volume),
                         validation_error=str(e),
-                        severity="low"
+                        severity="low",
                     )
                     transformed["volume"] = 0
 
@@ -534,7 +535,7 @@ class DataValidator:
                 try:
                     SecureNumeric.validate_positive_number(vwap, "polygon_vwap")
                     transformed["vwap"] = vwap
-                except SecurityValidationError as e:
+                except SecurityValidationError:
                     self.logger.warning(f"Invalid VWAP in API response: {vwap}")
                     # Don't include invalid VWAP - let downstream logic handle missing VWAP
 
@@ -546,7 +547,7 @@ class DataValidator:
                 field="polygon_api_response",
                 value=str(polygon_record)[:300],
                 validation_error=str(e),
-                severity="high" if e.security_threat else "medium"
+                severity="high" if e.security_threat else "medium",
             )
             self.logger.warning(f"Security validation failed for Polygon.io record: {e.message}")
             raise  # Re-raise to let caller handle
@@ -690,7 +691,7 @@ class DataValidator:
                 field="ticker_info",
                 value=str(ticker_data)[:200],
                 validation_error=str(e),
-                severity="medium"
+                severity="medium",
             )
             self.logger.warning(f"Security validation failed for ticker info: {e.message}")
             if self.strict_mode:

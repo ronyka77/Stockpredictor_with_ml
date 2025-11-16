@@ -14,12 +14,8 @@ from src.utils.core.validation import (
     SecureDateTime,
     ValidationUtils,
     SecurityValidationError,
-    validate_input_data,
 )
-from src.utils.qa.security_audit import (
-    SecurityAuditLogger,
-    log_input_validation_failure,
-)
+from src.utils.qa.security_audit import SecurityAuditLogger, log_input_validation_failure
 
 logger = get_logger(__name__)
 security_logger = SecurityAuditLogger()
@@ -62,15 +58,15 @@ class SecureFinancialValue(SecureBaseModel):
                 details={
                     "field": e.field,
                     "value": str(e.value)[:100],
-                    "validation_type": "financial_value"
-                }
+                    "validation_type": "financial_value",
+                },
             )
             raise
 
     @classmethod
-    def from_financial_value(cls, fv: Any) -> 'SecureFinancialValue':
+    def from_financial_value(cls, fv: Any) -> "SecureFinancialValue":
         """Create secure financial value from regular FinancialValue"""
-        if hasattr(fv, '__dict__'):
+        if hasattr(fv, "__dict__"):
             data = fv.__dict__
         elif isinstance(fv, dict):
             data = fv
@@ -147,8 +143,8 @@ class SecureFinancialStatement(SecureBaseModel):
                 details={
                     "field": e.field,
                     "value": str(e.value)[:100],
-                    "validation_type": "financial_statement"
-                }
+                    "validation_type": "financial_statement",
+                },
             )
             raise
 
@@ -205,7 +201,7 @@ class FundamentalDataValidatorV2:
                 field=e.field,
                 value=str(e.value)[:100],
                 validation_type="fundamental_response",
-                error_message=e.message
+                error_message=e.message,
             )
         except Exception as e:
             logger.error(f"Unexpected error during validation: {e}")
@@ -216,7 +212,7 @@ class FundamentalDataValidatorV2:
             cross_errors=cross_errors,
             cross_warnings=cross_warnings,
             security_errors=security_errors,
-            security_warnings=security_warnings
+            security_warnings=security_warnings,
         )
 
     def _validate_security(self, resp: FundamentalDataResponse) -> dict:
@@ -231,17 +227,17 @@ class FundamentalDataValidatorV2:
                 return {"errors": errors, "warnings": warnings}
 
             # Validate each statement type with security checks
-            for stmt in getattr(resp, 'income_statements', []):
+            for stmt in getattr(resp, "income_statements", []):
                 stmt_security = self._validate_statement_security(stmt, "income_statement")
                 errors.extend(stmt_security["errors"])
                 warnings.extend(stmt_security["warnings"])
 
-            for stmt in getattr(resp, 'balance_sheets', []):
+            for stmt in getattr(resp, "balance_sheets", []):
                 stmt_security = self._validate_statement_security(stmt, "balance_sheet")
                 errors.extend(stmt_security["errors"])
                 warnings.extend(stmt_security["warnings"])
 
-            for stmt in getattr(resp, 'cash_flow_statements', []):
+            for stmt in getattr(resp, "cash_flow_statements", []):
                 stmt_security = self._validate_statement_security(stmt, "cash_flow_statement")
                 errors.extend(stmt_security["errors"])
                 warnings.extend(stmt_security["warnings"])
@@ -259,14 +255,16 @@ class FundamentalDataValidatorV2:
 
         try:
             # Create secure statement model and validate
-            secure_stmt = SecureFinancialStatement(**stmt.__dict__ if hasattr(stmt, '__dict__') else stmt)
+            secure_stmt = SecureFinancialStatement(
+                **stmt.__dict__ if hasattr(stmt, "__dict__") else stmt
+            )
             secure_stmt.validate_security()
 
             # Validate all financial values in the statement
             for attr_name in dir(stmt):
-                if not attr_name.startswith('_'):
+                if not attr_name.startswith("_"):
                     attr_value = getattr(stmt, attr_name)
-                    if hasattr(attr_value, 'value'):  # FinancialValue object
+                    if hasattr(attr_value, "value"):  # FinancialValue object
                         try:
                             SecureFinancialValue.from_financial_value(attr_value)
                         except SecurityValidationError as e:
@@ -337,7 +335,7 @@ class FundamentalDataValidatorV2:
             return errors, warnings
 
         try:
-            if hasattr(inc, 'end_date') and hasattr(bs, 'end_date'):
+            if hasattr(inc, "end_date") and hasattr(bs, "end_date"):
                 SecureDateTime.validate_date(str(inc.end_date), "inc_end_date")
                 SecureDateTime.validate_date(str(bs.end_date), "bs_end_date")
 
@@ -357,7 +355,7 @@ class FundamentalDataValidatorV2:
             return errors, warnings
 
         try:
-            if hasattr(cf, 'end_date'):
+            if hasattr(cf, "end_date"):
                 SecureDateTime.validate_date(str(cf.end_date), "cf_end_date")
 
             if (inc.end_date != cf.end_date) or (inc.fiscal_period != cf.fiscal_period):
@@ -373,12 +371,17 @@ class FundamentalDataValidatorV2:
         warnings = []
 
         try:
-            if not (bs and hasattr(bs, 'assets') and hasattr(bs, 'liabilities') and hasattr(bs, 'equity')):
+            if not (
+                bs
+                and hasattr(bs, "assets")
+                and hasattr(bs, "liabilities")
+                and hasattr(bs, "equity")
+            ):
                 return errors, warnings
 
-            assets_val = getattr(bs.assets, 'value', None) if bs.assets else None
-            liabilities_val = getattr(bs.liabilities, 'value', None) if bs.liabilities else None
-            equity_val = getattr(bs.equity, 'value', None) if bs.equity else None
+            assets_val = getattr(bs.assets, "value", None) if bs.assets else None
+            liabilities_val = getattr(bs.liabilities, "value", None) if bs.liabilities else None
+            equity_val = getattr(bs.equity, "value", None) if bs.equity else None
 
             if not all(v is not None for v in [assets_val, liabilities_val, equity_val]):
                 return errors, warnings
@@ -405,16 +408,19 @@ class FundamentalDataValidatorV2:
         warnings = []
 
         try:
-            if not (cf and hasattr(cf, 'net_cash_flow_from_operating_activities') and
-                    hasattr(cf, 'net_cash_flow_from_investing_activities') and
-                    hasattr(cf, 'net_cash_flow_from_financing_activities') and
-                    hasattr(cf, 'net_cash_flow')):
+            if not (
+                cf
+                and hasattr(cf, "net_cash_flow_from_operating_activities")
+                and hasattr(cf, "net_cash_flow_from_investing_activities")
+                and hasattr(cf, "net_cash_flow_from_financing_activities")
+                and hasattr(cf, "net_cash_flow")
+            ):
                 return errors, warnings
 
-            op_val = getattr(cf.net_cash_flow_from_operating_activities, 'value', None)
-            inv_val = getattr(cf.net_cash_flow_from_investing_activities, 'value', None)
-            fin_val = getattr(cf.net_cash_flow_from_financing_activities, 'value', None)
-            net_val = getattr(cf.net_cash_flow, 'value', None)
+            op_val = getattr(cf.net_cash_flow_from_operating_activities, "value", None)
+            inv_val = getattr(cf.net_cash_flow_from_investing_activities, "value", None)
+            fin_val = getattr(cf.net_cash_flow_from_financing_activities, "value", None)
+            net_val = getattr(cf.net_cash_flow, "value", None)
 
             if not all(v is not None for v in [op_val, inv_val, fin_val, net_val]):
                 return errors, warnings

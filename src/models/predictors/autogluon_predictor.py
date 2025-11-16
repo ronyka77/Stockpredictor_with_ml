@@ -26,7 +26,7 @@ class AutoGluonPredictor(BasePredictor):
             try:
                 self.model = AutoGluonModel()
                 self.model.load_from_dir(self.model_dir)
-                logger.info(f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
+                logger.info(f"AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
                 return
             except Exception as e:
                 logger.warning(
@@ -47,7 +47,7 @@ class AutoGluonPredictor(BasePredictor):
                 self.optimal_threshold = threshold
                 self.model.selected_model_name = model_name
                 logger.info(
-                    f"✅ AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
+                    f"AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
                 )
             except Exception as e:
                 logger.warning(

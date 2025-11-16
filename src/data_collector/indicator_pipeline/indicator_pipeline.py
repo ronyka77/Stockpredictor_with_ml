@@ -542,7 +542,9 @@ class BatchFeatureProcessor:
             logger.error(f"Error in batch processing: {str(e)}")
             raise
 
-    def chunk_tickers(self, tickers: List[str], chunk_size: int) -> Generator[List[str], None, None]:
+    def chunk_tickers(
+        self, tickers: List[str], chunk_size: int
+    ) -> Generator[List[str], None, None]:
         """
         Split a list of tickers into chunks for memory-efficient processing
 
@@ -554,13 +556,10 @@ class BatchFeatureProcessor:
             Chunks of ticker symbols
         """
         for i in range(0, len(tickers), chunk_size):
-            yield tickers[i:i + chunk_size]
+            yield tickers[i : i + chunk_size]
 
     def process_in_chunks(
-        self,
-        tickers: List[str],
-        config: BatchJobConfig,
-        chunk_size: int = 50
+        self, tickers: List[str], config: BatchJobConfig, chunk_size: int = 50
     ) -> Dict[str, Any]:
         """
         Process tickers in memory-efficient chunks instead of all at once
@@ -580,12 +579,16 @@ class BatchFeatureProcessor:
         all_results = []
         all_failed_tickers = []
 
-        logger.info(f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})")
+        logger.info(
+            f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})"
+        )
 
         chunk_count = 0
         for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
             chunk_count += 1
-            logger.info(f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)")
+            logger.info(
+                f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)"
+            )
 
             # Process chunk
             chunk_result = self.process_batch(ticker_chunk, config)
@@ -595,12 +598,16 @@ class BatchFeatureProcessor:
             all_failed_tickers.extend(chunk_result.get("failed_tickers", []))
 
             # Log chunk summary
-            logger.info(f"Chunk {chunk_count} complete: {chunk_result['successful']}/{len(ticker_chunk)} successful")
+            logger.info(
+                f"Chunk {chunk_count} complete: {chunk_result['successful']}/{len(ticker_chunk)} successful"
+            )
 
         # Create final aggregated summary
         total_successful = sum(1 for result in all_results if result["success"])
         total_failed = len(all_results) - total_successful
-        total_features = sum(result.get("features_calculated", 0) for result in all_results if result["success"])
+        total_features = sum(
+            result.get("features_calculated", 0) for result in all_results if result["success"]
+        )
 
         final_summary = {
             "total_tickers": len(tickers),
@@ -614,7 +621,9 @@ class BatchFeatureProcessor:
             "chunk_size": chunk_size,
         }
 
-        logger.info(f"All chunks processed. Final results: {total_successful}/{len(tickers)} successful")
+        logger.info(
+            f"All chunks processed. Final results: {total_successful}/{len(tickers)} successful"
+        )
         return final_summary
 
     def process_with_callback(
@@ -623,7 +632,7 @@ class BatchFeatureProcessor:
         config: BatchJobConfig,
         callback: Any,
         chunk_size: int = 100,
-        **callback_kwargs: Any
+        **callback_kwargs: Any,
     ) -> int:
         """
         Process tickers in chunks and call a callback function for each chunk
@@ -734,7 +743,7 @@ def run_production_batch():
     processor = BatchFeatureProcessor()
 
     try:
-        logger.info("📊 Getting all available tickers...")
+        logger.info("Getting all available tickers...")
         all_tickers = processor.get_available_tickers(
             min_data_points=job_config.min_data_points, market="stocks"
         )
@@ -749,20 +758,20 @@ def run_production_batch():
 
         # log results
         logger.info("🎉 Batch Processing Completed!")
-        logger.info(f"   Total tickers: {results['total_tickers']}")
-        logger.info(f"   Successful: {results['successful']}")
-        logger.info(f"   Failed: {results['failed']}")
-        logger.info(f"   Success rate: {results['success_rate']:.1f}%")
-        logger.info(f"   Total features: {results['total_features']:,}")
-        logger.info(f"   Processing time: {processing_time:.1f} seconds")
+        logger.info(f"Total tickers: {results['total_tickers']}")
+        logger.info(f"Successful: {results['successful']}")
+        logger.info(f"Failed: {results['failed']}")
+        logger.info(f"Success rate: {results['success_rate']:.1f}%")
+        logger.info(f"Total features: {results['total_features']:,}")
+        logger.info(f"Processing time: {processing_time:.1f} seconds")
 
         # Check storage stats
 
         stats = storage.get_storage_stats()
         logger.info("📁 Storage Statistics:")
-        logger.info(f"   Total tickers stored: {stats['total_tickers']}")
-        logger.info(f"   Total storage size: {stats['total_size_mb']:.2f} MB")
-        logger.info(f"   Storage path: {stats['base_path']}")
+        logger.info(f"Total tickers stored: {stats['total_tickers']}")
+        logger.info(f"Total storage size: {stats['total_size_mb']:.2f} MB")
+        logger.info(f"Storage path: {stats['base_path']}")
 
         # Show failed tickers if any
         if results["failed"] > 0:
@@ -782,29 +791,29 @@ def run_production_batch():
                 consolidation_time = time.time() - consolidation_start
 
                 logger.info(
-                    f"✅ Date-based consolidation completed in {consolidation_time:.2f} seconds"
+                    f"Date-based consolidation completed in {consolidation_time:.2f} seconds"
                 )
-                logger.info(f"   Date-partitioned files: {consolidation_result['files_created']}")
-                logger.info(f"   Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
+                logger.info(f"Date-partitioned files: {consolidation_result['files_created']}")
+                logger.info(f"Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
 
                 # Show date breakdown
                 logger.info("📁 Date-based Files:")
                 for file_info in consolidation_result["files"]:
                     date_label = file_info.get("date", file_info.get("year"))
                     logger.info(
-                        f"   {file_info['file']}: {file_info['rows']:,} rows, Date: {date_label}"
+                        f"{file_info['file']}: {file_info['rows']:,} rows, Date: {date_label}"
                     )
 
                 results["consolidation"] = consolidation_result
 
             except Exception as e:
-                logger.error(f"⚠️  Consolidation failed: {str(e)}")
+                logger.error(f" Consolidation failed: {str(e)}")
                 results["consolidation_error"] = str(e)
 
         return results
 
     except Exception as e:
-        logger.error(f"❌ Error in production batch: {e}", exc_info=True)
+        logger.error(f"Error in production batch: {e}", exc_info=True)
         return None
     finally:
         processor.close()

@@ -54,7 +54,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
     """
     try:
         # 1) Prepare data
-        logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
+        logger.info(f"Preparing test data with prediction_horizon={prediction_horizon}")
         label_name = f"Future_Return_{prediction_horizon}D"
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()

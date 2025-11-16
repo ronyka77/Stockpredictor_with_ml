@@ -7,11 +7,34 @@ and used across all modules in the project.
 import logging
 import atexit
 import sys
+import os
 from pathlib import Path
 from typing import Optional, Dict
 from datetime import datetime
 
 from loguru import logger as _loguru_logger
+
+# Run identifier for this process: combines process id and import-time timestamp.
+# Using a module-level RUN_ID ensures each process run produces at most one
+# log file per utility (the sink registry `_file_sink_ids` already prevents
+# adding the same utility twice in one process).
+RUN_ID = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}"
+
+
+def _ascii_patch(record: dict) -> None:
+    """Mutate the record to ensure the message is ASCII-only before sinks write it.
+
+    This will replace non-ASCII characters with the standard replacement char,
+    preventing encoding issues in environments that require ASCII-only logs.
+    """
+    try:
+        original = record.get("message", "")
+        text = str(original)
+        record["message"] = text.encode("ascii", errors="replace").decode("ascii")
+    except Exception:
+        # Fallback: ensure there's at least a string message.
+        record["message"] = str(record.get("message", ""))
+
 
 # Base logs directory - point to central logs folder at project root
 LOGS_BASE_DIR = Path(__file__).parent.parent.parent / "logs"
@@ -32,8 +55,14 @@ class InterceptHandler(logging.Handler):
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
+        # Ensure ASCII-safe message to avoid encoding issues in downstream sinks.
+        try:
+            message = record.getMessage()
+            message = str(message).encode("ascii", errors="replace").decode("ascii")
+        except Exception:
+            message = str(record.getMessage())
 
-        _loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        _loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, message)
 
 
 def _ensure_utility_dir(utility: str) -> Path:
@@ -63,8 +92,6 @@ def get_logger(name: str, utility: Optional[str] = None):
             utility = "feature_engineering"
         elif "mlp" in lower_name:
             utility = "mlp"
-        elif "lstm" in lower_name:
-            utility = "lstm"
         elif "lightgbm" in lower_name:
             utility = "lightgbm"
         elif "xgboost" in lower_name:
@@ -74,14 +101,8 @@ def get_logger(name: str, utility: Optional[str] = None):
         else:
             utility = "general"
 
-    # Ensure utility directory exists
-    util_dir = _ensure_utility_dir(utility)
-
     # Lazily initialize global sinks on first get_logger call
     _initialize_sinks_once()
-
-    # Ensure a file sink exists for this utility (one per process run)
-    _ensure_file_sink_for_utility(utility, util_dir)
 
     # Return a bound logger with metadata similar to previous behavior
     return _loguru_logger.bind(name=name, utility=utility)
@@ -92,15 +113,6 @@ def init_logging_structure():
     utilities = ["polygon", "predictor", "data_collector", "feature_engineering", "general"]
     for u in utilities:
         _ensure_utility_dir(u)
-
-
-# Initialize on import
-init_logging_structure()
-
-# --- New: sink management for enqueue and shutdown ---
-_sinks_initialized = False
-_console_sink_id: Optional[int] = None
-_file_sink_ids: Dict[str, int] = {}
 
 
 def _initialize_sinks_once() -> None:
@@ -131,9 +143,9 @@ def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
     global _file_sink_ids
     if utility in _file_sink_ids:
         return
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = util_dir / f"{utility}_{timestamp}.log"
+    # Use a deterministic run identifier (timestamp + pid) created on module import
+    # so each process run produces at most one file per utility.
+    log_file = util_dir / f"{utility}_{RUN_ID}.log"
 
     file_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
     sink_id = _loguru_logger.add(
@@ -182,13 +194,34 @@ def shutdown_logging() -> None:
     _sinks_initialized = False
 
 
+# Initialize on import
+init_logging_structure()
+
+# --- New: sink management for enqueue and shutdown ---
+_sinks_initialized = False
+_console_sink_id: Optional[int] = None
+_file_sink_ids: Dict[str, int] = {}
+
 # Register shutdown to flush sinks on graceful exit
 atexit.register(shutdown_logging)
 
 
 if __name__ == "__main__":
     logger = get_logger(__name__)
-    logger.info("Testing Loguru-based logging system")
-    logger.debug("Debug message")
-    logger.warning("Warning message")
-    logger.error("Error message")
+    logger.info("Removing log files under 2KB in 'logs' folder.")
+
+    logs_root = LOGS_BASE_DIR
+    num_removed = 0
+    for dirpath, _, filenames in os.walk(logs_root):
+        for fname in filenames:
+            file_path = os.path.join(dirpath, fname)
+            try:
+                if os.path.isfile(file_path):
+                    size = os.path.getsize(file_path)
+                    if size < 8096:
+                        os.remove(file_path)
+                        logger.info(f"Removed log file: {file_path} ({size} bytes)")
+                        num_removed += 1
+            except Exception as e:
+                logger.error(f"Failed to remove {file_path}: {e}")
+    logger.info(f"Completed cleanup. Removed {num_removed} files under 2KB.")

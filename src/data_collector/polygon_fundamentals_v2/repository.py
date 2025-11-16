@@ -213,7 +213,7 @@ class FundamentalsRepository:
             ORDER BY r.ingested_at DESC
         """
         rows = fetch_all(sql)
-        logger.info(f"📊 Found {len(rows)} pending raw fundamental records to process")
+        logger.info(f"Found {len(rows)} pending raw fundamental records to process")
         return rows
 
     def upsert_raw_payload(

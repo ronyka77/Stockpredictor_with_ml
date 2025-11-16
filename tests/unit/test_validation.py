@@ -18,7 +18,7 @@ from src.utils.validation import (
     PATH_TRAVERSAL_REGEX,
     MAX_STRING_LENGTH,
     MAX_LIST_LENGTH,
-    MAX_DICT_KEYS
+    MAX_DICT_KEYS,
 )
 
 
@@ -34,7 +34,9 @@ class TestSecurityValidationError:
 
     def test_security_threat_error(self):
         """Test error creation with security threat flag"""
-        error = SecurityValidationError("SQL injection detected", field="input", security_threat=True)
+        error = SecurityValidationError(
+            "SQL injection detected", field="input", security_threat=True
+        )
         assert error.security_threat is True
 
     def test_error_with_value(self):
@@ -49,6 +51,7 @@ class TestSecureBaseModel:
 
     def test_basic_model_creation(self):
         """Test basic model creation with valid data"""
+
         class TestModel(SecureBaseModel):
             name: str
             value: int
@@ -60,6 +63,7 @@ class TestSecureBaseModel:
 
     def test_sql_injection_detection(self):
         """Test SQL injection pattern detection"""
+
         class TestModel(SecureBaseModel):
             query: str
 
@@ -72,6 +76,7 @@ class TestSecureBaseModel:
 
     def test_xss_detection(self):
         """Test XSS pattern detection"""
+
         class TestModel(SecureBaseModel):
             content: str
 
@@ -79,7 +84,7 @@ class TestSecureBaseModel:
             "<script>alert('xss')</script>",
             "javascript:alert('xss')",
             "<img src=x onerror=alert(1)>",
-            "onclick=alert('xss')"
+            "onclick=alert('xss')",
         ]
 
         for malicious_input in malicious_inputs:
@@ -90,6 +95,7 @@ class TestSecureBaseModel:
 
     def test_path_traversal_detection(self):
         """Test path traversal pattern detection"""
+
         class TestModel(SecureBaseModel):
             filepath: str
 
@@ -97,7 +103,7 @@ class TestSecureBaseModel:
             "../../../etc/passwd",
             "..\\..\\windows\\system32",
             "~/.ssh/id_rsa",
-            "....//....//etc/shadow"
+            "....//....//etc/shadow",
         ]
 
         for malicious_input in malicious_inputs:
@@ -108,6 +114,7 @@ class TestSecureBaseModel:
 
     def test_string_length_limits(self):
         """Test string length validation"""
+
         class TestModel(SecureBaseModel):
             text: str
 
@@ -124,6 +131,7 @@ class TestSecureBaseModel:
 
     def test_list_length_limits(self):
         """Test list length validation"""
+
         class TestModel(SecureBaseModel):
             items: list
 
@@ -140,6 +148,7 @@ class TestSecureBaseModel:
 
     def test_dict_key_limits(self):
         """Test dictionary key limits"""
+
         class TestModel(SecureBaseModel):
             data: dict
 
@@ -156,6 +165,7 @@ class TestSecureBaseModel:
 
     def test_invalid_dict_keys(self):
         """Test invalid dictionary key validation"""
+
         class TestModel(SecureBaseModel):
             data: dict
 
@@ -167,23 +177,18 @@ class TestSecureBaseModel:
 
     def test_nested_structure_validation(self):
         """Test validation of nested data structures"""
+
         class TestModel(SecureBaseModel):
             data: dict
 
         # Test nested SQL injection
-        nested_data = {
-            "user": {
-                "query": "SELECT * FROM users; --"
-            }
-        }
+        nested_data = {"user": {"query": "SELECT * FROM users; --"}}
         with pytest.raises(SecurityValidationError) as exc_info:
             TestModel.validate_security({"data": nested_data})
         assert exc_info.value.security_threat is True
 
         # Test nested list with XSS
-        nested_list_data = {
-            "items": ["safe", "<script>alert('xss')</script>"]
-        }
+        nested_list_data = {"items": ["safe", "<script>alert('xss')</script>"]}
         with pytest.raises(SecurityValidationError) as exc_info:
             TestModel.validate_security({"data": nested_list_data})
         assert exc_info.value.security_threat is True
@@ -300,7 +305,7 @@ class TestSecureURL:
         valid_urls = [
             "https://example.com",
             "http://example.com/path",
-            "https://example.com:8080/path?query=value"
+            "https://example.com:8080/path?query=value",
         ]
 
         for url in valid_urls:
@@ -318,10 +323,7 @@ class TestSecureURL:
 
     def test_validate_url_suspicious_patterns(self):
         """Test suspicious URL pattern detection"""
-        suspicious_urls = [
-            "https://example.com/../../../etc/passwd",
-            "//evil.com"
-        ]
+        suspicious_urls = ["https://example.com/../../../etc/passwd", "//evil.com"]
 
         for url in suspicious_urls:
             with pytest.raises(SecurityValidationError):
@@ -428,7 +430,7 @@ class TestValidationUtils:
         valid_emails = [
             "user@example.com",
             "test.email+tag@example.co.uk",
-            "user_name@example-domain.com"
+            "user_name@example-domain.com",
         ]
 
         for email in valid_emails:
@@ -441,7 +443,7 @@ class TestValidationUtils:
             "@example.com",
             "user@",
             "user@@example.com",
-            "user name@example.com"
+            "user name@example.com",
         ]
 
         for email in invalid_emails:
@@ -456,13 +458,7 @@ class TestValidationUtils:
 
     def test_validate_ticker_symbol_valid(self):
         """Test valid ticker symbol validation"""
-        valid_tickers = [
-            "AAPL",
-            "MSFT",
-            "TSLA",
-            "A",
-            "BRK.A"
-        ]
+        valid_tickers = ["AAPL", "MSFT", "TSLA", "A", "BRK.A"]
 
         for ticker in valid_tickers:
             result = ValidationUtils.validate_ticker_symbol(ticker)
@@ -532,7 +528,7 @@ class TestValidationUtils:
         """Test empty filename after sanitization"""
         # Test filename that becomes empty after trimming whitespace
         with pytest.raises(SecurityValidationError):
-            ValidationUtils.sanitize_filename("   ")
+            ValidationUtils.sanitize_filename("")
 
     def test_sanitize_filename_too_long(self):
         """Test filename length limit"""
@@ -623,8 +619,8 @@ class TestValidationMetrics:
         assert result["validations_performed"] == 3
         assert result["security_threats_detected"] == 1
         assert result["validation_errors"] == 1
-        assert result["threat_rate"] == 1/3
-        assert result["error_rate"] == 1/3
+        assert result["threat_rate"] == 1 / 3
+        assert result["error_rate"] == 1 / 3
         assert abs(result["average_validation_time_ms"] - 200.0) < 0.001  # Average in ms
 
     def test_zero_division_protection(self):
@@ -641,6 +637,7 @@ class TestValidateInputData:
 
     def test_validate_with_schema(self):
         """Test validation with schema"""
+
         class TestModel(SecureBaseModel):
             name: str
             value: int
@@ -661,6 +658,7 @@ class TestValidateInputData:
 
     def test_validate_with_security_threat(self):
         """Test validation with security threat detection"""
+
         class TestModel(SecureBaseModel):
             query: str
 
@@ -670,9 +668,10 @@ class TestValidateInputData:
             validate_input_data(malicious_data, TestModel)
         assert exc_info.value.security_threat is True
 
-    @patch('src.utils.core.validation.validation_metrics')
+    @patch("src.utils.core.validation.validation_metrics")
     def test_metrics_recording(self, mock_metrics):
         """Test that validation metrics are recorded"""
+
         class TestModel(SecureBaseModel):
             name: str
 
@@ -683,6 +682,7 @@ class TestValidateInputData:
 
     def test_validation_error_handling(self):
         """Test validation error handling"""
+
         class TestModel(SecureBaseModel):
             name: str
             value: int
@@ -706,7 +706,7 @@ class TestRegexPatterns:
             "SELECT * FROM users; -- comment",
             "; DROP TABLE users;",
             "UNION SELECT password FROM admin",
-            "'; EXEC xp_cmdshell('dir'); --"
+            "'; EXEC xp_cmdshell('dir'); --",
         ]
 
         for injection in sql_injections:
@@ -716,7 +716,7 @@ class TestRegexPatterns:
         safe_strings = [
             "SELECT name FROM users WHERE id = 1",
             "Normal text without injection",
-            "UPDATE users SET name = 'John' WHERE id = 1"
+            "UPDATE users SET name = 'John' WHERE id = 1",
         ]
 
         for safe in safe_strings:
@@ -731,18 +731,14 @@ class TestRegexPatterns:
             "<script>alert('xss')</script>",
             "javascript:alert('xss')",
             "<iframe src='evil.com'></iframe>",
-            "onclick=alert('xss')"
+            "onclick=alert('xss')",
         ]
 
         for xss in xss_patterns:
             assert pattern.search(xss), f"Should match: {xss}"
 
         # Should not match safe strings
-        safe_strings = [
-            "Normal text",
-            "<div>safe content</div>",
-            "https://example.com"
-        ]
+        safe_strings = ["Normal text", "<div>safe content</div>", "https://example.com"]
 
         for safe in safe_strings:
             assert not pattern.search(safe), f"Should not match: {safe}"
@@ -756,18 +752,14 @@ class TestRegexPatterns:
             "../../../etc/passwd",
             "..\\..\\windows\\system32",
             "~/.ssh/id_rsa",
-            "....//....//etc/shadow"
+            "....//....//etc/shadow",
         ]
 
         for traversal in traversal_patterns:
             assert pattern.search(traversal), f"Should match: {traversal}"
 
         # Should not match safe strings
-        safe_strings = [
-            "normal/path/file.txt",
-            "C:\\Program Files\\app.exe",
-            "relative/path"
-        ]
+        safe_strings = ["normal/path/file.txt", "C:\\Program Files\\app.exe", "relative/path"]
 
         for safe in safe_strings:
             assert not pattern.search(safe), f"Should not match: {safe}"

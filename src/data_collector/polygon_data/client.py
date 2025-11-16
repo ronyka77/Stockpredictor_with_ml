@@ -14,7 +14,7 @@ from src.utils.core.retry import (
     RetryError,
     CircuitBreakerOpenError,
     RetryConfig,
-    CircuitBreaker
+    CircuitBreaker,
 )
 from src.data_collector.polygon_data.rate_limiter import get_rate_limiter
 from src.data_collector.config import config
@@ -25,6 +25,7 @@ logger = get_logger(__name__, utility="data_collector")
 # Type definitions for API responses
 class DividendRecord(TypedDict, total=False):
     """Dividend record structure from Polygon API"""
+
     cash_amount: float
     currency: str
     declaration_date: str
@@ -38,6 +39,7 @@ class DividendRecord(TypedDict, total=False):
 
 class TickerInfo(TypedDict, total=False):
     """Ticker information structure from Polygon API"""
+
     ticker: str
     name: str
     market: str
@@ -54,18 +56,20 @@ class TickerInfo(TypedDict, total=False):
 
 class OHLCVRecord(TypedDict, total=False):
     """OHLCV record structure from Polygon API"""
+
     c: float  # close
     h: float  # high
     low: float  # low
-    n: int    # transactions
+    n: int  # transactions
     o: float  # open
-    t: int    # timestamp
+    t: int  # timestamp
     v: float  # volume
-    vw: float # volume weighted average price
+    vw: float  # volume weighted average price
 
 
 class APIResponse(TypedDict, total=False):
     """Generic API response structure"""
+
     results: List[Dict[str, Any]]
     status: str
     request_id: str
@@ -88,7 +92,7 @@ class PolygonAPIError(Exception):
         message: str,
         status_code: Optional[int] = None,
         response_data: Optional[Dict[str, Any]] = None,
-        error_category: Optional[str] = None
+        error_category: Optional[str] = None,
     ) -> None:
         self.message: str = message
         self.status_code: Optional[int] = status_code
@@ -124,12 +128,7 @@ class PolygonAPIError(Exception):
             return RetryConfig(max_attempts=1)
         elif self.error_category == "retryable":
             # Use shorter delays for rate limits
-            return RetryConfig(
-                max_attempts=5,
-                base_delay=1.0,
-                max_delay=30.0,
-                backoff_factor=2.0
-            )
+            return RetryConfig(max_attempts=5, base_delay=1.0, max_delay=30.0, backoff_factor=2.0)
         else:
             # Use standard API retry config
             return API_RETRY_CONFIG
@@ -142,7 +141,7 @@ class PolygonDataClient:
         self,
         api_key: Optional[str] = None,
         requests_per_minute: int = 5,
-        circuit_breaker: Optional[CircuitBreaker] = None
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ) -> None:
         """
         Initialize the Polygon.io client with comprehensive error handling and retry mechanisms
@@ -202,7 +201,7 @@ class PolygonDataClient:
                 raise PolygonAPIError(
                     "Malformed JSON in response",
                     response.status_code,
-                    error_category="client_error"
+                    error_category="client_error",
                 )
 
             # Check for API-level errors in response
@@ -212,7 +211,7 @@ class PolygonDataClient:
                     f"API Error: {error_msg}",
                     response.status_code,
                     data,
-                    error_category="client_error"
+                    error_category="client_error",
                 )
 
             logger.debug(f"Successful request to {url}")
@@ -227,34 +226,24 @@ class PolygonDataClient:
             error_msg = "Rate limit exceeded"
             if not getattr(config, "DISABLE_RATE_LIMITING", False):
                 logger.warning(f"{error_msg} - triggering retry with backoff")
-            raise PolygonAPIError(
-                error_msg,
-                response.status_code,
-                error_category="retryable"
-            )
+            raise PolygonAPIError(error_msg, response.status_code, error_category="retryable")
 
         elif response.status_code == 401:  # Unauthorized
             raise PolygonAPIError(
-                "Invalid API key",
-                response.status_code,
-                error_category="authentication"
+                "Invalid API key", response.status_code, error_category="authentication"
             )
 
         elif response.status_code == 403:  # Forbidden
             raise PolygonAPIError(
                 "Access forbidden - check subscription level",
                 response.status_code,
-                error_category="authentication"
+                error_category="authentication",
             )
 
         elif response.status_code >= 500:  # Server errors
             error_msg = f"Server error {response.status_code}"
             logger.warning(f"{error_msg} - triggering retry")
-            raise PolygonAPIError(
-                error_msg,
-                response.status_code,
-                error_category="server_error"
-            )
+            raise PolygonAPIError(error_msg, response.status_code, error_category="server_error")
 
         else:
             # Other client errors
@@ -265,13 +254,11 @@ class PolygonDataClient:
                 logger.debug(f"Error parsing error response: {e}")
                 error_msg = f"HTTP {response.status_code}"
 
-            raise PolygonAPIError(
-                error_msg,
-                response.status_code,
-                error_category="client_error"
-            )
+            raise PolygonAPIError(error_msg, response.status_code, error_category="client_error")
 
-    def _make_request_with_retry(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _make_request_with_retry(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Make an API request with comprehensive error handling and retry mechanisms
 
@@ -307,19 +294,21 @@ class PolygonDataClient:
             raise PolygonAPIError(
                 f"Request to {endpoint} failed after {e.attempts} attempts. "
                 f"Last error: {e.last_exception}",
-                error_category="network"
+                error_category="network",
             ) from e
         except CircuitBreakerOpenError as e:
             # Circuit breaker is open - service is failing
             raise PolygonAPIError(
                 f"Circuit breaker is open for {endpoint} - service temporarily unavailable",
-                error_category="server_error"
+                error_category="server_error",
             ) from e
 
     # Alias for backward compatibility
     _make_request = _make_request_with_retry
 
-    def _fetch_paginated_data(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def _fetch_paginated_data(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Fetch all data from a paginated endpoint
 
@@ -380,10 +369,7 @@ class PolygonDataClient:
         return all_results
 
     def _fetch_paginated_data_stream(
-        self,
-        endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        chunk_size: int = 1000
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None, chunk_size: int = 1000
     ) -> Generator[List[Dict[str, Any]], None, None]:
         """
         Fetch data from a paginated endpoint as a streaming generator
@@ -445,9 +431,7 @@ class PolygonDataClient:
 
             # Check for next page
             if "next_url" not in response or not response["next_url"]:
-                logger.debug(
-                    f"Pagination complete. Total pages: {page_count}"
-                )
+                logger.debug(f"Pagination complete. Total pages: {page_count}")
                 break
 
             next_url = response["next_url"]
@@ -457,11 +441,7 @@ class PolygonDataClient:
             yield current_chunk
 
     def get_dividends(
-        self,
-        ticker: str,
-        order: str = "desc",
-        limit: int = 1000,
-        sort: str = "ex_dividend_date"
+        self, ticker: str, order: str = "desc", limit: int = 1000, sort: str = "ex_dividend_date"
     ) -> List[Union[DividendRecord, Dict[str, Any]]]:
         """
         Get dividends for a single ticker. Polygon's dividends endpoint only supports
@@ -479,15 +459,19 @@ class PolygonDataClient:
         if not ticker:
             raise ValueError("ticker is required for get_dividends")
 
-        params: Dict[str, Any] = {"ticker": ticker, "order": order, "limit": min(limit, 1000), "sort": sort}
-        return cast(List[Union[DividendRecord, Dict[str, Any]]], self._fetch_paginated_data("/v3/reference/dividends", params))
+        params: Dict[str, Any] = {
+            "ticker": ticker,
+            "order": order,
+            "limit": min(limit, 1000),
+            "sort": sort,
+        }
+        return cast(
+            List[Union[DividendRecord, Dict[str, Any]]],
+            self._fetch_paginated_data("/v3/reference/dividends", params),
+        )
 
     def get_tickers(
-        self,
-        market: str = "stocks",
-        active: bool = True,
-        limit: int = 1000,
-        **kwargs: Any
+        self, market: str = "stocks", active: bool = True, limit: int = 1000, **kwargs: Any
     ) -> List[Union[TickerInfo, Dict[str, Any]]]:
         """
         Get list of tickers from Polygon.io
@@ -510,7 +494,10 @@ class PolygonDataClient:
         }
 
         logger.info(f"Fetching {market} tickers (active={active})")
-        return cast(List[Union[TickerInfo, Dict[str, Any]]], self._fetch_paginated_data("/v3/reference/tickers", params))
+        return cast(
+            List[Union[TickerInfo, Dict[str, Any]]],
+            self._fetch_paginated_data("/v3/reference/tickers", params),
+        )
 
     def get_aggregates(
         self,
@@ -535,7 +522,9 @@ class PolygonDataClient:
         Returns:
             List of OHLCV records
         """
-        endpoint: str = f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from_date}/{to_date}"
+        endpoint: str = (
+            f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from_date}/{to_date}"
+        )
 
         params: Dict[str, Any] = {"adjusted": "true", "sort": "asc", "limit": min(limit, 50000)}
 
@@ -578,7 +567,7 @@ class PolygonDataClient:
         order: str = "desc",
         limit: int = 1000,
         chunk_size: int = 1000,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Generator[List[Union[DividendRecord, Dict[str, Any]]], None, None]:
         """
         Get dividend data for a ticker as a streaming generator
@@ -599,11 +588,18 @@ class PolygonDataClient:
         if not ticker:
             raise ValueError("ticker is required for get_dividends_stream")
 
-        params: Dict[str, Any] = {"ticker": ticker, "order": order, "limit": min(limit, 1000), **kwargs}
+        params: Dict[str, Any] = {
+            "ticker": ticker,
+            "order": order,
+            "limit": min(limit, 1000),
+            **kwargs,
+        }
 
         logger.info(f"Streaming dividends for {ticker} (order={order})")
 
-        for chunk in self._fetch_paginated_data_stream("/v3/reference/dividends", params, chunk_size):
+        for chunk in self._fetch_paginated_data_stream(
+            "/v3/reference/dividends", params, chunk_size
+        ):
             yield cast(List[Union[DividendRecord, Dict[str, Any]]], chunk)
 
     def get_tickers_stream(
@@ -612,7 +608,7 @@ class PolygonDataClient:
         active: bool = True,
         limit: int = 1000,
         chunk_size: int = 1000,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Generator[List[Union[TickerInfo, Dict[str, Any]]], None, None]:
         """
         Get list of tickers as a streaming generator
@@ -647,7 +643,7 @@ class PolygonDataClient:
         self,
         stream_generator: Generator[List[Dict[str, Any]], None, None],
         callback: Any,
-        **callback_kwargs: Any
+        **callback_kwargs: Any,
     ) -> int:
         """
         Process a streaming data generator with a callback function

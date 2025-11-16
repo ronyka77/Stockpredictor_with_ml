@@ -356,7 +356,7 @@ class RandomForestModel(BaseModel):
         ).sort_values("importance", ascending=False)
         logger.info("Top 10 features from preliminary model (by importance):")
         for _, row in importance_df.head(10).iterrows():
-            logger.info(f"  - {row['feature']}: {row['importance']:.2f}")
+            logger.info(f"- {row['feature']}: {row['importance']:.2f}")
         selected_features = list(importance_df["feature"].head(n_features_to_select))
         required_columns = ["close", "ticker_id"]
         for column in required_columns:
@@ -366,7 +366,7 @@ class RandomForestModel(BaseModel):
                 )
                 removed_feature = selected_features.pop()
                 selected_features.append(column)
-                logger.info(f"   Removed '{removed_feature}' to make space for '{column}'.")
+                logger.info(f"Removed '{removed_feature}' to make space for '{column}'.")
         logger.info(f"Feature selection complete. Selected {len(selected_features)} features.")
         return selected_features
 
@@ -490,7 +490,7 @@ class RandomForestModel(BaseModel):
         self.feature_names = trial_model.feature_names
         logger.info(f"NEW BEST TRIAL {trial_number}: Score = {metric:.4f}")
         if threshold_results and threshold_results.get("status") == "success":
-            logger.info(f"   Optimal threshold: {threshold_results['optimal_threshold']}")
+            logger.info(f"Optimal threshold: {threshold_results['optimal_threshold']}")
 
     @staticmethod
     def load_and_prepare_data(
@@ -528,7 +528,7 @@ class RandomForestModel(BaseModel):
 
 def main():
     logger.info("=" * 80)
-    logger.info("🎯 STANDALONE RANDOM FOREST HYPERTUNING & EVALUATION")
+    logger.info("STANDALONE RANDOM FOREST HYPERTUNING & EVALUATION")
     logger.info("=" * 80)
 
     # 1. Data loading

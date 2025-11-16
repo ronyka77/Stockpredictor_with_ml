@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 class ReportFormat(Enum):
     """Supported export formats for evaluation reports."""
+
     JSON = "json"
     MARKDOWN = "markdown"
     HTML = "html"
@@ -34,6 +35,7 @@ class ReportFormat(Enum):
 
 class FindingSeverity(Enum):
     """Severity levels for evaluation findings."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -49,6 +51,7 @@ class EvaluationFinding:
     This data model captures detailed information about specific issues,
     problems, or observations identified during evaluation.
     """
+
     severity: str  # 'critical', 'high', 'medium', 'low', 'info'
     category: str  # 'architecture', 'quality', 'performance', 'reliability', 'security'
     file_path: str  # relative path to the file with the issue
@@ -63,12 +66,16 @@ class EvaluationFinding:
     def __post_init__(self):
         """Validate severity and category values."""
         if self.severity not in [s.value for s in FindingSeverity]:
-            raise ValueError(f"Invalid severity '{self.severity}'. Must be one of: "
-                           f"{[s.value for s in FindingSeverity]}")
+            raise ValueError(
+                f"Invalid severity '{self.severity}'. Must be one of: "
+                f"{[s.value for s in FindingSeverity]}"
+            )
 
-        valid_categories = ['architecture', 'quality', 'performance', 'reliability', 'security']
+        valid_categories = ["architecture", "quality", "performance", "reliability", "security"]
         if self.category not in valid_categories:
-            raise ValueError(f"Invalid category '{self.category}'. Must be one of: {valid_categories}")
+            raise ValueError(
+                f"Invalid category '{self.category}'. Must be one of: {valid_categories}"
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert finding to dictionary for serialization."""
@@ -83,6 +90,7 @@ class EvaluationReport:
     This data model aggregates all evaluation results into a structured,
     serializable format that can be exported in multiple formats.
     """
+
     evaluation_id: str  # unique identifier for this evaluation
     timestamp: datetime  # when evaluation was run
     target_module: str  # which data collector was evaluated
@@ -104,29 +112,29 @@ class EvaluationReport:
 
         for component, score in self.component_scores.items():
             if score is not None and not 0 <= score <= 100:
-                raise ValueError(f"Component score for {component} must be between 0-100, got {score}")
+                raise ValueError(
+                    f"Component score for {component} must be between 0-100, got {score}"
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert report to dictionary for serialization."""
         data = asdict(self)
         # Convert datetime to ISO format string
-        data['timestamp'] = self.timestamp.isoformat()
+        data["timestamp"] = self.timestamp.isoformat()
         # Convert findings to dictionaries
-        data['findings'] = [finding.to_dict() for finding in self.findings]
+        data["findings"] = [finding.to_dict() for finding in self.findings]
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EvaluationReport':
+    def from_dict(cls, data: Dict[str, Any]) -> "EvaluationReport":
         """Create report from dictionary (deserialization)."""
         # Convert timestamp back to datetime
-        if 'timestamp' in data:
-            data['timestamp'] = datetime.fromisoformat(data['timestamp'])
+        if "timestamp" in data:
+            data["timestamp"] = datetime.fromisoformat(data["timestamp"])
 
         # Convert findings back to EvaluationFinding objects
-        if 'findings' in data:
-            data['findings'] = [
-                EvaluationFinding(**finding) for finding in data['findings']
-            ]
+        if "findings" in data:
+            data["findings"] = [EvaluationFinding(**finding) for finding in data["findings"]]
 
         return cls(**data)
 
@@ -144,9 +152,9 @@ class EvaluationReportGenerator:
         """Initialize the report generator."""
         self.logger = logger
 
-    def create_report(self,
-                     evaluation_results: Dict[str, Any],
-                     target_module: str = "data_collectors") -> EvaluationReport:
+    def create_report(
+        self, evaluation_results: Dict[str, Any], target_module: str = "data_collectors"
+    ) -> EvaluationReport:
         """
         Create a comprehensive evaluation report from raw evaluation results.
 
@@ -165,29 +173,32 @@ class EvaluationReportGenerator:
         all_findings = []
         all_recommendations = []
 
-        component_results = evaluation_results.get('component_results', {})
+        component_results = evaluation_results.get("component_results", {})
 
         for component_name, result in component_results.items():
-            component_scores[component_name] = result.get('score')
+            component_scores[component_name] = result.get("score")
 
             # Collect findings
-            for finding in result.get('findings', []):
+            for finding in result.get("findings", []):
                 finding_obj = EvaluationFinding(
-                    severity=finding.get('severity', 'info'),
-                    category=component_name.replace('_assessment', '').replace('_evaluation', '').replace('_review', '').replace('_testing', ''),
-                    file_path=finding.get('file_path', ''),
-                    line_number=finding.get('line_number'),
-                    description=finding.get('description', finding.get('message', '')),
-                    code_sample=finding.get('code_sample'),
-                    recommendation=finding.get('recommendation', ''),
-                    reference=finding.get('reference'),
+                    severity=finding.get("severity", "info"),
+                    category=component_name.replace("_assessment", "")
+                    .replace("_evaluation", "")
+                    .replace("_review", "")
+                    .replace("_testing", ""),
+                    file_path=finding.get("file_path", ""),
+                    line_number=finding.get("line_number"),
+                    description=finding.get("description", finding.get("message", "")),
+                    code_sample=finding.get("code_sample"),
+                    recommendation=finding.get("recommendation", ""),
+                    reference=finding.get("reference"),
                     component=component_name,
-                    metadata=finding.get('metadata', {})
+                    metadata=finding.get("metadata", {}),
                 )
                 all_findings.append(finding_obj)
 
             # Collect recommendations
-            all_recommendations.extend(result.get('recommendations', []))
+            all_recommendations.extend(result.get("recommendations", []))
 
         # Calculate overall score
         valid_scores = [score for score in component_scores.values() if score is not None]
@@ -203,21 +214,25 @@ class EvaluationReportGenerator:
             findings=all_findings,
             recommendations=list(set(all_recommendations)),  # Remove duplicates
             metadata={
-                'generator_version': '1.0.0',
-                'evaluation_framework': 'data-collector-evaluation'
+                "generator_version": "1.0.0",
+                "evaluation_framework": "data-collector-evaluation",
             },
-            evaluation_metadata=evaluation_results.get('evaluation_metadata', {}),
-            overall_statistics=evaluation_results.get('overall_statistics', {}),
-            component_results=component_results
+            evaluation_metadata=evaluation_results.get("evaluation_metadata", {}),
+            overall_statistics=evaluation_results.get("overall_statistics", {}),
+            component_results=component_results,
         )
 
-        self.logger.info(f"Created evaluation report {evaluation_id} with {len(all_findings)} findings")
+        self.logger.info(
+            f"Created evaluation report {evaluation_id} with {len(all_findings)} findings"
+        )
         return report
 
-    def export_report(self,
-                     report: EvaluationReport,
-                     format_type: Union[str, ReportFormat],
-                     output_path: Union[str, Path]) -> str:
+    def export_report(
+        self,
+        report: EvaluationReport,
+        format_type: Union[str, ReportFormat],
+        output_path: Union[str, Path],
+    ) -> str:
         """
         Export evaluation report to specified format and path.
 
@@ -252,7 +267,7 @@ class EvaluationReportGenerator:
             raise ValueError(f"Unsupported format: {format_type}")
 
         # Write to file
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         self.logger.info(f"Exported report to {output_path} in {format_type.value} format")
@@ -308,16 +323,20 @@ class EvaluationReportGenerator:
                     findings_by_severity[severity] = []
                 findings_by_severity[severity].append(finding)
 
-            for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+            for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]:
                 if severity in findings_by_severity:
                     lines.append(f"### {severity} Severity ({len(findings_by_severity[severity])})")
                     for finding in findings_by_severity[severity][:10]:  # Limit per severity
                         lines.append(f"- **{finding.category.upper()}:** {finding.description}")
                         if finding.file_path:
-                            location = f"{finding.file_path}:{finding.line_number}" if finding.line_number else finding.file_path
-                            lines.append(f"  - *Location:* {location}")
+                            location = (
+                                f"{finding.file_path}:{finding.line_number}"
+                                if finding.line_number
+                                else finding.file_path
+                            )
+                            lines.append(f"- *Location:* {location}")
                         if finding.recommendation:
-                            lines.append(f"  - *Recommendation:* {finding.recommendation}")
+                            lines.append(f"- *Recommendation:* {finding.recommendation}")
                     lines.append("")
 
         # Recommendations
@@ -335,7 +354,7 @@ class EvaluationReportGenerator:
         """Generate HTML formatted report."""
         # Generate markdown first, then convert to HTML
         markdown_content = self._generate_markdown_report(report)
-        html_content = markdown.markdown(markdown_content, extensions=['tables', 'codehilite'])
+        html_content = markdown.markdown(markdown_content, extensions=["tables", "codehilite"])
 
         # Wrap in basic HTML template
         html_template = f"""
@@ -432,7 +451,7 @@ class EvaluationReportGenerator:
             lines.append("-" * 20)
             for component, score in report.component_scores.items():
                 if score is not None:
-                    lines.append(f"  {component.replace('_', ' ').title()}: {score:.1f}/100")
+                    lines.append(f"{component.replace('_', ' ').title()}: {score:.1f}/100")
             lines.append("")
 
         # Statistics
@@ -440,11 +459,11 @@ class EvaluationReportGenerator:
             lines.append("STATISTICS")
             lines.append("-" * 10)
             stats = report.overall_statistics
-            lines.append(f"  Components Evaluated: {stats.get('total_components', 0)}")
-            lines.append(f"  Completed: {stats.get('completed_components', 0)}")
-            lines.append(f"  Failed: {stats.get('failed_components', 0)}")
-            lines.append(f"  Total Findings: {stats.get('total_findings', 0)}")
-            lines.append(f"  Total Recommendations: {stats.get('total_recommendations', 0)}")
+            lines.append(f"Components Evaluated: {stats.get('total_components', 0)}")
+            lines.append(f"Completed: {stats.get('completed_components', 0)}")
+            lines.append(f"Failed: {stats.get('failed_components', 0)}")
+            lines.append(f"Total Findings: {stats.get('total_findings', 0)}")
+            lines.append(f"Total Recommendations: {stats.get('total_recommendations', 0)}")
             lines.append("")
 
         # Findings Summary
@@ -456,9 +475,9 @@ class EvaluationReportGenerator:
                 severity = finding.severity.upper()
                 severity_counts[severity] = severity_counts.get(severity, 0) + 1
 
-            for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+            for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]:
                 if severity in severity_counts:
-                    lines.append(f"  {severity}: {severity_counts[severity]}")
+                    lines.append(f"{severity}: {severity_counts[severity]}")
             lines.append("")
 
         # Top Recommendations
@@ -466,17 +485,18 @@ class EvaluationReportGenerator:
             lines.append("TOP RECOMMENDATIONS")
             lines.append("-" * 20)
             for i, rec in enumerate(report.recommendations[:10], 1):
-                lines.append(f"  {i}. {rec}")
+                lines.append(f"{i}. {rec}")
             if len(report.recommendations) > 10:
-                lines.append(f"  ... and {len(report.recommendations) - 10} more recommendations")
+                lines.append(f"... and {len(report.recommendations) - 10} more recommendations")
             lines.append("")
 
         lines.append("=" * 60)
         return "\n".join(lines)
 
 
-def create_evaluation_report(evaluation_results: Dict[str, Any],
-                           target_module: str = "data_collectors") -> EvaluationReport:
+def create_evaluation_report(
+    evaluation_results: Dict[str, Any], target_module: str = "data_collectors"
+) -> EvaluationReport:
     """
     Convenience function to create an evaluation report.
 
@@ -491,9 +511,9 @@ def create_evaluation_report(evaluation_results: Dict[str, Any],
     return generator.create_report(evaluation_results, target_module)
 
 
-def export_evaluation_report(report: EvaluationReport,
-                           format_type: Union[str, ReportFormat],
-                           output_path: Union[str, Path]) -> str:
+def export_evaluation_report(
+    report: EvaluationReport, format_type: Union[str, ReportFormat], output_path: Union[str, Path]
+) -> str:
     """
     Convenience function to export an evaluation report.
 

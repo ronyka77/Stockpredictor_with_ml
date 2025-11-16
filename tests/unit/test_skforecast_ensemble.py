@@ -16,7 +16,9 @@ def test_ensemble_smoke_train_predict():
     y_train = y.iloc[:split]
 
     forecaster = EnsembleForecaster(
-        lags=lags, steps=steps, base_regressors=["ridge", "ridge"]  # Back to ridge
+        lags=lags,
+        steps=steps,
+        base_regressors=["ridge", "ridge"],  # Back to ridge
     )
     forecaster.fit(y_train, validation=None, save_artifacts=False)
 

@@ -24,7 +24,7 @@ from src.utils.core.retry import (
     DATABASE_RETRY_CONFIG,
     API_RETRY_CONFIG,
     CircuitBreaker,
-    CircuitBreakerConfig
+    CircuitBreakerConfig,
 )
 from src.database.connection import get_global_pool, fetch_all, fetch_one, execute
 
@@ -94,16 +94,12 @@ class OptimizedFundamentalCollector:
         self.rate_limiter = FundamentalRateLimiter()
 
         # Initialize circuit breakers for fault tolerance
-        self.api_circuit_breaker = CircuitBreaker(CircuitBreakerConfig(
-            failure_threshold=5,
-            success_threshold=2,
-            timeout=60.0
-        ))
-        self.db_circuit_breaker = CircuitBreaker(CircuitBreakerConfig(
-            failure_threshold=3,
-            success_threshold=1,
-            timeout=30.0
-        ))
+        self.api_circuit_breaker = CircuitBreaker(
+            CircuitBreakerConfig(failure_threshold=5, success_threshold=2, timeout=60.0)
+        )
+        self.db_circuit_breaker = CircuitBreaker(
+            CircuitBreakerConfig(failure_threshold=3, success_threshold=1, timeout=30.0)
+        )
 
         # Statistics
         self.stats: Dict[str, Any] = {
@@ -286,9 +282,7 @@ class OptimizedFundamentalCollector:
                     success_count += 1
 
             if success_count > 0:
-                logger.info(
-                    f"Successfully stored {success_count} statement periods for {ticker}"
-                )
+                logger.info(f"Successfully stored {success_count} statement periods for {ticker}")
                 self.stats["successful"] += 1
                 return True
             else:
@@ -301,7 +295,9 @@ class OptimizedFundamentalCollector:
             self.stats["failed"] += 1
             return False
 
-    @async_retry(config=API_RETRY_CONFIG, circuit_breaker=None)  # Circuit breaker handled at higher level
+    @async_retry(
+        config=API_RETRY_CONFIG, circuit_breaker=None
+    )  # Circuit breaker handled at higher level
     async def _collect_with_retry(self, ticker: str) -> Optional[Any]:
         """
         Collect financial data for a ticker with retry logic
@@ -378,7 +374,7 @@ class OptimizedFundamentalCollector:
             await asyncio.to_thread(
                 lambda: self._execute_db_operation(
                     lambda: execute(
-                    """
+                        """
                     INSERT INTO raw_fundamental_data (
                         ticker_id, date, filing_date, fiscal_period, fiscal_year, timeframe,
                         revenues, cost_of_revenue, gross_profit, operating_expenses, net_income_loss,
@@ -420,8 +416,8 @@ class OptimizedFundamentalCollector:
                         source_filing_file_url = EXCLUDED.source_filing_file_url,
                         data_source_confidence = EXCLUDED.data_source_confidence
                     """,
-                    raw_data,
-                    True
+                        raw_data,
+                        True,
                     )
                 )
             )

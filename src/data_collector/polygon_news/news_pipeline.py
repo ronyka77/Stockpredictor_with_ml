@@ -425,10 +425,10 @@ def main():
             days_lookback = config.NEWS_DAYS_LOOKBACK
 
             logger.info("Configuration:")
-            logger.info(f"  - Max tickers: {max_tickers}")
-            logger.info(f"  - Days lookback (for new tickers): {days_lookback}")
-            logger.info(f"  - Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
-            logger.info(f"  - Retention period: {config.NEWS_RETENTION_YEARS} years")
+            logger.info(f"- Max tickers: {max_tickers}")
+            logger.info(f"- Days lookback (for new tickers): {days_lookback}")
+            logger.info(f"- Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
+            logger.info(f"- Retention period: {config.NEWS_RETENTION_YEARS} years")
 
             # Execute collection
             stats_historical = collector.collect_historical_news(
@@ -440,12 +440,12 @@ def main():
             logger.info("COLLECTION COMPLETED SUCCESSFULLY")
             logger.info("=" * 60)
             logger.info("Collection Statistics:")
-            logger.info(f"  - Total API calls: {stats_historical['total_api_calls']}")
-            logger.info(f"  - Articles fetched: {stats_historical['total_articles_fetched']}")
-            logger.info(f"  - Articles stored: {stats_historical['total_articles_stored']}")
-            logger.info(f"  - Articles updated: {stats_historical['total_articles_updated']}")
-            logger.info(f"  - Articles skipped: {stats_historical['total_articles_skipped']}")
-            logger.info(f"  - Failed tickers: {len(stats_historical['failed_tickers'])}")
+            logger.info(f"- Total API calls: {stats_historical['total_api_calls']}")
+            logger.info(f"- Articles fetched: {stats_historical['total_articles_fetched']}")
+            logger.info(f"- Articles stored: {stats_historical['total_articles_stored']}")
+            logger.info(f"- Articles updated: {stats_historical['total_articles_updated']}")
+            logger.info(f"- Articles skipped: {stats_historical['total_articles_skipped']}")
+            logger.info(f"- Failed tickers: {len(stats_historical['failed_tickers'])}")
 
             if stats_historical["failed_tickers"]:
                 logger.warning(f"Failed tickers: {stats_historical['failed_tickers']}")
@@ -453,33 +453,31 @@ def main():
             if stats_historical["processing_errors"]:
                 logger.warning(f"Processing errors: {len(stats_historical['processing_errors'])}")
                 for error in stats_historical["processing_errors"][:5]:  # Show first 5 errors
-                    logger.warning(f"  - {error}")
+                    logger.warning(f"- {error}")
 
             # Duration
             if stats_historical["start_time"] and stats_historical["end_time"]:
                 duration = stats_historical["end_time"] - stats_historical["start_time"]
-                logger.info(f"  - Duration: {duration}")
+                logger.info(f"- Duration: {duration}")
 
             # Get system status
             try:
                 status = collector.get_collection_status()
                 logger.info("System Status:")
-                logger.info(f"  - Database health: {status.get('status', 'unknown')}")
-                logger.info(f"  - Latest article date: {status.get('latest_article_date', 'None')}")
+                logger.info(f"- Database health: {status.get('status', 'unknown')}")
+                logger.info(f"- Latest article date: {status.get('latest_article_date', 'None')}")
 
                 if "recent_statistics" in status:
                     recent_stats = status["recent_statistics"]
-                    logger.info(
-                        f"  - Total articles in DB: {recent_stats.get('total_articles', 0)}"
-                    )
+                    logger.info(f"- Total articles in DB: {recent_stats.get('total_articles', 0)}")
 
                     top_tickers = recent_stats.get("top_tickers", {})
                     if top_tickers:
-                        logger.info(f"  - Top tickers count: {dict(list(top_tickers.items())[:5])}")
+                        logger.info(f"- Top tickers count: {dict(list(top_tickers.items())[:5])}")
 
                     sentiment_dist = recent_stats.get("sentiment_distribution", {})
                     if sentiment_dist:
-                        logger.info(f"  - Sentiment distribution: {sentiment_dist}")
+                        logger.info(f"- Sentiment distribution: {sentiment_dist}")
 
             except Exception as e:
                 logger.warning(f"Could not retrieve system status: {e}")

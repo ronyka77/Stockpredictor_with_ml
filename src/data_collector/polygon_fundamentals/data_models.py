@@ -279,12 +279,14 @@ class FundamentalDataResponse(BaseModel):
             return None
         return max(self.cash_flow_statements, key=lambda x: x.filing_date or date.min)
 
-    def get_statements_by_period(self, fiscal_period: str) -> Dict[str, Optional[Union[IncomeStatement, BalanceSheet, CashFlowStatement]]]:
+    def get_statements_by_period(
+        self, fiscal_period: str
+    ) -> Dict[str, Optional[Union[IncomeStatement, BalanceSheet, CashFlowStatement]]]:
         """Get all statements for a specific fiscal period"""
         result: Dict[str, Optional[Union[IncomeStatement, BalanceSheet, CashFlowStatement]]] = {
             "income_statement": None,
             "balance_sheet": None,
-            "cash_flow": None
+            "cash_flow": None,
         }
 
         for income_stmt in self.income_statements:
