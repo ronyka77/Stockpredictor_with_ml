@@ -121,7 +121,7 @@ predicted_prices = convert_percentage_predictions_to_prices(y_pred, current_pric
 
 ## 4) Data & Logging
 - Functions are defensive: they only add features when required columns exist.
-- Centralized logging via `src/utils/logger.py` provides progress and diagnostics.
+- Centralized logging via `src/utils/core/logger.py` provides progress and diagnostics.
 
 ## 5) Gotchas
 - If `date` is not timezone-aware or not standard ISO, ensure it parses correctly before temporal feature creation.

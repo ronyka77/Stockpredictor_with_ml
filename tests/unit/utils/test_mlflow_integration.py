@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.utils.mlflow_integration import (
+from src.utils.mlops.mlflow_integration import (
     MLflowIntegration,
     cleanup_deleted_runs,
     cleanup_empty_experiments,

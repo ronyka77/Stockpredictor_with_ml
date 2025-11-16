@@ -11,7 +11,7 @@ import warnings
 import logging
 from src.models.predictors.base_predictor import BasePredictor
 from src.models.automl.autogluon_model import AutoGluonModel
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ class AutoGluonPredictor(BasePredictor):
             try:
                 self.model = AutoGluonModel()
                 self.model.load_from_dir(self.model_dir)
-                logger.info(f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
+                logger.info(f"AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
                 return
             except Exception as e:
                 logger.warning(
@@ -47,7 +47,7 @@ class AutoGluonPredictor(BasePredictor):
                 self.optimal_threshold = threshold
                 self.model.selected_model_name = model_name
                 logger.info(
-                    f"✅ AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
+                    f"AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
                 )
             except Exception as e:
                 logger.warning(

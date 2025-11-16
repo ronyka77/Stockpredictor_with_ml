@@ -19,7 +19,7 @@ from src.data_utils.ml_data_pipeline import (
     prepare_ml_data_for_prediction_with_cleaning,
     filter_dates_to_weekdays,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -70,16 +70,16 @@ class BasePredictor(ABC):
         if "final_optimal_threshold" in run_metrics:
             self.optimal_threshold = float(run_metrics["final_optimal_threshold"])
 
-        logger.info(f"✅ Model metadata loaded for run: {self.run_id}")
-        logger.info(f"   Prediction horizon: {self.prediction_horizon}")
+        logger.info(f"Model metadata loaded for run: {self.run_id}")
+        logger.info(f"Prediction horizon: {self.prediction_horizon}")
         if self.optimal_threshold:
-            logger.info(f"   Optimal threshold: {self.optimal_threshold:.3f}")
+            logger.info(f"Optimal threshold: {self.optimal_threshold:.3f}")
 
     def load_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Load the most recent data for making predictions.
         """
-        logger.info(f"📊 Loading recent data (last {days_back} days)...")
+        logger.info(f"Loading recent data (last {days_back} days)...")
         data_result = prepare_ml_data_for_prediction_with_cleaning(
             prediction_horizon=self.prediction_horizon, days_back=days_back
         )
@@ -90,7 +90,7 @@ class BasePredictor(ABC):
 
         if "ticker_id" in recent_features.columns:
             unique_tickers = recent_features["ticker_id"].nunique()
-            logger.info(f"   Unique tickers: {unique_tickers}")
+            logger.info(f"Unique tickers: {unique_tickers}")
 
         if self.model and hasattr(self.model, "feature_names") and self.model.feature_names:
             model_features = set(self.model.feature_names)
@@ -98,7 +98,7 @@ class BasePredictor(ABC):
 
             missing_in_data = model_features - data_features
             if missing_in_data:
-                logger.warning(f"   ⚠️  Missing features ({len(missing_in_data)}): Filling with 0.0")
+                logger.warning(f" Missing features ({len(missing_in_data)}): Filling with 0.0")
                 for feature in missing_in_data:
                     recent_features[feature] = 0.0
 
@@ -120,13 +120,13 @@ class BasePredictor(ABC):
         numeric_cols = [col for col in numeric_cols if col not in ["ticker_id", "date_int"]]
 
         if not numeric_cols:
-            logger.warning("   ⚠️  No numeric features to validate.")
+            logger.warning(" No numeric features to validate.")
             return
 
         for feature in numeric_cols[:5]:
             stats = features_df[feature].describe()
             logger.info(
-                f"   {feature}: unique={stats['count'] > 0}, mean={stats['mean']:.3f}, std={stats['std']:.3f}"
+                f"{feature}: unique={stats['count'] > 0}, mean={stats['mean']:.3f}, std={stats['std']:.3f}"
             )
 
     def _validate_model_compatibility(self, features_df: pd.DataFrame) -> None:
@@ -138,7 +138,7 @@ class BasePredictor(ABC):
             or not hasattr(self.model, "feature_names")
             or not self.model.feature_names
         ):
-            logger.warning("   ⚠️  No model feature names available for validation.")
+            logger.warning(" No model feature names available for validation.")
             return
 
         logger.info("🔗 Validating model compatibility...")
@@ -148,7 +148,7 @@ class BasePredictor(ABC):
 
         if missing_in_data:
             logger.warning(
-                f"   🚨 WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality."
+                f"🚨 WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality."
             )
 
     def make_predictions(self, features_df: pd.DataFrame) -> np.ndarray:
@@ -227,7 +227,7 @@ class BasePredictor(ABC):
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, file_name)
 
-        logger.info("💾 Validating and saving predictions")
+        logger.info("Validating and saving predictions")
 
         results_df = self._build_results_dataframe_and_profit(
             features_df=features_df, metadata_df=metadata_df, predictions=predictions
@@ -238,7 +238,7 @@ class BasePredictor(ABC):
                 ["passes_threshold", "optimal_threshold"], axis=1, errors="ignore"
             )
             results_df.to_excel(output_path, index=False)
-            logger.info(f"   Saved {len(results_df)} predictions.")
+            logger.info(f"Saved {len(results_df)} predictions.")
             return output_path
         else:
             return None
@@ -261,7 +261,7 @@ class BasePredictor(ABC):
                 )
                 results_df["company_name"] = results_df["ticker_id"].map(name_map).fillna("Unknown")
         except Exception as e:
-            logger.warning(f"   Could not fetch ticker metadata: {e}")
+            logger.warning(f"Could not fetch ticker metadata: {e}")
             results_df["ticker"] = results_df["ticker_id"]
             results_df["company_name"] = "Unknown"
         return results_df
@@ -300,15 +300,13 @@ class BasePredictor(ABC):
         try:
             results_df["ticker_id"] = features_df["ticker_id"].values
         except KeyError:
-            logger.warning(
-                "   ⚠️  No ticker_id column found in features_df. Using date_int instead."
-            )
-            logger.warning(f"   ⚠️  Features_df columns: {features_df.columns.tolist()}")
+            logger.warning(" No ticker_id column found in features_df. Using date_int instead.")
+            logger.warning(f" Features_df columns: {features_df.columns.tolist()}")
 
         try:
             results_df["date_int"] = features_df["date_int"].values
         except KeyError:
-            logger.warning("   ⚠️  Missing date_int in features_df; aborting build")
+            logger.warning(" Missing date_int in features_df; aborting build")
             return None
 
         results_df = self._merge_ticker_metadata(results_df)
@@ -317,7 +315,7 @@ class BasePredictor(ABC):
         try:
             current_prices = features_df["close"].values
         except KeyError:
-            logger.warning("   ⚠️  Missing close prices in features_df; aborting build")
+            logger.warning(" Missing close prices in features_df; aborting build")
             return None
 
         results_df["predicted_return"] = predictions
@@ -345,11 +343,11 @@ class BasePredictor(ABC):
             results_df = results_df[results_df["passes_threshold"]].copy()
             threshold_filtered_count = len(results_df)
             logger.info(
-                f"   📊 Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count / original_count:.1%} kept)"
+                f"Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count / original_count:.1%} kept)"
             )
 
         if threshold_filtered_count == 0:
-            logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+            logger.warning(" WARNING: No predictions passed the threshold!")
             return None
 
         results_df = (
@@ -364,9 +362,9 @@ class BasePredictor(ABC):
             results_df = results_df[results_df["day_of_week"] == "Friday"]
 
         top_10_count = len(results_df)
-        logger.info(f"   📈 Top 10 final count: {top_10_count}")
+        logger.info(f"📈 Top 10 final count: {top_10_count}")
         if top_10_count == 0:
-            logger.warning("   ⚠️  WARNING: No predictions passed the threshold!")
+            logger.warning(" WARNING: No predictions passed the threshold!")
             return None
         return results_df
 
@@ -396,7 +394,7 @@ class BasePredictor(ABC):
         ).astype(int)
 
         logger.info(
-            f"   💰 ${float(results_df.loc[non_nan_mask, 'profit_100_investment'].mean()):.2f} Average profit per $100 investment"
+            f"💰 ${float(results_df.loc[non_nan_mask, 'profit_100_investment'].mean()):.2f} Average profit per $100 investment"
         )
 
         return results_df
@@ -408,10 +406,10 @@ class BasePredictor(ABC):
         avg_profit_per_investment = self._calc_avg_profit(valid_profit_df)
 
         not_closed = self._count_not_closed_predictions(results_df)
-        logger.info(f"   🔮 Not closed predictions: {not_closed}")
+        logger.info(f"🔮 Not closed predictions: {not_closed}")
         if not_closed == 0:
             logger.warning(
-                "   ⚠️  WARNING: No not closed predictions found - all predictions have actual prices!"
+                " WARNING: No not closed predictions found - all predictions have actual prices!"
             )
             return None
 
@@ -462,10 +460,10 @@ class BasePredictor(ABC):
         )
 
         logger.info(
-            f"   🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
+            f"🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
         )
         logger.info(
-            f"   🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
+            f"🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
         )
         return friday_avg, monday_avg
 
@@ -482,7 +480,7 @@ class BasePredictor(ABC):
             filtered = results_df[results_df["day_of_week"] == "Monday"]
 
         if filtered is None:
-            logger.warning("   ⚠️  WARNING: No predictions should be exported!")
+            logger.warning(" WARNING: No predictions should be exported!")
             return None
 
         return avg_profit if len(filtered) > 5 else None

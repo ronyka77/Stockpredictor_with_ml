@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.utils import logger as logger_mod
+from src.utils.core import logger as logger_mod
 
 
 def test_get_logger_creates_file(tmp_path: Path) -> None:

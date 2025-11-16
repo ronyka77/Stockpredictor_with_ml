@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, List
 from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
 from src.database.connection import execute
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -194,6 +194,24 @@ class FundamentalsExtractor:
         execute(sql, params)
 
     def extract_from_payload(self, ticker: str, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract and transform financial data from a raw Polygon API payload.
+
+        Parses the raw JSON payload, extracts financial statement data (income statements,
+        balance sheets, cash flow statements), and upserts the transformed data to the
+        fundamentals facts table.
+
+        Args:
+            ticker: The stock ticker symbol
+            raw: Raw JSON payload from Polygon API
+
+        Returns:
+            Dict containing processing results with keys:
+            - ticker: The ticker symbol
+            - success: Boolean indicating success/failure
+            - rows_upserted: Number of rows inserted/updated (on success)
+            - error: Error message (on failure)
+        """
         ticker_id = self.repo.get_ticker_id(ticker)
         if ticker_id is None:
             logger.warning(f"Ticker not found: {ticker}")

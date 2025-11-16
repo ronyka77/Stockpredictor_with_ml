@@ -7,7 +7,7 @@ on the most recent data, saving results to Excel files.
 
 from src.models.gradient_boosting.xgboost_model import XGBoostModel
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,9 +31,9 @@ class XGBoostPredictor(BasePredictor):
         Load the XGBoost model from MLflow using the specified run ID
         """
         self.model = XGBoostModel.load_from_mlflow(self.run_id)
-        logger.info(f"✅ XGBoost model loaded: {self.model.model_name}")
+        logger.info(f"XGBoost model loaded: {self.model.model_name}")
         logger.info(
-            f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
+            f"Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
 

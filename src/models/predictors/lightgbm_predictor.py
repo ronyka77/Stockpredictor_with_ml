@@ -7,7 +7,7 @@ on the most recent data, saving results to Excel files.
 
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,9 +31,9 @@ class LightGBMPredictor(BasePredictor):
         Load the LightGBM model from MLflow using the specified run ID
         """
         self.model = LightGBMModel.load_from_mlflow(self.run_id)
-        logger.info(f"✅ LightGBM model loaded: {self.model.model_name}")
+        logger.info(f"LightGBM model loaded: {self.model.model_name}")
         logger.info(
-            f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
+            f"Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
 

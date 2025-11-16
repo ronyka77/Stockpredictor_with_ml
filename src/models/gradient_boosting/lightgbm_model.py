@@ -17,8 +17,8 @@ import os
 
 from src.models.base_model import BaseModel
 from src.models.evaluation import ThresholdEvaluator, CustomMetrics
-from src.utils.logger import get_logger
-from src.utils.mlflow_utils import MLFlowManager
+from src.utils.core.logger import get_logger
+from src.utils.mlops.mlflow_utils import MLFlowManager
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_training_with_cleaning
 
 logger = get_logger(__name__)
@@ -67,7 +67,7 @@ class LightGBMModel(BaseModel):
         # Calculate CPU usage limit (75% of available cores by default)
         total_cores = os.cpu_count() or 4
         self.max_cpu_cores = max(1, int(total_cores * 0.85))
-        logger.info(f"🔧 CPU Usage Limit: {self.max_cpu_cores}/{total_cores} cores (75%)")
+        logger.info(f" CPU Usage Limit: {self.max_cpu_cores}/{total_cores} cores (75%)")
 
         # Initialize central evaluators
         self.custom_metrics = CustomMetrics()
@@ -152,10 +152,8 @@ class LightGBMModel(BaseModel):
             return
 
         logger.error("🚨 Data validation failed: Constant features detected!")
-        logger.error(
-            f"   Number of constant features: {len(constant_cols)} out of {len(X.columns)}"
-        )
-        logger.error(f"   Constant feature names (sample): {constant_cols[:10]}")
+        logger.error(f"Number of constant features: {len(constant_cols)} out of {len(X.columns)}")
+        logger.error(f"Constant feature names (sample): {constant_cols[:10]}")
 
         # Check the ratio of constant features
         constant_ratio = len(constant_cols) / len(X.columns)
@@ -432,17 +430,15 @@ class LightGBMModel(BaseModel):
                         self.confidence_method = "leaf_depth"
 
                     logger.info(
-                        f"🎯 NEW BEST TRIAL {trial.number}: Profit Per Investment = {optimized_profit_score:.3f}"
+                        f"NEW BEST TRIAL {trial.number}: Profit Per Investment = {optimized_profit_score:.3f}"
                     )
                     if threshold_info["optimal_threshold"] is not None:
+                        logger.info(f"Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                        logger.info(f"Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
                         logger.info(
-                            f"   Optimal threshold: {threshold_info['optimal_threshold']:.3f}"
+                            f"Investment success rate: {threshold_info['investment_success_rate']:.3f}"
                         )
-                        logger.info(f"   Samples kept: {threshold_info['samples_kept_ratio']:.1%}")
-                        logger.info(
-                            f"   Investment success rate: {threshold_info['investment_success_rate']:.3f}"
-                        )
-                        logger.info(f"   Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
+                        logger.info(f"Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
 
                     self.previous_best = optimized_profit_score
                 else:
@@ -519,27 +515,25 @@ class LightGBMModel(BaseModel):
 
             # Log the finalization
             logger.info(
-                f"✅ Best model finalized with investment success rate: {self.best_investment_success_rate:.3f}"
+                f"Best model finalized with investment success rate: {self.best_investment_success_rate:.3f}"
             )
-            logger.info(f"✅ Best parameters: {self.best_trial_params}")
+            logger.info(f"Best parameters: {self.best_trial_params}")
 
             # Log threshold information if available
             if hasattr(self, "best_threshold_info") and self.best_threshold_info is not None:
                 threshold_info = self.best_threshold_info
                 if threshold_info.get("optimal_threshold") is not None:
-                    logger.info(f"✅ Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                    logger.info(f"Optimal threshold: {threshold_info['optimal_threshold']:.3f}")
+                    logger.info(f"Samples kept ratio: {threshold_info['samples_kept_ratio']:.1%}")
                     logger.info(
-                        f"✅ Samples kept ratio: {threshold_info['samples_kept_ratio']:.1%}"
+                        f"Investment success rate: {threshold_info['investment_success_rate']:.3f}"
                     )
+                    logger.info(f"Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
                     logger.info(
-                        f"✅ Investment success rate: {threshold_info['investment_success_rate']:.3f}"
-                    )
-                    logger.info(f"✅ Custom accuracy: {threshold_info['custom_accuracy']:.3f}")
-                    logger.info(
-                        f"✅ Profitable investments: {threshold_info['profitable_investments']}"
+                        f"Profitable investments: {threshold_info['profitable_investments']}"
                     )
                 else:
-                    logger.info("✅ No threshold optimization was successful for the best trial")
+                    logger.info("No threshold optimization was successful for the best trial")
 
             # Log to MLflow if enabled
             if not getattr(self, "disable_mlflow", False):
@@ -575,7 +569,7 @@ class LightGBMModel(BaseModel):
 
                 self.log_metrics(metrics_to_log)
         else:
-            logger.warning("⚠ No best model found to finalize")
+            logger.warning("No best model found to finalize")
 
     def get_model_info(self) -> Dict[str, Any]:
         """
@@ -627,7 +621,7 @@ class LightGBMModel(BaseModel):
             metrics=metrics, params=params, x_eval=x_eval, experiment_name=experiment_name
         )
 
-        logger.info(f"✅ LightGBM model saved using universal logging function. Run ID: {run_id}")
+        logger.info(f"LightGBM model saved using universal logging function. Run ID: {run_id}")
         return run_id
 
     def load_model(self, run_id: str) -> None:
@@ -664,12 +658,12 @@ class LightGBMModel(BaseModel):
             # Default to "model" (the standard MLflow artifact path)
             if model_artifact_path is None:
                 model_artifact_path = "model"
-                logger.warning("⚠️ No model artifact found, defaulting to 'model' path")
+                logger.warning("No model artifact found, defaulting to 'model' path")
 
             # Log available artifacts for debugging
             logger.info(f"Available artifacts in run {run_id}:")
             for artifact in artifacts:
-                logger.info(f"  - {artifact.path} ({'dir' if artifact.is_dir else 'file'})")
+                logger.info(f"- {artifact.path} ({'dir' if artifact.is_dir else 'file'})")
 
             # Construct model URI and load
             model_uri = f"runs:/{run_id}/{model_artifact_path}"
@@ -682,10 +676,10 @@ class LightGBMModel(BaseModel):
             # Load additional metadata from run
             self._load_metadata_from_run(run_info)
 
-            logger.info(f"✅ LightGBM model loaded successfully from MLflow run: {run_id}")
+            logger.info(f"LightGBM model loaded successfully from MLflow run: {run_id}")
 
         except Exception as e:
-            logger.error(f"❌ Error loading LightGBM model from MLflow run {run_id}: {str(e)}")
+            logger.error(f"Error loading LightGBM model from MLflow run {run_id}: {str(e)}")
             raise
 
     def _load_metadata_from_run(self, run_info) -> None:
@@ -752,18 +746,18 @@ class LightGBMModel(BaseModel):
                         if feature_names:
                             self.feature_names = feature_names
                             logger.info(
-                                f"✅ Loaded {len(self.feature_names)} feature names from MLflow signature"
+                                f"Loaded {len(self.feature_names)} feature names from MLflow signature"
                             )
                         else:
-                            logger.warning("⚠️ No feature names found in model signature inputs")
+                            logger.warning("No feature names found in model signature inputs")
                     else:
-                        logger.warning("⚠️ Model signature has no inputs")
+                        logger.warning("Model signature has no inputs")
                 else:
-                    logger.warning("⚠️ No model signature found in model info")
+                    logger.warning("No model signature found in model info")
 
             except Exception as signature_error:
                 logger.warning(
-                    f"⚠️ Could not extract feature names from signature: {str(signature_error)}"
+                    f"Could not extract feature names from signature: {str(signature_error)}"
                 )
                 logger.info(
                     f"Signature error details: {type(signature_error).__name__}: {signature_error}"
@@ -772,7 +766,7 @@ class LightGBMModel(BaseModel):
             logger.info("Model metadata loaded successfully")
 
         except Exception as e:
-            logger.warning(f"⚠ Could not load all metadata: {str(e)}")
+            logger.warning(f"Could not load all metadata: {str(e)}")
 
     @classmethod
     def load_from_mlflow(cls, run_id: str) -> "LightGBMModel":
@@ -827,7 +821,7 @@ class LightGBMModel(BaseModel):
             x_eval=x_eval,
         )
 
-        logger.info(f"✅ Model logged to MLflow using universal function. Run ID: {run_id}")
+        logger.info(f"Model logged to MLflow using universal function. Run ID: {run_id}")
         return run_id
 
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = "leaf_depth") -> np.ndarray:
@@ -950,7 +944,7 @@ class LightGBMModel(BaseModel):
 
         logger.info("Top 10 features from preliminary model (by gain):")
         for _, row in importance_df.head(10).iterrows():
-            logger.info(f"  - {row['feature']}: {row['importance']:.2f}")
+            logger.info(f"- {row['feature']}: {row['importance']:.2f}")
 
         # Select top N features
         selected_features = list(importance_df["feature"].head(n_features_to_select))
@@ -960,14 +954,14 @@ class LightGBMModel(BaseModel):
         for column in required_columns:
             if column in X.columns and column not in selected_features:
                 logger.info(
-                    f"✅ '{column}' column was not in the top features. Adding it to the list."
+                    f"'{column}' column was not in the top features. Adding it to the list."
                 )
                 # Remove the least important feature from the list to make space
                 removed_feature = selected_features.pop()
                 selected_features.append(column)
-                logger.info(f"   Removed '{removed_feature}' to make space for '{column}'.")
+                logger.info(f"Removed '{removed_feature}' to make space for '{column}'.")
 
-        logger.info(f"✅ Feature selection complete. Selected {len(selected_features)} features.")
+        logger.info(f"Feature selection complete. Selected {len(selected_features)} features.")
         return selected_features
 
 
@@ -1044,10 +1038,10 @@ def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, x_eval):
                 run_uri = f"runs:/{run.info.run_id}/model"
                 registered_model_name = f"lightgbm_{datetime.now().strftime('%Y%m%d_%H%M')}"
                 mlflow.register_model(run_uri, registered_model_name)
-                logger.info(f"✅ Model registered as: {registered_model_name}")
+                logger.info(f"Model registered as: {registered_model_name}")
             except Exception as reg_error:
-                logger.warning(f"⚠️ Model registration failed (this is optional): {reg_error}")
-                logger.info("✅ Model logged successfully without registration")
+                logger.warning(f"Model registration failed (this is optional): {reg_error}")
+                logger.info("Model logged successfully without registration")
 
             logger.info(f"Model logged to MLflow: {model_info.model_uri}")
             logger.info(f"Run ID: {run.info.run_id}")
@@ -1063,7 +1057,7 @@ def main():
     Standalone LightGBM hypertuning and evaluation using load_all_data
     """
     logger.info("=" * 80)
-    logger.info("🎯 STANDALONE LIGHTGBM HYPERTUNING & EVALUATION")
+    logger.info("STANDALONE LIGHTGBM HYPERTUNING & EVALUATION")
     logger.info("=" * 80)
 
     try:
@@ -1072,8 +1066,8 @@ def main():
         mlflow_manager = MLFlowManager()
         experiment_id = mlflow_manager.setup_experiment(experiment_name)
 
-        logger.info(f"✅ MLflow experiment setup completed: {experiment_id}")
-        logger.info(f"✅ MLflow tracking URI: {mlflow.get_tracking_uri()}")
+        logger.info(f"MLflow experiment setup completed: {experiment_id}")
+        logger.info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
         # Define prediction horizon
         prediction_horizon = 20
@@ -1107,20 +1101,20 @@ def main():
         # Create new DataFrames with only the selected features
         x_train_selected = x_train[selected_features]
         x_test_selected = x_test[selected_features]
-        logger.info(f"   DataFrames updated with {len(selected_features)} selected features.")
+        logger.info(f"DataFrames updated with {len(selected_features)} selected features.")
 
         # Remove rows with the highest 15 date_int values
         if "date_int" in x_test_selected.columns:
             threshold = x_test_selected["date_int"].copy()
             threshold = threshold.drop_duplicates().max() - 15
-            logger.info(f"📅 Threshold: {threshold}")
+            logger.info(f"Threshold: {threshold}")
             mask = x_test_selected["date_int"] < threshold
             x_test_selected, y_test = x_test_selected[mask], y_test[mask]
             logger.info(
-                f"📅 Removed rows with date_int >= {threshold} (kept {len(x_test_selected)} samples)"
+                f"Removed rows with date_int >= {threshold} (kept {len(x_test_selected)} samples)"
             )
         else:
-            logger.warning("⚠️ 'date_int' column not found - skipping date filtering")
+            logger.warning("'date_int' column not found - skipping date filtering")
 
         lgb_model = LightGBMModel(
             model_name="lightgbm_standalone_hypertuned", prediction_horizon=prediction_horizon
@@ -1137,16 +1131,16 @@ def main():
         best_params = study.best_params
         best_profit = study.best_value  # This is now threshold-optimized profit per investment
 
-        logger.info("🎯 Hyperparameter optimization with threshold optimization completed!")
-        logger.info(f"✅ Best Threshold-Optimized Profit per Investment: ${best_profit:.2f}")
-        logger.info(f"✅ Best parameters: {best_params}")
+        logger.info("Hyperparameter optimization with threshold optimization completed!")
+        logger.info(f"Best Threshold-Optimized Profit per Investment: ${best_profit:.2f}")
+        logger.info(f"Best parameters: {best_params}")
 
         # Finalize the best model (ensure lgb_model contains the best performing model)
         lgb_model.finalize_best_model()
 
         # Get best trial info for verification (now includes threshold info)
         best_trial_info = lgb_model.get_best_trial_info()
-        logger.info(f"✅ Best trial info: {best_trial_info}")
+        logger.info(f"Best trial info: {best_trial_info}")
 
         # lgb_model now contains the best model with optimal threshold, no need to create a new one
         final_model = lgb_model
@@ -1186,21 +1180,21 @@ def main():
             )
             baseline_profit_per_investment = baseline_profit / len(y_test)
 
-            logger.info("📊 Final Results Comparison:")
+            logger.info("Final Results Comparison:")
             logger.info(
-                f"   Baseline (unfiltered) profit per investment: ${baseline_profit_per_investment:.2f}"
+                f"Baseline (unfiltered) profit per investment: ${baseline_profit_per_investment:.2f}"
             )
             logger.info(
-                f"   Threshold-optimized profit per investment: ${threshold_performance['profit_per_investment']:.2f}"
+                f"Threshold-optimized profit per investment: ${threshold_performance['profit_per_investment']:.2f}"
             )
             logger.info(
-                f"   Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
+                f"Improvement ratio: {threshold_performance['profit_per_investment'] / baseline_profit_per_investment if baseline_profit_per_investment != 0 else 0:.2f}x"
             )
             logger.info(
-                f"   Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
+                f"Samples kept: {threshold_performance['samples_evaluated']}/{len(x_test_selected)} ({threshold_performance['samples_kept_ratio']:.1%})"
             )
             logger.info(
-                f"   Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
+                f"Investment success rate: {threshold_performance['investment_success_rate']:.3f}"
             )
 
             # Use threshold-optimized metrics for final evaluation
@@ -1226,20 +1220,18 @@ def main():
                 else 0,
             }
 
-        logger.info("📊 Final Optimized Results:")
-        logger.info(f"   Total Profit: ${final_total_profit:.2f}")
-        logger.info(f"   Profit per Investment: ${final_profit_per_investment:.2f}")
+        logger.info("Final Optimized Results:")
+        logger.info(f"Total Profit: ${final_total_profit:.2f}")
+        logger.info(f"Profit per Investment: ${final_profit_per_investment:.2f}")
         if has_threshold_optimization:
             logger.info(
-                f"   Samples Used: {final_samples_kept}/{len(x_test_selected)} (threshold-filtered)"
+                f"Samples Used: {final_samples_kept}/{len(x_test_selected)} (threshold-filtered)"
             )
         else:
-            logger.info(
-                f"   Samples Used: {final_samples_kept}/{len(x_test_selected)} (all samples)"
-            )
-        logger.info(f"   Traditional MSE: {final_mse:.4f}")
-        logger.info(f"   Traditional MAE: {final_mae:.4f}")
-        logger.info(f"   Traditional R²: {final_r2:.4f}")
+            logger.info(f"Samples Used: {final_samples_kept}/{len(x_test_selected)} (all samples)")
+        logger.info(f"Traditional MSE: {final_mse:.4f}")
+        logger.info(f"Traditional MAE: {final_mae:.4f}")
+        logger.info(f"Traditional R²: {final_r2:.4f}")
 
         feature_importance = final_model.get_feature_importance("gain")
 
@@ -1303,27 +1295,27 @@ def main():
             experiment_name=experiment_name,
         )
 
-        logger.info(f"✅ Model saved using updated save_model method. Run ID: {saved_run_id}")
-        logger.info("✅ Model registered with timestamp-based name via universal function")
+        logger.info(f"Model saved using updated save_model method. Run ID: {saved_run_id}")
+        logger.info("Model registered with timestamp-based name via universal function")
 
         logger.info("=" * 80)
         logger.info("🎉 STANDALONE LIGHTGBM HYPERTUNING COMPLETED SUCCESSFULLY!")
         logger.info("=" * 80)
         logger.info(
-            f"📊 Dataset: {data_result['train_samples'] + data_result['test_samples']:,} samples, {data_result['feature_count']} features"
+            f"Dataset: {data_result['train_samples'] + data_result['test_samples']:,} samples, {data_result['feature_count']} features"
         )
-        logger.info(f"🎯 Target: {target_column} ({prediction_horizon}-day horizon)")
-        logger.info(f"📅 Train period: {train_date_range}")
-        logger.info(f"📅 Test period: {test_date_range}")
-        logger.info(f"🔧 Hypertuning: {number_of_trials} trials completed (optimizing for profit)")
+        logger.info(f"Target: {target_column} ({prediction_horizon}-day horizon)")
+        logger.info(f"Train period: {train_date_range}")
+        logger.info(f"Test period: {test_date_range}")
+        logger.info(f" Hypertuning: {number_of_trials} trials completed (optimizing for profit)")
         logger.info(f"📈 Final Total Profit: ${final_total_profit:.2f}")
         logger.info(f"📈 Average Profit per Investment: ${final_profit_per_investment:.2f}")
         logger.info(f"📈 Traditional MSE: {final_mse:.4f}")
-        logger.info(f"💾 Model saved to MLflow run: {saved_run_id}")
+        logger.info(f"Model saved to MLflow run: {saved_run_id}")
         logger.info("=" * 80)
 
     except Exception as e:
-        logger.error(f"❌ CRITICAL ERROR in standalone LightGBM hypertuning: {str(e)}")
+        logger.error(f"CRITICAL ERROR in standalone LightGBM hypertuning: {str(e)}")
         import traceback
 
         traceback.print_exc()

@@ -2,11 +2,12 @@
 Data storage functionality for PostgreSQL database operations
 """
 
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Iterator, Callable
 from datetime import datetime, date
 import pandas as pd
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
+from src.utils.data.memory_efficient import ChunkedDataProcessor, StreamingDataFrame
 from src.data_collector.polygon_data.data_validator import OHLCVRecord
 from src.database.connection import init_global_pool, fetch_all, fetch_one, execute, execute_values
 
@@ -554,6 +555,198 @@ class DataStorage:
         except Exception as e:
             logger.error(f"Error loading dividend data for {ticker}: {e}")
             raise
+
+    def load_dividends_for_ticker_chunked(
+        self,
+        ticker: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        chunk_size: int = 10000,
+    ) -> Iterator[pd.DataFrame]:
+        """
+        Load dividend data for a specific ticker in chunks using pandas chunking
+
+        This method loads large dividend datasets in memory-efficient chunks,
+        suitable for processing historical dividend data for tickers with many records.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date filter (ex_dividend_date >= start_date)
+            end_date: End date filter (ex_dividend_date <= end_date)
+            chunk_size: Number of records per chunk
+
+        Yields:
+            DataFrame chunks with dividend data
+        """
+        query = """
+            SELECT
+                d.ex_dividend_date,
+                d.cash_amount,
+                d.pay_date,
+                d.record_date,
+                d.id,
+                d.currency
+            FROM dividends d
+            JOIN tickers t ON d.ticker_id = t.id
+            WHERE t.ticker = %s
+        """
+        params = [ticker.upper()]
+
+        if start_date:
+            query += " AND d.ex_dividend_date >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND d.ex_dividend_date <= %s"
+            params.append(end_date)
+
+        query += " ORDER BY d.ex_dividend_date ASC"
+
+        try:
+            # Use pandas read_sql with chunking
+            from src.database.connection import get_connection
+
+            with get_connection() as conn:
+                chunk_iter = pd.read_sql_query(
+                    query, conn, params=tuple(params), chunksize=chunk_size
+                )
+
+                for chunk in chunk_iter:
+                    # Ensure proper data types for each chunk
+                    chunk["ex_dividend_date"] = pd.to_datetime(chunk["ex_dividend_date"]).dt.date
+                    chunk["cash_amount"] = chunk["cash_amount"].astype(float)
+                    if "pay_date" in chunk.columns and chunk["pay_date"].notna().any():
+                        chunk["pay_date"] = pd.to_datetime(chunk["pay_date"]).dt.date
+                    if "record_date" in chunk.columns and chunk["record_date"].notna().any():
+                        chunk["record_date"] = pd.to_datetime(chunk["record_date"]).dt.date
+
+                    logger.debug(f"Yielded dividend chunk with {len(chunk)} records for {ticker}")
+                    yield chunk
+
+        except Exception as e:
+            logger.error(f"Error loading chunked dividend data for {ticker}: {e}")
+            raise
+
+    def get_historical_data_chunked(
+        self,
+        ticker: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        chunk_size: int = 50000,
+    ) -> Iterator[pd.DataFrame]:
+        """
+        Retrieve historical data in chunks for memory-efficient processing
+
+        This method loads large historical datasets in chunks to avoid loading
+        entire datasets into memory at once.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date filter
+            end_date: End date filter
+            chunk_size: Number of records per chunk
+
+        Yields:
+            DataFrame chunks with historical data
+        """
+        query = "SELECT * FROM historical_prices WHERE ticker = %s"
+        params: List[Any] = [ticker.upper()]
+
+        if start_date:
+            query += " AND date >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND date <= %s"
+            params.append(end_date)
+
+        query += " ORDER BY date ASC"
+
+        try:
+            from src.database.connection import get_connection
+
+            with get_connection() as conn:
+                chunk_iter = pd.read_sql_query(
+                    query, conn, params=tuple(params), chunksize=chunk_size
+                )
+
+                for chunk in chunk_iter:
+                    # Ensure proper data types
+                    if "date" in chunk.columns:
+                        chunk["date"] = pd.to_datetime(chunk["date"]).dt.date
+
+                    logger.debug(
+                        f"Yielded historical data chunk with {len(chunk)} records for {ticker}"
+                    )
+                    yield chunk
+
+        except Exception as e:
+            logger.error(f"Error retrieving chunked data for {ticker}: {e}")
+            raise
+
+    def process_large_dataset_with_chunks(
+        self,
+        data_loader: Callable[[], Iterator[pd.DataFrame]],
+        processor_func: Callable[[pd.DataFrame], pd.DataFrame],
+        output_chunk_size: Optional[int] = None,
+    ) -> Iterator[pd.DataFrame]:
+        """
+        Process large datasets using chunked operations
+
+        This method provides a framework for processing large datasets in chunks,
+        applying transformations while maintaining memory efficiency.
+
+        Args:
+            data_loader: Function that returns an iterator over DataFrame chunks
+            processor_func: Function to apply to each chunk
+            output_chunk_size: Optional chunk size for output (uses input chunk size if None)
+
+        Yields:
+            Processed DataFrame chunks
+        """
+        processor = ChunkedDataProcessor()
+
+        for chunk in data_loader():
+            # Apply processing function to chunk
+            processed_chunk = processor_func(chunk)
+
+            # Yield processed chunk
+            yield processed_chunk
+
+            # Memory monitoring
+            if hasattr(processor, "memory_monitor") and processor.memory_monitor.should_cleanup():
+                processor.memory_monitor.force_cleanup()
+
+    def create_streaming_dataframe_from_query(
+        self, query: str, params: Optional[tuple] = None, chunk_size: int = 10000
+    ) -> StreamingDataFrame:
+        """
+        Create a streaming DataFrame from a SQL query
+
+        This method creates a StreamingDataFrame that processes query results
+        in chunks, suitable for large result sets.
+
+        Args:
+            query: SQL query to execute
+            params: Query parameters
+            chunk_size: Number of rows per chunk
+
+        Returns:
+            StreamingDataFrame for memory-efficient processing
+        """
+
+        def data_iterator():
+            from src.database.connection import get_connection
+
+            with get_connection() as conn:
+                chunk_iter = pd.read_sql_query(query, conn, params=params, chunksize=chunk_size)
+
+                for chunk in chunk_iter:
+                    # Convert DataFrame rows to dict for StreamingDataFrame
+                    for _, row in chunk.iterrows():
+                        yield row.to_dict()
+
+        return StreamingDataFrame(data_iterator(), chunk_size)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""

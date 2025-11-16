@@ -8,7 +8,7 @@ from src.data_collector.polygon_fundamentals.config import (
     polygon_fundamentals_config,
 )
 from src.data_collector.polygon_fundamentals.client import RateLimiter as BasicRateLimiter
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -66,6 +66,16 @@ class RawPolygonFundamentalsClient:
         return None
 
     async def get_financials_raw(self, ticker: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
+        """
+        Fetch raw financial data for a ticker from Polygon API.
+
+        Args:
+            ticker: The stock ticker symbol to fetch data for
+            **kwargs: Additional parameters passed to the API request (limit, period, etc.)
+
+        Returns:
+            Raw JSON response from Polygon API, or None if request fails
+        """
         url = self.config.get_financials_url(ticker)
         params = self.config.get_request_params(ticker, **kwargs)
         logger.info(f"Fetching fundamentals (raw) for {ticker}")

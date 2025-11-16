@@ -20,7 +20,7 @@ from dateutil.parser import isoparse
 from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.polygon_data.data_storage import DataStorage
 from src.database.db_utils import _upsert_dividends_batch
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="data_collector")
 
@@ -34,11 +34,11 @@ DIVIDEND_INGESTION_CONFIG = {
 
 
 class TransformError(Exception):
-    pass
+    """Exception raised when dividend data transformation fails."""
 
 
 class SkipRecord(Exception):
-    pass
+    """Exception raised when a dividend record should be skipped during processing."""
 
 
 BAD_STAGING_PATH = os.getenv("DIVIDENDS_BAD_STAGING", "./dividends_staging_bad.jsonl")

@@ -19,7 +19,7 @@ from src.data_collector.indicator_pipeline.volatility_indicators import (
 from src.data_collector.indicator_pipeline.volume_indicators import VolumeIndicatorCalculator
 from src.data_collector.indicator_pipeline.base import IndicatorResult, IndicatorValidator
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
 logger = get_logger(__name__, utility="feature_engineering")
@@ -231,7 +231,7 @@ class FeatureCalculator:
             price_aligned = price_data.reindex(pd.DatetimeIndex(temp["_work_date"]))
 
             # Explicit horizons (trading rows ahead) — use exact trading-row shifts
-            horizons = [10, 20]  # add others if needed e.g., 5, 30
+            horizons = [5, 10, 20]  # add others if needed e.g., 5, 30
             for h in horizons:
                 temp[f"Future_High_{h}D"] = price_aligned["high"].shift(-h)
                 temp[f"Future_Close_{h}D"] = price_aligned["close"].shift(-h)

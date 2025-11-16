@@ -16,7 +16,7 @@ from typing import Dict, Any, List, Optional
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -6,7 +6,7 @@ from src.data_collector.polygon_fundamentals_v2.parser import FundamentalsParser
 from src.data_collector.polygon_fundamentals_v2.validator_v2 import FundamentalDataValidatorV2
 from src.data_collector.polygon_fundamentals_v2.repository import FundamentalsRepository
 from src.data_collector.polygon_fundamentals_v2.extractor import FundamentalsExtractor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)

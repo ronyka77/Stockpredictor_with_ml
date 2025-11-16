@@ -7,7 +7,7 @@ from src.data_collector.polygon_fundamentals.data_models import (
     CashFlowStatement,
     FinancialValue,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -20,6 +20,20 @@ class FundamentalsParser:
     """
 
     def parse(self, raw: Dict[str, Any], ticker: str) -> FundamentalDataResponse:
+        """
+        Parse raw Polygon API response into structured financial data.
+
+        Extracts income statements, balance sheets, and cash flow statements from
+        the raw JSON response, organizing them into a structured format for further
+        processing and validation.
+
+        Args:
+            raw: Raw JSON response from Polygon fundamentals API
+            ticker: The stock ticker symbol
+
+        Returns:
+            FundamentalDataResponse containing parsed financial statements
+        """
         response = FundamentalDataResponse(
             status=raw.get("status", "OK"),
             request_id=raw.get("request_id"),

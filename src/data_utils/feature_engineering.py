@@ -8,7 +8,7 @@ prediction bounds features for better performance.
 
 import pandas as pd
 import numpy as np
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -28,7 +28,7 @@ def add_price_normalized_features(features_df: pd.DataFrame) -> pd.DataFrame:
     """
 
     if "close" not in features_df.columns:
-        logger.warning("⚠ 'close' column not found. Skipping price normalization.")
+        logger.warning("'close' column not found. Skipping price normalization.")
         return features_df
 
     features_enhanced = features_df.copy()
@@ -148,7 +148,7 @@ def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Cleaned DataFrame ready for training
     """
-    logger.info(f"🧹 Starting data cleaning on {len(df)} samples...")
+    logger.info(f"Starting data cleaning on {len(df)} samples...")
 
     # 1. Handle infinite and extremely large values
     df_clean = df.copy()
@@ -166,13 +166,13 @@ def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
         # Count extreme values before capping
         extreme_count = ((df_clean[col] > max_val) | (df_clean[col] < min_val)).sum()
         if extreme_count > 0:
-            logger.info(f"   Capping {extreme_count} extreme values in {col}")
+            logger.info(f"Capping {extreme_count} extreme values in {col}")
             df_clean[col] = df_clean[col].clip(lower=min_val, upper=max_val)
 
     # 2. Fill NaN values with median (more robust than mean)
     nan_counts = df_clean[numeric_cols].isnull().sum()
     if nan_counts.sum() > 0:
-        logger.info(f"   Filling {nan_counts.sum()} NaN values with column medians")
+        logger.info(f"Filling {nan_counts.sum()} NaN values with column medians")
         for col in numeric_cols:
             if nan_counts[col] > 0:
                 median_val = df_clean[col].median()
@@ -187,7 +187,7 @@ def clean_data_for_training(df: pd.DataFrame) -> pd.DataFrame:
         df_clean[numeric_cols].apply(pd.to_numeric, errors="coerce").astype(np.float32)
     )
 
-    logger.info(f"✅ Training data cleaning completed: {len(df_clean)} samples ready")
+    logger.info(f"Training data cleaning completed: {len(df_clean)} samples ready")
 
     return df_clean
 
@@ -203,7 +203,7 @@ def analyze_feature_diversity(df: pd.DataFrame, min_variance_threshold: float = 
     Returns:
         Dictionary with diversity analysis results
     """
-    logger.info("📊 Analyzing feature diversity...")
+    logger.info("Analyzing feature diversity...")
 
     # Calculate variances only for numeric columns
     numeric_df = df.select_dtypes(include=[np.number])
@@ -234,13 +234,13 @@ def analyze_feature_diversity(df: pd.DataFrame, min_variance_threshold: float = 
         "feature_variances": variances.describe().to_dict() if not variances.empty else {},
     }
 
-    logger.info("📊 Feature Diversity Analysis:")
-    logger.info(f"   Total features: {analysis['total_features']}")
-    logger.info(f"   Numeric features: {analysis['numeric_features']}")
-    logger.info(f"   Zero variance: {analysis['zero_variance_count']}")
-    logger.info(f"   Low variance: {analysis['low_variance_count']}")
-    logger.info(f"   Constant features: {analysis['constant_feature_count']}")
-    logger.info(f"   Useful features: {analysis['useful_feature_count']}")
+    logger.info("Feature Diversity Analysis:")
+    logger.info(f"Total features: {analysis['total_features']}")
+    logger.info(f"Numeric features: {analysis['numeric_features']}")
+    logger.info(f"Zero variance: {analysis['zero_variance_count']}")
+    logger.info(f"Low variance: {analysis['low_variance_count']}")
+    logger.info(f"Constant features: {analysis['constant_feature_count']}")
+    logger.info(f"Useful features: {analysis['useful_feature_count']}")
 
     return analysis
 
@@ -267,7 +267,7 @@ def clean_features_for_training(
     Returns:
         Tuple of (cleaned_X, cleaned_y, removed_features_info)
     """
-    logger.info(f"🔧 Cleaning features for training: {X.shape[0]} samples, {X.shape[1]} features")
+    logger.info(f"Cleaning features for training: {X.shape[0]} samples, {X.shape[1]} features")
 
     x_clean = X.copy()
     y_clean = y.copy()
@@ -285,18 +285,16 @@ def clean_features_for_training(
     non_numeric_to_remove = [col for col in non_numeric_cols if col not in essential_columns]
 
     if non_numeric_to_remove:
-        logger.info(f"   Removing {len(non_numeric_to_remove)} non-numeric columns")
+        logger.info(f"Removing {len(non_numeric_to_remove)} non-numeric columns")
         removed_features["non_numeric"] = non_numeric_to_remove
         x_clean = x_clean.drop(columns=non_numeric_to_remove)
 
     # Ensure essential numeric columns are properly typed
-    for col in essential_columns:
-        if col in x_clean.columns and x_clean[col].dtype == "object":
-            try:
-                x_clean[col] = pd.to_numeric(x_clean[col], errors="coerce")
-                logger.info(f"   Converted essential column '{col}' to numeric")
-            except Exception as e:
-                logger.error(f"   Error converting essential column '{col}' to numeric: {e}")
+    cols = [c for c in essential_columns if c in x_clean.columns and x_clean[c].dtype == "object"]
+    if cols:
+        # convert the block at once and assign in a single operation
+        x_clean.loc[:, cols] = x_clean[cols].apply(pd.to_numeric, errors="coerce")
+        logger.info(f"Converted {len(cols)} essential columns to numeric")
 
     # 2. Remove constant features
     if remove_constants:
@@ -308,7 +306,7 @@ def clean_features_for_training(
 
         if constant_features:
             logger.info(
-                f"   Removing {len(constant_features)} constant features (preserving essential columns)"
+                f"Removing {len(constant_features)} constant features (preserving essential columns)"
             )
             removed_features["constant"] = constant_features
             x_clean = x_clean.drop(columns=constant_features)
@@ -328,7 +326,7 @@ def clean_features_for_training(
 
         if zero_var_features:
             logger.info(
-                f"   Removing {len(zero_var_features)} zero variance features (preserving essential columns)"
+                f"Removing {len(zero_var_features)} zero variance features (preserving essential columns)"
             )
             removed_features["zero_variance"] = zero_var_features
             x_clean = x_clean.drop(columns=zero_var_features)
@@ -352,7 +350,7 @@ def clean_features_for_training(
 
         if high_corr_features:
             logger.info(
-                f"   Removing {len(high_corr_features)} highly correlated features (>{correlation_threshold}, preserving essential columns)"
+                f"Removing {len(high_corr_features)} highly correlated features (>{correlation_threshold}, preserving essential columns)"
             )
             removed_features["high_correlation"] = high_corr_features
             x_clean = x_clean.drop(columns=high_corr_features)
@@ -361,7 +359,7 @@ def clean_features_for_training(
     nan_mask = y_clean.notna()
     if not nan_mask.all():
         nan_count = (~nan_mask).sum()
-        logger.info(f"   Removing {nan_count} samples with NaN targets")
+        logger.info(f"Removing {nan_count} samples with NaN targets")
         x_clean = x_clean[nan_mask]
         y_clean = y_clean[nan_mask]
 
@@ -371,9 +369,9 @@ def clean_features_for_training(
     y_clean = y_clean.iloc[:min_length]
 
     logger.info(
-        f"✅ Feature cleaning completed: {x_clean.shape[0]} samples, {x_clean.shape[1]} features"
+        f"Feature cleaning completed: {x_clean.shape[0]} samples, {x_clean.shape[1]} features"
     )
-    logger.info(f"   Removed: {sum(len(v) for v in removed_features.values())} features total")
+    logger.info(f"Removed: {sum(len(v) for v in removed_features.values())} features total")
 
     return x_clean, y_clean, removed_features
 

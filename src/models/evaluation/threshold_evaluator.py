@@ -10,7 +10,7 @@ import pandas as pd
 from typing import Dict, Any, Optional, Tuple, Protocol, runtime_checkable
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.models.evaluation.metrics import CustomMetrics
 
 logger = get_logger(__name__)
@@ -199,12 +199,12 @@ class ThresholdEvaluator:
 
         if len(results_df) == 0:
             logger.warning(
-                f"⚠️ No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage * 100}% to {self.max_samples_percentage * 100}%)"
+                f"No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage * 100}% to {self.max_samples_percentage * 100}%)"
             )
             logger.warning(
-                f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]"
+                f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f}]"
             )
-            logger.warning(f"   Total samples: {len(test_confidence)}")
+            logger.warning(f"Total samples: {len(test_confidence)}")
             return pd.DataFrame()  # Return empty DataFrame instead of dict
 
         # Find best threshold based on profit per investment
@@ -351,10 +351,10 @@ class ThresholdEvaluator:
             Dictionary with optimization results based on test data only (optimized for investment success rate)
         """
         logger.info(
-            f"🎯 Starting threshold optimization on test data using {confidence_method} confidence method"
+            f"Starting threshold optimization on test data using {confidence_method} confidence method"
         )
         logger.info(
-            f"   Testing {n_thresholds} thresholds from {threshold_range[0]:.2f} to {threshold_range[1]:.2f}"
+            f"Testing {n_thresholds} thresholds from {threshold_range[0]:.2f} to {threshold_range[1]:.2f}"
         )
 
         try:
@@ -364,7 +364,7 @@ class ThresholdEvaluator:
                 f"Predictions range: [{test_predictions.min():.4f}, {test_predictions.max():.4f}]"
             )
         except Exception as e:
-            logger.error(f"❌ Failed to get predictions: {e}")
+            logger.error(f"Failed to get predictions: {e}")
             return {"status": "failed", "message": f"Prediction failed: {e}"}
 
         # Validate prediction diversity
@@ -373,12 +373,12 @@ class ThresholdEvaluator:
 
         if len(unique_predictions) < min_required_diversity:
             logger.error("🚨 CRITICAL: Model produced insufficient prediction diversity.")
-            logger.error(f"   Unique predictions: {len(unique_predictions)}")
-            logger.error(f"   Minimum required: {min_required_diversity:.1f}")
+            logger.error(f"Unique predictions: {len(unique_predictions)}")
+            logger.error(f"Minimum required: {min_required_diversity:.1f}")
             logger.error(
-                "   This indicates a failed training process, likely due to constant features."
+                "This indicates a failed training process, likely due to constant features."
             )
-            logger.error("   Aborting threshold optimization.")
+            logger.error("Aborting threshold optimization.")
             return {
                 "status": "failed",
                 "message": f"Model produced insufficient prediction diversity: {len(unique_predictions)} unique values (minimum required: {min_required_diversity:.1f}).",
@@ -395,16 +395,16 @@ class ThresholdEvaluator:
                 f"Confidence mean: {test_confidence.mean():.4f}, std: {test_confidence.std():.4f}"
             )
         except Exception as e:
-            logger.error(f"❌ Failed to get confidence scores: {e}")
+            logger.error(f"Failed to get confidence scores: {e}")
             return {"status": "failed", "message": f"Confidence calculation failed: {e}"}
 
         # Validate confidence scores
         if np.isnan(test_confidence).any():
-            logger.error("❌ Confidence scores contain NaN values")
+            logger.error("Confidence scores contain NaN values")
             return {"status": "failed", "message": "Confidence scores contain NaN values"}
 
         if np.isinf(test_confidence).any():
-            logger.error("❌ Confidence scores contain infinite values")
+            logger.error("Confidence scores contain infinite values")
             return {"status": "failed", "message": "Confidence scores contain infinite values"}
 
         # For percentage returns: invest when predicted return > 0
@@ -413,7 +413,7 @@ class ThresholdEvaluator:
         )
         invest_mask = test_predictions_1d > 0
         logger.info("🔍 DIAGNOSTIC - Investment Decision Analysis:")
-        # logger.info(f"   Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")
+        # logger.info(f"Total investment candidates: {invest_mask.sum()}/{len(invest_mask)} ({invest_mask.sum()/len(invest_mask)*100:.1f}%)")
         if invest_mask.sum() > 0:
             # Ensure y_test.values and test_predictions are 1D
             y_test_1d = y_test.values.flatten() if y_test.values.ndim > 1 else y_test.values
@@ -422,10 +422,10 @@ class ThresholdEvaluator:
             )
             actual_vs_predicted = y_test_1d[invest_mask] >= test_predictions_1d[invest_mask]
             logger.info(
-                f"   Conservative success rate (all samples): {actual_vs_predicted.sum()}/{invest_mask.sum()} ({actual_vs_predicted.sum() / invest_mask.sum() * 100:.1f}%)"
+                f"Conservative success rate (all samples): {actual_vs_predicted.sum()}/{invest_mask.sum()} ({actual_vs_predicted.sum() / invest_mask.sum() * 100:.1f}%)"
             )
         else:
-            logger.info("   No investment candidates found!")
+            logger.info("No investment candidates found!")
 
         # Phase 3: Vectorized threshold testing
         thresholds = np.linspace(threshold_range[0], threshold_range[1], n_thresholds)
@@ -438,13 +438,13 @@ class ThresholdEvaluator:
         # Phase 4: Analyze results
         if len(results_df) == 0:
             logger.warning(
-                f"⚠️ No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage * 100}% to {self.max_samples_percentage * 100}%)"
+                f"No valid thresholds found that satisfy the sample constraints ({self.min_samples_percentage * 100}% to {self.max_samples_percentage * 100}%)"
             )
             logger.warning(
-                f"   Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f} avg: {test_confidence.mean():.4f} std: {test_confidence.std():.4f}"
+                f"Confidence range: [{test_confidence.min():.4f}, {test_confidence.max():.4f} avg: {test_confidence.mean():.4f} std: {test_confidence.std():.4f}"
             )
             logger.warning(
-                f"   Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f} avg: {test_predictions.mean():.4f} std: {test_predictions.std():.4f}"
+                f"Prediction range: [{test_predictions.min():.4f}, {test_predictions.max():.4f} avg: {test_predictions.mean():.4f} std: {test_predictions.std():.4f}"
             )
             return {
                 "status": "failed",
@@ -455,19 +455,17 @@ class ThresholdEvaluator:
         best_idx = results_df["test_profit_per_investment"].idxmax()
         best_result = results_df.loc[best_idx]
 
-        logger.info("🎯 Threshold Optimization Results (Optimized for Profit Per Investment):")
-        logger.info(f"   Best threshold: {best_result['threshold']:.3f}")
+        logger.info("Threshold Optimization Results (Optimized for Profit Per Investment):")
+        logger.info(f"Best threshold: {best_result['threshold']:.3f}")
         logger.info(
-            f"   Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})"
+            f"Test samples kept: {best_result['test_samples_kept']}/{len(test_confidence)} ({best_result['test_samples_ratio']:.1%})"
         )
-        logger.info(f"   Investment success rate: {best_result['investment_success_rate']:.3f}")
+        logger.info(f"Investment success rate: {best_result['investment_success_rate']:.3f}")
+        logger.info(f"Test profit per investment: ${best_result['test_profit_per_investment']:.2f}")
+        logger.info(f"Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
+        logger.info(f"Total test profit: ${best_result['test_profit']:.2f}")
         logger.info(
-            f"   Test profit per investment: ${best_result['test_profit_per_investment']:.2f}"
-        )
-        logger.info(f"   Test custom accuracy: {best_result['test_custom_accuracy']:.3f}")
-        logger.info(f"   Total test profit: ${best_result['test_profit']:.2f}")
-        logger.info(
-            f"   Average confidence of selected predictions: {best_result['average_confidence']:.3f}"
+            f"Average confidence of selected predictions: {best_result['average_confidence']:.3f}"
         )
 
         return {
@@ -547,12 +545,12 @@ class ThresholdEvaluator:
             result["all_confidence"] = all_confidence
             result["filtered_confidence"] = filtered_confidence
 
-        logger.info("🎯 Threshold Filtering Results:")
-        logger.info(f"   Confidence threshold: {threshold:.3f}")
+        logger.info("Threshold Filtering Results:")
+        logger.info(f"Confidence threshold: {threshold:.3f}")
         logger.info(
-            f"   Samples kept: {len(filtered_predictions)}/{len(X)} ({result['samples_kept_ratio']:.1%})"
+            f"Samples kept: {len(filtered_predictions)}/{len(X)} ({result['samples_kept_ratio']:.1%})"
         )
-        logger.info(f"   Average confidence of kept samples: {filtered_confidence.mean():.3f}")
+        logger.info(f"Average confidence of kept samples: {filtered_confidence.mean():.3f}")
 
         return result
 
@@ -589,7 +587,7 @@ class ThresholdEvaluator:
         filtered_predictions = prediction_result["filtered_predictions"]
 
         if len(filtered_indices) == 0:
-            logger.warning("⚠️ No predictions passed the confidence threshold")
+            logger.warning("No predictions passed the confidence threshold")
             return {"status": "failed", "message": "No predictions passed threshold"}
 
         # Get corresponding actual values and current prices
@@ -643,15 +641,15 @@ class ThresholdEvaluator:
             "avg_confidence_filtered": prediction_result["filtered_confidence"].mean(),
         }
 
-        logger.info("📊 Threshold Performance Evaluation:")
+        logger.info("Threshold Performance Evaluation:")
         logger.info(
-            f"   Samples evaluated: {results['samples_evaluated']}/{results['total_test_samples']} ({results['samples_kept_ratio']:.1%})"
+            f"Samples evaluated: {results['samples_evaluated']}/{results['total_test_samples']} ({results['samples_kept_ratio']:.1%})"
         )
-        logger.info(f"   Total profit: ${results['total_profit']:.2f}")
-        logger.info(f"   Profit per investment: ${results['profit_per_investment']:.2f}")
-        logger.info(f"   Custom accuracy: {results['custom_accuracy']:.3f}")
-        logger.info(f"   Investment success rate: {results['investment_success_rate']:.3f}")
-        logger.info(f"   Traditional R²: {results['r2_score']:.4f}")
+        logger.info(f"Total profit: ${results['total_profit']:.2f}")
+        logger.info(f"Profit per investment: ${results['profit_per_investment']:.2f}")
+        logger.info(f"Custom accuracy: {results['custom_accuracy']:.3f}")
+        logger.info(f"Investment success rate: {results['investment_success_rate']:.3f}")
+        logger.info(f"Traditional R²: {results['r2_score']:.4f}")
 
         return results
 
@@ -688,10 +686,8 @@ class ThresholdEvaluator:
         positive_predictions = invest_mask.sum()
 
         if positive_predictions == 0:
-            logger.info("📊 Prediction Metrics: No positive predictions made")
-            logger.info(
-                f"📊 Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)"
-            )
+            logger.info("Prediction Metrics: No positive predictions made")
+            logger.info(f"Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
             return 0.0
 
         # Calculate actual profitable investments among positive predictions
@@ -714,16 +710,16 @@ class ThresholdEvaluator:
         )
 
         # Log accuracy and precision metrics
-        logger.info("📊 Prediction Accuracy & Conservative Investment Metrics:")
-        logger.info(f"   Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
-        logger.info(f"   Total predictions: {total_predictions}")
+        logger.info("Prediction Accuracy & Conservative Investment Metrics:")
+        logger.info(f"Custom Accuracy: {custom_accuracy:.3f} (conservative prediction logic)")
+        logger.info(f"Total predictions: {total_predictions}")
         logger.info(
-            f"   Positive predictions: {positive_predictions} ({positive_prediction_rate:.1f}%)"
+            f"Positive predictions: {positive_predictions} ({positive_prediction_rate:.1f}%)"
         )
         logger.info(
-            f"   Conservative predictions (actual >= predicted): {correct_conservative_predictions}"
+            f"Conservative predictions (actual >= predicted): {correct_conservative_predictions}"
         )
-        logger.info(f"   Conservative success rate: {conservative_rate:.1f}%")
+        logger.info(f"Conservative success rate: {conservative_rate:.1f}%")
 
         # Calculate number of shares we can buy with investment amount for selected stocks
         shares_bought = investment_amount / selected_current_prices
@@ -737,12 +733,12 @@ class ThresholdEvaluator:
         total_profitable_count = profitable_investments.sum()
         average_profit_per_investment = profits.mean()
 
-        logger.info("📊 Investment Performance Metrics:")
-        logger.info(f"   Total investments made: {len(profits)}")
+        logger.info("Investment Performance Metrics:")
+        logger.info(f"Total investments made: {len(profits)}")
         logger.info(
-            f"   Profitable investments: {total_profitable_count} ({(total_profitable_count / len(profits) * 100):.1f}%)"
+            f"Profitable investments: {total_profitable_count} ({(total_profitable_count / len(profits) * 100):.1f}%)"
         )
-        logger.info(f"   Average profit per investment: ${average_profit_per_investment:.2f}")
+        logger.info(f"Average profit per investment: ${average_profit_per_investment:.2f}")
 
         # Return total profit from selected investments
         total_profit = profits.sum()

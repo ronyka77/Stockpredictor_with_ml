@@ -12,7 +12,7 @@ from mlflow.tracking import MlflowClient
 
 from src.models.gradient_boosting.lightgbm_model import LightGBMModel
 from src.models.predictors.base_predictor import BasePredictor
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -25,9 +25,9 @@ class LightGBMPredictor(BasePredictor):
 
     def load_model_from_mlflow(self) -> None:
         self.model = LightGBMModel.load_from_mlflow(self.run_id)
-        logger.info(f"✅ LightGBM model loaded: {self.model.model_name}")
+        logger.info(f"LightGBM model loaded: {self.model.model_name}")
         logger.info(
-            f"   Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
+            f"Expected features: {len(self.model.feature_names) if self.model.feature_names else 'Unknown'}"
         )
 
 
@@ -39,7 +39,7 @@ def get_active_run_ids_for_experiment(experiment_name: str) -> List[str]:
 
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
-        logger.warning(f"⚠️ Experiment not found: {experiment_name}")
+        logger.warning(f"Experiment not found: {experiment_name}")
         return []
 
     runs = client.search_runs(
@@ -73,12 +73,12 @@ def run_all_and_export_best(
                 predictor.evaluate_on_recent_data(days_back=days_back)
             )
         except Exception as e:
-            logger.warning(f"   ❌ Skipping run due to error: {e}")
+            logger.warning(f"Skipping run due to error: {e}")
             continue
 
         if best_tuple is None or (avg_profit is not None and avg_profit > best_tuple[1]):
             best_tuple = (run_id, avg_profit, (features_df, metadata_df, predictions))
-            logger.info(f"   ⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
+            logger.info(f"⭐ New best so far: {run_id} with avg profit ${avg_profit:.2f}")
 
     if best_tuple is None:
         logger.warning("No valid runs produced predictions.")

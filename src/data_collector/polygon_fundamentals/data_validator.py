@@ -6,7 +6,7 @@ financial data retrieved from the Polygon API.
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
 from src.data_collector.polygon_fundamentals.data_models import (
@@ -32,7 +32,7 @@ class ValidationResult:
     missing_fields: List[str]
     outliers: List[str]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate overall quality score"""
         if not hasattr(self, "quality_score") or self.quality_score is None:
             self.quality_score = self._calculate_quality_score()
@@ -59,8 +59,9 @@ class ValidationResult:
 class FundamentalDataValidator:
     """Validator for fundamental financial data"""
 
-    def __init__(self):
-        self.validation_rules = VALIDATION_RULES
+    def __init__(self) -> None:
+        """Initialize fundamental data validator"""
+        self.validation_rules: Dict[str, Any] = VALIDATION_RULES
 
     def validate_response(self, response: FundamentalDataResponse) -> ValidationResult:
         """
@@ -72,10 +73,10 @@ class FundamentalDataValidator:
         Returns:
             ValidationResult with validation details
         """
-        errors = []
-        warnings = []
-        missing_fields = []
-        outliers = []
+        errors: List[str] = []
+        warnings: List[str] = []
+        missing_fields: List[str] = []
+        outliers: List[str] = []
 
         # Check if we have any data at all
         if not any(
@@ -92,26 +93,26 @@ class FundamentalDataValidator:
             )
 
         # Validate each statement type
-        for stmt in response.income_statements:
-            result = self.validate_income_statement(stmt)
-            errors.extend(result.errors)
-            warnings.extend(result.warnings)
-            missing_fields.extend(result.missing_fields)
-            outliers.extend(result.outliers)
+        for income_stmt in response.income_statements:
+            income_result = self.validate_income_statement(income_stmt)
+            errors.extend(income_result.errors)
+            warnings.extend(income_result.warnings)
+            missing_fields.extend(income_result.missing_fields)
+            outliers.extend(income_result.outliers)
 
-        for stmt in response.balance_sheets:
-            result = self.validate_balance_sheet(stmt)
-            errors.extend(result.errors)
-            warnings.extend(result.warnings)
-            missing_fields.extend(result.missing_fields)
-            outliers.extend(result.outliers)
+        for balance_stmt in response.balance_sheets:
+            balance_result = self.validate_balance_sheet(balance_stmt)
+            errors.extend(balance_result.errors)
+            warnings.extend(balance_result.warnings)
+            missing_fields.extend(balance_result.missing_fields)
+            outliers.extend(balance_result.outliers)
 
-        for stmt in response.cash_flow_statements:
-            result = self.validate_cash_flow_statement(stmt)
-            errors.extend(result.errors)
-            warnings.extend(result.warnings)
-            missing_fields.extend(result.missing_fields)
-            outliers.extend(result.outliers)
+        for cash_flow_stmt in response.cash_flow_statements:
+            cash_flow_result = self.validate_cash_flow_statement(cash_flow_stmt)
+            errors.extend(cash_flow_result.errors)
+            warnings.extend(cash_flow_result.warnings)
+            missing_fields.extend(cash_flow_result.missing_fields)
+            outliers.extend(cash_flow_result.outliers)
 
         # Cross-statement validation
         cross_validation = self._validate_cross_statements(response)
@@ -131,10 +132,10 @@ class FundamentalDataValidator:
 
     def validate_income_statement(self, stmt: IncomeStatement) -> ValidationResult:
         """Validate an income statement"""
-        errors = []
-        warnings = []
-        missing_fields = []
-        outliers = []
+        errors: List[str] = []
+        warnings: List[str] = []
+        missing_fields: List[str] = []
+        outliers: List[str] = []
 
         # Check required fields
         required_fields = self.validation_rules["required_fields"]["income_statement"]
@@ -184,10 +185,10 @@ class FundamentalDataValidator:
 
     def validate_balance_sheet(self, stmt: BalanceSheet) -> ValidationResult:
         """Validate a balance sheet"""
-        errors = []
-        warnings = []
-        missing_fields = []
-        outliers = []
+        errors: List[str] = []
+        warnings: List[str] = []
+        missing_fields: List[str] = []
+        outliers: List[str] = []
 
         # Check required fields
         required_fields = self.validation_rules["required_fields"]["balance_sheet"]
@@ -247,10 +248,10 @@ class FundamentalDataValidator:
 
     def validate_cash_flow_statement(self, stmt: CashFlowStatement) -> ValidationResult:
         """Validate a cash flow statement"""
-        errors = []
-        warnings = []
-        missing_fields = []
-        outliers = []
+        errors: List[str] = []
+        warnings: List[str] = []
+        missing_fields: List[str] = []
+        outliers: List[str] = []
 
         # Check required fields
         required_fields = self.validation_rules["required_fields"]["cash_flow"]
@@ -281,10 +282,10 @@ class FundamentalDataValidator:
 
     def _validate_cross_statements(self, response: FundamentalDataResponse) -> ValidationResult:
         """Validate consistency across different statement types"""
-        errors = []
-        warnings = []
-        missing_fields = []
-        outliers = []
+        errors: List[str] = []
+        warnings: List[str] = []
+        missing_fields: List[str] = []
+        outliers: List[str] = []
 
         # Get latest statements for comparison
         latest_income = response.get_latest_income_statement()
@@ -315,6 +316,6 @@ class FundamentalDataValidator:
         """Extract numeric value from FinancialValue object"""
         if financial_value is None:
             return None
-        if hasattr(financial_value, "value"):
+        if hasattr(financial_value, "value") and financial_value.value is not None:
             return financial_value.value
-        return financial_value
+        return None

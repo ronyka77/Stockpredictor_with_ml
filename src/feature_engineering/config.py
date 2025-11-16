@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Tuple
 import dotenv
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -453,7 +453,7 @@ def validate_configuration() -> None:
     errors = config.validate_config()
     if errors:
         raise ValueError(
-            "Configuration validation failed:\n" + "\n".join(f"  - {error}" for error in errors)
+            "Configuration validation failed:\n" + "\n".join(f"- {error}" for error in errors)
         )
 
 
@@ -470,7 +470,7 @@ if __name__ == "__main__":
     # Validate configuration when run directly
     try:
         validate_configuration()
-        logger.info("✅ Configuration validation passed")
+        logger.info("Configuration validation passed")
         print_config_summary()
     except ValueError as e:
-        logger.info(f"❌ Configuration validation failed: {e}")
+        logger.info(f"Configuration validation failed: {e}")

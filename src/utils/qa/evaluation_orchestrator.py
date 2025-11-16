@@ -21,7 +21,7 @@ from datetime import datetime
 from enum import Enum
 from dotenv import load_dotenv
 
-from src.utils.logger import get_logger
+from ..core.logger import get_logger
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +31,7 @@ logger = get_logger(__name__)
 
 class EvaluationStatus(Enum):
     """Status of individual evaluation components"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -40,6 +41,7 @@ class EvaluationStatus(Enum):
 
 class EvaluationComponent(Enum):
     """Available evaluation components"""
+
     ARCHITECTURE_ASSESSMENT = "architecture_assessment"
     CODE_QUALITY_ANALYSIS = "code_quality_analysis"
     PERFORMANCE_EVALUATION = "performance_evaluation"
@@ -50,6 +52,7 @@ class EvaluationComponent(Enum):
 @dataclass
 class EvaluationResult:
     """Result of an individual evaluation component"""
+
     component: EvaluationComponent
     status: EvaluationStatus
     score: Optional[float] = None
@@ -69,7 +72,7 @@ class EvaluationResult:
             "recommendations": self.recommendations,
             "execution_time": self.execution_time,
             "error_message": self.error_message,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
@@ -87,13 +90,13 @@ class EvaluationConfig:
             EvaluationComponent.CODE_QUALITY_ANALYSIS,
             EvaluationComponent.PERFORMANCE_EVALUATION,
             EvaluationComponent.RELIABILITY_TESTING,
-            EvaluationComponent.SECURITY_REVIEW
+            EvaluationComponent.SECURITY_REVIEW,
         ]
     )
 
     # Execution parameters
     max_execution_time: int = 3600  # Maximum time in seconds for entire evaluation
-    component_timeout: int = 300    # Timeout per component in seconds
+    component_timeout: int = 300  # Timeout per component in seconds
     parallel_execution: bool = False  # Run components in parallel
 
     # Reporting configuration
@@ -123,7 +126,7 @@ class EvaluationConfig:
             dry_run=os.getenv("EVAL_DRY_RUN", "false").lower() == "true",
             isolation_mode=os.getenv("EVAL_ISOLATION_MODE", "true").lower() == "true",
             log_level=os.getenv("EVAL_LOG_LEVEL", cls.log_level),
-            verbose_output=os.getenv("EVAL_VERBOSE", "false").lower() == "true"
+            verbose_output=os.getenv("EVAL_VERBOSE", "false").lower() == "true",
         )
 
     def validate(self) -> List[str]:
@@ -181,7 +184,9 @@ class EvaluationOrchestrator:
         # Validate configuration on initialization
         validation_errors = self.config.validate()
         if validation_errors:
-            error_msg = "Configuration validation failed:\n" + "\n".join(f"  - {err}" for err in validation_errors)
+            error_msg = "Configuration validation failed:\n" + "\n".join(
+                f"- {err}" for err in validation_errors
+            )
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -209,8 +214,7 @@ class EvaluationOrchestrator:
             # Initialize results for all enabled components
             for component in self.config.enabled_components:
                 self.results[component] = EvaluationResult(
-                    component=component,
-                    status=EvaluationStatus.PENDING
+                    component=component, status=EvaluationStatus.PENDING
                 )
 
             # Run each evaluation component
@@ -285,7 +289,7 @@ class EvaluationOrchestrator:
             EvaluationComponent.CODE_QUALITY_ANALYSIS: "src.utils.code_quality_analysis",
             EvaluationComponent.PERFORMANCE_EVALUATION: "src.utils.performance_evaluation",
             EvaluationComponent.RELIABILITY_TESTING: "src.utils.reliability_testing",
-            EvaluationComponent.SECURITY_REVIEW: "src.utils.security_review"
+            EvaluationComponent.SECURITY_REVIEW: "src.utils.security_review",
         }
 
         module_name = module_map.get(component)
@@ -294,6 +298,7 @@ class EvaluationOrchestrator:
 
         try:
             import importlib
+
             return importlib.import_module(module_name)
         except ImportError:
             return None
@@ -313,7 +318,9 @@ class EvaluationOrchestrator:
             total_time = (self.end_time - self.start_time).total_seconds()
 
         # Calculate overall statistics
-        completed_count = sum(1 for r in self.results.values() if r.status == EvaluationStatus.COMPLETED)
+        completed_count = sum(
+            1 for r in self.results.values() if r.status == EvaluationStatus.COMPLETED
+        )
         failed_count = sum(1 for r in self.results.values() if r.status == EvaluationStatus.FAILED)
         total_findings = sum(len(r.findings) for r in self.results.values())
         total_recommendations = sum(len(r.recommendations) for r in self.results.values())
@@ -331,8 +338,8 @@ class EvaluationOrchestrator:
                 "config": {
                     "enabled_components": [c.value for c in self.config.enabled_components],
                     "parallel_execution": self.config.parallel_execution,
-                    "dry_run": self.config.dry_run
-                }
+                    "dry_run": self.config.dry_run,
+                },
             },
             "overall_statistics": {
                 "total_components": len(self.config.enabled_components),
@@ -340,12 +347,11 @@ class EvaluationOrchestrator:
                 "failed_components": failed_count,
                 "total_findings": total_findings,
                 "total_recommendations": total_recommendations,
-                "average_score": average_score
+                "average_score": average_score,
             },
             "component_results": {
-                component.value: result.to_dict()
-                for component, result in self.results.items()
-            }
+                component.value: result.to_dict() for component, result in self.results.items()
+            },
         }
 
         if error:
@@ -362,13 +368,13 @@ class EvaluationOrchestrator:
 
         if self.config.report_format in ["json", "both"]:
             json_file = Path(self.config.report_directory) / f"evaluation_report_{timestamp}.json"
-            with open(json_file, 'w', encoding='utf-8') as f:
+            with open(json_file, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
             self.logger.info(f"JSON report generated: {json_file}")
 
         if self.config.report_format in ["markdown", "both"]:
             md_file = Path(self.config.report_directory) / f"evaluation_report_{timestamp}.md"
-            with open(md_file, 'w', encoding='utf-8') as f:
+            with open(md_file, "w", encoding="utf-8") as f:
                 f.write(self._generate_markdown_report(summary))
             self.logger.info(f"Markdown report generated: {md_file}")
 
@@ -396,7 +402,7 @@ class EvaluationOrchestrator:
         lines.append(f"- **Failed:** {stats['failed_components']}")
         lines.append(f"- **Total Findings:** {stats['total_findings']}")
         lines.append(f"- **Total Recommendations:** {stats['total_recommendations']}")
-        if stats['average_score'] is not None:
+        if stats["average_score"] is not None:
             lines.append(f"- **Average Score:** {stats['average_score']:.2f}/100")
         lines.append("")
 
@@ -407,36 +413,38 @@ class EvaluationOrchestrator:
         for component_name, result in summary["component_results"].items():
             lines.append(f"### {component_name.replace('_', ' ').title()}")
             lines.append(f"- **Status:** {result['status']}")
-            if result['score'] is not None:
+            if result["score"] is not None:
                 lines.append(f"- **Score:** {result['score']:.2f}/100")
-            if result['execution_time']:
+            if result["execution_time"]:
                 lines.append(f"- **Execution Time:** {result['execution_time']:.2f}s")
-            if result['findings']:
+            if result["findings"]:
                 lines.append(f"- **Findings:** {len(result['findings'])}")
-            if result['recommendations']:
+            if result["recommendations"]:
                 lines.append(f"- **Recommendations:** {len(result['recommendations'])}")
-            if result['error_message']:
+            if result["error_message"]:
                 lines.append(f"- **Error:** {result['error_message']}")
             lines.append("")
 
             # Add findings if any
-            if result['findings']:
+            if result["findings"]:
                 lines.append("#### Findings")
-                for finding in result['findings'][:10]:  # Limit to first 10
-                    severity = finding.get('severity', 'info')
-                    message = finding.get('message', 'No message')
+                for finding in result["findings"][:10]:  # Limit to first 10
+                    severity = finding.get("severity", "info")
+                    message = finding.get("message", "No message")
                     lines.append(f"- **{severity.upper()}:** {message}")
-                if len(result['findings']) > 10:
+                if len(result["findings"]) > 10:
                     lines.append(f"- ... and {len(result['findings']) - 10} more findings")
                 lines.append("")
 
             # Add recommendations if any
-            if result['recommendations']:
+            if result["recommendations"]:
                 lines.append("#### Recommendations")
-                for rec in result['recommendations'][:10]:  # Limit to first 10
+                for rec in result["recommendations"][:10]:  # Limit to first 10
                     lines.append(f"- {rec}")
-                if len(result['recommendations']) > 10:
-                    lines.append(f"- ... and {len(result['recommendations']) - 10} more recommendations")
+                if len(result["recommendations"]) > 10:
+                    lines.append(
+                        f"- ... and {len(result['recommendations']) - 10} more recommendations"
+                    )
                 lines.append("")
 
         if summary.get("error"):
@@ -460,10 +468,12 @@ def run_evaluation(config: Optional[EvaluationConfig] = None) -> Dict[str, Any]:
     return orchestrator.run_evaluation()
 
 
-def run_evaluation_cli(target_dir: str = "src/data_collector",
-                      dry_run: bool = False,
-                      verbose: bool = False,
-                      report_dir: str = "evaluation_reports") -> None:
+def run_evaluation_cli(
+    target_dir: str = "src/data_collector",
+    dry_run: bool = False,
+    verbose: bool = False,
+    report_dir: str = "evaluation_reports",
+) -> None:
     """
     Convenience function for running evaluation with explicit parameters.
 
@@ -480,7 +490,7 @@ def run_evaluation_cli(target_dir: str = "src/data_collector",
         target_directory=target_dir,
         dry_run=dry_run,
         verbose_output=verbose,
-        report_directory=report_dir
+        report_directory=report_dir,
     )
 
     try:
@@ -489,7 +499,7 @@ def run_evaluation_cli(target_dir: str = "src/data_collector",
         print(f"- Components: {result['overall_statistics']['total_components']}")
         print(f"- Completed: {result['overall_statistics']['completed_components']}")
         print(f"- Failed: {result['overall_statistics']['failed_components']}")
-        if result['overall_statistics']['average_score'] is not None:
+        if result["overall_statistics"]["average_score"] is not None:
             print(f"- Average Score: {result['overall_statistics']['average_score']:.2f}/100")
     except Exception as e:
         print(f"Evaluation failed: {e}")

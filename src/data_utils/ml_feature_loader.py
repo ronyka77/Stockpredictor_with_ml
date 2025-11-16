@@ -12,7 +12,7 @@ from datetime import date
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
 from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 from src.feature_engineering.data_loader import StockDataLoader
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="feature_engineering")
 
@@ -173,7 +173,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
 
                 if not features.empty:
                     logger.info(
-                        f"✓ {year} data loaded: {features.shape[0]:,} records, {features.shape[1]} columns"
+                        f"{year} data loaded: {features.shape[0]:,} records, {features.shape[1]} columns"
                     )
 
                     # Add year column for tracking
@@ -184,7 +184,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                     if "ticker" in features.columns:
                         year_tickers = features["ticker"].unique()
                         logger.info(
-                            f"📊 Tickers in {year}: {len(year_tickers)} ({year_tickers[:5]}...)"
+                            f"Tickers in {year}: {len(year_tickers)} ({year_tickers[:5]}...)"
                         )
 
                     # Log date range for this year
@@ -193,7 +193,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                         date_range = (
                             f"{features['date'].min().date()} to {features['date'].max().date()}"
                         )
-                        logger.info(f"📅 Date range: {date_range}")
+                        logger.info(f"Date range: {date_range}")
                 else:
                     logger.warning(f"No data found for {year}")
 
@@ -205,8 +205,8 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
             logger.info("Combining and analyzing ALL yearly data...")
             combined_features = pd.concat(all_features_data, ignore_index=True)
 
-            logger.info(f"✓ Combined dataset: {combined_features.shape[0]:,} total records")
-            logger.info(f"✓ Total features: {combined_features.shape[1]} columns")
+            logger.info(f"Combined dataset: {combined_features.shape[0]:,} total records")
+            logger.info(f"Total features: {combined_features.shape[1]} columns")
 
             # Add ticker_id column from database metadata
             if "ticker" in combined_features.columns:
@@ -214,7 +214,7 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
 
                 # Get unique tickers from the combined data
                 unique_tickers = combined_features["ticker"].unique()
-                logger.info("📊 Fetching metadata for all tickers in one query...")
+                logger.info("Fetching metadata for all tickers in one query...")
 
                 try:
                     # Get all ticker metadata in one efficient query
@@ -234,20 +234,20 @@ def load_all_data(ticker: Optional[str] = None) -> pd.DataFrame:
                         # Log statistics about ticker_id mapping
                         null_ticker_ids = combined_features["ticker_id"].isnull().sum()
                         if null_ticker_ids > 0:
-                            logger.warning(f"⚠ {null_ticker_ids:,} records have null ticker_id")
+                            logger.warning(f"{null_ticker_ids:,} records have null ticker_id")
                             missing_tickers = [
                                 t for t in unique_tickers if t not in ticker_id_mapping
                             ]
                             if missing_tickers:
                                 logger.warning(
-                                    f"⚠ Tickers not found in database: {missing_tickers[:10]}{'...' if len(missing_tickers) > 10 else ''}"
+                                    f"Tickers not found in database: {missing_tickers[:10]}{'...' if len(missing_tickers) > 10 else ''}"
                                 )
                     else:
-                        logger.error("❌ No ticker metadata retrieved from database")
+                        logger.error("No ticker metadata retrieved from database")
                         combined_features["ticker_id"] = None
 
                 except Exception as e:
-                    logger.error(f"❌ Error fetching all ticker metadata: {str(e)}")
+                    logger.error(f"Error fetching all ticker metadata: {str(e)}")
                     combined_features["ticker_id"] = None
 
             return combined_features

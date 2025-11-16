@@ -9,7 +9,7 @@ from src.database.connection import (
     execute,
     run_in_transaction,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -122,16 +122,42 @@ class FundamentalsRepository:
         self.pool = get_global_pool()
 
     def ensure_schema(self) -> None:
+        """
+        Ensure the database schema exists for fundamentals data storage.
+
+        Creates the raw_fundamental_json staging table and fundamental_facts_v2
+        facts table if they don't already exist, along with necessary indexes.
+
+        This method is idempotent and safe to call multiple times.
+        """
         # Use centralized execute helper which handles connection and commit
         execute(RAW_STAGING_DDL)
         execute(FACTS_V2_DDL)
         logger.info("Ensured fundamentals V2 staging and facts schema")
 
     def get_ticker_id(self, ticker: str) -> Optional[int]:
+        """
+        Get the internal database ID for a ticker symbol.
+
+        Args:
+            ticker: The ticker symbol to look up (e.g., 'AAPL')
+
+        Returns:
+            The internal database ID for the ticker, or None if not found
+        """
         row = fetch_one("SELECT id FROM tickers WHERE ticker=%s", (ticker,))
         return int(row["id"]) if row and "id" in row else None
 
     def get_ticker_symbol(self, ticker_id: int) -> Optional[str]:
+        """
+        Get the ticker symbol for an internal database ID.
+
+        Args:
+            ticker_id: The internal database ID to look up
+
+        Returns:
+            The ticker symbol (e.g., 'AAPL'), or None if not found
+        """
         row = fetch_one("SELECT ticker FROM tickers WHERE id=%s", (ticker_id,))
         return str(row["ticker"]) if row and "ticker" in row else None
 
@@ -187,7 +213,7 @@ class FundamentalsRepository:
             ORDER BY r.ingested_at DESC
         """
         rows = fetch_all(sql)
-        logger.info(f"📊 Found {len(rows)} pending raw fundamental records to process")
+        logger.info(f"Found {len(rows)} pending raw fundamental records to process")
         return rows
 
     def upsert_raw_payload(
@@ -202,6 +228,23 @@ class FundamentalsRepository:
         source: Optional[str],
         payload: Dict[str, Any],
     ) -> None:
+        """
+        Insert or update raw fundamental data payload in the staging table.
+
+        Uses a hash of the payload for deduplication - if the same payload already
+        exists, it will be updated. This prevents storing duplicate data while
+        allowing updates to filing dates.
+
+        Args:
+            ticker_id: Internal database ID of the ticker
+            period_end: End date of the reporting period (YYYY-MM-DD)
+            timeframe: Timeframe of the data (e.g., 'annual', 'quarterly')
+            fiscal_period: Fiscal period identifier
+            fiscal_year: Fiscal year
+            filing_date: Date the data was filed (YYYY-MM-DD)
+            source: Source of the data (e.g., '10-K', '10-Q')
+            payload: Raw JSON payload from the API
+        """
         response_hash = self._hash_payload(payload)
         params = {
             "ticker_id": ticker_id,

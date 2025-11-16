@@ -10,8 +10,8 @@ from typing import Any
 import joblib
 import torch
 
-from src.utils.mlflow_integration import MLflowIntegration
-from src.utils.logger import get_logger
+from src.utils.mlops.mlflow_integration import MLflowIntegration
+from src.utils.core.logger import get_logger
 from src.models.feature_selection.autoencoder import DenseAutoencoder
 
 logger = get_logger(__name__)
