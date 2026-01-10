@@ -3,7 +3,7 @@ Polygon.io API client with comprehensive error handling and retry mechanisms
 """
 
 import requests
-from typing import Dict, List, Optional, Any, Union, TypedDict, cast, Generator
+from typing import Dict, List, Optional, Any, Union, TypedDict, cast
 from urllib.parse import urljoin, urlparse, parse_qs
 
 from src.utils.core.logger import get_logger
@@ -19,7 +19,7 @@ from src.utils.core.retry import (
 from src.data_collector.polygon_data.rate_limiter import get_rate_limiter
 from src.data_collector.config import config
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 # Type definitions for API responses
@@ -138,10 +138,7 @@ class PolygonDataClient:
     """Main client for interacting with Polygon.io API"""
 
     def __init__(
-        self,
-        api_key: Optional[str] = None,
-        requests_per_minute: int = 5,
-        circuit_breaker: Optional[CircuitBreaker] = None,
+        self, requests_per_minute: int = 5, circuit_breaker: Optional[CircuitBreaker] = None
     ) -> None:
         """
         Initialize the Polygon.io client with comprehensive error handling and retry mechanisms
@@ -151,7 +148,7 @@ class PolygonDataClient:
             requests_per_minute: Rate limit for API requests
             circuit_breaker: Optional circuit breaker for fault tolerance (defaults to shared instance)
         """
-        self.api_key: str = api_key or config.API_KEY
+        self.api_key: str = config.API_KEY
         self.base_url: str = config.BASE_URL
         self.rate_limiter: Any = get_rate_limiter(requests_per_minute)
         self.circuit_breaker: CircuitBreaker = circuit_breaker or API_CIRCUIT_BREAKER
@@ -161,10 +158,6 @@ class PolygonDataClient:
         self.session.headers.update(
             {"User-Agent": "StockPredictor/1.0", "Accept": "application/json"}
         )
-
-        # logger.info(
-        #     f"Polygon client initialized with {requests_per_minute} requests/minute limit"
-        # )
 
     def _make_single_request(self, url: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -303,9 +296,6 @@ class PolygonDataClient:
                 error_category="server_error",
             ) from e
 
-    # Alias for backward compatibility
-    _make_request = _make_request_with_retry
-
     def _fetch_paginated_data(
         self, endpoint: str, params: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
@@ -340,10 +330,12 @@ class PolygonDataClient:
                 }
 
                 # Make request to next page
-                response: Dict[str, Any] = self._make_request(parsed_url.path, request_params)
+                response: Dict[str, Any] = self._make_request_with_retry(
+                    parsed_url.path, request_params
+                )
             else:
                 # First page
-                response = self._make_request(endpoint, params)
+                response = self._make_request_with_retry(endpoint, params)
 
             # Extract results
             if "results" in response and response["results"]:
@@ -358,87 +350,11 @@ class PolygonDataClient:
 
             # Check for next page
             if "next_url" not in response or not response["next_url"]:
-                logger.info(
-                    f"Pagination complete. Total pages: {page_count}, "
-                    f"Total records: {len(all_results)}"
-                )
                 break
 
             next_url = response["next_url"]
 
         return all_results
-
-    def _fetch_paginated_data_stream(
-        self, endpoint: str, params: Optional[Dict[str, Any]] = None, chunk_size: int = 1000
-    ) -> Generator[List[Dict[str, Any]], None, None]:
-        """
-        Fetch data from a paginated endpoint as a streaming generator
-
-        This method yields chunks of data instead of loading all results into memory,
-        significantly reducing memory usage for large datasets.
-
-        Args:
-            endpoint: API endpoint path
-            params: Query parameters
-            chunk_size: Number of records to yield per chunk
-
-        Yields:
-            List of results (chunk) from each page until all data is processed
-        """
-        next_url: Optional[str] = None
-        page_count: int = 0
-        current_chunk: List[Dict[str, Any]] = []
-
-        while True:
-            page_count += 1
-            if page_count > 1:
-                logger.debug(f"Streaming page {page_count} from {endpoint}")
-
-            if next_url:
-                # Parse next_url to extract parameters
-                parsed_url: Any = urlparse(next_url)
-                next_params: Dict[str, List[str]] = parse_qs(parsed_url.query)
-
-                # Convert query parameters back to single values
-                request_params: Dict[str, Any] = {
-                    k: v[0] if isinstance(v, list) and len(v) == 1 else v
-                    for k, v in next_params.items()
-                }
-
-                # Make request to next page
-                response: Dict[str, Any] = self._make_request(parsed_url.path, request_params)
-            else:
-                # First page
-                response = self._make_request(endpoint, params)
-
-            # Extract results
-            if "results" in response and response["results"]:
-                results: List[Dict[str, Any]] = response["results"]
-                current_chunk.extend(results)
-
-                # Yield chunks when we reach the chunk size
-                while len(current_chunk) >= chunk_size:
-                    yield current_chunk[:chunk_size]
-                    current_chunk = current_chunk[chunk_size:]
-
-                logger.debug(
-                    f"Page {page_count}: processed {len(results)} records. "
-                    f"Chunk buffer: {len(current_chunk)}"
-                )
-            else:
-                logger.debug(f"Page {page_count}: no results found")
-                break
-
-            # Check for next page
-            if "next_url" not in response or not response["next_url"]:
-                logger.debug(f"Pagination complete. Total pages: {page_count}")
-                break
-
-            next_url = response["next_url"]
-
-        # Yield any remaining records in the final chunk
-        if current_chunk:
-            yield current_chunk
 
     def get_dividends(
         self, ticker: str, order: str = "desc", limit: int = 1000, sort: str = "ex_dividend_date"
@@ -530,7 +446,7 @@ class PolygonDataClient:
 
         logger.info(f"Fetching {timespan} aggregates for {ticker} from {from_date} to {to_date}")
 
-        response = self._make_request(endpoint, params)
+        response = self._make_request_with_retry(endpoint, params)
         return cast(List[Union[OHLCVRecord, Dict[str, Any]]], response.get("results", []))
 
     def get_grouped_daily(self, date: str) -> List[Union[OHLCVRecord, Dict[str, Any]]]:
@@ -541,7 +457,7 @@ class PolygonDataClient:
 
         logger.info(f"Fetching grouped daily data for {date}")
 
-        response = self._make_request(endpoint, params)
+        response = self._make_request_with_retry(endpoint, params)
         return cast(List[Union[OHLCVRecord, Dict[str, Any]]], response.get("results", []))
 
     def get_ticker_details(self, ticker: str) -> Union[TickerInfo, Dict[str, Any]]:
@@ -558,123 +474,14 @@ class PolygonDataClient:
 
         logger.info(f"Fetching details for ticker {ticker}")
 
-        response = self._make_request(endpoint)
+        response = self._make_request_with_retry(endpoint)
         return cast(Union[TickerInfo, Dict[str, Any]], response.get("results", {}))
-
-    def get_dividends_stream(
-        self,
-        ticker: str,
-        order: str = "desc",
-        limit: int = 1000,
-        chunk_size: int = 1000,
-        **kwargs: Any,
-    ) -> Generator[List[Union[DividendRecord, Dict[str, Any]]], None, None]:
-        """
-        Get dividend data for a ticker as a streaming generator
-
-        This method yields chunks of dividend data instead of loading all results into memory,
-        making it suitable for processing large amounts of historical dividend data.
-
-        Args:
-            ticker: Stock ticker symbol
-            order: Sort order (asc or desc)
-            limit: Maximum number of results per page
-            chunk_size: Number of records to yield per chunk
-            **kwargs: Additional query parameters
-
-        Yields:
-            Chunks of dividend records
-        """
-        if not ticker:
-            raise ValueError("ticker is required for get_dividends_stream")
-
-        params: Dict[str, Any] = {
-            "ticker": ticker,
-            "order": order,
-            "limit": min(limit, 1000),
-            **kwargs,
-        }
-
-        logger.info(f"Streaming dividends for {ticker} (order={order})")
-
-        for chunk in self._fetch_paginated_data_stream(
-            "/v3/reference/dividends", params, chunk_size
-        ):
-            yield cast(List[Union[DividendRecord, Dict[str, Any]]], chunk)
-
-    def get_tickers_stream(
-        self,
-        market: str = "stocks",
-        active: bool = True,
-        limit: int = 1000,
-        chunk_size: int = 1000,
-        **kwargs: Any,
-    ) -> Generator[List[Union[TickerInfo, Dict[str, Any]]], None, None]:
-        """
-        Get list of tickers as a streaming generator
-
-        This method yields chunks of ticker data instead of loading all results into memory,
-        making it suitable for processing large ticker lists.
-
-        Args:
-            market: Market type (stocks, crypto, fx, etc.)
-            active: Whether to include only active tickers
-            limit: Number of results per page
-            chunk_size: Number of records to yield per chunk
-            **kwargs: Additional query parameters
-
-        Yields:
-            Chunks of ticker information
-        """
-        params: Dict[str, Any] = {
-            "market": market,
-            "active": str(active).lower(),
-            "limit": min(limit, 1000),  # API maximum
-            "sort": "ticker",
-            **kwargs,
-        }
-
-        logger.info(f"Streaming {market} tickers (active={active})")
-
-        for chunk in self._fetch_paginated_data_stream("/v3/reference/tickers", params, chunk_size):
-            yield cast(List[Union[TickerInfo, Dict[str, Any]]], chunk)
-
-    def process_stream_with_callback(
-        self,
-        stream_generator: Generator[List[Dict[str, Any]], None, None],
-        callback: Any,
-        **callback_kwargs: Any,
-    ) -> int:
-        """
-        Process a streaming data generator with a callback function
-
-        This utility method allows processing large datasets in chunks without loading
-        everything into memory. The callback function is called for each chunk.
-
-        Args:
-            stream_generator: Generator yielding data chunks
-            callback: Function to call for each chunk (receives chunk and **callback_kwargs)
-            **callback_kwargs: Additional keyword arguments to pass to callback
-
-        Returns:
-            Total number of records processed
-        """
-        total_processed = 0
-
-        for chunk in stream_generator:
-            if chunk:
-                callback(chunk, **callback_kwargs)
-                total_processed += len(chunk)
-                logger.debug(f"Processed chunk of {len(chunk)} records. Total: {total_processed}")
-
-        logger.info(f"Stream processing complete. Total records processed: {total_processed}")
-        return total_processed
 
     def health_check(self) -> bool:
         """Perform a health check on the API connection"""
         try:
             # Simple request to check API connectivity
-            response = self._make_request("/v3/reference/tickers", {"limit": 1})
+            response = self._make_request_with_retry("/v3/reference/tickers", {"limit": 1})
             return "results" in response
         except Exception as e:
             logger.error(f"Health check failed: {e}")

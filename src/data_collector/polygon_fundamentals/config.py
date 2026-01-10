@@ -23,7 +23,6 @@ class PolygonFundamentalsConfig:
     API_KEY: str = os.getenv("POLYGON_API_KEY", "")
     BASE_URL: str = "https://api.polygon.io"
     FINANCIALS_ENDPOINT: str = "/vX/reference/financials"
-    COMPANY_DETAILS_ENDPOINT: str = "/v3/reference/tickers"
 
     # Rate Limiting
     REQUESTS_PER_MINUTE: int = 5  # Conservative rate limit for fundamentals
@@ -36,10 +35,6 @@ class PolygonFundamentalsConfig:
     FILING_TYPES: Optional[List[str]] = None  # Will default to ['10-K', '10-Q']
     TIMEFRAME: str = "quarterly"  # quarterly or annual
     INCLUDE_SOURCES: bool = True
-
-    # Data Quality
-    MIN_REQUIRED_FIELDS: int = 10  # Minimum fields required for valid data
-    MAX_MISSING_PERCENTAGE: float = 0.3  # 30% max missing data
 
     # Caching
     CACHE_ENABLED: bool = True

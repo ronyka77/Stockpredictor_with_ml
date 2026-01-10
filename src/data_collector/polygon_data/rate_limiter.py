@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -18,13 +18,11 @@ class RateLimiter:
 
     Attributes:
         requests_per_minute: Maximum requests allowed per minute
-        last_request_time: Timestamp of last request
         request_count: Number of requests in current window
         window_start: Start time of current rate limiting window
     """
 
     requests_per_minute: int = 5
-    last_request_time: float = 0
     request_count: int = 0
     window_start: float = 0
 
@@ -64,7 +62,6 @@ class RateLimiter:
                 current_time = time.time()
 
         self.request_count += 1
-        self.last_request_time = current_time
 
         logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
 

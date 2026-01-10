@@ -100,15 +100,15 @@ def prepare_common_training_data(
     x_test_clean, y_test = _filter_recent_dates(x_test_clean, y_test, recent_date_int_cut)
 
     # 5) Extract random sample to CSV for inspection/analysis
-    # target_col = data_result.get("target_column", "target")
-    # export_dataset_sample_to_csv(
-    #     x_test=x_test_clean,
-    #     y_test=y_test,
-    #     target_column=target_col,
-    #     sample_size=1000,
-    #     predictions_dir="predictions",
-    #     random_state=42,
-    # )
+    target_col = data_result.get("target_column", "target")
+    export_dataset_sample_to_csv(
+        x_test=x_test_clean,
+        y_test=y_test,
+        target_column=target_col,
+        sample_size=1000,
+        predictions_dir="predictions",
+        random_state=42,
+    )
 
     # Bundle results
     result: Dict[str, Any] = {

@@ -76,7 +76,7 @@ class RawPolygonFundamentalsClient:
         Returns:
             Raw JSON response from Polygon API, or None if request fails
         """
-        url = self.config.get_financials_url(ticker)
+        url = self.config.get_financials_url()
         params = self.config.get_request_params(ticker, **kwargs)
         logger.info(f"Fetching fundamentals (raw) for {ticker}")
         return await self._get(url, params)

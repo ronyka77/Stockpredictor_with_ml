@@ -149,7 +149,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             num_stack_levels=2,
             num_bag_folds=4,
             use_bag_holdout=True,
-            ag_args_ensemble={"fold_fitting_strategy": "sequential"},
         )
         summary = self.predictor.fit_summary(show_plot=True)
         logger.info(summary)
@@ -161,7 +160,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         logger.info("AutoGluon training completed")
         return self
 
-    # ModelProtocol requirement
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.predictor:
             raise ValueError(PREDICTOR_NOT_TRAINED)
@@ -175,7 +173,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             preds = self.predictor.predict(X, model=self.selected_model_name)
         return preds.to_numpy() if hasattr(preds, "to_numpy") else np.asarray(preds)
 
-    # ModelProtocol requirement
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = "margin") -> np.ndarray:
         if not self.predictor:
             raise ValueError(PREDICTOR_NOT_TRAINED)

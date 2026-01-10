@@ -464,21 +464,6 @@ class CredentialManager:
 
         return credential
 
-    def validate_all_credentials(self) -> Dict[str, bool]:
-        """Validate all managed credentials"""
-        results = {}
-        for name, credential in self._credentials.items():
-            results[name] = credential.validate()
-
-        invalid_count = sum(1 for valid in results.values() if not valid)
-        if invalid_count > 0:
-            logger.warning(
-                f"Credential validation completed: {invalid_count} invalid out of {len(results)} total",
-                extra={"total_credentials": len(results), "invalid_count": invalid_count},
-            )
-
-        return results
-
     def get_rotation_candidates(self) -> List[str]:
         """Get list of credential names that require rotation"""
         candidates = [name for name, cred in self._credentials.items() if cred.requires_rotation()]

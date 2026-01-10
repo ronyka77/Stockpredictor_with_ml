@@ -358,9 +358,6 @@ def close_global_pool() -> None:
                 _GLOBAL_POOL = None
 
 
-# --- Convenience DB helpers ---
-
-
 def check_database_health() -> bool:
     """Check the health of the global database connection pool.
 

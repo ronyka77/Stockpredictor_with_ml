@@ -14,7 +14,7 @@ from typing import Dict, List, Any
 from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -27,14 +27,12 @@ class IndicatorResult:
         metadata: Dictionary containing calculation metadata
         quality_score: Quality score of the calculation (0-100)
         warnings: List of warnings generated during calculation
-        calculation_time: Time taken for calculation in seconds
     """
 
     data: pd.DataFrame
     metadata: Dict[str, Any]
     quality_score: float
     warnings: List[str]
-    calculation_time: float
 
     def __post_init__(self):
         """Validate the result after initialization"""
@@ -154,10 +152,7 @@ class IndicatorValidator:
 
 
 def create_indicator_result(
-    data: pd.DataFrame,
-    metadata: Dict[str, Any],
-    warnings: List[str] = None,
-    calculation_time: float = 0.0,
+    data: pd.DataFrame, metadata: Dict[str, Any], warnings: List[str] = None
 ) -> IndicatorResult:
     """
     Convenience function to create an IndicatorResult with quality scoring
@@ -166,7 +161,6 @@ def create_indicator_result(
         data: Calculated indicator data
         metadata: Calculation metadata
         warnings: List of warnings (optional)
-        calculation_time: Time taken for calculation
 
     Returns:
         IndicatorResult with calculated quality score
@@ -182,9 +176,5 @@ def create_indicator_result(
         quality_score = 100 * (1 - missing_pct)
 
     return IndicatorResult(
-        data=data,
-        metadata=metadata,
-        quality_score=quality_score,
-        warnings=warnings,
-        calculation_time=calculation_time,
+        data=data, metadata=metadata, quality_score=quality_score, warnings=warnings
     )

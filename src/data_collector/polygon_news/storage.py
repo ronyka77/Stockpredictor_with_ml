@@ -6,12 +6,11 @@ Handles upserts, batch processing, and data maintenance
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 
-from src.data_collector.polygon_news.models import validate_article_data
 from src.data_collector.config import config
 from src.utils.core.logger import get_logger
 from src.database.connection import fetch_one, fetch_all, execute, run_in_transaction
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class PolygonNewsStorage:
@@ -23,50 +22,7 @@ class PolygonNewsStorage:
         """
         Initialize storage using module-level DB helpers
         """
-        self.logger = get_logger(__name__, utility="data_collector")
-
-    def store_article(self, article_data: Dict[str, Any]) -> Optional[int]:
-        """
-        Store a single article with upsert logic
-
-        Args:
-            article_data: Processed article data from Polygon API
-
-        Returns:
-            Article ID if successful, None if skipped/failed
-        """
-        try:
-            # Validate article data
-            if not validate_article_data(article_data):
-                self.logger.warning(
-                    f"Invalid article data: {article_data.get('polygon_id', 'unknown')}"
-                )
-                return None
-
-            # Check if article already exists
-            existing = fetch_one(
-                "SELECT id, title, description, article_url, published_utc, publisher_name, keywords, quality_score, relevance_score FROM polygon_news_articles WHERE polygon_id = %s",
-                params=(article_data["polygon_id"],),
-            )
-
-            if existing:
-                updated = self._update_existing_article(existing, article_data)
-                if updated:
-                    self.logger.info(f"Updated existing article: {article_data['polygon_id']}")
-                return existing.get("id")
-
-            # Create new article
-            article_id = self._create_new_article(article_data)
-            if article_id:
-                self.logger.info(f"Created new article: {article_data['polygon_id']}")
-
-            return article_id
-
-        except Exception as e:
-            self.logger.error(
-                f"Error storing article {article_data.get('polygon_id', 'unknown')}: {e}"
-            )
-            return None
+        self.logger = get_logger(__name__)
 
     def store_articles_batch(self, articles_data: List[Dict[str, Any]]) -> Dict[str, int]:
         """

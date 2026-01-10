@@ -49,11 +49,11 @@ class FundamentalsParser:
         for r in results:
             fin = r.get("financials") or {}
 
-            # metadata common
+            # metadata common - convert dates to strings for security validation
             meta = {
-                "start_date": r.get("start_date"),
-                "end_date": r.get("end_date"),
-                "filing_date": r.get("filing_date"),
+                "start_date": str(r.get("start_date")) if r.get("start_date") else None,
+                "end_date": str(r.get("end_date")) if r.get("end_date") else None,
+                "filing_date": str(r.get("filing_date")) if r.get("filing_date") else None,
                 "timeframe": r.get("timeframe"),
                 "fiscal_period": r.get("fiscal_period"),
                 "fiscal_year": r.get("fiscal_year"),

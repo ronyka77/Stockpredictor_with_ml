@@ -15,7 +15,7 @@ from src.utils.core.logger import get_logger
 from src.data_utils.ml_feature_loader import load_all_data
 from src.data_utils.target_engineering import (
     convert_absolute_to_percentage_returns,
-    _maybe_downcast_numeric,
+    _downcast_numeric,
 )
 from src.data_utils.feature_engineering import (
     add_price_normalized_features,
@@ -92,7 +92,7 @@ def prepare_ml_data_for_training(
 
         # Early numeric downcast to reduce peak memory usage on large datasets
         try:
-            _maybe_downcast_numeric(combined_data)
+            _downcast_numeric(combined_data)
             logger.info("Applied early numeric downcast to reduce memory usage")
         except Exception as e:
             logger.warning(f"Early downcast skipped: {e}")
@@ -101,6 +101,16 @@ def prepare_ml_data_for_training(
         combined_data, target_column = convert_absolute_to_percentage_returns(
             combined_data, prediction_horizon
         )
+
+        # Verify no NaNs in target (safety check)
+        if combined_data[target_column].isna().any():
+            nan_count = combined_data[target_column].isna().sum()
+            logger.error(
+                f"Found {nan_count} NaNs in target column {target_column} after conversion!"
+            )
+            # Explicitly drop them to prevent zero-filling later
+            combined_data = combined_data.dropna(subset=[target_column])
+            logger.info(f"Dropped {nan_count} rows with NaN targets")
 
         # Extract percentage return targets (instead of absolute prices)
         y = combined_data[target_column].copy()
@@ -311,7 +321,7 @@ def prepare_ml_data_for_prediction(
             raise ValueError("No data loaded. Check data availability.")
 
         combined_data, target_column = convert_absolute_to_percentage_returns(
-            combined_data, prediction_horizon
+            combined_data, prediction_horizon, filter_outliers=False
         )
         date_col = combined_data["date"].copy()
         # keep Mondays and Fridays only (0, 4)
@@ -551,8 +561,6 @@ def prepare_ml_data_for_prediction_with_cleaning(
         data_result["x_test"] = data_result["x_test"][recent_mask]
         data_result["y_test"] = data_result["y_test"][recent_mask]
 
-    data_result["x_test"] = clean_data_for_training(data_result["x_test"])
-
     # Analyze feature diversity for prediction data
     diversity_analysis = analyze_feature_diversity(data_result["x_test"])
     data_result["diversity_analysis"] = diversity_analysis
@@ -570,6 +578,11 @@ def prepare_ml_data_for_prediction_with_cleaning(
         logger.info("[CACHE] Data cached successfully.")
     except Exception as e:
         logger.warning(f"Failed to cache cleaned data: {str(e)}")
+
+    # Combine x_test and y_test and save to CSV
+    combined_pred = data_result["x_test"].copy()
+    combined_pred["target"] = data_result["y_test"].values
+    combined_pred.to_csv("prediction_set.csv", index=False)
 
     logger.info(
         f"Prediction data: {len(data_result['x_test'])} samples, {len(data_result['x_test'].columns)} features"

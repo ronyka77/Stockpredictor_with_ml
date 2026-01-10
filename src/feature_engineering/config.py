@@ -158,9 +158,6 @@ class StorageConfig:
     USE_CONSOLIDATED_STORAGE: bool = True
     OVERWRITE_EXISTING: bool = os.getenv("FE_OVERWRITE_EXISTING", "false").lower() == "true"
 
-    # Partitioning
-    PARTITIONING_STRATEGY: str = "by_date"  # Only year-based supported
-
     # File Management
     CLEANUP_OLD_VERSIONS: bool = True
     MAX_VERSIONS_TO_KEEP: int = int(os.getenv("FE_MAX_VERSIONS_TO_KEEP", "3"))

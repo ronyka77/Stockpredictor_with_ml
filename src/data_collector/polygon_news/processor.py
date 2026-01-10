@@ -8,7 +8,7 @@ import re
 
 from src.utils.core.logger import get_logger
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class NewsProcessor:
@@ -18,7 +18,7 @@ class NewsProcessor:
     """
 
     def __init__(self):
-        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
+        self.logger = get_logger(self.__class__.__name__)
 
     def process_article(self, article_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """

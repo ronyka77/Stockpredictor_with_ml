@@ -8,24 +8,121 @@ incident response.
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass, field as dc_field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
-try:
-    from src.utils.core.logger import get_logger
-except ImportError:
-    # Allow running as standalone script
-    import sys
-    import os
-
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from src.utils.core.logger import get_logger
+from src.utils.core.logger import get_logger
 
 # Initialize security logger
 security_logger = get_logger(__name__, "security")
+
+# Compact validation logging artifacts and helpers
+
+
+@dataclass
+class CompactValidationIssue:
+    """Normalized representation of a single validation problem for compact logs."""
+
+    field: str
+    reason: str
+    value: Optional[Union[str, int, float]] = None
+    source: Optional[str] = None
+    context: Dict[str, str] = dc_field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Enforce invariants
+        if not isinstance(self.field, str) or not self.field:
+            raise ValueError("field must be a non-empty string")
+        if not isinstance(self.reason, str) or not self.reason:
+            raise ValueError("reason must be a non-empty string")
+        # Truncate and ASCII-normalize context values to keep logs compact
+        for k, v in list(self.context.items()):
+            s = _truncate_ascii(v, 120)
+            self.context[k] = s
+
+
+@dataclass
+class CompactValidationLogConfig:
+    """Configuration knobs for compact validation logging."""
+
+    max_issues: int = 3
+    max_value_len: int = 120
+    max_reason_len: int = 200
+
+
+def _truncate_ascii(value: object, max_len: int) -> str:
+    """Return an ASCII-only, truncated string representation of value."""
+    s = str(value)
+    # Replace non-ascii chars with '?' to ensure ASCII-only logs
+    s = s.encode("ascii", "replace").decode("ascii")
+    if len(s) > max_len:
+        return s[: max_len - 3] + "..."
+    return s
+
+
+def _format_compact_issue(issue: CompactValidationIssue, cfg: CompactValidationLogConfig) -> str:
+    """Format a single CompactValidationIssue into a short key=value fragment."""
+    reason = _truncate_ascii(issue.reason, cfg.max_reason_len)
+    parts: List[str] = [f"field={issue.field}", f'reason="{reason}"']
+    if issue.value is not None:
+        parts.append(f"value={_truncate_ascii(issue.value, cfg.max_value_len)}")
+    if issue.source:
+        parts.append(f"source={issue.source}")
+    if issue.context:
+        ctx = ",".join(f"{k}={_truncate_ascii(v, 60)}" for k, v in issue.context.items())
+        parts.append(f"context={ctx}")
+    return " ".join(parts)
+
+
+def emit_compact_validation_log(
+    issues: List[CompactValidationIssue],
+    *,
+    service: str = "unknown",
+    cfg: Optional[CompactValidationLogConfig] = None,
+) -> None:
+    """Emit a single, compact validation log line summarizing the supplied issues.
+
+    The message is intentionally single-line and ASCII-only to reduce noise in
+    logging backends and to prevent generation of structured security audit
+    events for routine validation failures.
+    """
+    cfg = cfg or CompactValidationLogConfig()
+    logger = get_logger("validation")
+
+    total = len(issues)
+    shown = issues[: cfg.max_issues]
+    fragments = [_format_compact_issue(i, cfg) for i in shown]
+    msg = f"VALIDATION: {' | '.join(fragments)}"
+    if total > cfg.max_issues:
+        msg += f" ({total - cfg.max_issues} more issues suppressed)"
+
+    # Use warning level for validation failures to make them visible but not
+    # part of the security audit stream.
+    logger.warning(msg)
+
+
+def _make_issues_from_inputs(
+    resource: str, validation_errors: List[str], input_source: str, details: Dict[str, Any]
+) -> List[CompactValidationIssue]:
+    """Create CompactValidationIssue objects from normalized inputs."""
+    issues: List[CompactValidationIssue] = []
+    field_name = details.get("field") or resource or "unknown"
+    value = details.get("value")
+
+    for err in validation_errors:
+        issue = CompactValidationIssue(
+            field=str(field_name),
+            reason=str(err),
+            value=value,
+            source=input_source,
+            context={k: str(v) for k, v in details.items() if k not in ("value", "field")},
+        )
+        issues.append(issue)
+    return issues
 
 
 class SecurityEventType(Enum):
@@ -296,32 +393,21 @@ class SecurityAuditLogger:
         user_id: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Log input validation failure."""
-        event_details = {
-            "validation_errors": validation_errors,
-            "input_source": input_source,
-            "error_count": len(validation_errors),
-        }
-        if details:
-            event_details.update(details)
+        """Emit a compact validation log instead of an audit security event.
 
-        severity = (
-            SecurityEventSeverity.HIGH
-            if len(validation_errors) > 3
-            else SecurityEventSeverity.MEDIUM
-        )
+        For backward compatibility we return a stable placeholder event id.
+        This method intentionally does NOT call `log_security_event` or
+        `_log_event` to avoid creating security audit noise for routine
+        validation failures.
+        """
+        details = details or {}
 
-        return self.log_security_event(
-            event_type=SecurityEventType.INPUT_VALIDATION_FAILURE,
-            severity=severity,
-            user_id=user_id,
-            ip_address=ip_address,
-            resource=resource,
-            action="validate_input",
-            outcome="failure",
-            details=event_details,
-            risk_score=self._calculate_risk_score("validation_failure", len(validation_errors)),
-        )
+        # Build compact issues and emit a single-line compact log
+        issues = _make_issues_from_inputs(resource, validation_errors, input_source, details)
+        emit_compact_validation_log(issues, service=self.service_name)
+
+        # Return placeholder event id for callers that expect a string identifier
+        return "suppressed_input_validation_failure"
 
     def log_credential_validation(
         self,
@@ -511,8 +597,53 @@ def log_authentication_failure(**kwargs) -> str:
 
 
 def log_input_validation_failure(**kwargs) -> str:
-    """Log input validation failure."""
-    return audit_logger.log_input_validation_failure(**kwargs)
+    """Log input validation failure using compact validation logs.
+
+    This wrapper normalizes calling forms and emits compact validation logs
+    instead of security audit events. It intentionally does NOT call into
+    the security audit event pipeline to avoid emitting `SECURITY EVENT [`
+    lines for routine validation failures.
+    """
+    data = dict(kwargs)  # copy so we can mutate safely
+
+    # Gather and normalize details
+    details = data.pop("details", {}) or {}
+
+    if "field" in data:
+        details.setdefault("field", data.pop("field"))
+    if "value" in data:
+        details.setdefault("value", data.pop("value"))
+
+    # Support single-string validation_error or list of errors
+    if "validation_error" in data:
+        ve = data.pop("validation_error")
+        validation_errors = ve if isinstance(ve, list) else [str(ve)]
+    else:
+        validation_errors = data.pop("validation_errors", None)
+
+    # Map severity into details (not used for structured audit events, but kept)
+    if "severity" in data:
+        details.setdefault("severity", data.pop("severity"))
+
+    # Extract canonical args
+    resource = data.pop("resource", None) or details.get("field") or "unknown"
+    input_source = data.pop("input_source", data.pop("input", "unknown"))
+    data.pop("ip_address", None)
+    data.pop("user_id", None)
+
+    # Anything else leftover should be attached to details
+    for k, v in list(data.items()):
+        details.setdefault(k, v)
+
+    if not validation_errors:
+        validation_errors = ["validation_failed"]
+
+    # Build compact issues and emit the compact log
+    issues = _make_issues_from_inputs(resource, validation_errors, input_source, details)
+    emit_compact_validation_log(issues)
+
+    # Return the placeholder for backward compatibility
+    return "suppressed_input_validation_failure"
 
 
 def log_credential_validation(**kwargs) -> str:

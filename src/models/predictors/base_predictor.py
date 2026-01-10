@@ -15,10 +15,8 @@ from abc import ABC, abstractmethod
 
 from src.data_utils.target_engineering import convert_percentage_predictions_to_prices
 from src.feature_engineering.data_loader import StockDataLoader
-from src.data_utils.ml_data_pipeline import (
-    prepare_ml_data_for_prediction_with_cleaning,
-    filter_dates_to_weekdays,
-)
+from src.data_utils.ml_data_pipeline import filter_dates_to_weekdays
+from src.data_utils.polars_ml_pipeline import prepare_ml_data_for_prediction_with_cleaning_polars
 from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -48,14 +46,17 @@ class BasePredictor(ABC):
     @abstractmethod
     def load_model_from_mlflow(self) -> None:
         """
-        Abstract method to load a model from MLflow.
-        Must be implemented by subclasses.
+        Load the trained model from MLflow tracking server.
+        This abstract method must be implemented by subclasses to handle
+        model-specific loading logic (e.g., LightGBM, XGBoost, AutoGluon).
         """
         pass
 
     def _load_metadata_from_mlflow(self):
         """
-        Load model metadata from MLflow.
+        Extract and set model configuration parameters from MLflow run metadata.
+        Loads prediction horizon, optimal threshold, and other model-specific settings
+        that were logged during training.
         """
         client = mlflow.tracking.MlflowClient()
         run_info = client.get_run(self.run_id)
@@ -77,16 +78,28 @@ class BasePredictor(ABC):
 
     def load_recent_data(self, days_back: int = 30) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Load the most recent data for making predictions.
+        Prepare and load the most recent market data for prediction generation.
+        Fetches features and targets for the specified number of days back, performs
+        data cleaning, handles missing features, and validates data-model compatibility.
         """
         logger.info(f"Loading recent data (last {days_back} days)...")
-        data_result = prepare_ml_data_for_prediction_with_cleaning(
+        data_result = prepare_ml_data_for_prediction_with_cleaning_polars(
             prediction_horizon=self.prediction_horizon, days_back=days_back
         )
-        logger.info(f"Data shape after cleaning: {data_result['x_test'].shape}")
 
-        recent_features = data_result["x_test"].copy()
-        recent_targets = data_result["y_test"].copy()
+        # Keep downstream logic pandas-based for minimal change footprint
+        x_test = data_result["x_test"]
+        y_test = data_result["y_test"]
+        recent_features = (
+            x_test.to_pandas().copy() if hasattr(x_test, "to_pandas") else x_test.copy()
+        )
+
+        if hasattr(y_test, "to_pandas"):
+            recent_targets = y_test.to_pandas()
+        else:
+            recent_targets = y_test
+
+        logger.info(f"Data shape after cleaning: {recent_features.shape}")
 
         if "ticker_id" in recent_features.columns:
             unique_tickers = recent_features["ticker_id"].nunique()
@@ -108,14 +121,25 @@ class BasePredictor(ABC):
         self._validate_feature_diversity(recent_features)
         self._validate_model_compatibility(recent_features)
 
-        metadata_df = pd.DataFrame({"target_values": recent_targets.values})
+        if isinstance(recent_targets, pd.DataFrame):
+            if recent_targets.shape[1] != 1:
+                raise ValueError(f"Expected y_test to have 1 column, got {recent_targets.shape[1]}")
+            target_values = recent_targets.iloc[:, 0].values
+        elif isinstance(recent_targets, pd.Series):
+            target_values = recent_targets.values
+        else:
+            target_values = np.asarray(recent_targets)
+
+        metadata_df = pd.DataFrame({"target_values": target_values})
         return recent_features, metadata_df
 
     def _validate_feature_diversity(self, features_df: pd.DataFrame) -> None:
         """
-        Validate that features show diversity across tickers.
+        Check feature data quality by analyzing statistical diversity across tickers.
+        Logs descriptive statistics for numeric features to detect potential data issues
+        like constant values or insufficient variation.
         """
-        logger.info("🔍 Validating feature diversity...")
+        logger.info("Validating feature diversity...")
         numeric_cols = features_df.select_dtypes(include=[np.number]).columns
         numeric_cols = [col for col in numeric_cols if col not in ["ticker_id", "date_int"]]
 
@@ -131,7 +155,9 @@ class BasePredictor(ABC):
 
     def _validate_model_compatibility(self, features_df: pd.DataFrame) -> None:
         """
-        Validate that features are compatible with the loaded model.
+        Ensure prediction data features match the model's expected input schema.
+        Compares feature names between loaded data and trained model, logging warnings
+        for any missing features that may impact prediction accuracy.
         """
         if (
             not self.model
@@ -141,24 +167,26 @@ class BasePredictor(ABC):
             logger.warning(" No model feature names available for validation.")
             return
 
-        logger.info("🔗 Validating model compatibility...")
+        logger.info("Validating model compatibility...")
         model_features = set(self.model.feature_names)
         data_features = set(features_df.columns)
         missing_in_data = model_features - data_features
 
         if missing_in_data:
             logger.warning(
-                f"🚨 WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality."
+                f"WARNING: Missing {len(missing_in_data)} features. This may impact prediction quality."
             )
 
     def make_predictions(self, features_df: pd.DataFrame) -> np.ndarray:
         """
-        Make predictions using the loaded model.
+        Generate return predictions using the loaded machine learning model.
+        Takes prepared feature data and returns percentage return predictions
+        for each ticker-date combination.
         """
         if self.model is None:
             raise RuntimeError("Model not loaded. Call load_model_from_mlflow() first.")
 
-        logger.info("🔮 Making predictions...")
+        logger.info("Making predictions...")
         prediction_features = features_df.copy()
         if self.model.feature_names:
             prediction_features = prediction_features[self.model.feature_names]
@@ -168,7 +196,9 @@ class BasePredictor(ABC):
 
     def get_confidence_scores(self, features_df: pd.DataFrame) -> np.ndarray:
         """
-        Get confidence scores for predictions.
+        Calculate prediction confidence scores using model-specific methods.
+        Returns probability scores or confidence intervals that indicate
+        the model's certainty in each prediction.
         """
         if self.model is None:
             raise RuntimeError("Model not loaded. Call load_model_from_mlflow() first.")
@@ -182,7 +212,9 @@ class BasePredictor(ABC):
         self, predictions: np.ndarray, confidence_scores: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Apply threshold filtering to predictions via centralized ThresholdPolicy.
+        Filter predictions based on confidence scores using the optimal threshold.
+        Returns filtered prediction indices and boolean mask to select only
+        high-confidence predictions for trading decisions.
         """
         try:
             from src.models.evaluation.threshold_policy import ThresholdPolicy, ThresholdConfig
@@ -209,7 +241,9 @@ class BasePredictor(ABC):
         model_name=None,
     ) -> str | None:
         """
-        Save predictions to an Excel file.
+        Export processed predictions and metadata to a timestamped Excel file.
+        Creates comprehensive output including ticker information, predicted returns,
+        confidence scores, and profit calculations for trading analysis.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         if self.model_dir is not None:
@@ -227,8 +261,6 @@ class BasePredictor(ABC):
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, file_name)
 
-        logger.info("Validating and saving predictions")
-
         results_df = self._build_results_dataframe_and_profit(
             features_df=features_df, metadata_df=metadata_df, predictions=predictions
         )
@@ -245,7 +277,9 @@ class BasePredictor(ABC):
 
     def _merge_ticker_metadata(self, results_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Get ticker metadata from the database.
+        Enrich results with human-readable ticker symbols and company names.
+        Converts numeric ticker IDs to ticker symbols and company names
+        by querying the database for metadata mapping.
         """
         try:
             results_df["date"] = pd.to_datetime(
@@ -268,11 +302,12 @@ class BasePredictor(ABC):
 
     def _build_results_dataframe_and_profit(
         self, *, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray
-    ) -> Tuple[pd.DataFrame, float]:
+    ) -> pd.DataFrame:
         """
-        Build the results DataFrame and compute the average profit per investment
-        without writing to disk.
-        Returns a tuple of (results_df, avg_profit_per_investment).
+        Construct comprehensive results DataFrame with predictions, prices, and profit calculations.
+        Orchestrates the complete post-prediction processing pipeline: initializes results,
+        applies filtering, computes derived metrics, and calculates profitability statistics.
+        Preserves future rows (without actual prices) alongside processed historical data.
         """
         # Split logic into small helpers for readability and lower cognitive complexity
         results_df = self._init_results_df(features_df, metadata_df, predictions)
@@ -280,22 +315,68 @@ class BasePredictor(ABC):
             return pd.DataFrame()
 
         results_df = self._apply_threshold_and_top10(results_df, features_df)
+        results_df.to_excel("debug_results_df.xlsx", index=False)  # Debug output
         if results_df is None or results_df.empty:
             return pd.DataFrame()
 
-        results_df = self._compute_derived_metrics(results_df)
-        if results_df is None or results_df.empty:
-            return pd.DataFrame()
+        # PRESERVE FUTURE ROWS: compute mask after filtering so it aligns with filtered results_df
+        future_rows_mask = results_df["actual_return"].isna()
+        future_rows_df = (
+            results_df[future_rows_mask].copy(deep=True)
+            if future_rows_mask.any()
+            else pd.DataFrame()
+        )
+        not_closed = len(future_rows_df)
+        logger.info(f"🔮 unclosed predictions: {not_closed}")
+        if not_closed == 0:
+            logger.warning(
+                " WARNING: No unclosed predictions found - all predictions have actual prices!"
+            )
 
-        avg_profit_per_investment = self._aggregate_profit_and_filter_by_weekday(results_df)
+        # Process only historical rows (with actual prices) for profit calculations
+        historical_results_df = results_df[~future_rows_mask].copy()
+        if not historical_results_df.empty:
+            historical_results_df = self._compute_derived_metrics(historical_results_df)
+            if historical_results_df is None or historical_results_df.empty:
+                historical_results_df = pd.DataFrame()
+        else:
+            historical_results_df = pd.DataFrame()
+
+        historical_results_df.to_excel(
+            "debug_historical_results_df.xlsx", index=False
+        )  # Debug output
+        avg_profit_per_investment = self._aggregate_profit_and_filter_by_weekday(
+            historical_results_df
+        )
         if avg_profit_per_investment is None:
+            logger.warning(" No valid profit data found!")
             return pd.DataFrame()
 
-        return results_df
+        # 🔥 RE-ADD FUTURE ROWS: Combine processed historical data with preserved future predictions
+        if not future_rows_df.empty and not historical_results_df.empty:
+            combined_results_df = pd.concat(
+                [historical_results_df, future_rows_df], ignore_index=True
+            )
+        elif not historical_results_df.empty:
+            combined_results_df = historical_results_df
+        elif not future_rows_df.empty:
+            combined_results_df = future_rows_df
+        else:
+            logger.warning(" No valid results to combine!")
+            return pd.DataFrame()
+
+        combined_results_df.to_excel("debug_final_results_df.xlsx", index=False)  # Debug output
+
+        return combined_results_df
 
     def _init_results_df(
         self, features_df: pd.DataFrame, metadata_df: pd.DataFrame, predictions: np.ndarray
     ) -> pd.DataFrame | None:
+        """
+        Initialize the results DataFrame with core prediction data and metadata.
+        Combines features, predictions, and price information into a structured format,
+        validates required columns, and prepares data for further processing.
+        """
         results_df = metadata_df.copy()
         try:
             results_df["ticker_id"] = features_df["ticker_id"].values
@@ -329,6 +410,11 @@ class BasePredictor(ABC):
     def _apply_threshold_and_top10(
         self, results_df: pd.DataFrame, features_df: pd.DataFrame
     ) -> pd.DataFrame | None:
+        """
+        Apply confidence threshold filtering and select top 10 predictions per date.
+        Filters predictions by confidence scores, keeps only positive return predictions,
+        ranks by confidence, and selects the top 10 per trading day (optionally Fridays only).
+        """
         threshold_filtered_count = 0
         if self.optimal_threshold is not None:
             confidence_scores = self.get_confidence_scores(features_df)
@@ -343,7 +429,7 @@ class BasePredictor(ABC):
             results_df = results_df[results_df["passes_threshold"]].copy()
             threshold_filtered_count = len(results_df)
             logger.info(
-                f"Threshold filtering: {original_count} → {threshold_filtered_count} predictions ({threshold_filtered_count / original_count:.1%} kept)"
+                f"Threshold filtering: {original_count} -> {threshold_filtered_count} predictions ({threshold_filtered_count / original_count:.1%} kept)"
             )
 
         if threshold_filtered_count == 0:
@@ -362,13 +448,19 @@ class BasePredictor(ABC):
             results_df = results_df[results_df["day_of_week"] == "Friday"]
 
         top_10_count = len(results_df)
-        logger.info(f"📈 Top 10 final count: {top_10_count}")
+        logger.info(f"Top 10 final count: {top_10_count}")
         if top_10_count == 0:
             logger.warning(" WARNING: No predictions passed the threshold!")
             return None
         return results_df
 
     def _compute_derived_metrics(self, results_df: pd.DataFrame) -> pd.DataFrame | None:
+        """
+        Calculate profit metrics and prediction accuracy measures from actual vs predicted prices.
+        Computes actual prices from returns, profit per $100 investment, prediction errors,
+        and binary success indicators for evaluating prediction performance.
+        """
+        # 🔥 FUTURE ROW FILTER: Exclude rows where actual_return is NaN (future predictions not yet realized)
         non_nan_mask = results_df["actual_return"].notna()
         if not non_nan_mask.any():
             return results_df
@@ -394,24 +486,19 @@ class BasePredictor(ABC):
         ).astype(int)
 
         logger.info(
-            f"💰 ${float(results_df.loc[non_nan_mask, 'profit_100_investment'].mean()):.2f} Average profit per $100 investment"
+            f"${float(results_df.loc[non_nan_mask, 'profit_100_investment'].mean()):.2f} Average profit per $100 investment"
         )
 
         return results_df
 
-    def _aggregate_profit_and_filter_by_weekday(
-        self, results_df: pd.DataFrame
-    ) -> float | None:  # NOSONAR
+    def _aggregate_profit_and_filter_by_weekday(self, results_df: pd.DataFrame) -> float | None:
+        """
+        Calculate profitability statistics and determine export eligibility based on weekday performance.
+        Computes average profits for Friday and Monday predictions, checks against minimum thresholds,
+        and decides whether predictions meet criteria for export to trading systems.
+        """
         valid_profit_df = self._get_valid_profit_df(results_df)
         avg_profit_per_investment = self._calc_avg_profit(valid_profit_df)
-
-        not_closed = self._count_not_closed_predictions(results_df)
-        logger.info(f"🔮 Not closed predictions: {not_closed}")
-        if not_closed == 0:
-            logger.warning(
-                " WARNING: No not closed predictions found - all predictions have actual prices!"
-            )
-            return None
 
         dates_series = pd.to_datetime(results_df["date"].copy())
         friday_avg, monday_avg = self._compute_weekday_avgs(
@@ -423,6 +510,12 @@ class BasePredictor(ABC):
         )
 
     def _get_valid_profit_df(self, results_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Extract DataFrame rows with valid actual prices for profit calculations.
+        Filters out predictions that don't have realized prices yet, ensuring
+        only completed trades are included in profitability analysis.
+        """
+        # 🔥 FUTURE ROW FILTER: Only include rows with actual_price > 0 (completed/realized predictions)
         if "actual_price" in results_df.columns:
             valid_mask = results_df["actual_price"] > 0
         else:
@@ -430,6 +523,10 @@ class BasePredictor(ABC):
         return results_df[valid_mask].copy()
 
     def _calc_avg_profit(self, valid_profit_df: pd.DataFrame) -> float:
+        """
+        Calculate the average profit per $100 investment across all valid predictions.
+        Returns zero if no valid profit data is available for analysis.
+        """
         return (
             float(valid_profit_df["profit_100_investment"].mean())
             if not valid_profit_df.empty
@@ -437,6 +534,11 @@ class BasePredictor(ABC):
         )
 
     def _count_not_closed_predictions(self, results_df: pd.DataFrame) -> int:
+        """
+        Count predictions that haven't been realized yet (no actual price available).
+        Used to track the number of open positions that are still pending market closure.
+        """
+        # 🔥 FUTURE ROW COUNTING: Count rows where actual_price is NaN (future/unrealized predictions)
         if "actual_price" in results_df.columns:
             return int(results_df["actual_price"].isna().sum())
         return 0
@@ -444,6 +546,11 @@ class BasePredictor(ABC):
     def _compute_weekday_avgs(
         self, results_df: pd.DataFrame, dates_series: pd.Series, valid_profit_df: pd.DataFrame
     ) -> tuple[float, float]:
+        """
+        Calculate average profits separately for Friday and Monday predictions.
+        Analyzes performance by trading day to identify optimal entry timing,
+        returning Friday and Monday average profits per $100 investment.
+        """
         friday_keep, _ = filter_dates_to_weekdays(dates_series, (4,))
         friday_df = results_df[friday_keep & (results_df.index.isin(valid_profit_df.index))]
         friday_avg = (
@@ -460,16 +567,21 @@ class BasePredictor(ABC):
         )
 
         logger.info(
-            f"🗓️ ${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
+            f"${friday_avg:.2f} Friday average profit per $100 investment (based on {len(friday_df)} predictions)"
         )
         logger.info(
-            f"🗓️ ${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
+            f"${monday_avg:.2f} Monday average profit per $100 investment (based on {len(monday_df)} predictions)"
         )
         return friday_avg, monday_avg
 
     def _decide_export_and_return_avg(
         self, results_df: pd.DataFrame, avg_profit: float, friday_avg: float, monday_avg: float
     ) -> float | None:  # NOSONAR
+        """
+        Determine whether predictions meet profitability thresholds for export.
+        Evaluates weekday-specific performance against minimum profit requirements
+        and decides which predictions (if any) should be exported for trading.
+        """
         # Decide whether to export and which weekday filter to apply
         filtered = None
         if friday_avg > self.min_profit_threshold and monday_avg > self.min_profit_threshold:
@@ -489,13 +601,11 @@ class BasePredictor(ABC):
         self, days_back: int = 30
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
-        Run the prediction pipeline without writing to disk and return:
-        - results_df
-        - features_df
-        - metadata_df
-        - predictions
+        Execute the complete prediction pipeline for evaluation purposes without file output.
+        Returns all intermediate data structures for analysis: processed results,
+        feature data, metadata, and raw predictions for model evaluation and testing.
         """
-        logger.info(f"🚀 Evaluating {self.model_type.upper()} predictions (no file output)...")
+        logger.info(f"Evaluating {self.model_type.upper()} predictions (no file output)...")
         if self.model is None:
             self.load_model_from_mlflow()
             self._load_metadata_from_mlflow()
@@ -508,12 +618,17 @@ class BasePredictor(ABC):
 
     def run_prediction_pipeline(self, days_back: int = 30) -> str:
         """
-        Run the complete prediction pipeline.
+        Execute the end-to-end prediction workflow from model loading to Excel export.
+        Orchestrates the complete process: loads model and metadata, prepares data,
+        generates predictions, processes results, and saves to timestamped Excel file.
         """
-        logger.info(f"🚀 Starting {self.model_type.upper()} prediction pipeline...")
+        logger.info(f"Starting {self.model_type.upper()} prediction pipeline...")
         self.load_model_from_mlflow()
         self._load_metadata_from_mlflow()
         features_df, metadata_df = self.load_recent_data(days_back)
         predictions = self.make_predictions(features_df)
+        if predictions is None:
+            logger.warning(" No predictions to save to Excel.")
+            return None
         output_file = self.save_predictions_to_excel(features_df, metadata_df, predictions)
         return output_file

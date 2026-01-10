@@ -3,7 +3,7 @@ Main news collection orchestrator for Polygon news data
 Handles incremental updates, historical backfill, and comprehensive news collection
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 import json
 from src.database.connection import close_global_pool
@@ -15,7 +15,7 @@ from src.data_collector.polygon_news.processor import NewsProcessor
 from src.data_collector.polygon_news.validator import NewsValidator
 from src.utils.core.logger import get_logger
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class PolygonNewsCollector:
@@ -37,7 +37,7 @@ class PolygonNewsCollector:
             polygon_api_key: Polygon.io API key
             requests_per_minute: Rate limit for API requests
         """
-        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
+        self.logger = get_logger(self.__class__.__name__)
 
         # Initialize components
         self.news_client = PolygonNewsClient(polygon_api_key, requests_per_minute)
@@ -139,67 +139,6 @@ class PolygonNewsCollector:
         except Exception as e:
             self.logger.error(f"Historical collection failed: {e}")
             self.stats["end_time"] = datetime.now(timezone.utc)
-            raise
-
-    def collect_targeted_news(
-        self,
-        tickers: List[str],
-        start_date: datetime,
-        end_date: datetime,
-        limit_per_ticker: int = 100,
-    ) -> Dict[str, Any]:
-        """
-        Collect news for specific tickers and date range
-
-        Args:
-            tickers: List of ticker symbols
-            start_date: Start date for collection
-            end_date: End date for collection
-            limit_per_ticker: Maximum articles per ticker
-
-        Returns:
-            Collection statistics
-        """
-        self.logger.info(f"Starting targeted collection for {len(tickers)} tickers")
-        self._reset_stats()
-        self.stats["start_time"] = datetime.now(timezone.utc)
-
-        try:
-            # Validate tickers
-            valid_tickers, invalid_tickers = self.ticker_integration.validate_ticker_list(tickers)
-
-            if invalid_tickers:
-                self.logger.warning(f"Invalid tickers skipped: {invalid_tickers}")
-
-            self.logger.info(f"Processing {len(valid_tickers)} valid tickers")
-
-            for ticker in valid_tickers:
-                try:
-                    # Get ticker info for priority scoring
-                    ticker_info = self.ticker_integration.get_ticker_info(ticker)
-                    priority_score = ticker_info.get("priority_score", 50)
-
-                    # Collect news for this ticker
-                    ticker_stats = self._collect_ticker_news(
-                        ticker, start_date, end_date, priority_score, limit_per_ticker
-                    )
-
-                    # Update overall stats
-                    self._update_stats(ticker_stats)
-
-                except Exception as e:
-                    self.logger.error(f"Error processing ticker {ticker}: {e}")
-                    self.stats["failed_tickers"].append(ticker)
-                    self.stats["processing_errors"].append(f"{ticker}: {str(e)}")
-
-            self.stats["end_time"] = datetime.now(timezone.utc)
-            self.logger.info(f"Targeted collection completed: {self._format_stats()}")
-
-            return self.stats.copy()
-
-        except Exception as e:
-            self.logger.error(f"Targeted collection failed: {e}")
-            self.stats["end_time"] = datetime.now()
             raise
 
     def _collect_ticker_news(
@@ -376,7 +315,7 @@ class PolygonNewsCollector:
         pass
 
 
-def main():
+def run_news_pipeline():
     """
     Main function to run incremental news collection
     This function sets up the database connection, initializes the news collector,
@@ -509,4 +448,4 @@ if __name__ == "__main__":
     """
     Entry point when running the module directly
     """
-    success = main()
+    success = run_news_pipeline()

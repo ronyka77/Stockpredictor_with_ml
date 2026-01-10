@@ -1,61 +1,48 @@
-"""
-Centralized Logging System for StockPredictor V1
+"""Centralized Logging System for StockPredictor V1.
+
 This module provides a unified logging configuration that can be imported
 and used across all modules in the project.
+
+Refactor notes:
+- Utility folders and utility-based file routing have been removed.
+- A single timestamped log file is created per process run under /logs.
+- Stdlib logging is intercepted and routed to Loguru.
 """
 
-import logging
+from __future__ import annotations
+
 import atexit
-import sys
+import logging
 import os
-from pathlib import Path
-from typing import Optional, Dict
+import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+import functools
+import time
+import asyncio
 
 from loguru import logger as _loguru_logger
 
-# Run identifier for this process: combines process id and import-time timestamp.
-# Using a module-level RUN_ID ensures each process run produces at most one
-# log file per utility (the sink registry `_file_sink_ids` already prevents
-# adding the same utility twice in one process).
-RUN_ID = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}"
-
-
-def _ascii_patch(record: dict) -> None:
-    """Mutate the record to ensure the message is ASCII-only before sinks write it.
-
-    This will replace non-ASCII characters with the standard replacement char,
-    preventing encoding issues in environments that require ASCII-only logs.
-    """
-    try:
-        original = record.get("message", "")
-        text = str(original)
-        record["message"] = text.encode("ascii", errors="replace").decode("ascii")
-    except Exception:
-        # Fallback: ensure there's at least a string message.
-        record["message"] = str(record.get("message", ""))
-
-
-# Base logs directory - point to central logs folder at project root
-LOGS_BASE_DIR = Path(__file__).parent.parent.parent / "logs"
+LOGS_BASE_DIR = Path(__file__).parent.parent.parent.parent / "logs"
+RUN_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 class InterceptHandler(logging.Handler):
-    """Intercepts stdlib logging and routes it to Loguru."""
+    """Intercept stdlib logging and forward it to Loguru."""
 
     def emit(self, record: logging.LogRecord) -> None:
-        # Retrieve corresponding Loguru level if it exists
         try:
             level = _loguru_logger.level(record.levelname).name
         except (ValueError, AttributeError):
             level = record.levelno
 
-        # Find caller from where logging was called
         frame, depth = logging.currentframe(), 2
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        # Ensure ASCII-safe message to avoid encoding issues in downstream sinks.
+
+        # ASCII-only logging to avoid UnicodeEncodeError issues downstream.
         try:
             message = record.getMessage()
             message = str(message).encode("ascii", errors="replace").decode("ascii")
@@ -65,144 +52,233 @@ class InterceptHandler(logging.Handler):
         _loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, message)
 
 
-def _ensure_utility_dir(utility: str) -> Path:
-    path = LOGS_BASE_DIR / utility
-    path.mkdir(parents=True, exist_ok=True)
-    gitkeep = path / ".gitkeep"
+def _ensure_logs_dir() -> None:
+    LOGS_BASE_DIR.mkdir(parents=True, exist_ok=True)
+    gitkeep = LOGS_BASE_DIR / ".gitkeep"
     if not gitkeep.exists():
         gitkeep.touch()
-    return path
+
+
+def _unique_path(path: Path) -> Path:
+    """Avoid collisions if multiple runs start within the same second."""
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix or ".log"
+    index = 1
+    while True:
+        candidate = path.with_name(f"{stem}_{index}{suffix}")
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
+class _Sinks:
+    """Internal sink lifecycle manager (single file + console)."""
+
+    def __init__(self) -> None:
+        self.initialized = False
+        self.console_id: Optional[int] = None
+        self.file_id: Optional[int] = None
+
+    def ensure(self) -> None:
+        if self.initialized:
+            return
+
+        _ensure_logs_dir()
+
+        # Remove any pre-existing sinks configured elsewhere.
+        _loguru_logger.remove()
+
+        fmt = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
+
+        self.console_id = _loguru_logger.add(sys.stdout, level="INFO", enqueue=True, format=fmt)
+
+        log_file = _unique_path(LOGS_BASE_DIR / f"run_{RUN_TIMESTAMP}.log")
+        self.file_id = _loguru_logger.add(
+            str(log_file),
+            level="INFO",
+            rotation="10 MB",
+            retention="30 days",
+            compression="zip",
+            encoding="utf-8",
+            enqueue=False,
+            format=fmt,
+        )
+
+        # Intercept stdlib logging.
+        logging.basicConfig(handlers=[InterceptHandler()], level=0)
+
+        self.initialized = True
+
+    def shutdown(self) -> None:
+        # Remove file sink.
+        try:
+            if self.file_id is not None:
+                _loguru_logger.remove(self.file_id)
+        except Exception:
+            sys.stderr.write("Error removing file sink\n")
+        finally:
+            self.file_id = None
+
+        # Remove console sink.
+        try:
+            if self.console_id is not None:
+                _loguru_logger.remove(self.console_id)
+        except Exception:
+            sys.stderr.write("Error removing console sink\n")
+        finally:
+            self.console_id = None
+
+        self.initialized = False
+
+
+_SINKS = _Sinks()
+
+
+def init_logging_structure() -> None:
+    """Ensure the logs directory exists."""
+    _ensure_logs_dir()
 
 
 def get_logger(name: str, utility: Optional[str] = None):
     """Return a Loguru-bound logger compatible with previous get_logger API.
-    The returned object exposes `.info`, `.warning`, `.error`, `.debug`, and
-    other Loguru methods via the bound logger.
+
+    The returned object exposes `.info`, `.warning`, `.error`, `.debug`, and other
+    Loguru methods via the bound logger.
+
+    Note: `utility` is accepted for backwards compatibility but is ignored.
     """
-    # Auto-detect utility from module name if not provided
-    if utility is None:
-        lower_name = name.lower()
-        if "polygon" in lower_name:
-            utility = "polygon"
-        elif "predictor" in lower_name:
-            utility = "predictor"
-        elif "data_collector" in lower_name:
-            utility = "data_collector"
-        elif "feature_engineering" in lower_name:
-            utility = "feature_engineering"
-        elif "mlp" in lower_name:
-            utility = "mlp"
-        elif "lightgbm" in lower_name:
-            utility = "lightgbm"
-        elif "xgboost" in lower_name:
-            utility = "xgboost"
-        elif "random_forest" in lower_name:
-            utility = "random_forest"
-        else:
-            utility = "general"
-
-    # Lazily initialize global sinks on first get_logger call
-    _initialize_sinks_once()
-
-    # Return a bound logger with metadata similar to previous behavior
-    return _loguru_logger.bind(name=name, utility=utility)
+    _SINKS.ensure()
+    return _loguru_logger.bind(name=name)
 
 
-def init_logging_structure():
-    """Initialize the logging directory structure"""
-    utilities = ["polygon", "predictor", "data_collector", "feature_engineering", "general"]
-    for u in utilities:
-        _ensure_utility_dir(u)
+def timeit(func):
+    """Decorator that measures execution time of the wrapped function and logs it in seconds.
 
-
-def _initialize_sinks_once() -> None:
-    """Initialize console sink and stdlib intercept once per process."""
-    global _sinks_initialized, _console_sink_id
-    if _sinks_initialized:
-        return
-
-    # Remove default handlers
-    _loguru_logger.remove()
-
-    # Console sink: write to stdout, non-blocking queue enabled
-    console_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
-    _console_sink_id = _loguru_logger.add(
-        sys.stdout, level="INFO", enqueue=True, format=console_format
-    )
-
-    # Intercept stdlib logging
-    logging.basicConfig(handlers=[InterceptHandler()], level=0)
-
-    _sinks_initialized = True
-
-
-def _ensure_file_sink_for_utility(utility: str, util_dir: Path) -> None:
-    """Add a file sink for the given utility if not already added for this process run.
-    File name includes timestamp to avoid cross-process collisions.
+    Works with both synchronous and asynchronous functions.
     """
-    global _file_sink_ids
-    if utility in _file_sink_ids:
-        return
-    # Use a deterministic run identifier (timestamp + pid) created on module import
-    # so each process run produces at most one file per utility.
-    log_file = util_dir / f"{utility}_{RUN_ID}.log"
+    if asyncio.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def _async_wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return await func(*args, **kwargs)
+            finally:
+                elapsed = time.perf_counter() - start
+                # ASCII-only log message
+                _loguru_logger.info(f"Execution time for {func.__name__}: {elapsed:.6f} seconds")
+        return _async_wrapper
 
-    file_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message} | {function}:{line}"
-    sink_id = _loguru_logger.add(
-        str(log_file),
-        level="INFO",
-        rotation="10 MB",
-        retention="30 days",
-        compression="zip",
-        encoding="utf-8",
-        enqueue=True,
-        format=file_format,
-    )
-
-    _file_sink_ids[utility] = sink_id
+    @functools.wraps(func)
+    def _sync_wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            elapsed = time.perf_counter() - start
+            # ASCII-only log message
+            _loguru_logger.info(f"Execution time for {func.__name__}: {elapsed:.6f} seconds")
+    return _sync_wrapper
 
 
 def shutdown_logging() -> None:
     """Remove all Loguru sinks to flush queued messages. Safe to call multiple times."""
-    global _sinks_initialized, _console_sink_id, _file_sink_ids
-    # Attempt to remove file sinks; log failures at debug level with exception info
-    for sid in list(_file_sink_ids.values()):
-        try:
-            _loguru_logger.remove(sid)
-        except Exception as e:
-            try:
-                logger.debug(f"Error removing file sink id={sid}", exc_info=True)
-            except Exception:
-                # If logger is not available or logging fails, fallback to stderr
-                sys.stderr.write(f"Error removing file sink id={sid}: {e}\n")
-    # Clear file sink registry regardless of removal success
-    _file_sink_ids.clear()
-
-    # Attempt to remove console sink; ensure console sink id is reset regardless
-    try:
-        if _console_sink_id is not None:
-            _loguru_logger.remove(_console_sink_id)
-    except Exception as e:
-        try:
-            logger.debug(f"Error removing console sink id={_console_sink_id}", exc_info=True)
-        except Exception:
-            sys.stderr.write(f"Error removing console sink id={_console_sink_id}: {e}\n")
-    finally:
-        _console_sink_id = None
-
-    # Ensure initialized flag is reset so state is consistent
-    _sinks_initialized = False
+    _SINKS.shutdown()
 
 
-# Initialize on import
+def merge_run_logs(
+    run_timestamp: str = None, delete_originals: bool = True
+) -> Optional[Path | list[Path]]:
+    """Merge multiple log files with the same RUN_TIMESTAMP into one.
+
+    This function finds all numbered variants of a log file (e.g., run_20260110_143000_1.log,
+    run_20260110_143000_2.log) and appends them to the base file in order.
+
+    Args:
+        run_timestamp: The timestamp string (e.g., '20260110_143000'). If None, processes all timestamps.
+        delete_originals: Whether to delete the numbered variants after merging
+
+    Returns:
+        Path to the merged log file, or None if only one file exists.
+        If run_timestamp is None, returns list of all merged file paths.
+    """
+    if run_timestamp is None:
+        # Process all timestamps in the logs folder
+        return merge_all_run_logs(delete_originals)
+
+    base_file = LOGS_BASE_DIR / f"run_{run_timestamp}.log"
+
+    # Find all variants: run_20260110_143000_1.log, run_20260110_143000_2.log, etc.
+    variants = sorted(
+        LOGS_BASE_DIR.glob(f"run_{run_timestamp}_*.log"),
+        key=lambda p: int(p.stem.rsplit("_", 1)[-1]),
+    )
+
+    if not variants:
+        _loguru_logger.info(f"No additional log files found for timestamp {run_timestamp}")
+        return None
+
+    _loguru_logger.info(f"Merging {len(variants)} log file(s) into {base_file.name}")
+
+    # Append each variant to the base file
+    with open(base_file, "a", encoding="utf-8") as merged:
+        merged.write(f"\n{'=' * 80}\n")
+        merged.write(f"MERGED LOG FILES: {len(variants)} additional file(s)\n")
+        merged.write(f"{'=' * 80}\n\n")
+
+        for variant_file in variants:
+            merged.write(f"\n--- Content from {variant_file.name} ---\n\n")
+            with open(variant_file, "r", encoding="utf-8") as src:
+                merged.write(src.read())
+
+            if delete_originals:
+                variant_file.unlink()
+                _loguru_logger.info(f"Deleted {variant_file.name}")
+
+    _loguru_logger.info(f"Merge complete: {base_file}")
+    return base_file
+
+
+def merge_all_run_logs(delete_originals: bool = True) -> list[Path]:
+    """Internal function to merge all run logs with variants in the logs folder.
+
+    Args:
+        delete_originals: Whether to delete the numbered variants after merging
+
+    Returns:
+        List of paths to all merged log files
+    """
+    import re
+
+    # Pattern to extract timestamp from log files: run_20260110_143000.log or run_20260110_143000_1.log
+    pattern = re.compile(r"^run_(\d{8}_\d{6})(?:_\d+)?\.log$")
+
+    # Collect all unique timestamps
+    timestamps = set()
+    for log_file in LOGS_BASE_DIR.glob("run_*.log"):
+        match = pattern.match(log_file.name)
+        if match:
+            timestamps.add(match.group(1))
+
+    if not timestamps:
+        _loguru_logger.info("No run log files found in logs folder")
+        return []
+
+    _loguru_logger.info(f"Found {len(timestamps)} unique timestamp(s) to check for merging")
+
+    merged_files = []
+    for timestamp in sorted(timestamps):
+        result = merge_run_logs(timestamp, delete_originals)
+        if result:
+            merged_files.append(result)
+
+    _loguru_logger.info(f"Completed merging. Total merged: {len(merged_files)} timestamp(s)")
+    return merged_files
+
+
 init_logging_structure()
-
-# --- New: sink management for enqueue and shutdown ---
-_sinks_initialized = False
-_console_sink_id: Optional[int] = None
-_file_sink_ids: Dict[str, int] = {}
-
-# Register shutdown to flush sinks on graceful exit
 atexit.register(shutdown_logging)
 
 
@@ -210,9 +286,10 @@ if __name__ == "__main__":
     logger = get_logger(__name__)
     logger.info("Removing log files under 2KB in 'logs' folder.")
 
-    logs_root = LOGS_BASE_DIR
+    merge_all_run_logs(delete_originals=True)
+
     num_removed = 0
-    for dirpath, _, filenames in os.walk(logs_root):
+    for dirpath, _, filenames in os.walk(LOGS_BASE_DIR):
         for fname in filenames:
             file_path = os.path.join(dirpath, fname)
             try:
@@ -224,4 +301,5 @@ if __name__ == "__main__":
                         num_removed += 1
             except Exception as e:
                 logger.error(f"Failed to remove {file_path}: {e}")
+
     logger.info(f"Completed cleanup. Removed {num_removed} files under 2KB.")

@@ -191,51 +191,6 @@ class CashFlowStatement(FinancialStatement):
     free_cash_flow: Optional[FinancialValue] = None
 
 
-class CompanyDetails(BaseModel):
-    """Company details and classification information"""
-
-    # Basic information
-    ticker: str
-    name: Optional[str] = None
-    market: Optional[str] = None
-    locale: Optional[str] = None
-    primary_exchange: Optional[str] = None
-    type: Optional[str] = None
-    active: Optional[bool] = None
-    currency_name: Optional[str] = None
-    cik: Optional[str] = None
-    composite_figi: Optional[str] = None
-    share_class_figi: Optional[str] = None
-
-    # Market data
-    market_cap: Optional[float] = None
-    phone_number: Optional[str] = None
-    address: Optional[Dict[str, Any]] = None
-    description: Optional[str] = None
-    homepage_url: Optional[str] = None
-    total_employees: Optional[int] = None
-    list_date: Optional[date] = None
-
-    # GICS classification
-    sic_code: Optional[str] = None
-    sic_description: Optional[str] = None
-
-    # Branding
-    logo_url: Optional[str] = None
-    icon_url: Optional[str] = None
-
-    @field_validator("list_date", mode="before")
-    @classmethod
-    def parse_list_date(cls, v):
-        """Parse list date string into date object"""
-        if isinstance(v, str):
-            try:
-                return datetime.strptime(v, "%Y-%m-%d").date()
-            except ValueError:
-                return None
-        return v
-
-
 class FundamentalDataResponse(BaseModel):
     """Complete response model for fundamental data"""
 
@@ -247,9 +202,6 @@ class FundamentalDataResponse(BaseModel):
 
     # Financial data
     results: Optional[List[Dict[str, Any]]] = None
-
-    # Company information
-    company_details: Optional[CompanyDetails] = None
 
     # Processed statements
     income_statements: List[IncomeStatement] = Field(default_factory=list)

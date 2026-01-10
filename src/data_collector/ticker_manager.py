@@ -9,7 +9,7 @@ from src.data_collector.polygon_data.client import PolygonDataClient
 from src.data_collector.polygon_data.data_validator import DataValidator
 from src.data_collector.polygon_data.data_storage import DataStorage
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class TickerManager:
@@ -27,7 +27,7 @@ class TickerManager:
         """
         self.client = client
         self.storage = storage or DataStorage()
-        self.validator = DataValidator(strict_mode=False)
+        self.validator = DataValidator()
 
     def get_ticker_details(self, ticker: str) -> Optional[Dict]:
         """

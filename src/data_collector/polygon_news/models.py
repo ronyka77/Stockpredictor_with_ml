@@ -10,55 +10,55 @@ from src.data_collector.config import config
 from src.utils.core.logger import get_logger
 from src.database.connection import execute
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 # Raw SQL DDL for required tables
 _CREATE_ARTICLES_SQL = """
-CREATE TABLE IF NOT EXISTS polygon_news_articles (
-    id SERIAL PRIMARY KEY,
-    polygon_id VARCHAR(100) UNIQUE NOT NULL,
-    title VARCHAR(1000) NOT NULL,
-    description TEXT,
-    article_url VARCHAR(2000) NOT NULL,
-    amp_url VARCHAR(2000),
-    image_url VARCHAR(2000),
-    author VARCHAR(200),
-    published_utc TIMESTAMPTZ NOT NULL,
-    publisher_name VARCHAR(200),
-    publisher_homepage_url VARCHAR(500),
-    publisher_logo_url VARCHAR(500),
-    publisher_favicon_url VARCHAR(500),
-    keywords TEXT[],
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    is_processed BOOLEAN DEFAULT FALSE,
-    processing_errors TEXT,
-    quality_score DOUBLE PRECISION,
-    relevance_score DOUBLE PRECISION
-);
+    CREATE TABLE IF NOT EXISTS polygon_news_articles (
+        id SERIAL PRIMARY KEY,
+        polygon_id VARCHAR(100) UNIQUE NOT NULL,
+        title VARCHAR(1000) NOT NULL,
+        description TEXT,
+        article_url VARCHAR(2000) NOT NULL,
+        amp_url VARCHAR(2000),
+        image_url VARCHAR(2000),
+        author VARCHAR(200),
+        published_utc TIMESTAMPTZ NOT NULL,
+        publisher_name VARCHAR(200),
+        publisher_homepage_url VARCHAR(500),
+        publisher_logo_url VARCHAR(500),
+        publisher_favicon_url VARCHAR(500),
+        keywords TEXT[],
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        is_processed BOOLEAN DEFAULT FALSE,
+        processing_errors TEXT,
+        quality_score DOUBLE PRECISION,
+        relevance_score DOUBLE PRECISION
+    );
 """
 
 _CREATE_TICKERS_SQL = """
-CREATE TABLE IF NOT EXISTS polygon_news_tickers (
-    id SERIAL PRIMARY KEY,
-    article_id INTEGER NOT NULL REFERENCES polygon_news_articles(id) ON DELETE CASCADE,
-    ticker VARCHAR(10) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
+    CREATE TABLE IF NOT EXISTS polygon_news_tickers (
+        id SERIAL PRIMARY KEY,
+        article_id INTEGER NOT NULL REFERENCES polygon_news_articles(id) ON DELETE CASCADE,
+        ticker VARCHAR(10) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+    );
 """
 
 _CREATE_INSIGHTS_SQL = """
-CREATE TABLE IF NOT EXISTS polygon_news_insights (
-    id SERIAL PRIMARY KEY,
-    article_id INTEGER NOT NULL REFERENCES polygon_news_articles(id) ON DELETE CASCADE,
-    sentiment VARCHAR(20),
-    sentiment_reasoning TEXT,
-    insight_type VARCHAR(50) NOT NULL,
-    insight_value TEXT,
-    confidence_score DOUBLE PRECISION,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
+    CREATE TABLE IF NOT EXISTS polygon_news_insights (
+        id SERIAL PRIMARY KEY,
+        article_id INTEGER NOT NULL REFERENCES polygon_news_articles(id) ON DELETE CASCADE,
+        sentiment VARCHAR(20),
+        sentiment_reasoning TEXT,
+        insight_type VARCHAR(50) NOT NULL,
+        insight_value TEXT,
+        confidence_score DOUBLE PRECISION,
+        created_at TIMESTAMPTZ DEFAULT now()
+    );
 """
 
 

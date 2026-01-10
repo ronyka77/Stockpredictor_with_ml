@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.utils.core.logger import get_logger
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class NewsValidator:
@@ -16,7 +16,7 @@ class NewsValidator:
     """
 
     def __init__(self):
-        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
+        self.logger = get_logger(self.__class__.__name__)
         self.min_title_length = 10
         self.max_title_length = 1000
         self.required_fields = ["polygon_id", "title", "article_url", "published_utc"]

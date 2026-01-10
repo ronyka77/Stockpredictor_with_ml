@@ -10,7 +10,7 @@ from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPI
 from src.data_collector.config import config
 from src.utils.core.logger import get_logger
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class PolygonNewsClient(PolygonDataClient):
@@ -202,87 +202,6 @@ class PolygonNewsClient(PolygonDataClient):
 
         logger.info(f"Retrieved {len(all_articles)} unique recent market news articles")
         return all_articles
-
-    def get_news_by_date_range(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        tickers: Optional[List[str]] = None,
-        limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
-        """
-        Get news articles within a specific date range
-
-        Args:
-            start_date: Start date for news search
-            end_date: End date for news search
-            tickers: Optional list of specific tickers to focus on
-            limit: Maximum number of articles to return
-
-        Returns:
-            List of news articles within the date range
-        """
-        logger.info(f"Fetching news from {start_date.date()} to {end_date.date()}")
-
-        if tickers:
-            # Get news for specific tickers
-            ticker_results = self.get_news_for_multiple_tickers(
-                tickers=tickers,
-                published_utc_gte=start_date,
-                published_utc_lte=end_date,
-                limit_per_ticker=limit // len(tickers) if len(tickers) > 0 else limit,
-            )
-
-            # Combine results
-            all_articles = []
-            seen_ids = set()
-
-            for ticker, articles in ticker_results.items():
-                for article in articles:
-                    article_id = article.get("id")
-                    if article_id and article_id not in seen_ids:
-                        seen_ids.add(article_id)
-                        all_articles.append(article)
-        else:
-            # Get general market news using major tickers
-            all_articles = self.get_recent_market_news(
-                days_back=(end_date - start_date).days, limit=limit
-            )
-
-        # Filter by exact date range
-        filtered_articles = []
-        for article in all_articles:
-            published_str = article.get("published_utc", "")
-            if published_str:
-                try:
-                    published_date = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
-                    if start_date <= published_date <= end_date:
-                        filtered_articles.append(article)
-                except ValueError:
-                    logger.warning(f"Invalid date format in article: {published_str}")
-                    continue
-
-        logger.info(f"Retrieved {len(filtered_articles)} articles within date range")
-        return filtered_articles
-
-    def validate_news_response(self, article: Dict[str, Any]) -> bool:
-        """
-        Validate that a news article response has required fields
-
-        Args:
-            article: News article data from Polygon API
-
-        Returns:
-            True if article has required fields, False otherwise
-        """
-        required_fields = ["id", "title", "article_url", "published_utc"]
-
-        for field in required_fields:
-            if not article.get(field):
-                logger.warning(f"Article missing required field: {field}")
-                return False
-
-        return True
 
     def extract_article_metadata(self, article: Dict[str, Any]) -> Dict[str, Any]:
         """

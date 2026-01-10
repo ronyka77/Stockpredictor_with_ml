@@ -13,18 +13,77 @@ from src.data_collector.polygon_data.data_storage import DataStorage
 from src.feature_engineering.config import config
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import threading
 from dataclasses import dataclass, asdict
 
 from src.feature_engineering.data_loader import StockDataLoader
 from src.data_collector.indicator_pipeline.feature_calculator import FeatureCalculator
 from src.data_collector.indicator_pipeline.feature_storage import FeatureStorage
-from src.data_collector.indicator_pipeline.consolidated_storage import ConsolidatedFeatureStorage
 from src.utils.core.logger import get_logger
-from src.utils.data.feature_categories import classify_feature_name
+from src.data_collector.indicator_pipeline.dividend_features import compute_dividend_features
+from src.database.db_utils import bulk_upsert_technical_features
+from src.data_collector.indicator_pipeline.consolidated_storage import consolidate_existing_features
+from src.utils.data.cleaned_data_cache import CleanedDataCache
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
+
+
+def _normalize_date_value(value: Any, fallback_iso: str) -> str:
+    """Normalize a date-like value to an ISO `YYYY-MM-DD` string."""
+    if value is None or value == "":
+        return fallback_iso
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return str(value)
+
+
+def _sanitize_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Sanitize feature data for persistence.
+
+    - Replace infinite values with NaN.
+    - Convert pandas nullable integer dtypes (Int64/UInt64) to float.
+    """
+    df = df.replace([np.inf, -np.inf], np.nan)
+    for col in df.columns:
+        dtype_name = str(df[col].dtype)
+        if dtype_name.startswith("Int64") or dtype_name.startswith("UInt64"):
+            df[col] = df[col].astype(float)
+    return df
+
+
+def _coerce_feature_value_for_json(value: Any) -> Optional[object]:
+    """Convert a feature value into a JSON-serializable scalar.
+
+    Returns None for values that should be skipped.
+    Filtering rules mirror prior DB persistence behavior:
+    - skip NaN and +/-inf
+    - skip extreme magnitudes (abs(value) >= 1e9) for numeric values
+    """
+
+    if value is None:
+        return None
+    if pd.isna(value):
+        return None
+    # Handle numpy/pandas scalars cleanly.
+    if isinstance(value, (np.generic,)):
+        value = value.item()
+
+    # Booleans should remain booleans (bool is also an int, so check first).
+    if isinstance(value, bool):
+        return value
+
+    # Numeric values: filter inf and extreme magnitudes, cast to float for consistency.
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        if np.isinf(value):
+            return None
+        val = float(value)
+        if abs(val) >= 1e9:
+            return None
+        return val
+
+    # Fallback: stringify unknown types.
+    return str(value)
 
 
 def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str):
@@ -49,15 +108,10 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
         calculator = FeatureCalculator()
         storage = FeatureStorage()
 
-        # Normalize date strings
-        start_date = config_dict.get("start_date") or "2022-01-01"
-        end_date = config_dict.get("end_date") or datetime.now().strftime("%Y-%m-%d")
-
-        # If dates are date objects, convert to ISO strings
-        if isinstance(start_date, (datetime, date)):
-            start_date = start_date.isoformat()
-        if isinstance(end_date, (datetime, date)):
-            end_date = end_date.isoformat()
+        start_date = _normalize_date_value(config_dict.get("start_date"), "2022-01-01")
+        end_date = _normalize_date_value(
+            config_dict.get("end_date"), datetime.now().strftime("%Y-%m-%d")
+        )
 
         stock_data = loader.load_stock_data(ticker, start_date, end_date)
 
@@ -67,7 +121,7 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
 
         if len(stock_data) < config_dict.get("min_data_points", 0):
             result["error"] = (
-                f"Insufficient data: {len(stock_data)} < {config_dict.get('min_data_points')}"
+                f"Insufficient data: {len(stock_data)} < {config_dict.get('min_data_points')} for ticker {ticker}"
             )
             return result
 
@@ -75,18 +129,17 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
             stock_data, include_categories=config_dict.get("feature_categories")
         )
 
+        data_length = len(feature_result.data)
+        logger.info(
+            f"Calculated {len(feature_result.data.columns)} features for {ticker} ({data_length} rows)"
+        )
+
         # Load and compute dividend features
         try:
             dividends_df = DataStorage().load_dividends_for_ticker(ticker, start_date, end_date)
 
             if not dividends_df.empty:
-                from src.data_collector.indicator_pipeline.dividend_features import (
-                    compute_dividend_features,
-                )
-
                 dividend_features = compute_dividend_features(stock_data, dividends_df)
-
-                # Merge dividend features into main feature DataFrame
                 feature_result.data = feature_result.data.combine_first(dividend_features)
 
                 # Add dividend feature metadata
@@ -107,6 +160,11 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
         result["warnings"] = len(feature_result.warnings)
         result["quality_score"] = feature_result.quality_score
         result["processing_time"] = time.time() - start_time
+
+        try:
+            feature_result.data = _sanitize_feature_frame(feature_result.data)
+        except Exception:
+            logger.warning("Failed to sanitize feature_result.data")
 
         if config_dict.get("save_to_parquet"):
             storage_metadata = {
@@ -130,36 +188,20 @@ def _process_ticker_worker(ticker: str, config_dict: Dict[str, Any], job_id: str
             storage.save_features(ticker, feature_result.data, storage_metadata)
 
         if config_dict.get("save_to_database"):
-            # Prepare rows for bulk upsert to avoid per-row DB inserts
             try:
-                from src.database.db_utils import bulk_upsert_technical_features
-
                 rows = []
-                quality_score_val = (
-                    float(feature_result.quality_score.item())
-                    if hasattr(feature_result.quality_score, "item")
-                    else float(feature_result.quality_score)
-                )
-
                 for date_idx, row in feature_result.data.iterrows():
+                    payload: Dict[str, object] = {}
                     for feature_name, feature_value in row.items():
-                        if pd.isna(feature_value) or np.isinf(feature_value):
+                        coerced = _coerce_feature_value_for_json(feature_value)
+                        if coerced is None:
                             continue
+                        payload[str(feature_name)] = coerced
 
-                        feature_value = float(feature_value)
-                        if abs(feature_value) >= 1e9:
-                            continue
+                    if not payload:
+                        continue
 
-                        rows.append(
-                            {
-                                "ticker": ticker,
-                                "date": date_idx.date(),
-                                "feature_category": classify_feature_name(feature_name),
-                                "feature_name": feature_name,
-                                "feature_value": feature_value,
-                                "quality_score": quality_score_val,
-                            }
-                        )
+                    rows.append({"ticker": ticker, "date": date_idx.date(), "data": payload})
 
                 bulk_upsert_technical_features(
                     rows, page_size=1000, overwrite=config_dict.get("overwrite_existing", True)
@@ -186,15 +228,12 @@ class BatchJobConfig:
 
     batch_size: int = config.batch_processing.DEFAULT_BATCH_SIZE
     max_workers: int = config.batch_processing.MAX_WORKERS
-    use_processes: bool = True
     start_date: Optional[Union[str, date]] = None
     end_date: Optional[Union[str, date]] = None
     feature_categories: Optional[List[str]] = None
     min_data_points: int = config.data_quality.MIN_DATA_POINTS
     save_to_database: bool = config.storage.SAVE_TO_DATABASE
     save_to_parquet: bool = config.storage.SAVE_TO_PARQUET
-    use_consolidated_storage: bool = config.storage.USE_CONSOLIDATED_STORAGE
-    partitioning_strategy: str = config.storage.PARTITIONING_STRATEGY
     overwrite_existing: bool = config.storage.OVERWRITE_EXISTING
 
     def __post_init__(self):
@@ -263,10 +302,6 @@ class BatchFeatureProcessor:
         Initialize the batch processor
         """
         self.data_loader = StockDataLoader()
-        self.feature_calculator = FeatureCalculator()
-        self.feature_storage = FeatureStorage()
-        self.consolidated_storage = ConsolidatedFeatureStorage()
-        self.data_storage = DataStorage()
         self.stats = ProcessingStats()
         self._lock = threading.Lock()
 
@@ -276,7 +311,6 @@ class BatchFeatureProcessor:
         """
         Get list of tickers with sufficient data for processing
         """
-        # Apply config defaults
         min_data_points = min_data_points or config.data_quality.MIN_DATA_POINTS
         market = market or config.feature_categories.DEFAULT_MARKET
 
@@ -294,202 +328,37 @@ class BatchFeatureProcessor:
             logger.error(f"Error getting available tickers: {str(e)}")
             raise
 
-    def process_single_ticker(
-        self, ticker: str, config: BatchJobConfig, job_id: str
-    ) -> Dict[str, Any]:
-        """
-        Process a single ticker and calculate all features
-        """
-        start_time = time.time()
-        result = {
-            "ticker": ticker,
-            "success": False,
-            "features_calculated": 0,
-            "warnings": 0,
-            "error": None,
-            "processing_time": 0.0,
-            "quality_score": 0.0,
-        }
-
-        try:
-            # Load stock data
-            stock_data = self.data_loader.load_stock_data(
-                ticker,
-                config.start_date or "2022-01-01",
-                config.end_date or datetime.now().strftime("%Y-%m-%d"),
-            )
-
-            if stock_data.empty:
-                result["error"] = "No data available"
-                return result
-
-            if len(stock_data) < config.min_data_points:
-                result["error"] = f"Insufficient data: {len(stock_data)} < {config.min_data_points}"
-                return result
-
-            # Calculate features
-            feature_result = self.feature_calculator.calculate_all_features(
-                stock_data, include_categories=config.feature_categories
-            )
-
-            # Load and compute dividend features
-            try:
-                dividends_df = self.data_storage.load_dividends_for_ticker(
-                    ticker,
-                    config.start_date or "2022-01-01",
-                    config.end_date or datetime.now().strftime("%Y-%m-%d"),
-                )
-
-                if not dividends_df.empty:
-                    from src.data_collector.indicator_pipeline.dividend_features import (
-                        compute_dividend_features,
-                    )
-
-                    dividend_features = compute_dividend_features(stock_data, dividends_df)
-
-                    # Merge dividend features into main feature DataFrame
-                    # Use combine_first to preserve existing values and add new ones
-                    feature_result.data = feature_result.data.combine_first(dividend_features)
-
-                    # Add dividend feature metadata
-                    if hasattr(feature_result, "metadata") and feature_result.metadata:
-                        feature_result.metadata["dividend_features_included"] = True
-                        feature_result.metadata["dividend_records_count"] = len(dividends_df)
-                    else:
-                        feature_result.metadata = {
-                            "dividend_features_included": True,
-                            "dividend_records_count": len(dividends_df),
-                        }
-
-                    logger.info(
-                        f"Added {len(dividend_features.columns)} dividend features for {ticker}"
-                    )
-                else:
-                    logger.info(f"No dividend data available for {ticker}")
-
-            except Exception as e:
-                warning_msg = f"Failed to compute dividend features for {ticker}: {str(e)}"
-                feature_result.warnings.append(warning_msg)
-                logger.warning(warning_msg)
-
-            result["features_calculated"] = len(feature_result.data.columns)
-            result["warnings"] = len(feature_result.warnings)
-            result["quality_score"] = feature_result.quality_score
-            result["processing_time"] = time.time() - start_time
-
-            # Save to storage systems
-            if config.save_to_parquet:
-                # Save to Parquet (primary storage)
-                storage_metadata = {
-                    "categories": config.feature_categories,
-                    "quality_score": feature_result.quality_score,
-                    "warnings": feature_result.warnings,
-                    "job_id": job_id,
-                    "dividend_features": feature_result.metadata.get(
-                        "dividend_features_included", False
-                    )
-                    if hasattr(feature_result, "metadata") and feature_result.metadata
-                    else False,
-                    "dividend_source": "polygon"
-                    if (
-                        hasattr(feature_result, "metadata")
-                        and feature_result.metadata
-                        and feature_result.metadata.get("dividend_features_included")
-                    )
-                    else None,
-                }
-                self.feature_storage.save_features(ticker, feature_result.data, storage_metadata)
-                # logger.info(f"Saved features to Parquet: {parquet_metadata.file_path}")
-
-            if config.save_to_database:
-                try:
-                    from src.database.db_utils import bulk_upsert_technical_features
-
-                    rows = []
-                    quality_score_val = (
-                        float(feature_result.quality_score.item())
-                        if hasattr(feature_result.quality_score, "item")
-                        else float(feature_result.quality_score)
-                    )
-
-                    for date_idx, row in feature_result.data.iterrows():
-                        for feature_name, feature_value in row.items():
-                            if pd.isna(feature_value) or np.isinf(feature_value):
-                                continue
-                            feature_value = float(feature_value)
-                            if abs(feature_value) >= 1e9:
-                                continue
-
-                            rows.append(
-                                {
-                                    "ticker": ticker,
-                                    "date": date_idx.date(),
-                                    "feature_category": classify_feature_name(feature_name),
-                                    "feature_name": feature_name,
-                                    "feature_value": feature_value,
-                                    "quality_score": quality_score_val,
-                                }
-                            )
-
-                    saved_count = bulk_upsert_technical_features(
-                        rows, page_size=1000, overwrite=config.overwrite_existing
-                    )
-                    logger.info(f"Saved {saved_count} feature records to database for {ticker}")
-                except Exception as e:
-                    logger.error(f"Error saving features for {ticker}: {e}")
-
-            result["success"] = True
-            logger.info(
-                f"Successfully processed {ticker}: {result['features_calculated']} features"
-            )
-
-        except Exception as e:
-            result["error"] = str(e)
-            logger.error(f"Error processing {ticker}: {str(e)}")
-
-        return result
-
     def process_batch(self, tickers: List[str], config: BatchJobConfig) -> Dict[str, Any]:
         """
-        Process a batch of tickers with parallel processing
+        Process a batch of tickers with parallel processing.
+
+        Note: This pipeline always uses process-based parallelism.
         """
         job_id = str(uuid.uuid4())
         logger.info(f"Starting batch processing job {job_id} for {len(tickers)} tickers")
 
-        # Initialize stats
         self.stats = ProcessingStats(total_tickers=len(tickers), start_time=datetime.now())
 
         results = []
         failed_tickers = []
 
         try:
-            # Choose executor based on config flag. For process-based parallelism on
-            # Windows, ProcessPoolExecutor requires module-level callables and
-            if config.use_processes:
-                executor_cls = ProcessPoolExecutor
-            else:
-                executor_cls = ThreadPoolExecutor
+            config_dict = asdict(config)
 
-            with executor_cls(max_workers=config.max_workers) as executor:
-                if config.use_processes:
-                    # Convert config to serializable dict
-                    config_dict = asdict(config)
-                    # Submit module-level worker that recreates resources per process
-                    future_to_ticker = {
-                        executor.submit(_process_ticker_worker, ticker, config_dict, job_id): ticker
-                        for ticker in tickers
-                    }
-                else:
-                    future_to_ticker = {
-                        executor.submit(self.process_single_ticker, ticker, config, job_id): ticker
-                        for ticker in tickers
-                    }
+            with ProcessPoolExecutor(max_workers=config.max_workers) as executor:
+                future_to_ticker = {
+                    executor.submit(_process_ticker_worker, ticker, config_dict, job_id): ticker
+                    for ticker in tickers
+                }
 
                 for future in as_completed(future_to_ticker):
                     ticker = future_to_ticker[future]
                     try:
                         result = future.result()
                         results.append(result)
+
+                        if not result.get("success", False):
+                            failed_tickers.append(ticker)
 
                         # Update stats
                         with self._lock:
@@ -505,9 +374,10 @@ class BatchFeatureProcessor:
                             / self.stats.total_tickers
                             * 100
                         )
-                        logger.info(
-                            f"Progress: {progress:.1f}% - Processed {ticker} ({'✓' if result['success'] else '✗'})"
-                        )
+                        if progress == int(progress):
+                            logger.info(
+                                f"Progress: {progress:.1f}% - Processed {ticker} ({'OK' if result['success'] else 'FAIL'})"
+                            )
 
                     except Exception as e:
                         logger.error(f"Error processing {ticker}: {str(e)}")
@@ -533,7 +403,6 @@ class BatchFeatureProcessor:
             logger.info(
                 f"Batch processing completed: {self.stats.processed_tickers}/{self.stats.total_tickers} successful"
             )
-            logger.info(f"Total features calculated: {self.stats.total_features}")
             logger.info(f"Processing time: {self.stats.processing_time:.2f} seconds")
 
             return summary
@@ -558,175 +427,15 @@ class BatchFeatureProcessor:
         for i in range(0, len(tickers), chunk_size):
             yield tickers[i : i + chunk_size]
 
-    def process_in_chunks(
-        self, tickers: List[str], config: BatchJobConfig, chunk_size: int = 50
-    ) -> Dict[str, Any]:
-        """
-        Process tickers in memory-efficient chunks instead of all at once
-
-        This method processes tickers in batches to reduce memory usage and provide
-        better progress tracking for large ticker lists.
-
-        Args:
-            tickers: List of ticker symbols to process
-            config: Batch processing configuration
-            chunk_size: Number of tickers to process per chunk
-
-        Returns:
-            Dictionary with processing results and statistics
-        """
-        total_chunks = (len(tickers) + chunk_size - 1) // chunk_size
-        all_results = []
-        all_failed_tickers = []
-
-        logger.info(
-            f"Processing {len(tickers)} tickers in {total_chunks} chunks (size: {chunk_size})"
-        )
-
-        chunk_count = 0
-        for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
-            chunk_count += 1
-            logger.info(
-                f"Processing chunk {chunk_count}/{total_chunks} ({len(ticker_chunk)} tickers)"
-            )
-
-            # Process chunk
-            chunk_result = self.process_batch(ticker_chunk, config)
-
-            # Aggregate results
-            all_results.extend(chunk_result["results"])
-            all_failed_tickers.extend(chunk_result.get("failed_tickers", []))
-
-            # Log chunk summary
-            logger.info(
-                f"Chunk {chunk_count} complete: {chunk_result['successful']}/{len(ticker_chunk)} successful"
-            )
-
-        # Create final aggregated summary
-        total_successful = sum(1 for result in all_results if result["success"])
-        total_failed = len(all_results) - total_successful
-        total_features = sum(
-            result.get("features_calculated", 0) for result in all_results if result["success"]
-        )
-
-        final_summary = {
-            "total_tickers": len(tickers),
-            "successful": total_successful,
-            "failed": total_failed,
-            "success_rate": (total_successful / len(tickers) * 100) if tickers else 0,
-            "total_features": total_features,
-            "failed_tickers": all_failed_tickers,
-            "results": all_results,
-            "chunks_processed": total_chunks,
-            "chunk_size": chunk_size,
-        }
-
-        logger.info(
-            f"All chunks processed. Final results: {total_successful}/{len(tickers)} successful"
-        )
-        return final_summary
-
-    def process_with_callback(
-        self,
-        tickers: List[str],
-        config: BatchJobConfig,
-        callback: Any,
-        chunk_size: int = 100,
-        **callback_kwargs: Any,
-    ) -> int:
-        """
-        Process tickers in chunks and call a callback function for each chunk
-
-        This method allows processing large ticker lists with custom callback logic,
-        reducing memory usage by processing in batches.
-
-        Args:
-            tickers: List of ticker symbols to process
-            config: Batch processing configuration
-            callback: Function to call for each processed chunk
-            chunk_size: Number of tickers to process per chunk before calling callback
-            **callback_kwargs: Additional keyword arguments to pass to callback
-
-        Returns:
-            Total number of tickers processed
-        """
-        total_processed = 0
-        total_chunks = (len(tickers) + chunk_size - 1) // chunk_size
-
-        logger.info(f"Processing {len(tickers)} tickers with callback in {total_chunks} chunks")
-
-        chunk_count = 0
-        for ticker_chunk in self.chunk_tickers(tickers, chunk_size):
-            chunk_count += 1
-            logger.debug(f"Processing callback chunk {chunk_count}/{total_chunks}")
-
-            # Process the chunk
-            chunk_result = self.process_batch(ticker_chunk, config)
-
-            # Call the callback with the results
-            callback(chunk_result, chunk_number=chunk_count, **callback_kwargs)
-
-            total_processed += len(ticker_chunk)
-            logger.debug(f"Callback chunk {chunk_count} complete. Processed: {total_processed}")
-
-        logger.info(f"Callback processing complete. Total tickers processed: {total_processed}")
-        return total_processed
-
-    def _save_features_to_database(
-        self, ticker: str, feature_result, overwrite: bool = False
-    ) -> int:
-        """
-        Save calculated features to the database
-        """
-        # New implementation uses bulk upsert helper to improve throughput
-        try:
-            from src.database.db_utils import bulk_upsert_technical_features
-
-            rows = []
-            quality_score_val = (
-                float(feature_result.quality_score.item())
-                if hasattr(feature_result.quality_score, "item")
-                else float(feature_result.quality_score)
-            )
-
-            for date_idx, row in feature_result.data.iterrows():
-                for feature_name, feature_value in row.items():
-                    if pd.isna(feature_value) or np.isinf(feature_value):
-                        continue
-
-                    feature_value = float(feature_value)
-                    if abs(feature_value) >= 1e9:
-                        logger.info(
-                            f"Skipping {feature_name} value {feature_value} - too large for database precision"
-                        )
-                        continue
-
-                    rows.append(
-                        {
-                            "ticker": ticker,
-                            "date": date_idx.date(),
-                            "feature_category": classify_feature_name(feature_name),
-                            "feature_name": feature_name,
-                            "feature_value": feature_value,
-                            "quality_score": quality_score_val,
-                        }
-                    )
-
-            saved_count = bulk_upsert_technical_features(rows, page_size=1000, overwrite=overwrite)
-            return saved_count
-        except Exception as e:
-            logger.error(f"Error saving features for {ticker}: {e}")
-            raise
-
     def close(self):
         """Close database connections"""
         if hasattr(self.data_loader, "close"):
             self.data_loader.close()
 
 
-def run_production_batch():
+def run_indicator_pipeline():
     """Run production batch processing for all available tickers"""
-    logger.info("🚀 Starting Production Feature Engineering Batch...")
+    logger.info("Starting Production Feature Engineering Batch...")
 
     # Production configuration
     job_config = BatchJobConfig(
@@ -734,9 +443,9 @@ def run_production_batch():
         max_workers=config.batch_processing.MAX_WORKERS,
         start_date="2023-01-01",
         end_date=datetime.now().strftime("%Y-%m-%d"),
-        min_data_points=config.data_quality.MIN_DATA_POINTS // 2,
+        min_data_points=config.data_quality.MIN_DATA_POINTS,
         save_to_parquet=config.storage.SAVE_TO_PARQUET,
-        save_to_database=False,
+        save_to_database=True,
         overwrite_existing=config.storage.OVERWRITE_EXISTING,
     )
 
@@ -747,7 +456,7 @@ def run_production_batch():
         all_tickers = processor.get_available_tickers(
             min_data_points=job_config.min_data_points, market="stocks"
         )
-        logger.info(f"📈 Processing {len(all_tickers)} tickers:")
+        logger.info(f"Processing {len(all_tickers)} tickers:")
         storage = FeatureStorage()
         storage.remove_all_versions_for_all_tickers()
 
@@ -757,7 +466,7 @@ def run_production_batch():
         processing_time = time.time() - start_time
 
         # log results
-        logger.info("🎉 Batch Processing Completed!")
+        logger.info("Batch Processing Completed!")
         logger.info(f"Total tickers: {results['total_tickers']}")
         logger.info(f"Successful: {results['successful']}")
         logger.info(f"Failed: {results['failed']}")
@@ -766,42 +475,29 @@ def run_production_batch():
         logger.info(f"Processing time: {processing_time:.1f} seconds")
 
         # Check storage stats
-
         stats = storage.get_storage_stats()
-        logger.info("📁 Storage Statistics:")
+        logger.info("Storage Statistics:")
         logger.info(f"Total tickers stored: {stats['total_tickers']}")
         logger.info(f"Total storage size: {stats['total_size_mb']:.2f} MB")
         logger.info(f"Storage path: {stats['base_path']}")
 
         # Show failed tickers if any
         if results["failed"] > 0:
-            failed_tickers = [r["ticker"] for r in results["results"] if not r["success"]]
-            logger.warning(f"Failed tickers: {', '.join(failed_tickers[:10])}")
+            logger.warning(f"Failed tickers: {', '.join(results.get('failed_tickers', [])[:10])}")
 
-        # Consolidate into date-based partitions
+        # Consolidate into year-partitioned files
         if results["successful"] > 0:
-            logger.info("🗓️ Consolidating features into date-based partitions...")
+            logger.info("Consolidating features into year-partitioned files...")
             try:
-                from src.data_collector.indicator_pipeline.consolidated_storage import (
-                    consolidate_existing_features,
-                )
-
-                consolidation_start = time.time()
-                consolidation_result = consolidate_existing_features(strategy="by_date")
-                consolidation_time = time.time() - consolidation_start
-
-                logger.info(
-                    f"Date-based consolidation completed in {consolidation_time:.2f} seconds"
-                )
-                logger.info(f"Date-partitioned files: {consolidation_result['files_created']}")
+                consolidation_result = consolidate_existing_features()
+                logger.info(f"Year-partitioned files: {consolidation_result['files_created']}")
                 logger.info(f"Consolidated size: {consolidation_result['total_size_mb']:.2f} MB")
 
-                # Show date breakdown
-                logger.info("📁 Date-based Files:")
+                # Show year breakdown
+                logger.info("Year-based files:")
                 for file_info in consolidation_result["files"]:
-                    date_label = file_info.get("date", file_info.get("year"))
                     logger.info(
-                        f"{file_info['file']}: {file_info['rows']:,} rows, Date: {date_label}"
+                        f"{file_info['file']}: {file_info['rows']:,} rows, Year: {file_info['year']}"
                     )
 
                 results["consolidation"] = consolidation_result
@@ -821,9 +517,7 @@ def run_production_batch():
 
 def main():
     """Main function for production batch processing"""
-    run_production_batch()
-
-    from src.utils.data.cleaned_data_cache import CleanedDataCache
+    run_indicator_pipeline()
 
     cache = CleanedDataCache()
     cache.clear_cache()

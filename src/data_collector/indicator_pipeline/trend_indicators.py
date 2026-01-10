@@ -7,7 +7,6 @@ moving averages, MACD, and Ichimoku cloud components.
 
 import pandas as pd
 import numpy as np
-import time
 from typing import List, Optional
 
 try:
@@ -23,7 +22,7 @@ from src.data_collector.indicator_pipeline.base import (
 from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
 
 
 def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
@@ -37,7 +36,6 @@ def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     Returns:
         IndicatorResult containing SMA values
     """
-    start_time = time.time()
     warnings = []
 
     if periods is None:
@@ -71,14 +69,7 @@ def calculate_sma(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             "valid_calculations": len([p for p in periods if len(data) >= p]),
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating SMA: {str(e)}")
@@ -96,7 +87,6 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
     Returns:
         IndicatorResult containing EMA values
     """
-    start_time = time.time()
     warnings = []
 
     if periods is None:
@@ -128,14 +118,7 @@ def calculate_ema(data: pd.DataFrame, periods: Optional[List[int]] = None) -> In
             "valid_calculations": len([p for p in periods if len(data) >= p]),
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating EMA: {str(e)}")
@@ -160,7 +143,6 @@ def calculate_macd(
     Returns:
         IndicatorResult containing MACD, signal line, and histogram
     """
-    start_time = time.time()
     warnings = []
 
     # Use config defaults if not provided
@@ -217,14 +199,7 @@ def calculate_macd(
             ],
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating MACD: {str(e)}")
@@ -251,7 +226,7 @@ def calculate_ichimoku(
     Returns:
         IndicatorResult containing Ichimoku components
     """
-    start_time = time.time()
+
     warnings = []
 
     # Use config defaults if not provided
@@ -290,7 +265,7 @@ def calculate_ichimoku(
         result_data["Ichimoku_Senkou_B"] = ichimoku_b.shift(displacement)
 
         # Calculate Chikou Span (lagging span)
-        result_data["Ichimoku_Chikou"] = data["close"].shift(-displacement)
+        result_data["Ichimoku_Chikou"] = data["close"].shift(displacement)
 
         # Calculate additional Ichimoku signals
         result_data["Ichimoku_Tenkan_Above_Kijun"] = (
@@ -340,14 +315,7 @@ def calculate_ichimoku(
             ],
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating Ichimoku: {str(e)}")
@@ -367,8 +335,6 @@ class TrendIndicatorCalculator(BaseIndicator):
         Returns:
             IndicatorResult containing all trend indicators
         """
-        start_time = time.time()
-
         try:
             # Calculate individual indicators
             sma_result = calculate_sma(self.data)
@@ -403,12 +369,8 @@ class TrendIndicatorCalculator(BaseIndicator):
                 },
             }
 
-            calculation_time = time.time() - start_time
             return create_indicator_result(
-                data=combined_data,
-                metadata=metadata,
-                warnings=all_warnings,
-                calculation_time=calculation_time,
+                data=combined_data, metadata=metadata, warnings=all_warnings
             )
 
         except Exception as e:
