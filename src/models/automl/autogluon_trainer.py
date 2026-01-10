@@ -21,8 +21,8 @@ from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from typing import Any, Dict, Tuple, Optional
 
-from src.utils.logger import get_logger
-from src.models.common.training_data_prep import prepare_common_training_data
+from src.utils.core.logger import get_logger
+from src.data_utils.polars_ml_pipeline import prepare_ml_data_for_training_with_cleaning_polars, to_pandas
 from src.models.automl.autogluon_model import AutoGluonModel
 from src.models.automl.autogluen_load_model import run_model_evaluation
 from src.models.feature_selection.io import load_encoder
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 def filter_to_selected_features(
     x_train: pd.DataFrame, x_test: pd.DataFrame
-) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[str]]:
     """
     Filter training and test datasets to only include features selected by AutoGluon.
 
@@ -57,8 +57,6 @@ def filter_to_selected_features(
 
             # Filter to only include selected features that exist in the dataset
             available_features = [col for col in selected_features if col in x_train.columns]
-            # INSERT_YOUR_CODE
-            # Ensure essential columns are present in available_features list (if available in x_train)
             for essential_col in essential_columns:
                 if essential_col not in available_features:
                     available_features.append(essential_col)
@@ -137,9 +135,8 @@ def apply_saved_encoder_and_scaler(
         except Exception as e:
             logger.warning(f"Failed to load scaler: {e}")
 
-    used_encoding = False
     if encoder is None or scaler is None:
-        return x_train, x_test, used_encoding
+        return x_train, x_test, None, None
 
     try:
         logger.info(
@@ -191,29 +188,26 @@ def apply_saved_encoder_and_scaler(
 def train_autogluon(
     *, prediction_horizon: int = 20, presets: str = "best_quality"
 ) -> Dict[str, Any]:
-    # Use centralized common training data preparation
-    data = prepare_common_training_data(
-        prediction_horizon=prediction_horizon, recent_date_int_cut=10
+    # Use Polars-based training data preparation (lazy-first), then convert to pandas
+    # because AutoGluon TabularPredictor expects pandas objects.
+    data = prepare_ml_data_for_training_with_cleaning_polars(
+        prediction_horizon=prediction_horizon, clean_features=True
     )
     logger.info(f"target_column: {data.get('target_column')}")
-    x_train: pd.DataFrame = data["x_train"]
+    x_train: pd.DataFrame = to_pandas(data["x_train"])
     logger.info(f"x_train: {x_train.columns.tolist()}")
-    y_train: pd.Series = data["y_train"]
-    x_test: pd.DataFrame = data["x_test"]
-    y_test: pd.Series = data["y_test"]
+    y_train: pd.Series = to_pandas(data["y_train"])
+    x_test: pd.DataFrame = to_pandas(data["x_test"])
+    y_test: pd.Series = to_pandas(data["y_test"])
 
-    # Filter datasets to only include selected features (auto-locate selection file if present)
     x_train, x_test, selected_features_path = filter_to_selected_features(x_train, x_test)
-
-    # Try to apply saved encoder and scaler to produce encoded features before training
-    # x_train, x_test, encoder, scaler = apply_saved_encoder_and_scaler(x_train, x_test, batch_size=2048, device="cpu")
 
     collected = gc.collect()
     logger.info(f"Garbage collected: {collected}")
     proc = psutil.Process(os.getpid())
-    print("RSS MB:", proc.memory_info().rss / 1024**2)
+    logger.info(f"RSS MB: {proc.memory_info().rss / 1024**2}")
     top_dataframes(10)
-    # Build model
+
     config = {"label": f"Future_Return_{prediction_horizon}D", "presets": presets, "groups": "year"}
     model = AutoGluonModel(model_name="autogluon", config=config)
     model.fit(x_train, y_train, X_val=x_test, y_val=y_test)

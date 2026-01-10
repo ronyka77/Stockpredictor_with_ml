@@ -6,9 +6,9 @@ from the Polygon fundamentals API endpoints.
 """
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, date
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -191,51 +191,6 @@ class CashFlowStatement(FinancialStatement):
     free_cash_flow: Optional[FinancialValue] = None
 
 
-class CompanyDetails(BaseModel):
-    """Company details and classification information"""
-
-    # Basic information
-    ticker: str
-    name: Optional[str] = None
-    market: Optional[str] = None
-    locale: Optional[str] = None
-    primary_exchange: Optional[str] = None
-    type: Optional[str] = None
-    active: Optional[bool] = None
-    currency_name: Optional[str] = None
-    cik: Optional[str] = None
-    composite_figi: Optional[str] = None
-    share_class_figi: Optional[str] = None
-
-    # Market data
-    market_cap: Optional[float] = None
-    phone_number: Optional[str] = None
-    address: Optional[Dict[str, Any]] = None
-    description: Optional[str] = None
-    homepage_url: Optional[str] = None
-    total_employees: Optional[int] = None
-    list_date: Optional[date] = None
-
-    # GICS classification
-    sic_code: Optional[str] = None
-    sic_description: Optional[str] = None
-
-    # Branding
-    logo_url: Optional[str] = None
-    icon_url: Optional[str] = None
-
-    @field_validator("list_date", mode="before")
-    @classmethod
-    def parse_list_date(cls, v):
-        """Parse list date string into date object"""
-        if isinstance(v, str):
-            try:
-                return datetime.strptime(v, "%Y-%m-%d").date()
-            except ValueError:
-                return None
-        return v
-
-
 class FundamentalDataResponse(BaseModel):
     """Complete response model for fundamental data"""
 
@@ -247,9 +202,6 @@ class FundamentalDataResponse(BaseModel):
 
     # Financial data
     results: Optional[List[Dict[str, Any]]] = None
-
-    # Company information
-    company_details: Optional[CompanyDetails] = None
 
     # Processed statements
     income_statements: List[IncomeStatement] = Field(default_factory=list)
@@ -279,23 +231,29 @@ class FundamentalDataResponse(BaseModel):
             return None
         return max(self.cash_flow_statements, key=lambda x: x.filing_date or date.min)
 
-    def get_statements_by_period(self, fiscal_period: str) -> Dict[str, Any]:
+    def get_statements_by_period(
+        self, fiscal_period: str
+    ) -> Dict[str, Optional[Union[IncomeStatement, BalanceSheet, CashFlowStatement]]]:
         """Get all statements for a specific fiscal period"""
-        result = {"income_statement": None, "balance_sheet": None, "cash_flow": None}
+        result: Dict[str, Optional[Union[IncomeStatement, BalanceSheet, CashFlowStatement]]] = {
+            "income_statement": None,
+            "balance_sheet": None,
+            "cash_flow": None,
+        }
 
-        for stmt in self.income_statements:
-            if stmt.fiscal_period == fiscal_period:
-                result["income_statement"] = stmt
+        for income_stmt in self.income_statements:
+            if income_stmt.fiscal_period == fiscal_period:
+                result["income_statement"] = income_stmt
                 break
 
-        for stmt in self.balance_sheets:
-            if stmt.fiscal_period == fiscal_period:
-                result["balance_sheet"] = stmt
+        for balance_stmt in self.balance_sheets:
+            if balance_stmt.fiscal_period == fiscal_period:
+                result["balance_sheet"] = balance_stmt
                 break
 
-        for stmt in self.cash_flow_statements:
-            if stmt.fiscal_period == fiscal_period:
-                result["cash_flow"] = stmt
+        for cash_flow_stmt in self.cash_flow_statements:
+            if cash_flow_stmt.fiscal_period == fiscal_period:
+                result["cash_flow"] = cash_flow_stmt
                 break
 
         return result
@@ -352,7 +310,15 @@ class FundamentalDataResponse(BaseModel):
 
 # Utility functions for data extraction
 def extract_financial_value(data: Dict[str, Any], field_name: str) -> Optional[float]:
-    """Extract numeric value from financial data field"""
+    """Extract numeric value from financial data field
+
+    Args:
+        data: Dictionary containing financial data
+        field_name: Name of the field to extract value from
+
+    Returns:
+        Extracted float value or None if not found/invalid
+    """
     if field_name not in data:
         return None
 
@@ -366,14 +332,30 @@ def extract_financial_value(data: Dict[str, Any], field_name: str) -> Optional[f
 
 
 def safe_divide(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
-    """Safely divide two numbers, handling None and zero values"""
+    """Safely divide two numbers, handling None and zero values
+
+    Args:
+        numerator: The numerator value
+        denominator: The denominator value
+
+    Returns:
+        Division result or None if division is invalid
+    """
     if numerator is None or denominator is None or denominator == 0:
         return None
     return numerator / denominator
 
 
 def calculate_growth_rate(current: Optional[float], previous: Optional[float]) -> Optional[float]:
-    """Calculate growth rate between two values"""
+    """Calculate growth rate between two values
+
+    Args:
+        current: Current period value
+        previous: Previous period value
+
+    Returns:
+        Growth rate as decimal or None if calculation invalid
+    """
     if current is None or previous is None or previous == 0:
         return None
     return (current - previous) / abs(previous)
@@ -382,7 +364,16 @@ def calculate_growth_rate(current: Optional[float], previous: Optional[float]) -
 def calculate_cagr(
     ending_value: Optional[float], beginning_value: Optional[float], periods: int
 ) -> Optional[float]:
-    """Calculate Compound Annual Growth Rate"""
+    """Calculate Compound Annual Growth Rate
+
+    Args:
+        ending_value: Value at the end of the period
+        beginning_value: Value at the beginning of the period
+        periods: Number of periods for CAGR calculation
+
+    Returns:
+        CAGR as decimal or None if calculation invalid
+    """
     if ending_value is None or beginning_value is None or beginning_value <= 0 or periods <= 0:
         return None
 

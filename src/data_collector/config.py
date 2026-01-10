@@ -33,7 +33,6 @@ class PolygonConfig:
     NEWS_MAX_TICKERS: int = int(os.getenv("NEWS_MAX_TICKERS", "1000"))
     NEWS_DAYS_LOOKBACK: int = int(os.getenv("NEWS_DAYS_LOOKBACK", "30"))
     NEWS_RETENTION_YEARS: int = int(os.getenv("NEWS_RETENTION_YEARS", "3"))
-    NEWS_BATCH_SIZE: int = int(os.getenv("NEWS_BATCH_SIZE", "100"))
 
     # Database Configuration
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
@@ -74,6 +73,10 @@ class FeatureEngineeringConfig:
     MACD_PARAMS: Dict = field(default_factory=lambda: {"fast": 12, "slow": 26, "signal": 9})
     BOLLINGER_PARAMS: Dict = field(default_factory=lambda: {"period": 20, "std": 2})
     ATR_PERIOD: int = 14
+    # ATR volatility flag configuration: lookback window (rolling) and percentile thresholds
+    ATR_VOLATILITY_LOOKBACK: int = 50
+    ATR_HIGH_PERCENTILE: float = 0.7
+    ATR_LOW_PERCENTILE: float = 0.3
     STOCHASTIC_PARAMS: Dict = field(default_factory=lambda: {"k_period": 14, "d_period": 3})
 
     # Advanced Indicator Parameters

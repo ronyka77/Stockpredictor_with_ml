@@ -6,8 +6,8 @@ RSI, Stochastic Oscillator, Rate of Change, and Williams %R.
 """
 
 import pandas as pd
-import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Callable
+from dataclasses import dataclass
 
 try:
     import ta
@@ -19,358 +19,218 @@ from src.data_collector.indicator_pipeline.base import (
     IndicatorResult,
     create_indicator_result,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
 
 
-def calculate_rsi(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
-    """
-    Calculate Relative Strength Index for multiple periods
+@dataclass
+class IndicatorConfig:
+    """Configuration for momentum indicator calculation"""
 
-    Args:
-        data: OHLCV DataFrame
-        periods: List of periods for RSI calculation
+    name: str
+    calc_func: Callable
+    default_periods: List[int]
+    min_data_multiplier: float
+    signal_thresholds: Dict[str, tuple]
+    calc_kwargs: Dict[str, Any] = None
 
-    Returns:
-        IndicatorResult containing RSI values
-    """
-    start_time = time.time()
+
+# Indicator registry with all configurations
+MOMENTUM_CONFIGS = {
+    "RSI": IndicatorConfig(
+        name="Relative Strength Index",
+        calc_func=lambda df, p: ta.momentum.rsi(df["close"], window=p),
+        default_periods=lambda: feature_config.RSI_PERIODS,
+        min_data_multiplier=2.0,
+        signal_thresholds={
+            "Overbought": (">", 70),
+            "Oversold": ("<", 30),
+            "Neutral": ("between", (30, 70)),
+        },
+    ),
+    "ROC": IndicatorConfig(
+        name="Rate of Change",
+        calc_func=lambda df, p: ta.momentum.roc(df["close"], window=p),
+        default_periods=[10, 20, 30],
+        min_data_multiplier=1.0,
+        signal_thresholds={
+            "Positive": (">", 0),
+            "Strong_Positive": (">", 5),
+            "Strong_Negative": ("<", -5),
+        },
+    ),
+    "Williams_R": IndicatorConfig(
+        name="Williams %R",
+        calc_func=lambda df, p: ta.momentum.williams_r(df["high"], df["low"], df["close"], lbp=p),
+        default_periods=[14, 21],
+        min_data_multiplier=1.0,
+        signal_thresholds={
+            "Overbought": (">", -20),
+            "Oversold": ("<", -80),
+            "Neutral": ("between", (-80, -20)),
+        },
+    ),
+}
+
+
+def _apply_signals(df: pd.DataFrame, col: str, thresholds: Dict[str, tuple]) -> None:
+    """Generate signal columns based on threshold rules"""
+    for name, (op, val) in thresholds.items():
+        if op == ">":
+            df[f"{col}_{name}"] = (df[col] > val).astype(int)
+        elif op == "<":
+            df[f"{col}_{name}"] = (df[col] < val).astype(int)
+        elif op == "between":
+            df[f"{col}_{name}"] = ((df[col] >= val[0]) & (df[col] <= val[1])).astype(int)
+
+
+def calculate_generic_momentum(
+    data: pd.DataFrame, config_key: str, periods: Optional[List[int]] = None
+) -> IndicatorResult:
+    """Generic momentum indicator calculator driven by config"""
+    config = MOMENTUM_CONFIGS[config_key]
     warnings = []
 
-    if periods is None:
-        periods = feature_config.RSI_PERIODS
-
-    # logger.info(f"Calculating RSI for periods: {periods}")
+    periods = periods or (
+        config.default_periods() if callable(config.default_periods) else config.default_periods
+    )
+    result_data = pd.DataFrame(index=data.index)
+    valid_calcs = 0
 
     try:
-        result_data = pd.DataFrame(index=data.index)
-
         for period in periods:
-            if len(data) < period * 2:  # RSI needs more data for stability
-                warning_msg = f"Insufficient data for RSI_{period}. Need {period * 2} points, have {len(data)}"
-                warnings.append(warning_msg)
-                logger.warning(warning_msg)
+            min_required = int(period * config.min_data_multiplier) + 1
+            if len(data) < min_required:
+                msg = f"Insufficient data for {config_key}_{period}. Need {min_required}, have {len(data)}"
+                warnings.append(msg)
+                logger.warning(msg)
                 continue
 
-            rsi_values = ta.momentum.rsi(data["close"], window=period)
-            result_data[f"RSI_{period}"] = rsi_values
-
-            # Add RSI-based signals
-            result_data[f"RSI_{period}_Overbought"] = (rsi_values > 70).astype(int)
-            result_data[f"RSI_{period}_Oversold"] = (rsi_values < 30).astype(int)
-            result_data[f"RSI_{period}_Neutral"] = ((rsi_values >= 30) & (rsi_values <= 70)).astype(
-                int
-            )
-
-            # logger.info(f"Calculated RSI_{period}: {rsi_values.notna().sum()} valid values")
+            col_name = f"{config_key}_{period}"
+            result_data[col_name] = config.calc_func(data, period)
+            _apply_signals(result_data, col_name, config.signal_thresholds)
+            valid_calcs += 1
 
         if result_data.empty:
-            raise ValueError("No RSI indicators could be calculated")
+            raise ValueError(f"No {config_key} indicators could be calculated")
 
         metadata = {
             "indicator_type": "momentum",
-            "indicator_name": "Relative Strength Index",
+            "indicator_name": config.name,
             "periods": periods,
             "data_points": len(data),
-            "valid_calculations": len([p for p in periods if len(data) >= p * 2]),
-            "thresholds": {"overbought": 70, "oversold": 30},
+            "valid_calculations": valid_calcs,
+            "thresholds": {k: v[1] for k, v in config.signal_thresholds.items()},
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
-
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
     except Exception as e:
-        logger.error(f"Error calculating RSI: {str(e)}")
+        logger.error(f"Error calculating {config_key}: {str(e)}")
         raise
+
+
+def calculate_rsi(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
+    """Calculate Relative Strength Index for multiple periods"""
+    return calculate_generic_momentum(data, "RSI", periods)
+
+
+def calculate_roc(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
+    """Calculate Rate of Change for multiple periods"""
+    return calculate_generic_momentum(data, "ROC", periods)
+
+
+def calculate_williams_r(
+    data: pd.DataFrame, periods: Optional[List[int]] = None
+) -> IndicatorResult:
+    """Calculate Williams %R for multiple periods"""
+    return calculate_generic_momentum(data, "Williams_R", periods)
 
 
 def calculate_stochastic(
     data: pd.DataFrame, k_period: Optional[int] = None, d_period: Optional[int] = None
 ) -> IndicatorResult:
-    """
-    Calculate Stochastic Oscillator (%K and %D)
-
-    Args:
-        data: OHLCV DataFrame
-        k_period: %K period
-        d_period: %D smoothing period
-
-    Returns:
-        IndicatorResult containing Stochastic values
-    """
-    start_time = time.time()
+    """Calculate Stochastic Oscillator (%K and %D)"""
     warnings = []
 
-    # Use config defaults if not provided
     params = feature_config.STOCHASTIC_PARAMS
-    if k_period is None:
-        k_period = params["k_period"]
-    if d_period is None:
-        d_period = params["d_period"]
+    k_period = k_period or params["k_period"]
+    d_period = d_period or params["d_period"]
 
-    # logger.info(f"Calculating Stochastic with parameters: k_period={k_period}, d_period={d_period}")
+    min_required = k_period + d_period
+    if len(data) < min_required:
+        msg = f"Insufficient data for Stochastic. Need {min_required}, have {len(data)}"
+        warnings.append(msg)
+        logger.warning(msg)
 
     try:
-        # Check minimum data requirements
-        min_required = k_period + d_period
-        if len(data) < min_required:
-            warning_msg = (
-                f"Insufficient data for Stochastic. Need {min_required} points, have {len(data)}"
-            )
-            warnings.append(warning_msg)
-            logger.warning(warning_msg)
-
-        # Calculate Stochastic using ta library
-        stoch_k = ta.momentum.stoch(
-            data["high"], data["low"], data["close"], window=k_period, smooth_window=d_period
+        result_data = pd.DataFrame(
+            {
+                "Stoch_K": ta.momentum.stoch(
+                    data["high"],
+                    data["low"],
+                    data["close"],
+                    window=k_period,
+                    smooth_window=d_period,
+                ),
+                "Stoch_D": ta.momentum.stoch_signal(
+                    data["high"],
+                    data["low"],
+                    data["close"],
+                    window=k_period,
+                    smooth_window=d_period,
+                ),
+            },
+            index=data.index,
         )
-        stoch_d = ta.momentum.stoch_signal(
-            data["high"], data["low"], data["close"], window=k_period, smooth_window=d_period
-        )
 
-        result_data = pd.DataFrame(index=data.index)
-        result_data["Stoch_K"] = stoch_k
-        result_data["Stoch_D"] = stoch_d
-
-        # Add Stochastic signals
         result_data["Stoch_Overbought"] = (
             (result_data["Stoch_K"] > 80) & (result_data["Stoch_D"] > 80)
         ).astype(int)
-
         result_data["Stoch_Oversold"] = (
             (result_data["Stoch_K"] < 20) & (result_data["Stoch_D"] < 20)
         ).astype(int)
-
         result_data["Stoch_K_Above_D"] = (result_data["Stoch_K"] > result_data["Stoch_D"]).astype(
             int
         )
-
-        result_data["Stoch_Crossover"] = (
-            (result_data["Stoch_K"] > result_data["Stoch_D"]).astype(int).diff()
-        )
-
-        # logger.info(f"Calculated Stochastic: {result_data['Stoch_K'].notna().sum()} valid values")
+        result_data["Stoch_Crossover"] = result_data["Stoch_K_Above_D"].diff()
 
         metadata = {
             "indicator_type": "momentum",
             "indicator_name": "Stochastic Oscillator",
             "parameters": {"k_period": k_period, "d_period": d_period},
             "data_points": len(data),
-            "features": [
-                "Stoch_K",
-                "Stoch_D",
-                "Stoch_Overbought",
-                "Stoch_Oversold",
-                "Stoch_K_Above_D",
-                "Stoch_Crossover",
-            ],
+            "features": list(result_data.columns),
             "thresholds": {"overbought": 80, "oversold": 20},
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
-
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
     except Exception as e:
         logger.error(f"Error calculating Stochastic: {str(e)}")
         raise
 
 
-def calculate_roc(data: pd.DataFrame, periods: Optional[List[int]] = None) -> IndicatorResult:
-    """
-    Calculate Rate of Change for multiple periods
-
-    Args:
-        data: OHLCV DataFrame
-        periods: List of periods for ROC calculation
-
-    Returns:
-        IndicatorResult containing ROC values
-    """
-    start_time = time.time()
-    warnings = []
-
-    if periods is None:
-        periods = [10, 20, 30]  # Default ROC periods
-
-    # logger.info(f"Calculating ROC for periods: {periods}")
-
-    try:
-        result_data = pd.DataFrame(index=data.index)
-
-        for period in periods:
-            if len(data) < period + 1:
-                warning_msg = f"Insufficient data for ROC_{period}. Need {period + 1} points, have {len(data)}"
-                warnings.append(warning_msg)
-                logger.warning(warning_msg)
-                continue
-
-            roc_values = ta.momentum.roc(data["close"], window=period)
-            result_data[f"ROC_{period}"] = roc_values
-
-            # Add ROC-based signals
-            result_data[f"ROC_{period}_Positive"] = (roc_values > 0).astype(int)
-            result_data[f"ROC_{period}_Strong_Positive"] = (roc_values > 5).astype(int)
-            result_data[f"ROC_{period}_Strong_Negative"] = (roc_values < -5).astype(int)
-
-            # logger.info(f"Calculated ROC_{period}: {roc_values.notna().sum()} valid values")
-
-        if result_data.empty:
-            raise ValueError("No ROC indicators could be calculated")
-
-        metadata = {
-            "indicator_type": "momentum",
-            "indicator_name": "Rate of Change",
-            "periods": periods,
-            "data_points": len(data),
-            "valid_calculations": len([p for p in periods if len(data) >= p + 1]),
-            "thresholds": {"strong_positive": 5, "strong_negative": -5},
-        }
-
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
-
-    except Exception as e:
-        logger.error(f"Error calculating ROC: {str(e)}")
-        raise
-
-
-def calculate_williams_r(
-    data: pd.DataFrame, periods: Optional[List[int]] = None
-) -> IndicatorResult:
-    """
-    Calculate Williams %R for multiple periods
-
-    Args:
-        data: OHLCV DataFrame
-        periods: List of periods for Williams %R calculation
-
-    Returns:
-        IndicatorResult containing Williams %R values
-    """
-    start_time = time.time()
-    warnings = []
-
-    if periods is None:
-        periods = [14, 21]  # Default Williams %R periods
-
-    # logger.info(f"Calculating Williams %R for periods: {periods}")
-
-    try:
-        result_data = pd.DataFrame(index=data.index)
-
-        for period in periods:
-            if len(data) < period:
-                warning_msg = f"Insufficient data for Williams_R_{period}. Need {period} points, have {len(data)}"
-                warnings.append(warning_msg)
-                logger.warning(warning_msg)
-                continue
-
-            williams_r_values = ta.momentum.williams_r(
-                data["high"], data["low"], data["close"], lbp=period
-            )
-            result_data[f"Williams_R_{period}"] = williams_r_values
-
-            # Add Williams %R signals
-            result_data[f"Williams_R_{period}_Overbought"] = (williams_r_values > -20).astype(int)
-            result_data[f"Williams_R_{period}_Oversold"] = (williams_r_values < -80).astype(int)
-            result_data[f"Williams_R_{period}_Neutral"] = (
-                (williams_r_values >= -80) & (williams_r_values <= -20)
-            ).astype(int)
-
-            # logger.info(f"Calculated Williams_R_{period}: {williams_r_values.notna().sum()} valid values")
-
-        if result_data.empty:
-            raise ValueError("No Williams %R indicators could be calculated")
-
-        metadata = {
-            "indicator_type": "momentum",
-            "indicator_name": "Williams %R",
-            "periods": periods,
-            "data_points": len(data),
-            "valid_calculations": len([p for p in periods if len(data) >= p]),
-            "thresholds": {"overbought": -20, "oversold": -80},
-        }
-
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
-
-    except Exception as e:
-        logger.error(f"Error calculating Williams %R: {str(e)}")
-        raise
-
-
 class MomentumIndicatorCalculator(BaseIndicator):
-    """
-    Comprehensive momentum indicator calculator
-
-    This class combines all momentum indicators into a single calculation
-    """
+    """Comprehensive momentum indicator calculator"""
 
     def calculate(self) -> IndicatorResult:
         """Calculate all momentum indicators"""
-        start_time = time.time()
-        all_warnings = []
+        results = [
+            func(self.data)
+            for func in [calculate_rsi, calculate_stochastic, calculate_roc, calculate_williams_r]
+        ]
+        combined_data = pd.concat([r.data for r in results], axis=1)
+        all_warnings = [w for r in results for w in r.warnings]
 
-        # logger.info("Calculating all momentum indicators")
-
-        try:
-            # Calculate individual indicators
-            rsi_result = calculate_rsi(self.data)
-            stoch_result = calculate_stochastic(self.data)
-            roc_result = calculate_roc(self.data)
-            willr_result = calculate_williams_r(self.data)
-
-            # Combine all results
-            combined_data = pd.DataFrame(index=self.data.index)
-
-            # Add all indicator data
-            for result in [rsi_result, stoch_result, roc_result, willr_result]:
-                combined_data = pd.concat([combined_data, result.data], axis=1)
-                all_warnings.extend(result.warnings)
-
-            metadata = {
+        return create_indicator_result(
+            data=combined_data,
+            metadata={
                 "indicator_type": "momentum_combined",
                 "indicator_name": "All Momentum Indicators",
                 "components": ["RSI", "Stochastic", "ROC", "Williams_R"],
                 "data_points": len(self.data),
                 "total_features": len(combined_data.columns),
-            }
-
-            calculation_time = time.time() - start_time
-
-            return create_indicator_result(
-                data=combined_data,
-                metadata=metadata,
-                warnings=all_warnings,
-                calculation_time=calculation_time,
-            )
-
-        except Exception as e:
-            logger.error(f"Error calculating momentum indicators: {str(e)}")
-            raise
+            },
+            warnings=all_warnings,
+        )

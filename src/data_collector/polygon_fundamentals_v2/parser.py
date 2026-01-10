@@ -7,7 +7,7 @@ from src.data_collector.polygon_fundamentals.data_models import (
     CashFlowStatement,
     FinancialValue,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -20,6 +20,20 @@ class FundamentalsParser:
     """
 
     def parse(self, raw: Dict[str, Any], ticker: str) -> FundamentalDataResponse:
+        """
+        Parse raw Polygon API response into structured financial data.
+
+        Extracts income statements, balance sheets, and cash flow statements from
+        the raw JSON response, organizing them into a structured format for further
+        processing and validation.
+
+        Args:
+            raw: Raw JSON response from Polygon fundamentals API
+            ticker: The stock ticker symbol
+
+        Returns:
+            FundamentalDataResponse containing parsed financial statements
+        """
         response = FundamentalDataResponse(
             status=raw.get("status", "OK"),
             request_id=raw.get("request_id"),
@@ -35,11 +49,11 @@ class FundamentalsParser:
         for r in results:
             fin = r.get("financials") or {}
 
-            # metadata common
+            # metadata common - convert dates to strings for security validation
             meta = {
-                "start_date": r.get("start_date"),
-                "end_date": r.get("end_date"),
-                "filing_date": r.get("filing_date"),
+                "start_date": str(r.get("start_date")) if r.get("start_date") else None,
+                "end_date": str(r.get("end_date")) if r.get("end_date") else None,
+                "filing_date": str(r.get("filing_date")) if r.get("filing_date") else None,
                 "timeframe": r.get("timeframe"),
                 "fiscal_period": r.get("fiscal_period"),
                 "fiscal_year": r.get("fiscal_year"),

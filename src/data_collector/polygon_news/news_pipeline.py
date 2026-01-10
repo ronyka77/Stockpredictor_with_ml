@@ -3,7 +3,7 @@ Main news collection orchestrator for Polygon news data
 Handles incremental updates, historical backfill, and comprehensive news collection
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 import json
 from src.database.connection import close_global_pool
@@ -13,9 +13,9 @@ from src.data_collector.polygon_news.storage import PolygonNewsStorage
 from src.data_collector.polygon_news.ticker_integration import NewsTickerIntegration
 from src.data_collector.polygon_news.processor import NewsProcessor
 from src.data_collector.polygon_news.validator import NewsValidator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class PolygonNewsCollector:
@@ -37,7 +37,7 @@ class PolygonNewsCollector:
             polygon_api_key: Polygon.io API key
             requests_per_minute: Rate limit for API requests
         """
-        self.logger = get_logger(self.__class__.__name__, utility="data_collector")
+        self.logger = get_logger(self.__class__.__name__)
 
         # Initialize components
         self.news_client = PolygonNewsClient(polygon_api_key, requests_per_minute)
@@ -139,67 +139,6 @@ class PolygonNewsCollector:
         except Exception as e:
             self.logger.error(f"Historical collection failed: {e}")
             self.stats["end_time"] = datetime.now(timezone.utc)
-            raise
-
-    def collect_targeted_news(
-        self,
-        tickers: List[str],
-        start_date: datetime,
-        end_date: datetime,
-        limit_per_ticker: int = 100,
-    ) -> Dict[str, Any]:
-        """
-        Collect news for specific tickers and date range
-
-        Args:
-            tickers: List of ticker symbols
-            start_date: Start date for collection
-            end_date: End date for collection
-            limit_per_ticker: Maximum articles per ticker
-
-        Returns:
-            Collection statistics
-        """
-        self.logger.info(f"Starting targeted collection for {len(tickers)} tickers")
-        self._reset_stats()
-        self.stats["start_time"] = datetime.now(timezone.utc)
-
-        try:
-            # Validate tickers
-            valid_tickers, invalid_tickers = self.ticker_integration.validate_ticker_list(tickers)
-
-            if invalid_tickers:
-                self.logger.warning(f"Invalid tickers skipped: {invalid_tickers}")
-
-            self.logger.info(f"Processing {len(valid_tickers)} valid tickers")
-
-            for ticker in valid_tickers:
-                try:
-                    # Get ticker info for priority scoring
-                    ticker_info = self.ticker_integration.get_ticker_info(ticker)
-                    priority_score = ticker_info.get("priority_score", 50)
-
-                    # Collect news for this ticker
-                    ticker_stats = self._collect_ticker_news(
-                        ticker, start_date, end_date, priority_score, limit_per_ticker
-                    )
-
-                    # Update overall stats
-                    self._update_stats(ticker_stats)
-
-                except Exception as e:
-                    self.logger.error(f"Error processing ticker {ticker}: {e}")
-                    self.stats["failed_tickers"].append(ticker)
-                    self.stats["processing_errors"].append(f"{ticker}: {str(e)}")
-
-            self.stats["end_time"] = datetime.now(timezone.utc)
-            self.logger.info(f"Targeted collection completed: {self._format_stats()}")
-
-            return self.stats.copy()
-
-        except Exception as e:
-            self.logger.error(f"Targeted collection failed: {e}")
-            self.stats["end_time"] = datetime.now()
             raise
 
     def _collect_ticker_news(
@@ -376,7 +315,7 @@ class PolygonNewsCollector:
         pass
 
 
-def main():
+def run_news_pipeline():
     """
     Main function to run incremental news collection
     This function sets up the database connection, initializes the news collector,
@@ -425,10 +364,10 @@ def main():
             days_lookback = config.NEWS_DAYS_LOOKBACK
 
             logger.info("Configuration:")
-            logger.info(f"  - Max tickers: {max_tickers}")
-            logger.info(f"  - Days lookback (for new tickers): {days_lookback}")
-            logger.info(f"  - Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
-            logger.info(f"  - Retention period: {config.NEWS_RETENTION_YEARS} years")
+            logger.info(f"- Max tickers: {max_tickers}")
+            logger.info(f"- Days lookback (for new tickers): {days_lookback}")
+            logger.info(f"- Rate limit: {config.REQUESTS_PER_MINUTE} requests/minute")
+            logger.info(f"- Retention period: {config.NEWS_RETENTION_YEARS} years")
 
             # Execute collection
             stats_historical = collector.collect_historical_news(
@@ -440,12 +379,12 @@ def main():
             logger.info("COLLECTION COMPLETED SUCCESSFULLY")
             logger.info("=" * 60)
             logger.info("Collection Statistics:")
-            logger.info(f"  - Total API calls: {stats_historical['total_api_calls']}")
-            logger.info(f"  - Articles fetched: {stats_historical['total_articles_fetched']}")
-            logger.info(f"  - Articles stored: {stats_historical['total_articles_stored']}")
-            logger.info(f"  - Articles updated: {stats_historical['total_articles_updated']}")
-            logger.info(f"  - Articles skipped: {stats_historical['total_articles_skipped']}")
-            logger.info(f"  - Failed tickers: {len(stats_historical['failed_tickers'])}")
+            logger.info(f"- Total API calls: {stats_historical['total_api_calls']}")
+            logger.info(f"- Articles fetched: {stats_historical['total_articles_fetched']}")
+            logger.info(f"- Articles stored: {stats_historical['total_articles_stored']}")
+            logger.info(f"- Articles updated: {stats_historical['total_articles_updated']}")
+            logger.info(f"- Articles skipped: {stats_historical['total_articles_skipped']}")
+            logger.info(f"- Failed tickers: {len(stats_historical['failed_tickers'])}")
 
             if stats_historical["failed_tickers"]:
                 logger.warning(f"Failed tickers: {stats_historical['failed_tickers']}")
@@ -453,33 +392,31 @@ def main():
             if stats_historical["processing_errors"]:
                 logger.warning(f"Processing errors: {len(stats_historical['processing_errors'])}")
                 for error in stats_historical["processing_errors"][:5]:  # Show first 5 errors
-                    logger.warning(f"  - {error}")
+                    logger.warning(f"- {error}")
 
             # Duration
             if stats_historical["start_time"] and stats_historical["end_time"]:
                 duration = stats_historical["end_time"] - stats_historical["start_time"]
-                logger.info(f"  - Duration: {duration}")
+                logger.info(f"- Duration: {duration}")
 
             # Get system status
             try:
                 status = collector.get_collection_status()
                 logger.info("System Status:")
-                logger.info(f"  - Database health: {status.get('status', 'unknown')}")
-                logger.info(f"  - Latest article date: {status.get('latest_article_date', 'None')}")
+                logger.info(f"- Database health: {status.get('status', 'unknown')}")
+                logger.info(f"- Latest article date: {status.get('latest_article_date', 'None')}")
 
                 if "recent_statistics" in status:
                     recent_stats = status["recent_statistics"]
-                    logger.info(
-                        f"  - Total articles in DB: {recent_stats.get('total_articles', 0)}"
-                    )
+                    logger.info(f"- Total articles in DB: {recent_stats.get('total_articles', 0)}")
 
                     top_tickers = recent_stats.get("top_tickers", {})
                     if top_tickers:
-                        logger.info(f"  - Top tickers count: {dict(list(top_tickers.items())[:5])}")
+                        logger.info(f"- Top tickers count: {dict(list(top_tickers.items())[:5])}")
 
                     sentiment_dist = recent_stats.get("sentiment_distribution", {})
                     if sentiment_dist:
-                        logger.info(f"  - Sentiment distribution: {sentiment_dist}")
+                        logger.info(f"- Sentiment distribution: {sentiment_dist}")
 
             except Exception as e:
                 logger.warning(f"Could not retrieve system status: {e}")
@@ -511,4 +448,4 @@ if __name__ == "__main__":
     """
     Entry point when running the module directly
     """
-    success = main()
+    success = run_news_pipeline()

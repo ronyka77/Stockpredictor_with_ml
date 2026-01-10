@@ -8,7 +8,7 @@ import logging
 
 from autogluon.tabular import TabularPredictor
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_utils.ml_data_pipeline import prepare_ml_data_for_prediction_with_cleaning
 from src.models.predictors.autogluon_predictor import AutoGluonPredictor
 
@@ -54,7 +54,7 @@ def run_model_evaluation(model_dir: str, prediction_horizon: int = 10) -> Dict[s
     """
     try:
         # 1) Prepare data
-        logger.info("Preparing test data with prediction_horizon=%d", prediction_horizon)
+        logger.info(f"Preparing test data with prediction_horizon={prediction_horizon}")
         label_name = f"Future_Return_{prediction_horizon}D"
         predictor_class = AutoGluonPredictor(model_dir=model_dir)
         predictor_class.load_model_from_mlflow()

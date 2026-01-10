@@ -14,8 +14,8 @@ import ast
 from datetime import datetime
 
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
-from src.utils.logger import get_logger
-from src.utils.mlflow_integration import MLflowIntegration
+from src.utils.core.logger import get_logger
+from src.utils.mlops.mlflow_integration import MLflowIntegration
 
 logger = get_logger(__name__)
 
@@ -346,6 +346,164 @@ class BaseModel(ABC):
             self.optimal_threshold = results.get("optimal_threshold")
             self.confidence_method = results.get("confidence_method", confidence_method)
         return results
+
+    @staticmethod
+    def _optuna_safe_set_user_attr(trial: Any, key: str, value: Any) -> None:
+        """Best-effort Optuna trial user_attr setter.
+
+        Notes:
+        - Must remain JSON-serializable for sqlite-backed Optuna storage.
+        - Never raise from tracking helpers.
+        """
+        try:
+            if trial is None or not key:
+                return
+            trial.set_user_attr(str(key), value)
+        except Exception:
+            return
+
+    @staticmethod
+    def _optuna_to_float(value: Any) -> Optional[float]:
+        try:
+            return float(value) if value is not None else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _optuna_to_int(value: Any) -> Optional[int]:
+        try:
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
+    def _optuna_log_dataset_sizes(self, trial: Any, x_train: Any, x_test: Any) -> None:
+        """Log simple dataset sizes for dashboarding."""
+        try:
+            n_features = self._optuna_to_int(getattr(x_train, "shape", [None, None])[1])
+            n_train = self._optuna_to_int(len(x_train))
+            n_test = self._optuna_to_int(len(x_test))
+        except Exception:
+            return
+
+        if n_features is not None:
+            self._optuna_safe_set_user_attr(trial, "n_features", n_features)
+        if n_train is not None:
+            self._optuna_safe_set_user_attr(trial, "n_train", n_train)
+        if n_test is not None:
+            self._optuna_safe_set_user_attr(trial, "n_test", n_test)
+
+    def _optuna_log_trial_core_metrics(
+        self,
+        trial: Any,
+        *,
+        profit_per_investment: Any = None,
+        best_iteration: Any = None,
+        best_score: Any = None,
+    ) -> None:
+        """Log core per-trial metrics into Optuna user attrs."""
+        ppi = self._optuna_to_float(profit_per_investment)
+        if ppi is not None:
+            self._optuna_safe_set_user_attr(trial, "profit_per_investment", ppi)
+        bi = self._optuna_to_int(best_iteration)
+        if bi is not None:
+            self._optuna_safe_set_user_attr(trial, "best_iteration", bi)
+        bs = self._optuna_to_float(best_score)
+        if bs is not None:
+            self._optuna_safe_set_user_attr(trial, "best_score", bs)
+
+    def _optuna_log_threshold_metrics(
+        self,
+        trial: Any,
+        *,
+        optimal_threshold: Any = None,
+        samples_kept_ratio: Any = None,
+        investment_success_rate: Any = None,
+        custom_accuracy: Any = None,
+        total_profit: Any = None,
+        profitable_investments: Any = None,
+        prefix: str = "threshold_",
+    ) -> None:
+        """Log threshold-optimization metrics into Optuna user attrs."""
+        opt_thr = self._optuna_to_float(optimal_threshold)
+        if opt_thr is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}optimal_threshold", opt_thr)
+
+        skr = self._optuna_to_float(samples_kept_ratio)
+        if skr is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}samples_kept_ratio", skr)
+
+        isr = self._optuna_to_float(investment_success_rate)
+        if isr is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}investment_success_rate", isr)
+
+        ca = self._optuna_to_float(custom_accuracy)
+        if ca is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}custom_accuracy", ca)
+
+        tp = self._optuna_to_float(total_profit)
+        if tp is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}total_profit", tp)
+
+        pi = self._optuna_to_int(profitable_investments)
+        if pi is not None:
+            self._optuna_safe_set_user_attr(trial, f"{prefix}profitable_investments", pi)
+
+    def create_optuna_study(
+        self,
+        *,
+        prediction_horizon: Optional[int] = None,
+        direction: str = "maximize",
+        objective: str = "profit_per_investment",
+        objective_slug: str = "profit",
+        split_date: Optional[str] = None,
+        target_column: Optional[str] = None,
+        storage_url: Optional[str] = None,
+        study_name: Optional[str] = None,
+        load_if_exists: bool = True,
+        sampler: Any = None,
+        pruner: Any = None,
+        n_features: Optional[int] = None,
+        n_train: Optional[int] = None,
+        n_test: Optional[int] = None,
+        user_attrs: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Create/load a persistent Optuna study for this model.
+
+        This is a convenience hook to keep Optuna setup consistent across models.
+        """
+        from src.utils.mlops.optuna_utils import create_or_load_study
+
+        ph = prediction_horizon
+        if ph is None:
+            try:
+                ph = int(self.config.get("prediction_horizon", 0) or 0)
+            except Exception:
+                ph = 0
+
+        if n_features is None and self.feature_names is not None:
+            try:
+                n_features = int(len(self.feature_names))
+            except Exception:
+                n_features = None
+
+        return create_or_load_study(
+            model_name=self.model_name,
+            prediction_horizon=int(ph),
+            direction=direction,
+            objective=objective,
+            objective_slug=objective_slug,
+            split_date=split_date,
+            target_column=target_column,
+            storage_url=storage_url,
+            study_name=study_name,
+            load_if_exists=load_if_exists,
+            sampler=sampler,
+            pruner=pruner,
+            n_features=n_features,
+            n_train=n_train,
+            n_test=n_test,
+            user_attrs=user_attrs,
+        )
 
     def predict_with_threshold(
         self,

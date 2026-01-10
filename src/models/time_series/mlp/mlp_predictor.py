@@ -1,31 +1,49 @@
-"""
-MLP Predictor Module
+"""MLP Predictor with training, evaluation, optimization, and MLflow integration."""
 
-This module contains the MLPPredictor class with core training and prediction methods.
-Handles model creation, basic training, and prediction functionality.
-"""
-
-import torch.nn as nn
 import torch
+import torch.nn as nn
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
+import pickle
+import json
 import os
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple, List
+from contextlib import contextmanager
+from sklearn.preprocessing import StandardScaler
 
 from src.models.time_series.base_pytorch_model import PyTorchBasePredictor
 from src.models.evaluation import ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class MLPPredictor(PyTorchBasePredictor):
-    """
-    Predictor class for the MLP model with advanced training features.
+@contextmanager
+def temporary_device(model, target_device):
+    """Context manager for temporary device switching."""
+    original_device = next(model.parameters(), torch.tensor(0.0)).device
+    try:
+        model.to(target_device)
+        yield
+    finally:
+        model.to(original_device)
 
-    This class handles the creation, training, and prediction of the MLPModule,
-    leveraging the common logic from PyTorchBasePredictor with enhanced features.
-    """
+
+def load_artifact(run_id: str, artifact_path: str, loader_fn):
+    """Generic artifact loader with fallback."""
+    try:
+        local_path = __import__("mlflow").artifacts.download_artifacts(
+            artifact_uri=f"runs:/{run_id}/{artifact_path}"
+        )
+        return loader_fn(local_path)
+    except Exception as e:
+        logger.info(f"Artifact not found ({artifact_path}): {e}")
+        return None
+
+
+class MLPPredictor(PyTorchBasePredictor):
+    """MLP Predictor with training, feature selection, optimization, and MLflow integration."""
 
     def __init__(
         self,
@@ -34,41 +52,30 @@ class MLPPredictor(PyTorchBasePredictor):
         threshold_evaluator: Optional[ThresholdEvaluator] = None,
     ):
         super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
-
-        # Set default MLP-specific config if not provided
-        if config is None:
-            config = {}
-
         self.scaler = None
-        # Default confidence for MLP
         self.default_confidence_method = "variance"
 
-        # MLP-specific defaults
-        # Only set defaults if no config was provided
         if not config:
-            self.config.setdefault("layer_sizes", [128, 64, 32])
-            self.config.setdefault("activation", "relu")
-            self.config.setdefault("dropout", 0.2)
-            self.config.setdefault("batch_norm", False)
-            self.config.setdefault("residual", False)
-            self.config.setdefault("task", "regression")
-            self.config.setdefault("learning_rate", 1e-3)
-            self.config.setdefault("epochs", 50)
-            self.config.setdefault("batch_size", 32)
-            self.config.setdefault("optimizer", "adam")
-            self.config.setdefault("weight_decay", 0.0)
-            self.config.setdefault("gradient_clip", None)
+            defaults = {
+                "layer_sizes": [128, 64, 32],
+                "activation": "relu",
+                "dropout": 0.2,
+                "batch_norm": False,
+                "residual": False,
+                "task": "regression",
+                "learning_rate": 1e-3,
+                "epochs": 50,
+                "batch_size": 32,
+                "optimizer": "adam",
+                "weight_decay": 0.0,
+                "gradient_clip": None,
+                "early_stopping_patience": 10,
+                "early_stopping_min_delta": 1e-4,
+                "lr_scheduler": None,
+                "lr_scheduler_params": {},
+            }
+            self.config.update(defaults)
 
-            # Advanced training features
-            self.config.setdefault("early_stopping_patience", 10)
-            self.config.setdefault("early_stopping_min_delta", 1e-4)
-            self.config.setdefault("lr_scheduler", None)  # 'cosine', 'step', 'plateau'
-            self.config.setdefault("lr_scheduler_params", {})
-            self.config.setdefault("checkpoint_dir", "./checkpoints")
-            self.config.setdefault("save_best_model", True)
-            self.config.setdefault("save_checkpoint_frequency", 5)  # Save every N epochs
-
-        # Training state
         self.best_val_loss = float("inf")
         self.best_model_state = None
         self.early_stopping_counter = 0
@@ -80,6 +87,28 @@ class MLPPredictor(PyTorchBasePredictor):
             "epoch": [],
         }
 
+    def select_features(
+        self, X: pd.DataFrame, y: pd.Series, n_features_to_select: int = 50
+    ) -> List[str]:
+        """Feature selection using correlation."""
+        X_clean, y_clean = self._clean_data_simple(X, y)
+        selected = X_clean.corrwith(y_clean).abs().nlargest(n_features_to_select).index.tolist()
+        important = [
+            c for c in ("close", "date_int", "ticker_id") if c in X.columns and c not in selected
+        ]
+        overflow = max(0, len(selected) + len(important) - n_features_to_select)
+        if overflow:
+            selected = selected[:-overflow]
+        selected.extend(important)
+        logger.info(f"Selected {len(selected)} features, top 10: {selected[:10]}")
+        return selected
+
+    def _clean_data_simple(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
+        """Simple data cleaning for feature selection."""
+        X_clean = X.replace([np.inf, -np.inf], np.nan).fillna(X.median())
+        valid_mask = y.notna() & ~np.isinf(y)
+        return X_clean[valid_mask], y[valid_mask]
+
     def fit(
         self,
         train_loader,
@@ -88,707 +117,555 @@ class MLPPredictor(PyTorchBasePredictor):
         feature_names=None,
         resume_from_checkpoint: str = None,
     ):
-        """
-        Train the MLP model with advanced features including early stopping,
-        learning rate scheduling, checkpointing, and mixed precision training.
-
-        Args:
-            train_loader: DataLoader for training data
-            val_loader: DataLoader for validation data (optional)
-            scaler: Fitted StandardScaler instance (optional)
-            feature_names: List of feature names (optional)
-            resume_from_checkpoint: Path to checkpoint to resume from (optional)
-
-        Returns:
-            Self for method chaining
-        """
+        """Train MLP with early stopping and optional LR scheduling."""
         self.scaler = scaler
+        self.feature_names = list(feature_names) if feature_names is not None else None
 
-        # Handle feature_names - convert pandas Index to list if needed
-        if feature_names is not None:
-            if hasattr(feature_names, "tolist"):
-                self.feature_names = feature_names.tolist()
-            elif isinstance(feature_names, (list, tuple)):
-                self.feature_names = list(feature_names)
-            else:
-                self.feature_names = list(feature_names)
-        else:
-            self.feature_names = None
-
-        # Create model if not exists
         if self.model is None:
             self.model = self._create_model()
             self.model.to(self.device)
 
-        # Training configuration
         epochs = self.config.get("epochs", 50)
         early_stopping_patience = self.config.get("early_stopping_patience", 10)
         early_stopping_min_delta = self.config.get("early_stopping_min_delta", 1e-4)
         gradient_clip = self.config.get("gradient_clip", None)
-        save_checkpoint_frequency = self.config.get("save_checkpoint_frequency", 5)
-
-        # Initialize training components
         criterion = nn.MSELoss()
         optimizer = self._create_optimizer(self.model)
-        self.optimizer = optimizer  # Store optimizer as instance variable
+        self.optimizer = optimizer
         scheduler = self._create_scheduler(optimizer)
 
-        # Mixed precision training setup
-        use_mixed_precision = self.config.get("use_mixed_precision", False)
-        scaler_amp = torch.cuda.amp.GradScaler("cuda") if use_mixed_precision else None
-
-        # Resume from checkpoint if specified
-        start_epoch = 0
-        if resume_from_checkpoint and os.path.exists(resume_from_checkpoint):
-            start_epoch = self._load_checkpoint(self.model, optimizer, resume_from_checkpoint)
-            logger.info(f"Resuming training from epoch {start_epoch}")
-
-        # Training history initialization
-        if not hasattr(self, "training_history"):
-            self.training_history = {
-                "train_loss": [],
-                "val_loss": [],
-                "learning_rate": [],
-                "gradient_norm": [],
-                "epoch": [],
-            }
-
-        # Early stopping state
         self.best_val_loss = float("inf")
         self.early_stopping_counter = 0
 
-        logger.info(f"Starting MLP training for {epochs} epochs...")
-        logger.info(f"Device: {self.device}, Mixed Precision: {use_mixed_precision}")
-        logger.info(f"Early Stopping Patience: {early_stopping_patience}")
+        val_loss = None
+        for epoch in range(epochs):
+            self.model.train()
+            total_loss, total_gradient_norm, num_batches = 0.0, 0.0, 0
 
-        # Training loop
-        for epoch in range(start_epoch, epochs):
-            # Training phase
-            train_metrics = self._training_epoch(
-                train_loader, optimizer, criterion, scaler_amp, gradient_clip
+            for batch_X, batch_y in train_loader:
+                batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
+                optimizer.zero_grad()
+
+                outputs = self.model(batch_X)
+                loss = criterion(outputs.view(-1), batch_y.view(-1))
+                loss.backward()
+                if gradient_clip:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                optimizer.step()
+
+                total_gradient_norm += (
+                    sum(
+                        p.grad.data.norm(2).item() ** 2
+                        for p in self.model.parameters()
+                        if p.grad is not None
+                    )
+                    ** 0.5
+                )
+
+                total_loss += float(loss.item())
+                num_batches += 1
+
+            train_loss = total_loss / max(1, num_batches)
+            avg_gradient_norm = (
+                total_gradient_norm / max(1, num_batches) if total_gradient_norm > 0 else 0.0
             )
 
-            # Validation phase
             val_loss = None
             if val_loader is not None:
-                val_loss = self._validation_epoch(val_loader, criterion)
+                self.model.eval()
+                total_val_loss, val_batches = 0.0, 0
+                with torch.no_grad():
+                    for batch_X, batch_y in val_loader:
+                        batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
+                        outputs = self.model(batch_X)
+                        total_val_loss += float(
+                            criterion(outputs.view(-1), batch_y.view(-1)).item()
+                        )
+                        val_batches += 1
+                val_loss = total_val_loss / max(1, val_batches)
 
-                # Early stopping check
-                early_stop_info = self._check_early_stopping(
-                    val_loss, epoch, early_stopping_patience, early_stopping_min_delta
-                )
+                if val_loss < self.best_val_loss - early_stopping_min_delta:
+                    self.best_val_loss = val_loss
+                    self.early_stopping_counter = 0
+                    self.best_model_state = self.model.state_dict().copy()
+                else:
+                    self.early_stopping_counter += 1
+                    if self.early_stopping_counter >= early_stopping_patience:
+                        logger.info(f"Early stopping at epoch {epoch + 1}")
+                        break
 
-                if early_stop_info["should_stop"]:
-                    logger.info(f"Early stopping triggered at epoch {epoch + 1}")
-                    break
+            current_lr = (
+                self.optimizer.param_groups[0]["lr"]
+                if self.optimizer
+                else self.config.get("learning_rate", 1e-3)
+            )
+            if scheduler:
+                if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    if val_loss is not None:
+                        scheduler.step(val_loss)
+                else:
+                    scheduler.step()
+                if self.optimizer:
+                    current_lr = self.optimizer.param_groups[0]["lr"]
 
-            # Learning rate scheduling
-            current_lr = self._update_learning_rate(scheduler, val_loss)
+            self.training_history["train_loss"].append(train_loss)
+            self.training_history["val_loss"].append(
+                val_loss if val_loss is not None else float("inf")
+            )
+            self.training_history["learning_rate"].append(current_lr)
+            self.training_history["gradient_norm"].append(avg_gradient_norm)
+            self.training_history["epoch"].append(epoch + 1)
 
-            # Log metrics
-            self._log_epoch_metrics(epoch, epochs, train_metrics, val_loss, current_lr)
+            log_msg = f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_loss:.6f}"
+            if val_loss is not None:
+                log_msg += f", Val Loss: {val_loss:.6f}"
+            log_msg += f", LR: {current_lr:.2e}"
+            if avg_gradient_norm > 0:
+                log_msg += f", Grad Norm: {avg_gradient_norm:.4f}"
+            logger.info(log_msg)
 
-            # Save checkpoint
-            if (epoch + 1) % save_checkpoint_frequency == 0:
-                is_best = val_loss is not None and val_loss < self.best_val_loss
-                self._save_checkpoint(
-                    epoch + 1, self.model, optimizer, val_loss or train_metrics["loss"], is_best
-                )
-
-        # Restore best model if available
-        if hasattr(self, "best_model_state") and self.best_model_state is not None:
+        if self.best_model_state is not None:
             self.model.load_state_dict(self.best_model_state)
-            logger.info("Restored best model state")
 
         self.is_trained = True
-        logger.info("MLP training completed successfully!")
-        # Ensure a final checkpoint is saved so tests relying on checkpoint files pass
-        try:
-            final_epoch = epochs
-            final_val_loss = (
-                val_loss
-                if "val_loss" in locals() and val_loss is not None
-                else (
-                    train_metrics.get("loss")
-                    if "train_metrics" in locals() and train_metrics is not None
-                    else 0.0
-                )
-            )
-            # Save regular final checkpoint
-            self._save_checkpoint(
-                final_epoch,
-                self.model,
-                getattr(self, "optimizer", None),
-                final_val_loss,
-                is_best=False,
-            )
-
-            # Also save best model file if available and configured
-            if (
-                self.config.get("save_best_model", True)
-                and getattr(self, "best_model_state", None) is not None
-            ):
-                try:
-                    # Temporarily load best state into model to save correct best checkpoint
-                    current_state = self.model.state_dict() if self.model is not None else None
-                    if self.model is not None and self.best_model_state is not None:
-                        self.model.load_state_dict(self.best_model_state)
-                    self._save_checkpoint(
-                        final_epoch,
-                        self.model,
-                        getattr(self, "optimizer", None),
-                        self.best_val_loss or final_val_loss,
-                        is_best=True,
-                    )
-                    # restore model state
-                    if self.model is not None and current_state is not None:
-                        self.model.load_state_dict(current_state)
-                except Exception:
-                    logger.warning("⚠️ Could not save final best checkpoint")
-        except Exception:
-            logger.warning("⚠️ Final checkpoint could not be saved")
-
         return self
 
     def _create_optimizer(self, model: nn.Module) -> torch.optim.Optimizer:
-        """Create optimizer based on configuration."""
-        learning_rate = self.config.get("learning_rate", 1e-3)
-        weight_decay = self.config.get("weight_decay", 0.0)
-        optimizer_name = self.config.get("optimizer", "adam").lower()
+        lr = self.config.get("learning_rate", 1e-3)
+        wd = self.config.get("weight_decay", 0.0)
+        opt_name = self.config.get("optimizer", "adam").lower()
 
-        if optimizer_name == "adam":
-            return torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        elif optimizer_name == "adamw":
-            return torch.optim.AdamW(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay
-            )
-        elif optimizer_name == "rmsprop":
-            return torch.optim.RMSprop(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.9
-            )
-        elif optimizer_name == "sgd":
-            return torch.optim.SGD(
-                model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.9
-            )
-        else:
-            raise ValueError(f"Unsupported optimizer: {optimizer_name}")
+        optimizers = {
+            "adam": torch.optim.Adam,
+            "adamw": torch.optim.AdamW,
+            "rmsprop": lambda p, **kw: torch.optim.RMSprop(p, momentum=0.9, **kw),
+            "sgd": lambda p, **kw: torch.optim.SGD(p, momentum=0.9, **kw),
+        }
+        if opt_name not in optimizers:
+            raise ValueError(f"Unsupported optimizer: {opt_name}")
+        return optimizers[opt_name](model.parameters(), lr=lr, weight_decay=wd)
 
     def _create_scheduler(
         self, optimizer: torch.optim.Optimizer
     ) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
-        """Create learning rate scheduler based on configuration."""
         scheduler_type = self.config.get("lr_scheduler")
         if scheduler_type is None:
             return None
 
-        scheduler_params = self.config.get("lr_scheduler_params", {})
-
+        params = self.config.get("lr_scheduler_params", {})
         if scheduler_type == "cosine":
             return torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=scheduler_params.get("T_max", self.config.get("epochs", 50))
+                optimizer, T_max=params.get("T_max", self.config.get("epochs", 50))
             )
-        elif scheduler_type == "step":
-            return torch.optim.lr_scheduler.StepLR(
-                optimizer,
-                step_size=scheduler_params.get("step_size", 10),
-                gamma=scheduler_params.get("gamma", 0.1),
-            )
-        elif scheduler_type == "plateau":
+        if scheduler_type == "plateau":
             return torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer,
                 mode="min",
-                factor=scheduler_params.get("factor", 0.1),
-                patience=scheduler_params.get("patience", 5),
-                min_lr=scheduler_params.get("min_lr", 1e-6),
+                factor=params.get("factor", 0.1),
+                patience=params.get("patience", 5),
+                min_lr=params.get("min_lr", 1e-6),
             )
-        else:
-            logger.warning(f"Unknown scheduler type: {scheduler_type}")
-            return None
-
-    def _save_checkpoint(
-        self,
-        epoch: int,
-        model: nn.Module,
-        optimizer: torch.optim.Optimizer,
-        val_loss: float,
-        is_best: bool = False,
-    ):
-        """Save model checkpoint."""
-        import os
-
-        checkpoint_dir = self.config.get("checkpoint_dir", "./checkpoints")
-        os.makedirs(checkpoint_dir, exist_ok=True)
-
-        checkpoint = {
-            "epoch": epoch,
-            "model_state_dict": model.state_dict() if model is not None else None,
-            "optimizer_state_dict": optimizer.state_dict() if optimizer is not None else None,
-            "val_loss": val_loss,
-            "config": self.config,
-            "training_history": self.training_history,
-            "best_val_loss": self.best_val_loss,
-            "early_stopping_counter": self.early_stopping_counter,
-        }
-
-        # Save regular checkpoint
-        checkpoint_path = os.path.join(checkpoint_dir, f"{self.model_name}_checkpoint.pth")
-        torch.save(checkpoint, checkpoint_path)
-
-        # Save best model if specified
-        if is_best and self.config.get("save_best_model", True):
-            best_path = os.path.join(checkpoint_dir, f"{self.model_name}_best.pth")
-            torch.save(checkpoint, best_path)
-            logger.info(f"Saved best model with validation loss: {val_loss:.6f}")
-
-    def _load_checkpoint(
-        self, model: nn.Module, optimizer: torch.optim.Optimizer, checkpoint_path: str
-    ) -> int:
-        """Load model checkpoint."""
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-        # Restore training state
-        self.training_history = checkpoint.get(
-            "training_history",
-            {
-                "train_loss": [],
-                "val_loss": [],
-                "learning_rate": [],
-                "gradient_norm": [],
-                "epoch": [],
-            },
-        )
-        self.best_val_loss = checkpoint.get("best_val_loss", float("inf"))
-        self.early_stopping_counter = checkpoint.get("early_stopping_counter", 0)
-
-        logger.info(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
-        return checkpoint["epoch"]
-
-    def _calculate_gradient_norm(self, model: nn.Module) -> float:
-        """Calculate the gradient norm for monitoring."""
-        total_norm = 0.0
-        for p in model.parameters():
-            if p.grad is not None:
-                param_norm = p.grad.data.norm(2)
-                total_norm += param_norm.item() ** 2
-        total_norm = total_norm ** (1.0 / 2)
-        return total_norm
-
-    def _training_step(
-        self,
-        batch_X: torch.Tensor,
-        batch_y: torch.Tensor,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        scaler: Optional[torch.amp.GradScaler],
-        gradient_clip: Optional[float],
-    ) -> Tuple[Optional[float], float]:
-        """Execute a single training step with optional mixed precision."""
-        if scaler is not None:
-            return self._mixed_precision_step(
-                batch_X, batch_y, optimizer, criterion, scaler, gradient_clip
-            )
-        else:
-            return self._standard_step(batch_X, batch_y, optimizer, criterion, gradient_clip)
-
-    def _mixed_precision_step(
-        self,
-        batch_X: torch.Tensor,
-        batch_y: torch.Tensor,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        scaler: torch.amp.GradScaler,
-        gradient_clip: Optional[float],
-    ) -> Tuple[Optional[float], float]:
-        """Execute training step with mixed precision."""
-        optimizer.zero_grad()
-
-        with torch.cuda.amp.autocast():
-            outputs = self.model(batch_X)
-
-            # Ensure outputs and targets have compatible shapes for loss
-            outputs_flat = outputs.view(-1)
-            targets_flat = batch_y.view(-1)
-
-            loss = criterion(outputs_flat, targets_flat)
-
-        scaler.scale(loss).backward()
-
-        if gradient_clip is not None:
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
-
-        scaler.step(optimizer)
-        scaler.update()
-
-        return None, loss.item()
-
-    def _standard_step(
-        self,
-        batch_X: torch.Tensor,
-        batch_y: torch.Tensor,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        gradient_clip: Optional[float],
-    ) -> Tuple[Optional[float], float]:
-        """Execute standard training step."""
-        optimizer.zero_grad()
-        outputs = self.model(batch_X)
-
-        # Ensure outputs and targets have compatible shapes for loss
-        outputs_flat = outputs.view(-1)
-        targets_flat = batch_y.view(-1)
-
-        loss = criterion(outputs_flat, targets_flat)
-        loss.backward()
-
-        if gradient_clip is not None:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
-
-        optimizer.step()
-
-        gradient_norm = self._calculate_gradient_norm(self.model)
-        return gradient_norm, loss.item()
-
-    def _training_epoch(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        scaler: Optional[torch.amp.GradScaler],
-        gradient_clip: Optional[float],
-    ) -> Dict[str, float]:
-        """Execute one training epoch."""
-        self.model.train()
-        total_loss = 0.0
-        total_gradient_norm = 0.0
-        num_batches = 0
-
-        for batch_X, batch_y in train_loader:
-            batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
-
-            gradient_norm, loss = self._training_step(
-                batch_X, batch_y, optimizer, criterion, scaler, gradient_clip
-            )
-
-            total_loss += loss
-            if gradient_norm is not None:
-                total_gradient_norm += gradient_norm
-            num_batches += 1
-
-        avg_loss = total_loss / num_batches
-        avg_gradient_norm = total_gradient_norm / num_batches if total_gradient_norm > 0 else 0.0
-
-        return {"loss": avg_loss, "gradient_norm": avg_gradient_norm}
-
-    def _validation_epoch(
-        self, val_loader: torch.utils.data.DataLoader, criterion: nn.Module
-    ) -> float:
-        """Execute one validation epoch."""
-        self.model.eval()
-        total_loss = 0.0
-        num_batches = 0
-
-        with torch.no_grad():
-            for batch_X, batch_y in val_loader:
-                batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
-                outputs = self.model(batch_X)
-
-                # Ensure outputs and targets have compatible shapes for loss
-                outputs_flat = outputs.view(-1)
-                targets_flat = batch_y.view(-1)
-
-                loss = criterion(outputs_flat, targets_flat)
-                total_loss += loss.item()
-                num_batches += 1
-
-        return total_loss / num_batches
-
-    def _update_learning_rate(
-        self, scheduler: Optional[torch.optim.lr_scheduler._LRScheduler], val_loss: Optional[float]
-    ) -> float:
-        """Update learning rate using scheduler."""
-        # Get current learning rate from optimizer (if available) or use a default
-        current_lr = 0.0
-        if hasattr(self, "optimizer") and self.optimizer is not None:
-            current_lr = self.optimizer.param_groups[0]["lr"]
-        else:
-            # Fallback to config learning rate
-            current_lr = self.config.get("learning_rate", 1e-3)
-
-        if scheduler is not None:
-            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                if val_loss is not None:
-                    scheduler.step(val_loss)
-            else:
-                scheduler.step()
-
-            # Get updated learning rate after scheduler step
-            if hasattr(self, "optimizer") and self.optimizer is not None:
-                current_lr = self.optimizer.param_groups[0]["lr"]
-
-        return current_lr
-
-    def _check_early_stopping(
-        self,
-        val_loss: float,
-        epoch: int,
-        early_stopping_patience: int,
-        early_stopping_min_delta: float,
-    ) -> Dict[str, Any]:
-        """Check if early stopping should be triggered."""
-        if val_loss < self.best_val_loss - early_stopping_min_delta:
-            self.best_val_loss = val_loss
-            self.early_stopping_counter = 0
-            # Save best model state
-            self.best_model_state = self.model.state_dict().copy()
-            return {"should_stop": False, "best_loss": val_loss}
-        else:
-            self.early_stopping_counter += 1
-            if self.early_stopping_counter >= early_stopping_patience:
-                return {"should_stop": True, "best_loss": self.best_val_loss}
-            return {"should_stop": False, "best_loss": self.best_val_loss}
-
-    def _log_epoch_metrics(
-        self,
-        epoch: int,
-        epochs: int,
-        train_metrics: Dict[str, float],
-        val_loss: Optional[float],
-        learning_rate: float,
-    ):
-        """Log training metrics for the current epoch."""
-        # Update training history
-        self.training_history["train_loss"].append(train_metrics["loss"])
-        self.training_history["val_loss"].append(val_loss if val_loss is not None else float("inf"))
-        self.training_history["learning_rate"].append(learning_rate)
-        self.training_history["gradient_norm"].append(train_metrics.get("gradient_norm", 0.0))
-        self.training_history["epoch"].append(epoch + 1)
-
-        # Log metrics
-        log_msg = f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_metrics['loss']:.6f}"
-        if val_loss is not None:
-            log_msg += f", Val Loss: {val_loss:.6f}"
-        log_msg += f", LR: {learning_rate:.2e}"
-
-        if train_metrics.get("gradient_norm", 0.0) > 0:
-            log_msg += f", Grad Norm: {train_metrics['gradient_norm']:.4f}"
-
-        logger.info(log_msg)
+        return None
 
     def _create_model(self, params: Optional[Dict[str, Any]] = None) -> nn.Module:
-        """
-        Creates the MLPModule instance based on the model's configuration.
-        This function consolidates the MLPModelFactory logic into the predictor.
-
-        Args:
-            params: Optional parameters to override config values (for hyperparameter tuning)
-
-        Returns:
-            Configured MLPModule instance
-        """
+        """Create MLPModule from config."""
         from src.models.time_series.mlp.mlp_architecture import MLPModule
 
-        # Use provided params, stored trial_params, or fall back to config
-        config_to_use = self.config.copy()
-        if params is not None:
-            config_to_use.update(params)
-
-        # Extract configuration parameters
-        input_size = config_to_use.get("input_size")
+        config = {**self.config, **(params or {})}
+        input_size = config.get("input_size")
         if input_size is None:
-            raise ValueError("Config must include 'input_size' parameter")
+            raise ValueError("Config must include 'input_size'")
 
-        # Handle layer_sizes conversion from tuple to list (for Optuna compatibility)
-        layer_sizes = config_to_use.get("layer_sizes", [128, 64, 32])
-        if isinstance(layer_sizes, tuple):
-            layer_sizes = list(layer_sizes)
-        elif isinstance(layer_sizes, str):
-            # Handle string format like "64,32" or "128,64,32"
-            layer_sizes = [int(x.strip()) for x in layer_sizes.split(",")]
+        layer_sizes = config.get("layer_sizes", [128, 64, 32])
+        if isinstance(layer_sizes, (tuple, str)):
+            layer_sizes = (
+                list(layer_sizes)
+                if isinstance(layer_sizes, tuple)
+                else [int(x.strip()) for x in layer_sizes.split(",")]
+            )
 
-        # Extract other parameters with defaults
-        output_size = config_to_use.get("output_size", 1)
-        activation = config_to_use.get("activation", "relu")
-        dropout = config_to_use.get("dropout", 0.2)
-        batch_norm = config_to_use.get("batch_norm", False)
-        residual = config_to_use.get("residual", False)
-        task = config_to_use.get("task", "regression")
-
-        # Log model architecture for debugging
-        logger.info(
-            f"Creating MLP with architecture: input_size={input_size}, "
-            f"layer_sizes={layer_sizes}, activation={activation}, "
-            f"dropout={dropout}, batch_norm={batch_norm}, residual={residual}"
-        )
-
-        # Create and return the MLP module
         return MLPModule(
             input_size=input_size,
             layer_sizes=layer_sizes,
-            output_size=output_size,
-            activation=activation,
-            dropout=dropout,
-            batch_norm=batch_norm,
-            residual=residual,
-            task=task,
+            output_size=config.get("output_size", 1),
+            activation=config.get("activation", "relu"),
+            dropout=config.get("dropout", 0.2),
+            batch_norm=config.get("batch_norm", False),
+            residual=config.get("residual", False),
+            task=config.get("task", "regression"),
         )
 
     def _preprocess_for_prediction(
         self, X: pd.DataFrame, for_confidence: bool = False
     ) -> torch.FloatTensor:
-        """
-        Centralized preprocessing for prediction and confidence calculation.
-        Applies the loaded scaler if present; otherwise falls back to basic
-        preprocessing (fill NaNs, replace infinities, basic normalization).
-        Args:
-            X: Input features DataFrame
-            for_confidence: If True, adjust log messages for confidence calc
-
-        Returns:
-            Torch FloatTensor ready to be moved to device for model input.
-        """
+        """Centralized preprocessing with scaler."""
         from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-        try:
-            try:
-                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
-            except Exception as e:
-                logger.warning(f"⚠️ validate_and_clean_data failed: {e} — retrying once")
-                cleaned_X = MLPDataUtils.validate_and_clean_data(X)
+        cleaned_X = MLPDataUtils.validate_and_clean_data(X)
 
-            if getattr(self, "scaler", None) is not None:
-                X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
-                if for_confidence:
-                    logger.info("✅ Applied loaded scaler for confidence calculation preprocessing")
-                else:
-                    logger.info("✅ Applied loaded scaler for prediction preprocessing")
-            else:
-                if for_confidence:
-                    logger.warning(
-                        "⚠️ No scaler available - using basic preprocessing for confidence"
-                    )
-                else:
-                    logger.warning("⚠️ No scaler available - using basic preprocessing")
-                X_scaled = cleaned_X.copy()
-                X_scaled = X_scaled.fillna(0)
-                X_scaled = X_scaled.replace([np.inf, -np.inf], 0)
-                X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
+        if self.scaler is not None:
+            X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
+        else:
+            X_scaled = cleaned_X.copy().fillna(0).replace([np.inf, -np.inf], 0)
+            X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
 
-            X_tensor = torch.FloatTensor(X_scaled.values)
-
-        except Exception as preprocessing_error:
-            if for_confidence:
-                logger.error(
-                    f"❌ Error during preprocessing for confidence: {str(preprocessing_error)}"
-                )
-                logger.info("🔄 Falling back to basic preprocessing for confidence")
-            else:
-                logger.error(f"❌ Error during preprocessing: {str(preprocessing_error)}")
-                logger.info("🔄 Falling back to basic preprocessing")
-            raise preprocessing_error
-
-        return X_tensor
+        return torch.FloatTensor(X_scaled.values)
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Make predictions on new data.
-
-        Args:
-            X: Input features DataFrame
-
-        Returns:
-            Predictions as numpy array
-        """
+        """Make predictions."""
         if self.model is None:
-            raise ValueError("Model must be trained before making predictions")
+            raise ValueError("Model must be trained before predictions")
 
         self.model.eval()
-
-        # Centralized preprocessing
-        X_tensor = self._preprocess_for_prediction(X, for_confidence=False)
-        X_tensor = X_tensor.to(self.device)
+        X_tensor = self._preprocess_for_prediction(X, for_confidence=False).to(self.device)
 
         with torch.no_grad():
-            predictions = self.model(X_tensor)
+            predictions = self.model(X_tensor).cpu().numpy()
 
-        predictions_np = predictions.cpu().numpy()
-
-        # Ensure predictions are 1D for compatibility with threshold evaluation
-        if predictions_np.ndim > 1:
-            predictions_np = predictions_np.flatten()
-
-        # Debug: Check prediction diversity
-        unique_predictions = len(np.unique(predictions_np))
-        if unique_predictions < 10:
-            logger.warning(f"⚠️ Low prediction diversity: {unique_predictions} unique values")
-            logger.warning(
-                f"   Prediction range: {predictions_np.min():.6f} to {predictions_np.max():.6f}"
-            )
-            logger.warning(f"   Prediction mean: {predictions_np.mean():.6f}")
-            logger.warning(f"   Prediction std: {predictions_np.std():.6f}")
-
-        return predictions_np
+        return predictions.flatten() if predictions.ndim > 1 else predictions
 
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = "variance") -> np.ndarray:
-        """
-        Get prediction confidence scores.
-
-        Args:
-            X: Input features DataFrame
-            method: Confidence calculation method ('variance', 'simple', 'margin')
-
-        Returns:
-            Confidence scores as numpy array
-        """
-        if self.model is None:
-            raise ValueError("Model must be trained before calculating confidence scores")
-
-        self.model.eval()
-
-        # Centralized preprocessing for confidence calculation
-        X_tensor = self._preprocess_for_prediction(X, for_confidence=True)
-        X_tensor = X_tensor.to(self.device)
-
-        with torch.no_grad():
-            predictions = self.model(X_tensor)
-            predictions_np = predictions.cpu().numpy()
-
-        # Ensure predictions are 1D for compatibility with threshold evaluation
-        if predictions_np.ndim > 1:
-            predictions_np = predictions_np.flatten()
-
+        """Get prediction confidence scores."""
+        preds = np.asarray(self.predict(X)).flatten()
         if method == "variance":
-            confidence = np.abs(predictions_np)
-            if confidence.max() > 0:
-                confidence = confidence / confidence.max()
-            return confidence
-
-        elif method == "simple":
-            confidence = np.abs(predictions_np)
-            # Sigmoid-like normalization
-            confidence = 1 / (1 + np.exp(-confidence))
-            return confidence
-
-        elif method == "margin":
-            confidence = np.abs(predictions_np)
-            confidence = np.tanh(confidence)
-            return confidence
-
-        else:
-            raise ValueError(
-                f"Unsupported confidence method: {method}. "
-                f"Supported methods: 'variance', 'simple', 'margin'"
-            )
+            conf = np.abs(preds)
+            m = conf.max() if conf.size else 0
+            return conf / m if m > 0 else conf
+        if method == "simple":
+            return 1 / (1 + np.exp(-np.abs(preds)))
+        if method == "margin":
+            return np.tanh(np.abs(preds))
+        raise ValueError(f"Unsupported confidence method: {method}")
 
     def set_scaler(self, scaler):
-        """
-        Set the feature scaler for prediction scaling.
-
-        Args:
-            scaler: Fitted StandardScaler instance
-        """
+        """Set feature scaler."""
         self.scaler = scaler
-        logger.info("✅ Feature scaler set for MLP prediction scaling")
+
+    def objective(
+        self,
+        x_train: pd.DataFrame,
+        y_train: pd.Series,
+        x_test: pd.DataFrame,
+        x_test_scaled: pd.DataFrame,
+        y_test: pd.Series,
+        fitted_scaler=StandardScaler,
+    ) -> callable:
+        """Create Optuna objective with threshold optimization."""
+        self.best_investment_success_rate = -np.inf
+        self.best_trial_model = None
+        self.best_trial_params = None
+        self.best_threshold_info = None
+        self.feature_names = x_train.columns
+
+        if fitted_scaler is not None:
+            self.fitted_scaler = fitted_scaler
+
+        def objective_fn(trial):
+            from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
+
+            layer_sizes = [
+                int(x)
+                for x in trial.suggest_categorical(
+                    "layer_sizes",
+                    (
+                        "64,32",
+                        "128,64",
+                        "256,128,64",
+                        "512,256,128,64",
+                        "128,64,32",
+                        "256,128,64,32",
+                    ),
+                ).split(",")
+            ]
+
+            model_params = {
+                "input_size": len(x_train.columns),
+                "layer_sizes": layer_sizes,
+                "learning_rate": trial.suggest_float("learning_rate", 1e-4, 5e-2, log=True),
+                "dropout": trial.suggest_float("dropout", 0.05, 0.5),
+                "optimizer": "adamw",
+                "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
+                "activation": "relu",
+                "epochs": trial.suggest_int("epochs", 5, 30),
+                "batch_norm": True,
+                "residual": False,
+                "gradient_clip": trial.suggest_float("gradient_clip", 0.1, 5.0, log=True),
+                "early_stopping_patience": 15,
+                "lr_scheduler": "cosine",
+            }
+            data_params = {
+                "batch_size": trial.suggest_categorical("batch_size", (256, 512, 1024, 2048)),
+                "num_workers": 4,
+                "pin_memory": torch.cuda.is_available(),
+            }
+
+            try:
+                trial_model = MLPPredictor(
+                    model_name=f"mlp_trial_{trial.number}",
+                    config=model_params,
+                    threshold_evaluator=self.threshold_evaluator,
+                )
+                trial_model.disable_mlflow = True
+                trial_model.model = trial_model._create_model(params=model_params)
+                trial_model.model.to(trial_model.device)
+
+                self.current_trial_scaler = getattr(self, "fitted_scaler", None) or fitted_scaler
+
+                bs, nw, pm = (
+                    data_params["batch_size"],
+                    data_params["num_workers"],
+                    data_params["pin_memory"],
+                )
+                train_loader = MLPDataUtils.create_dataloader_from_dataframe(
+                    x_train, y_train, bs, True, nw, pm
+                )
+                val_loader = MLPDataUtils.create_dataloader_from_dataframe(
+                    x_test_scaled, y_test, bs, False, nw, pm
+                )
+
+                trial_model.fit(
+                    train_loader,
+                    val_loader,
+                    scaler=self.fitted_scaler,
+                    feature_names=self.feature_names,
+                )
+
+                prices = (
+                    x_test["close"].values if "close" in x_test.columns else np.ones(len(x_test))
+                )
+                thr = trial_model.optimize_prediction_threshold(
+                    x_test=x_test,
+                    y_test=y_test,
+                    current_prices_test=prices,
+                    confidence_method="variance",
+                )
+                best = thr["best_result"]
+                optimized_profit_score = best["test_profit_per_investment"]
+                threshold_info = {
+                    "optimal_threshold": thr["optimal_threshold"],
+                    "samples_kept_ratio": best["test_samples_ratio"],
+                    "investment_success_rate": best["investment_success_rate"],
+                    "test_profit_per_investment": best["test_profit_per_investment"],
+                    "custom_accuracy": best["test_custom_accuracy"],
+                    "total_threshold_profit": best["test_profit"],
+                    "profitable_investments": best["profitable_investments"],
+                }
+
+                if optimized_profit_score > self.best_investment_success_rate:
+                    self.best_investment_success_rate = optimized_profit_score
+                    self.best_trial_model = trial_model
+                    self.best_trial_params = {**model_params, **data_params}
+                    self.best_threshold_info = threshold_info
+                    self.model = trial_model.model
+                    self.feature_names = trial_model.feature_names
+
+                    if threshold_info["optimal_threshold"] is not None:
+                        self.optimal_threshold = threshold_info["optimal_threshold"]
+                        self.confidence_method = "variance"
+
+                    logger.info(
+                        f"NEW BEST TRIAL {trial.number}: profit={optimized_profit_score:.3f}, threshold={threshold_info.get('optimal_threshold', 'N/A'):.3f}"
+                    )
+                    self.previous_best = optimized_profit_score
+
+                return optimized_profit_score
+
+            except Exception as e:
+                logger.warning(f"Trial {trial.number} failed: {e}")
+                return -1e6
+
+        return objective_fn
+
+    def get_best_trial_info(self) -> Dict[str, Any]:
+        """Get best trial info."""
+        if not hasattr(self, "best_investment_success_rate"):
+            return {"message": "No hyperparameter optimization run yet"}
+
+        scaler = getattr(self, "scaler", None)
+        threshold_info = getattr(self, "best_threshold_info", None)
+        return {
+            "best_investment_success_rate": self.best_investment_success_rate,
+            "best_trial_params": self.best_trial_params,
+            "has_best_model": self.best_trial_model is not None,
+            "model_updated": getattr(self, "model", None) is not None,
+            "scaler_info": {
+                "scaler_type": "StandardScaler" if scaler else "None",
+                "scaler_available": scaler is not None,
+                "scaler_fitted": bool(
+                    scaler and hasattr(scaler, "mean_") and hasattr(scaler, "scale_")
+                ),
+            },
+            "threshold_optimization": (
+                {
+                    **threshold_info,
+                    "confidence_method": getattr(self, "confidence_method", "variance"),
+                }
+                if threshold_info
+                else None
+            ),
+        }
+
+    def finalize_best_model(self) -> None:
+        """Finalize best model after hyperparameter optimization."""
+        best_model = getattr(self, "best_trial_model", None)
+        if not best_model:
+            logger.warning("No best model to finalize")
+            return
+
+        self.model = best_model.model
+        self.feature_names = best_model.feature_names
+        if getattr(best_model, "scaler", None) is not None:
+            self.scaler = best_model.scaler
+
+        threshold_info = getattr(self, "best_threshold_info", None) or {}
+        if threshold_info.get("optimal_threshold") is not None:
+            self.optimal_threshold = threshold_info["optimal_threshold"]
+            self.confidence_method = getattr(self, "confidence_method", "variance")
+
+        logger.info(f"Best model finalized: profit={self.best_investment_success_rate:.3f}")
+        if getattr(self, "disable_mlflow", False):
+            return
+
+        if self.best_trial_params:
+            self.log_params({f"best_{k}": v for k, v in self.best_trial_params.items()})
+
+        scaler = getattr(self, "scaler", None)
+        metrics = {
+            "best_investment_success_rate": self.best_investment_success_rate,
+            "hypertuning_completed": 1,
+            "scaler_used": 1 if scaler else 0,
+            "scaler_type": "StandardScaler" if scaler else "None",
+        }
+        if threshold_info.get("optimal_threshold") is not None:
+            metrics.update(
+                {
+                    "best_optimal_threshold": threshold_info.get("optimal_threshold"),
+                    "best_samples_kept_ratio": threshold_info.get("samples_kept_ratio"),
+                    "best_investment_success_rate": threshold_info.get("investment_success_rate"),
+                    "best_custom_accuracy": threshold_info.get("custom_accuracy"),
+                    "best_total_threshold_profit": threshold_info.get("total_threshold_profit"),
+                    "best_profitable_investments": threshold_info.get("profitable_investments"),
+                }
+            )
+        self.log_metrics(metrics)
+
+    def save_model(
+        self,
+        metrics: Dict[str, float],
+        params: Dict[str, Any],
+        x_eval: pd.DataFrame,
+        experiment_name: str = None,
+        scaler=None,
+    ) -> str:
+        """Save trained MLP model to MLflow."""
+        import mlflow
+        import mlflow.pytorch
+
+        if self.model is None:
+            raise RuntimeError("No trained model to save")
+
+        experiment_name = experiment_name or "mlp_stock_predictor"
+
+        try:
+            mlflow.end_run()
+        except Exception:
+            pass
+
+        mlflow.set_experiment(experiment_name)
+
+        with mlflow.start_run(
+            run_name=f"mlp_final_{datetime.now().strftime('%Y%m%d_%H%M')}"
+        ) as run:
+            exclude = {"device", "objective", "verbosity", "seed", "nthread", "verbose"}
+            mlflow.log_params({k: v for k, v in params.items() if k not in exclude})
+            mlflow.log_metrics(metrics)
+
+            if scaler is not None:
+                temp_dir = "src/models/scalers"
+                os.makedirs(temp_dir, exist_ok=True)
+                scaler_path = os.path.join(temp_dir, "scaler.pkl")
+                with open(scaler_path, "wb") as f:
+                    pickle.dump(scaler, f)
+                mlflow.log_artifact(scaler_path, artifact_path="preprocessor")
+                os.unlink(scaler_path)
+
+            input_example = x_eval.iloc[:5].copy()
+            for col in input_example.columns:
+                if input_example[col].dtype.kind == "i":
+                    input_example[col] = input_example[col].astype("float64")
+
+            self.model.eval()
+            with temporary_device(self.model, torch.device("cpu")):
+                with torch.no_grad():
+                    input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32)
+                    predictions_example = self.model(input_tensor).cpu().numpy()
+                signature = mlflow.models.infer_signature(input_example, predictions_example)
+
+            mlflow.log_dict(
+                {"feature_names": list(x_eval.columns)}, "preprocessor/feature_names.json"
+            )
+
+            with temporary_device(self.model, torch.device("cpu")):
+                mlflow.pytorch.log_model(
+                    pytorch_model=self.model,
+                    artifact_path="model",
+                    signature=signature,
+                    input_example=input_example,
+                )
+
+            logger.info(f"MLP model saved. Run ID: {run.info.run_id}")
+            return run.info.run_id
+
+    def load_model(self, run_id: str, experiment_name: str = None) -> bool:
+        """Load trained MLP model from MLflow."""
+        import mlflow
+        import mlflow.pytorch
+
+        mlflow.set_experiment(experiment_name or "mlp_stock_predictor")
+
+        model_uri = f"runs:/{run_id}/model"
+        self.model = mlflow.pytorch.load_model(model_uri)
+        self.model.to(self.device)
+
+        self.scaler = load_artifact(
+            run_id, "preprocessor/scaler.pkl", lambda p: pickle.load(open(p, "rb"))
+        )
+
+        feature_data = load_artifact(
+            run_id,
+            "preprocessor/feature_names.json",
+            lambda p: json.load(open(p, "r", encoding="utf-8")),
+        )
+        if isinstance(feature_data, dict):
+            self.feature_names = feature_data.get("feature_names", [])
+
+        if not hasattr(self, "feature_names") or not self.feature_names:
+            self._extract_feature_names_from_model(model_uri)
+
+        self.is_trained = True
+        logger.info(f"Model loaded from run {run_id}")
+        return True
+
+    def _extract_feature_names_from_model(self, model_uri: str):
+        """Extract feature names from model signature."""
+        try:
+            from mlflow.models import get_model_info
+
+            model_info = get_model_info(model_uri)
+            sig = getattr(model_info, "signature", None)
+            inputs = getattr(sig, "inputs", None) if sig else None
+
+            feature_names: List[str] = []
+            if inputs is not None and hasattr(inputs, "inputs"):
+                feature_names = [i.name for i in inputs.inputs if getattr(i, "name", None)]
+            elif (
+                inputs is not None
+                and hasattr(inputs, "schema")
+                and hasattr(inputs.schema, "input_names")
+            ):
+                feature_names = list(inputs.schema.input_names)
+
+            if feature_names:
+                self.feature_names = feature_names
+        except Exception as e:
+            logger.warning(f"Could not extract feature names: {e}")

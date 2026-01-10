@@ -16,7 +16,7 @@ from typing import Dict, Any, List, Optional
 
 from src.models.base_model import BaseModel
 from src.models.evaluation.threshold_evaluator import ThresholdEvaluator
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -40,14 +40,44 @@ class PyTorchBasePredictor(BaseModel):
 
     @abstractmethod
     def _create_model(self) -> nn.Module:
-        """
-        Create the underlying PyTorch model instance (nn.Module).
-        This must be implemented by subclasses.
-
-        Returns:
-            A PyTorch model instance.
-        """
+        """Create the underlying PyTorch model instance (nn.Module)."""
         pass
+
+    def _make_loader(
+        self, X: pd.DataFrame, y: Optional[np.ndarray] = None, shuffle: bool = False
+    ) -> DataLoader:
+        """Helper to create DataLoader from features (and optional targets)."""
+        x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
+        dataset = (
+            TensorDataset(x_tensor)
+            if y is None
+            else TensorDataset(x_tensor, torch.tensor(y, dtype=torch.float32))
+        )
+        return DataLoader(
+            dataset, batch_size=self.config.get("batch_size", 32), shuffle=shuffle, num_workers=0
+        )
+
+    def _run_epoch(
+        self, loader: DataLoader, criterion: nn.Module, optimizer: torch.optim.Optimizer = None
+    ) -> float:
+        """Run one epoch (train if optimizer provided, else eval)."""
+        is_train = optimizer is not None
+        self.model.train() if is_train else self.model.eval()
+        total_loss = 0
+
+        with torch.set_grad_enabled(is_train):
+            for batch in loader:
+                batch_x, batch_y = (batch[0].to(self.device), batch[1].to(self.device))
+                if is_train:
+                    optimizer.zero_grad()
+                outputs = self.model(batch_x)
+                loss = criterion(outputs.squeeze(), batch_y)
+                if is_train:
+                    loss.backward()
+                    optimizer.step()
+                total_loss += loss.item()
+
+        return total_loss / len(loader)
 
     def fit(
         self,
@@ -56,208 +86,103 @@ class PyTorchBasePredictor(BaseModel):
         feature_names: List[str] = None,
         **kwargs,
     ) -> "PyTorchBasePredictor":
-        """
-        Train the PyTorch model.
-
-        Args:
-            train_loader: DataLoader for the training set.
-            val_loader: DataLoader for the validation set (optional).
-            **kwargs: Additional training parameters can be passed via config.
-
-        Returns:
-            Self for method chaining.
-        """
-        self.model = self._create_model()
-        self.model.to(self.device)
+        """Train the PyTorch model."""
+        self.model = self._create_model().to(self.device)
         self.feature_names = feature_names
 
         epochs = self.config.get("epochs", 20)
-        learning_rate = self.config.get("learning_rate", 1e-3)
-
-        # Loss toggle (MSE or Huber)
         loss_name = self.config.get("loss", "mse").lower()
-        if loss_name == "huber":
-            delta = float(self.config.get("huber_delta", 0.1))
-            criterion = nn.HuberLoss(delta=delta)
-        else:
-            criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-4)
+        criterion = (
+            nn.HuberLoss(delta=float(self.config.get("huber_delta", 0.1)))
+            if loss_name == "huber"
+            else nn.MSELoss()
+        )
+        optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.config.get("learning_rate", 1e-3), weight_decay=1e-4
+        )
 
         logger.info(f"Starting training for {epochs} epochs...")
 
         for epoch in range(epochs):
-            self.model.train()
-            total_train_loss = 0
-            for batch_x, batch_y in train_loader:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-
-                optimizer.zero_grad()
-                outputs = self.model(batch_x)
-                loss = criterion(outputs.squeeze(), batch_y)
-                loss.backward()
-                optimizer.step()
-                total_train_loss += loss.item()
-
-            avg_train_loss = total_train_loss / len(train_loader)
-            logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}")
+            train_loss = self._run_epoch(train_loader, criterion, optimizer)
+            log_msg = f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.6f}"
 
             if val_loader:
-                self.model.eval()
-                total_val_loss = 0
-                with torch.no_grad():
-                    for batch_x_val, batch_y_val in val_loader:
-                        batch_x_val, batch_y_val = (
-                            batch_x_val.to(self.device),
-                            batch_y_val.to(self.device),
-                        )
-                        val_outputs = self.model(batch_x_val)
-                        val_loss = criterion(val_outputs.squeeze(), batch_y_val)
-                        total_val_loss += val_loss.item()
+                val_loss = self._run_epoch(val_loader, criterion)
+                log_msg += f", Val Loss: {val_loss:.6f}"
 
-                avg_val_loss = total_val_loss / len(val_loader)
-                logger.info(
-                    f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}, Val Loss: {avg_val_loss:.6f}"
-                )
-            else:
-                logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss:.6f}")
+            logger.info(log_msg)
 
         self.is_trained = True
         logger.info("Training complete.")
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Make predictions with the PyTorch model.
-        """
+        """Make predictions with the PyTorch model."""
         if not self.is_trained:
             raise ValueError("Model must be trained before making predictions")
 
         self.model.eval()
-        self.model.to(self.device)
-
-        x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-        dataset = TensorDataset(x_tensor)
-        loader = DataLoader(
-            dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
-        )
+        loader = self._make_loader(X)
 
         predictions = []
         with torch.no_grad():
             for (batch_x,) in loader:
-                batch_x = batch_x.to(self.device)
-                outputs = self.model(batch_x)
+                outputs = self.model(batch_x.to(self.device))
                 predictions.append(outputs.cpu().numpy())
 
         return np.concatenate(predictions).squeeze()
 
+    def _get_predictions_batch(self, X: pd.DataFrame, enable_dropout: bool = False) -> np.ndarray:
+        """Internal helper for getting predictions with optional dropout."""
+        original_training = self.model.training
+        if enable_dropout:
+            self.model.train()
+        try:
+            return self.predict(X)
+        finally:
+            if not original_training:
+                self.model.eval()
+
     def get_prediction_confidence(self, X: pd.DataFrame, method: str = "leaf_depth") -> np.ndarray:
-        """
-        Calculate confidence scores for predictions using various methods
-
-        Args:
-            X: Feature matrix
-            method: Confidence calculation method ('variance', 'simple', 'margin')
-
-        Returns:
-            Array of confidence scores (higher = more confident)
-        """
+        """Calculate confidence scores for predictions using various methods."""
         if not self.is_trained:
             raise ValueError("Model must be trained before calculating confidence")
 
         if method == "variance":
-            # Use prediction variance across multiple forward passes with dropout enabled
-            # Enable dropout temporarily for uncertainty quantification (not training)
-            original_training = self.model.training
-            self.model.train()  # Enable dropout for variance calculation
-
-            try:
-                predictions = []
-                n_passes = 5  # Reduced from 10 for efficiency
-
-                x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-                dataset = TensorDataset(x_tensor)
-                loader = DataLoader(
-                    dataset,
-                    batch_size=self.config.get("batch_size", 32),
-                    shuffle=False,
-                    num_workers=0,
-                )
-
-                for _ in range(n_passes):
-                    pass_predictions = []
-                    with torch.no_grad():
-                        for (batch_x,) in loader:
-                            batch_x = batch_x.to(self.device)
-                            outputs = self.model(batch_x)
-                            pass_predictions.append(outputs.cpu().numpy())
-                    predictions.append(np.concatenate(pass_predictions).squeeze())
-
-                # Calculate variance across passes
-                predictions_array = np.array(predictions)
-                variance = np.var(predictions_array, axis=0)
-                confidence_scores = 1.0 / (1.0 + variance)  # Inverse variance as confidence
-
-            finally:
-                # Always restore original training state
-                if not original_training:
-                    self.model.eval()
+            predictions = np.array(
+                [self._get_predictions_batch(X, enable_dropout=True) for _ in range(5)]
+            )
+            variance = np.var(predictions, axis=0)
+            confidence_scores = 1.0 / (1.0 + variance)
 
         elif method == "simple":
-            # Simple confidence based on prediction magnitude (no dropout needed)
-            self.model.eval()
-            predictions = self.predict(X)
-            # Use absolute prediction values as confidence
-            confidence_scores = np.abs(predictions)
+            confidence_scores = np.abs(self.predict(X))
 
         elif method == "margin":
-            # Use prediction margin (distance from zero for regression) (no dropout needed)
-            self.model.eval()
             predictions = self.predict(X)
-            # For regression, margin is the distance from the mean prediction
-            # Higher distance from mean = more confident (outlier predictions)
-            mean_pred = np.mean(predictions)
-            confidence_scores = np.abs(predictions - mean_pred)
+            confidence_scores = np.abs(predictions - np.mean(predictions))
 
         elif method == "leaf_depth":
-            # For PyTorch models, use prediction stability as proxy for leaf_depth (no dropout needed)
-            self.model.eval()
-            # Get predictions with small input perturbations to measure stability
             predictions = self.predict(X)
-
-            # Create slightly perturbed inputs
             x_tensor = torch.tensor(X[self.feature_names].values, dtype=torch.float32)
-            noise_scale = 0.01  # Small perturbation
-            noise = torch.randn_like(x_tensor) * noise_scale
-            x_perturbed = x_tensor + noise
+            x_perturbed = x_tensor + torch.randn_like(x_tensor) * 0.01
 
-            # Get predictions on perturbed data
-            dataset = TensorDataset(x_perturbed)
-            loader = DataLoader(
-                dataset, batch_size=self.config.get("batch_size", 32), shuffle=False, num_workers=0
-            )
+            perturbed_df = X.copy()
+            perturbed_df[self.feature_names] = x_perturbed.numpy()
+            perturbed_predictions = self.predict(perturbed_df)
 
-            perturbed_predictions = []
-            with torch.no_grad():
-                for (batch_x,) in loader:
-                    batch_x = batch_x.to(self.device)
-                    outputs = self.model(batch_x)
-                    perturbed_predictions.append(outputs.cpu().numpy())
-
-            perturbed_predictions = np.concatenate(perturbed_predictions).squeeze()
-
-            # Stability = inverse of prediction change (more stable = higher confidence)
             prediction_change = np.abs(predictions - perturbed_predictions)
             confidence_scores = 1.0 / (1.0 + prediction_change)
 
         else:
             raise ValueError(f"Unknown confidence method: {method}")
 
-        # Normalize confidence scores to [0, 1] range
+        # Normalize to [0, 1]
         min_conf, max_conf = confidence_scores.min(), confidence_scores.max()
         if max_conf > min_conf:
             confidence_scores = (confidence_scores - min_conf) / (max_conf - min_conf)
         else:
-            # All confidence scores are identical - this is problematic
             logger.warning(
                 f"All confidence scores are identical ({min_conf:.4f}) - using uniform distribution"
             )

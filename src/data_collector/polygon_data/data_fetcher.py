@@ -6,16 +6,17 @@ from datetime import datetime, date
 from typing import List, Dict, Optional, Any, Union
 import time
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.polygon_data.client import PolygonDataClient, PolygonAPIError
 from src.data_collector.polygon_data.data_validator import (
     DataValidator,
     OHLCVRecord,
     DataQualityMetrics,
 )
+from cytoolz import partition_all
 from src.data_collector.config import config
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 class HistoricalDataFetcher:
@@ -34,7 +35,7 @@ class HistoricalDataFetcher:
             validator: Data validator instance (optional)
         """
         self.client = client
-        self.validator = validator or DataValidator(strict_mode=False)
+        self.validator = validator or DataValidator()
 
         logger.info("Historical data fetcher initialized")
 
@@ -145,17 +146,16 @@ class HistoricalDataFetcher:
         results = {}
         total_batches = (len(tickers) + batch_size - 1) // batch_size
 
-        for batch_num in range(total_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(tickers))
-            batch_tickers = tickers[start_idx:end_idx]
+        for batch_num, batch_tickers in enumerate(partition_all(batch_size, tickers), start=1):
+            # Compute human-readable indices for logging while preserving ordering
+            start_idx = (batch_num - 1) * batch_size + 1
+            end_idx = start_idx + len(batch_tickers) - 1
 
             logger.info(
-                f"Processing batch {batch_num + 1}/{total_batches}: "
-                f"tickers {start_idx + 1}-{end_idx}"
+                f"Processing batch {batch_num}/{total_batches}: tickers {start_idx}-{end_idx}"
             )
 
-            for ticker in batch_tickers:
+            for ticker in list(batch_tickers):
                 try:
                     records, metrics = self.get_historical_data(
                         ticker=ticker,
@@ -176,7 +176,7 @@ class HistoricalDataFetcher:
                     results[ticker] = ([], DataQualityMetrics())
 
             # Delay between batches – skip when rate limiting disabled
-            if batch_num < total_batches - 1 and delay_between_batches > 0:
+            if batch_num < total_batches and delay_between_batches > 0:
                 if not getattr(config, "DISABLE_RATE_LIMITING", False):
                     logger.info(f"Waiting {delay_between_batches}s before next batch")
                     time.sleep(delay_between_batches)
@@ -281,10 +281,6 @@ class HistoricalDataFetcher:
             # Add optional fields if available
             if "vw" in polygon_record and polygon_record["vw"] is not None:
                 transformed["vwap"] = float(polygon_record["vw"])
-
-            # For adjusted data, use close as adjusted_close
-            if polygon_record.get("c") is not None:
-                transformed["adjusted_close"] = float(polygon_record["c"])
 
             # Basic validation - ensure all required fields are positive
             required_fields = ["open", "high", "low", "close"]

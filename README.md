@@ -46,7 +46,7 @@ StockPredictor V1 is an end-to-end ML system for stock prediction:
   - Threshold optimization and profit-based evaluation
   - Prediction framework with confidence filtering and Excel export
 - **Observability and Ops**
-  - Centralized logging (`src/utils/logger.py`)
+  - Centralized logging (`src/utils/core/logger.py`)
   - Configurable batch processing with job tracking and statistics
   - SQL schemas for relational storage and staging
 
@@ -80,7 +80,7 @@ StockPredictor V1
 - PostgreSQL (for relational storage; required by data pipelines and some batch processes)
 - Polygon.io API key
 - Windows 11 supported; GPU optional (PyTorch with CUDA 12.8)
- - MLflow (project utilities target MLflow 3.x; see `src/utils/mlflow_integration.py`)
+ - MLflow (project utilities target MLflow 3.x; see `src/utils/mlops/mlflow_integration.py`)
 
 ## Installation
 Use uv exclusively.
@@ -121,9 +121,9 @@ Optional (GPU):
   ```
 
 ## Configuration
-- Central logging: `src/utils/logger.py`
+- Central logging: `src/utils/core/logger.py`
 - Technical indicators and batch config: `src/feature_engineering/config.py`
-- MLflow utilities: `src/utils/mlflow_integration.py`, `src/utils/mlflow_utils.py`
+- MLflow utilities: `src/utils/mlops/mlflow_integration.py`, `src/utils/mlops/mlflow_utils.py`
 - Database connection (example variables):
   - `DATABASE_URL` (e.g., postgres://user:pass@host:port/dbname)
   - `POLYGON_API_KEY` for API clients
@@ -310,7 +310,7 @@ Main components:
     - `prepare_ml_data_for_training_with_cleaning_memory_optimized`
 
 Cleaned data cache:
-- `src/utils/cleaned_data_cache.py` with Parquet-based cache and 24h freshness checks in callers.
+- `src/utils/data/cleaned_data_cache.py` with Parquet-based cache and 24h freshness checks in callers.
 
 Example (training data prep with caching and cleaning):
 ```python
@@ -377,7 +377,7 @@ Prediction outputs:
 - Include confidence, profit analysis, and metadata
 
 ## MLflow Integration
-- Utilities: `src/utils/mlflow_integration.py`, `src/utils/mlflow_utils.py`
+- Utilities: `src/utils/mlops/mlflow_integration.py`, `src/utils/mlops/mlflow_utils.py`
 - Common flows:
   - Experiment setup, parameter/metric logging, model artifact logging
   - Registry-friendly logging and run metadata normalization
@@ -395,7 +395,7 @@ Prediction outputs:
 - Integrated into LightGBM and MLP workflows
 
 ## Observability and Logging
-- Central logging via `src/utils/logger.py` (no prints in production code). Logs under `logs/`.
+- Central logging via `src/utils/core/logger.py` (no prints in production code). Logs under `logs/`.
 - Data pipelines record execution stats under `pipeline_stats/`.
 - News and data collectors perform health checks before execution.
 

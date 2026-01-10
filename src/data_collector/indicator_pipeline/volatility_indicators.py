@@ -7,7 +7,6 @@ Bollinger Bands, Average True Range, and custom volatility measures.
 
 import pandas as pd
 import numpy as np
-import time
 from typing import List, Optional
 
 try:
@@ -20,10 +19,11 @@ from src.data_collector.indicator_pipeline.base import (
     IndicatorResult,
     create_indicator_result,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import feature_config
+from src.data_utils.safe_math import SafeDivideSpec, compute_bb_position
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
 
 
 def calculate_bollinger_bands(
@@ -40,7 +40,6 @@ def calculate_bollinger_bands(
     Returns:
         IndicatorResult containing Bollinger Bands values
     """
-    start_time = time.time()
     warnings = []
 
     # Use config defaults if not provided
@@ -81,9 +80,10 @@ def calculate_bollinger_bands(
             result_data["BB_Width"] < result_data["BB_Width"].rolling(20).mean()
         ).astype(int)
 
-        # Price position within bands
-        result_data["BB_Position"] = (data["close"] - result_data["BB_Lower"]) / (
-            result_data["BB_Upper"] - result_data["BB_Lower"]
+        # Price position within bands (safe division)
+        spec = SafeDivideSpec(denom_epsilon=0.0, fill_value=None, sanitize_infinite=True)
+        result_data["BB_Position"] = compute_bb_position(
+            data["close"], result_data["BB_Lower"], result_data["BB_Upper"], spec
         )
 
         # logger.info(f"Calculated Bollinger Bands: {result_data['BB_Middle'].notna().sum()} valid values")
@@ -107,14 +107,7 @@ def calculate_bollinger_bands(
             ],
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating Bollinger Bands: {str(e)}")
@@ -132,7 +125,6 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
     Returns:
         IndicatorResult containing ATR values
     """
-    start_time = time.time()
     warnings = []
 
     if period is None:
@@ -154,13 +146,21 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
         result_data["ATR"] = atr_values
 
         # Calculate additional ATR-based features
+        # ATR percent as percent of close price
         result_data["ATR_Percent"] = (atr_values / data["close"]) * 100
-        result_data["ATR_High_Volatility"] = (
-            atr_values > atr_values.rolling(period * 2).mean() * 1.5
-        ).astype(int)
-        result_data["ATR_Low_Volatility"] = (
-            atr_values < atr_values.rolling(period * 2).mean() * 0.5
-        ).astype(int)
+
+        # Use percentile-based thresholds with a configurable rolling lookback
+        lookback = getattr(feature_config, "ATR_VOLATILITY_LOOKBACK", max(50, period * 2))
+        high_pct = getattr(feature_config, "ATR_HIGH_PERCENTILE", 0.7)
+        low_pct = getattr(feature_config, "ATR_LOW_PERCENTILE", 0.3)
+
+        # Rolling quantiles on ATR_Percent to determine high/low volatility regimes
+        atr_percent_series = result_data["ATR_Percent"]
+        high_quantile = atr_percent_series.rolling(lookback, min_periods=1).quantile(high_pct)
+        low_quantile = atr_percent_series.rolling(lookback, min_periods=1).quantile(low_pct)
+
+        result_data["ATR_High_Volatility"] = (atr_percent_series > high_quantile).astype(int)
+        result_data["ATR_Low_Volatility"] = (atr_percent_series < low_quantile).astype(int)
 
         # ATR-based support and resistance levels
         result_data["ATR_Upper_Band"] = data["close"] + (atr_values * 2)
@@ -171,7 +171,12 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
         metadata = {
             "indicator_type": "volatility",
             "indicator_name": "Average True Range",
-            "parameters": {"period": period},
+            "parameters": {
+                "period": period,
+                "volatility_lookback": lookback,
+                "high_percentile": high_pct,
+                "low_percentile": low_pct,
+            },
             "data_points": len(data),
             "features": [
                 "ATR",
@@ -183,14 +188,7 @@ def calculate_atr(data: pd.DataFrame, period: Optional[int] = None) -> Indicator
             ],
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating ATR: {str(e)}")
@@ -210,7 +208,6 @@ def calculate_custom_volatility(
     Returns:
         IndicatorResult containing custom volatility measures
     """
-    start_time = time.time()
     warnings = []
 
     if periods is None:
@@ -290,14 +287,7 @@ def calculate_custom_volatility(
             ],
         }
 
-        calculation_time = time.time() - start_time
-
-        return create_indicator_result(
-            data=result_data,
-            metadata=metadata,
-            warnings=warnings,
-            calculation_time=calculation_time,
-        )
+        return create_indicator_result(data=result_data, metadata=metadata, warnings=warnings)
 
     except Exception as e:
         logger.error(f"Error calculating custom volatility: {str(e)}")
@@ -317,8 +307,6 @@ class VolatilityIndicatorCalculator(BaseIndicator):
         Returns:
             IndicatorResult containing all volatility indicators
         """
-        start_time = time.time()
-
         try:
             # Calculate individual indicators
             bb_result = calculate_bollinger_bands(self.data)
@@ -346,13 +334,8 @@ class VolatilityIndicatorCalculator(BaseIndicator):
                 },
             }
 
-            calculation_time = time.time() - start_time
-
             return create_indicator_result(
-                data=combined_data,
-                metadata=metadata,
-                warnings=all_warnings,
-                calculation_time=calculation_time,
+                data=combined_data, metadata=metadata, warnings=all_warnings
             )
 
         except Exception as e:

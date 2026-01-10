@@ -21,7 +21,7 @@ from src.models.feature_selection.io import (
     save_torch_state,
     log_artifacts_to_mlflow,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -131,8 +131,6 @@ def run_feature_selection(
 
 
 def main():
-    # Minimal CLI-less entrypoint for manual runs. Configure via environment
-    # variables or edit the defaults below.
     prediction_horizon = int(os.environ.get("FS_PREDICTION_HORIZON", "20"))
     target_dim = int(os.environ.get("FS_TARGET_DIM", "40"))
     final_k = int(os.environ.get("FS_FINAL_K", "40"))

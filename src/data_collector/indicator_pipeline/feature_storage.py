@@ -15,11 +15,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from dataclasses import dataclass, asdict
 
-from src.utils.logger import get_logger
-from src.utils.feature_categories import filter_columns_by_categories
+from src.utils.core.logger import get_logger
+from src.utils.data.feature_categories import filter_columns_by_categories
 from src.feature_engineering.config import config
 
-logger = get_logger(__name__, utility="feature_engineering")
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -98,11 +98,18 @@ class FeatureStorage:
             # Generate file path
             file_path = self._generate_file_path(ticker)
 
+            # Cleanup old versions if configured
+            # if self.config.cleanup_old_versions:
+            #     self.cleanup_old_versions(ticker)
+
             # Prepare data for storage
             storage_data = self._prepare_data_for_storage(features_data)
 
             # Save to Parquet
             self._save_parquet(storage_data, file_path)
+            logger.info(
+                f"Saved features for {ticker} to {file_path} with {len(storage_data)} records"
+            )
 
             # Calculate file statistics
             file_stats = self._get_file_stats(file_path)
@@ -125,10 +132,6 @@ class FeatureStorage:
 
             # Save metadata to Parquet file alongside features
             self._save_metadata_to_parquet(feature_metadata)
-
-            # Cleanup old versions if configured
-            if self.config.cleanup_old_versions:
-                self._cleanup_old_versions(ticker)
 
             return feature_metadata
 
@@ -182,11 +185,6 @@ class FeatureStorage:
 
             # Load metadata
             metadata = self._load_metadata_from_parquet(ticker, version)
-
-            # logger.info(
-            #     f"Loaded {len(features_data)} records with {len(features_data.columns)} features for {ticker}"
-            # )
-
             return features_data, metadata
 
         except Exception as e:
@@ -395,7 +393,7 @@ class FeatureStorage:
         filename = f"{ticker}_metadata.parquet"
         return version_path / filename
 
-    def _cleanup_old_versions(self, ticker: str):
+    def cleanup_old_versions(self, ticker: str):
         """Cleanup old versions of ticker features"""
         try:
             # Find all parquet files for the ticker in the current version path
@@ -406,27 +404,25 @@ class FeatureStorage:
             data_files = [p for p in files if not p.stem.endswith("_metadata")]
 
             # If the number of files is within the limit, nothing to do
-            max_keep = max(1, int(self.config.max_versions))
-            if len(data_files) <= max_keep:
-                return
+            # max_keep = max(1, int(self.config.max_versions))
+            # if len(data_files) <= max_keep:
+            #     return
 
             # Sort by modification time (newest first)
             data_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
             # Files to remove are the older ones beyond the keep threshold
-            to_remove = data_files[max_keep:]
+            to_remove = data_files
 
             for f in to_remove:
                 try:
                     # Remove data file
                     f.unlink()
-                    logger.info(f"Removed old feature file: {f}")
 
                     # Also attempt to remove corresponding metadata file if present
                     meta_path = self.version_path / f"{f.stem}_metadata.parquet"
                     if meta_path.exists():
                         meta_path.unlink()
-                        logger.info(f"Removed old metadata file: {meta_path}")
 
                 except Exception as ex:
                     logger.warning(f"Failed to remove old feature file {f}: {ex}")
@@ -455,7 +451,7 @@ class FeatureStorage:
                         if p.is_file():
                             p.unlink()
                             removed_count += 1
-                            logger.info(f"Removed file: {p}")
+                            # logger.info(f"Removed file: {p}")
                     except Exception as ex:
                         logger.warning(f"Failed to remove file {p}: {ex}")
                         errors.append(str(ex))

@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import date
 from src.database.connection import fetch_all
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.feature_engineering.config import config
 
 logger = get_logger(__name__, utility="feature_engineering")
@@ -41,7 +41,6 @@ class StockDataLoader:
         Returns:
             DataFrame with OHLCV data
         """
-        logger.info(f"Loading data for {ticker} from {start_date} to {end_date}")
 
         try:
             # Convert dates to strings if needed
@@ -52,7 +51,7 @@ class StockDataLoader:
 
             # SQL query for historical_prices table (use positional params)
             query = (
-                'SELECT date, "open", high, low, "close", volume, adjusted_close, vwap '
+                'SELECT date, "open", high, low, "close", volume, vwap '
                 "FROM historical_prices "
                 "WHERE ticker = %s AND date >= %s AND date <= %s "
                 "ORDER BY date ASC"
@@ -64,17 +63,7 @@ class StockDataLoader:
             # Construct DataFrame from rows; columns match the SELECT order
             df = (
                 pd.DataFrame(
-                    rows,
-                    columns=[
-                        "date",
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "volume",
-                        "adjusted_close",
-                        "vwap",
-                    ],
+                    rows, columns=["date", "open", "high", "low", "close", "volume", "vwap"]
                 )
                 if rows
                 else pd.DataFrame()
@@ -90,7 +79,7 @@ class StockDataLoader:
             df.set_index("date", inplace=True)
 
             # Convert numeric columns to float (handle PostgreSQL numeric type)
-            numeric_columns = ["open", "high", "low", "close", "adjusted_close", "vwap"]
+            numeric_columns = ["open", "high", "low", "close", "vwap"]
             for col in numeric_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -101,6 +90,9 @@ class StockDataLoader:
 
             # Validate and clean the data
             df = self._validate_and_clean_data(df, ticker)
+            logger.info(
+                f"Loaded data for {ticker} from {start_date} to {end_date} - {len(df)} rows after cleaning"
+            )
 
             return df
 
@@ -151,7 +143,7 @@ class StockDataLoader:
                 else pd.DataFrame()
             )
 
-            tickers = df["ticker"].tolist()
+            tickers = list(set(df["ticker"].tolist()))
             logger.info(f"Found {len(tickers)} tickers with at least {min_data_points} data points")
 
             return tickers

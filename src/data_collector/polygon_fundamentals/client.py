@@ -8,7 +8,7 @@ from the Polygon API with proper rate limiting and error handling.
 import asyncio
 import aiohttp
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -24,7 +24,15 @@ from src.data_collector.polygon_fundamentals.data_models import (
     CashFlowStatement,
     FinancialValue,
 )
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
+from src.utils.core.retry import (
+    retry,
+    API_RETRY_CONFIG,
+    RetryError,
+    CircuitBreakerOpenError,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+)
 from src.data_collector.config import config
 
 logger = get_logger(__name__)
@@ -33,11 +41,11 @@ logger = get_logger(__name__)
 class RateLimiter:
     """Simple rate limiter for API requests"""
 
-    def __init__(self, requests_per_minute: int = 5):
+    def __init__(self, requests_per_minute: int = 5) -> None:
         self.requests_per_minute = requests_per_minute
-        self.requests = []
+        self.requests: List[float] = []
 
-    async def wait_if_needed(self):
+    async def wait_if_needed(self) -> None:
         """Wait if we've exceeded the rate limit"""
         now = time.time()
 
@@ -58,7 +66,7 @@ class RateLimiter:
 class PolygonFundamentalsClient:
     """Client for fetching fundamental data from Polygon API"""
 
-    def __init__(self, config: Optional[PolygonFundamentalsConfig] = None):
+    def __init__(self, config: Optional[PolygonFundamentalsConfig] = None) -> None:
         self.config = config or polygon_fundamentals_config
         self.rate_limiter = RateLimiter(self.config.REQUESTS_PER_MINUTE)
         self.session: Optional[aiohttp.ClientSession] = None
@@ -68,7 +76,12 @@ class PolygonFundamentalsClient:
             self.cache_dir = Path(self.config.CACHE_DIR)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    async def __aenter__(self):
+        # Initialize circuit breaker for fault tolerance
+        self.circuit_breaker = CircuitBreaker(
+            CircuitBreakerConfig(failure_threshold=5, success_threshold=2, timeout=60.0)
+        )
+
+    async def __aenter__(self) -> "PolygonFundamentalsClient":
         """Async context manager entry"""
         timeout = aiohttp.ClientTimeout(
             total=self.config.REQUEST_TIMEOUT, connect=self.config.CONNECTION_TIMEOUT
@@ -76,17 +89,32 @@ class PolygonFundamentalsClient:
         self.session = aiohttp.ClientSession(headers=self.config.headers, timeout=timeout)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit"""
         if self.session:
             await self.session.close()
 
     def _get_cache_path(self, ticker: str, endpoint: str) -> Path:
-        """Get cache file path for a ticker and endpoint"""
+        """Get cache file path for a ticker and endpoint
+
+        Args:
+            ticker: Stock ticker symbol
+            endpoint: API endpoint name
+
+        Returns:
+            Path to cache file
+        """
         return self.cache_dir / f"{ticker}_{endpoint}_{datetime.now().strftime('%Y%m%d')}.json"
 
     def _is_cache_valid(self, cache_path: Path) -> bool:
-        """Check if cache file is still valid"""
+        """Check if cache file is still valid
+
+        Args:
+            cache_path: Path to cache file
+
+        Returns:
+            True if cache is valid, False otherwise
+        """
         if not cache_path.exists():
             return False
 
@@ -94,7 +122,14 @@ class PolygonFundamentalsClient:
         return cache_age < timedelta(hours=self.config.CACHE_DURATION_HOURS)
 
     async def _load_from_cache(self, cache_path: Path) -> Optional[Dict[str, Any]]:
-        """Load data from cache file"""
+        """Load data from cache file
+
+        Args:
+            cache_path: Path to cache file
+
+        Returns:
+            Cached data dictionary or None if invalid/missing
+        """
         try:
             if self._is_cache_valid(cache_path):
                 return await asyncio.to_thread(self._sync_load_json, cache_path)
@@ -103,24 +138,58 @@ class PolygonFundamentalsClient:
         return None
 
     def _sync_load_json(self, cache_path: Path) -> Dict[str, Any]:
-        """Synchronous JSON loading"""
+        """Synchronous JSON loading
+
+        Args:
+            cache_path: Path to cache file
+
+        Returns:
+            Loaded JSON data as dictionary
+
+        Raises:
+            JSONDecodeError: If JSON parsing fails
+            FileNotFoundError: If file doesn't exist
+        """
         with open(cache_path, "r") as f:
             return json.load(f)
 
-    async def _save_to_cache(self, cache_path: Path, data: Dict[str, Any]):
-        """Save data to cache file"""
+    async def _save_to_cache(self, cache_path: Path, data: Dict[str, Any]) -> None:
+        """Save data to cache file
+
+        Args:
+            cache_path: Path to cache file
+            data: Data to cache
+        """
         try:
             await asyncio.to_thread(self._sync_save_json, cache_path, data)
         except Exception as e:
             logger.warning(f"Failed to save cache to {cache_path}: {e}")
 
-    def _sync_save_json(self, cache_path: Path, data: Dict[str, Any]):
-        """Synchronous JSON saving"""
+    def _sync_save_json(self, cache_path: Path, data: Dict[str, Any]) -> None:
+        """Synchronous JSON saving
+
+        Args:
+            cache_path: Path to cache file
+            data: Data to save
+        """
         with open(cache_path, "w") as f:
             json.dump(data, f, default=str)
 
     async def _make_request(self, url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Make HTTP request with retry logic"""
+        """
+        Make HTTP request with comprehensive error handling and retry mechanisms
+
+        Args:
+            url: API endpoint URL
+            params: Query parameters for the request
+
+        Returns:
+            JSON response data or None if all retries failed
+
+        Raises:
+            RetryError: When all retry attempts are exhausted
+            CircuitBreakerOpenError: When circuit breaker is open
+        """
         if not self.session:
             raise RuntimeError("Client session not initialized. Use async context manager.")
 
@@ -128,37 +197,61 @@ class PolygonFundamentalsClient:
         if not getattr(config, "DISABLE_RATE_LIMITING", False):
             await self.rate_limiter.wait_if_needed()
 
-        for attempt in range(self.config.RETRY_ATTEMPTS):
-            try:
-                async with self.session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data
-                    elif response.status == 429:  # Rate limited
-                        if getattr(config, "DISABLE_RATE_LIMITING", False):
-                            logger.warning(
-                                "Received 429 but rate limiting disabled. Retrying immediately."
-                            )
-                            continue
-                        wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
-                        logger.warning(f"Rate limited, waiting {wait_time} seconds")
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error(f"HTTP {response.status}: {await response.text()}")
+        # Create a retryable function with proper configuration
+        @retry(config=API_RETRY_CONFIG, circuit_breaker=self.circuit_breaker)
+        async def _execute_request() -> Dict[str, Any]:
+            return await self._make_single_request(url, params)
 
-            except asyncio.TimeoutError:
-                logger.warning(f"Request timeout (attempt {attempt + 1})")
-            except Exception as e:
-                logger.error(f"Request failed (attempt {attempt + 1}): {e}")
+        try:
+            return await _execute_request()
+        except RetryError as e:
+            # Wrap retry exhaustion in a more descriptive error
+            logger.error(
+                f"Request to {url} failed after {e.attempts} attempts. Last error: {e.last_exception}"
+            )
+            return None
+        except CircuitBreakerOpenError:
+            # Circuit breaker is open - service is failing
+            logger.error(f"Circuit breaker is open for {url} - service temporarily unavailable")
+            return None
 
-            if attempt < self.config.RETRY_ATTEMPTS - 1:
-                if getattr(config, "DISABLE_RATE_LIMITING", False):
-                    # No delay between retries when disabled
-                    continue
-                wait_time = self.config.RETRY_DELAY * (self.config.BACKOFF_FACTOR**attempt)
-                await asyncio.sleep(wait_time)
+    async def _make_single_request(self, url: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Make a single HTTP request without retry logic
 
-        return None
+        Args:
+            url: API endpoint URL
+            params: Query parameters for the request
+
+        Returns:
+            JSON response data
+
+        Raises:
+            aiohttp.ClientError: For HTTP client errors
+            ValueError: For invalid response data
+        """
+        async with self.session.get(url, params=params) as response:
+            if response.status == 200:
+                try:
+                    data = await response.json()
+                    return data
+                except Exception as e:
+                    raise ValueError(f"Failed to parse JSON response: {e}") from e
+            elif response.status == 429:  # Rate limited
+                error_text = await response.text()
+                logger.warning(f"Rate limited (429): {error_text}")
+                # Let retry framework handle this as a retryable error
+                raise aiohttp.ClientError(f"Rate limited: {error_text}")
+            else:
+                error_text = await response.text()
+                logger.error(f"HTTP {response.status}: {error_text}")
+                # Classify error for appropriate retry behavior
+                if response.status >= 500:
+                    # Server errors are retryable
+                    raise aiohttp.ClientError(f"Server error {response.status}: {error_text}")
+                else:
+                    # Client errors are typically not retryable
+                    raise ValueError(f"Client error {response.status}: {error_text}")
 
     async def get_financials(self, ticker: str, **kwargs) -> Optional[FundamentalDataResponse]:
         """
@@ -180,7 +273,7 @@ class PolygonFundamentalsClient:
                 return self._parse_financial_response(cached_data, ticker)
 
         # Make API request
-        url = self.config.get_financials_url(ticker)
+        url = self.config.get_financials_url()
         params = self.config.get_request_params(ticker, **kwargs)
 
         logger.info(f"Fetching financials for {ticker}")
@@ -217,7 +310,7 @@ class PolygonFundamentalsClient:
                 return response
 
             # Convert new format to legacy format for existing parsing logic
-            legacy_data = {}
+            legacy_data: Dict[str, Any] = {}
 
             for result in results:
                 financials = result.get("financials", {})
@@ -301,7 +394,14 @@ class PolygonFundamentalsClient:
             return response
 
     def _map_income_statement_fields(self, income_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Map new API field names to expected field names for income statement"""
+        """Map new API field names to expected field names for income statement
+
+        Args:
+            income_data: Raw income statement data from API
+
+        Returns:
+            Mapped field names for internal processing
+        """
         field_mapping = {
             # New API field -> Expected field name
             "basic_average_shares": "weighted_average_shares_outstanding",
@@ -337,7 +437,14 @@ class PolygonFundamentalsClient:
         return mapped_data
 
     def _map_balance_sheet_fields(self, balance_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Map new API field names to expected field names for balance sheet"""
+        """Map new API field names to expected field names for balance sheet
+
+        Args:
+            balance_data: Raw balance sheet data from API
+
+        Returns:
+            Mapped field names for internal processing
+        """
         field_mapping = {
             # New API field -> Expected field name
             "inventory": "inventory_net",
@@ -372,7 +479,14 @@ class PolygonFundamentalsClient:
         return mapped_data
 
     def _map_cash_flow_fields(self, cash_flow_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Map new API field names to expected field names for cash flow statement"""
+        """Map new API field names to expected field names for cash flow statement
+
+        Args:
+            cash_flow_data: Raw cash flow data from API
+
+        Returns:
+            Mapped field names for internal processing
+        """
         field_mapping = {
             # Most cash flow fields appear to match existing names
             "net_cash_flow_from_operating_activities": "net_cash_flow_from_operating_activities",
@@ -403,6 +517,9 @@ class PolygonFundamentalsClient:
             data: The source dictionary potentially containing financial values
             field_name: The financial field to extract
             statement_type: One of 'income_statement', 'balance_sheet', 'cash_flow_statement'
+
+        Returns:
+            FinancialValue object or None if extraction fails
         """
         try:
             if isinstance(data, dict):
@@ -443,16 +560,16 @@ class PolygonFundamentalsClient:
             # Parse balance sheets
             balance_sheets = data.get("balance_sheets", [])
             for stmt_data in balance_sheets:
-                stmt = self._parse_balance_sheet_direct(stmt_data)
-                if stmt:
-                    response.balance_sheets.append(stmt)
+                balance_stmt = self._parse_balance_sheet_direct(stmt_data)
+                if balance_stmt:
+                    response.balance_sheets.append(balance_stmt)
 
             # Parse cash flow statements
             cash_flow_statements = data.get("cash_flow_statements", [])
             for stmt_data in cash_flow_statements:
-                stmt = self._parse_cash_flow_statement_direct(stmt_data)
-                if stmt:
-                    response.cash_flow_statements.append(stmt)
+                cash_flow_stmt = self._parse_cash_flow_statement_direct(stmt_data)
+                if cash_flow_stmt:
+                    response.cash_flow_statements.append(cash_flow_stmt)
 
             # Set data quality metrics if available
             response.data_quality_score = data.get("data_quality_score")

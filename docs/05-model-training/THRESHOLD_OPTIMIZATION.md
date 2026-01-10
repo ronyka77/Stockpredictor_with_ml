@@ -66,7 +66,7 @@ This document provides complete documentation for the threshold optimization sys
 ### 6. **Unified Threshold Policies**
 - Consistent filtering logic across evaluators and predictors
 - Extensible policy methods (future: quantile, top-k per date, per-ticker, adaptive)
-- Centralized logging via `src/utils/logger.py` with policy params and stats
+- Centralized logging via `src/utils/core/logger.py` with policy params and stats
 
 ## Threshold Policies (Unified Masking)
 

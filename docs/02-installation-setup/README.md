@@ -55,7 +55,7 @@ For active development:
 1. Install development dependencies: `uv pip install -e ".[dev]"`
 2. Configure IDE with project structure
 3. Run tests to verify setup: `uv run pytest -q`
-4. Use the centralized logger in `src/utils/logger.py` for any logging needs
+4. Use the centralized logger in `src/utils/core/logger.py` for any logging needs
 
 ## 🔄 Next Steps
 

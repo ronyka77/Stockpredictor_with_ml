@@ -11,7 +11,7 @@ import warnings
 import logging
 from src.models.predictors.base_predictor import BasePredictor
 from src.models.automl.autogluon_model import AutoGluonModel
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ class AutoGluonPredictor(BasePredictor):
             try:
                 self.model = AutoGluonModel()
                 self.model.load_from_dir(self.model_dir)
-                logger.info(f"✅ AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
+                logger.info(f"AutoGluon predictor loaded from AG_MODEL_DIR: {self.model_dir}")
                 return
             except Exception as e:
                 logger.warning(
@@ -47,7 +47,7 @@ class AutoGluonPredictor(BasePredictor):
                 self.optimal_threshold = threshold
                 self.model.selected_model_name = model_name
                 logger.info(
-                    f"✅ AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
+                    f"AutoGluon optimal threshold and best model name loaded: {self.optimal_threshold}, {self.model.selected_model_name}"
                 )
             except Exception as e:
                 logger.warning(
@@ -66,7 +66,7 @@ def predict_best_model(model_dir: str):
     predictor.save_predictions_to_excel(features_df, metadata_df, predictions)
 
 
-def predict_all_model(model_dir: str):
+def predict_model(model_dir: str):
     predictor = AutoGluonPredictor(model_dir=model_dir)
     predictor.load_model_from_mlflow()
     predictor._load_metadata()
@@ -80,7 +80,10 @@ def predict_all_model(model_dir: str):
         metadata_df = metadata_df_base.copy()
         predictor.model.selected_model_name = model_name
         predictions = predictor.make_predictions(features_df)
-        predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
+        if predictions is None:
+            logger.warning(f"No predictions to save for model: {model_name}")
+        else:
+            predictor.save_predictions_to_excel(features_df, metadata_df, predictions, model_name)
 
 
 def predict_all_model_folders():
@@ -103,7 +106,7 @@ def predict_all_model_folders():
         model_dir = os.path.join(base_dir, folder)
         logger.info(f"Processing model folder: {folder}")
         try:
-            predict_all_model(model_dir)
+            predict_model(model_dir)
         except Exception as e:
             logger.error(f"Failed to process {folder}: {str(e)}")
             continue
@@ -114,6 +117,6 @@ if __name__ == "__main__":
         logging.getLogger(lg).setLevel(logging.WARNING)
     warnings.filterwarnings("ignore")
 
-    model_dir = "AutogluonModels/ag-20251019_213356"
-    # predict_all_model(model_dir)
-    predict_all_model_folders()
+    model_dir = "AutogluonModels/ag-20251120_213942"
+    predict_model(model_dir)
+    # predict_all_model_folders()

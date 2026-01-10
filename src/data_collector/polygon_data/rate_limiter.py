@@ -5,10 +5,10 @@ Rate limiting functionality for Polygon.io API requests
 import time
 from dataclasses import dataclass
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 from src.data_collector.config import config
 
-logger = get_logger(__name__, utility="data_collector")
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -18,13 +18,11 @@ class RateLimiter:
 
     Attributes:
         requests_per_minute: Maximum requests allowed per minute
-        last_request_time: Timestamp of last request
         request_count: Number of requests in current window
         window_start: Start time of current rate limiting window
     """
 
     requests_per_minute: int = 5
-    last_request_time: float = 0
     request_count: int = 0
     window_start: float = 0
 
@@ -64,7 +62,6 @@ class RateLimiter:
                 current_time = time.time()
 
         self.request_count += 1
-        self.last_request_time = current_time
 
         logger.info(f"Request {self.request_count}/{self.requests_per_minute} in current window")
 
@@ -184,19 +181,40 @@ class NoOpRateLimiter(RateLimiter):
         super().__init__(requests_per_minute=10_000_000)
 
     def wait_if_needed(self) -> None:
+        """
+        No-op implementation - performs no waiting or rate limiting.
+        """
         # Do nothing
         return
 
     def get_remaining_requests(self) -> int:
+        """
+        Return a very high number to indicate unlimited requests available.
+
+        Returns:
+            int: A large number indicating unlimited remaining requests
+        """
         return 10_000_000
 
     def get_time_until_reset(self) -> float:
+        """
+        Return 0.0 since rate limiting is disabled.
+
+        Returns:
+            float: Always returns 0.0 indicating no waiting needed
+        """
         return 0.0
 
     def handle_successful_request(self) -> None:
+        """
+        No-op implementation - no rate limit tracking needed.
+        """
         return
 
     def reset(self) -> None:
+        """
+        No-op implementation - no rate limit state to reset.
+        """
         return
 
 

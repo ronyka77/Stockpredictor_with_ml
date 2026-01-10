@@ -3,59 +3,64 @@
 Contains bulk upsert helpers used by feature engineering and other modules.
 """
 
+from dataclasses import dataclass
 from typing import Dict, Any, Iterable, Tuple, List
 import json
 from src.database.connection import execute_values
 
-from src.utils.logger import get_logger
+from src.utils.core.logger import get_logger
 
 logger = get_logger(__name__, utility="database")
 
 
+@dataclass
+class DBBatch:
+    """A bulk DB write payload detached from any dataframe library."""
+
+    columns: tuple[str, ...]
+    rows: list[tuple]
+
+    def __post_init__(self) -> None:
+        if not self.columns:
+            raise ValueError("DBBatch.columns must be non-empty")
+
+        expected = len(self.columns)
+        bad = next((i for i, r in enumerate(self.rows) if len(r) != expected), None)
+        if bad is not None:
+            raise ValueError(
+                f"DBBatch row length mismatch at index {bad}: expected {expected}, got {len(self.rows[bad])}"
+            )
+
+
 def _row_tuple_from_dict(d: Dict[str, Any]) -> Tuple:
-    return (
-        d["ticker"],
-        d["date"],
-        d["feature_category"],
-        d["feature_name"],
-        d["feature_value"],
-        d.get("quality_score", None),
-    )
+    """Build a DB parameter tuple for the `technical_features` JSON schema.
+
+    Expected dict keys:
+        ticker: str
+        date: date or ISO string (DB driver will adapt)
+        data: JSON-serializable dict (will be json.dumps'd)
+    """
+
+    # Store as a JSON string; execute_values flattens tuple params, so we pass
+    # a single scalar for the jsonb column.
+    payload = json.dumps(d["data"], default=str)
+    return (d["ticker"], d["date"], payload)
 
 
 def bulk_upsert_technical_features(
     rows: Iterable[Dict[str, Any]], page_size: int = 1000, overwrite: bool = True
 ) -> int:
-    """Bulk upsert technical features using execute_values for performance.
-
-    Args:
-        rows:   Iterable of dicts with keys: ticker, date, feature_category,
-                feature_name, feature_value, quality_score
-        page_size: page size passed to execute_values
-        overwrite: If True, ON CONFLICT DO UPDATE; if False, ON CONFLICT DO NOTHING
-
-    Returns:
-        Number of rows attempted to insert (best-effort). If DB returns
-        rowcount it is returned; otherwise returns len(rows).
-    """
+    """Bulk upsert technical features using execute_values for performance."""
     rows = list(rows)
     if not rows:
         return 0
 
     if overwrite:
-        conflict_clause = (
-            "ON CONFLICT (ticker, date, feature_category, feature_name) "
-            "DO UPDATE SET feature_value = EXCLUDED.feature_value, "
-            "quality_score = EXCLUDED.quality_score, calculation_timestamp = CURRENT_TIMESTAMP"
-        )
+        conflict_clause = "ON CONFLICT (ticker, date) DO UPDATE SET data = EXCLUDED.data"
     else:
-        conflict_clause = "ON CONFLICT (ticker, date, feature_category, feature_name) DO NOTHING"
+        conflict_clause = "ON CONFLICT (ticker, date) DO NOTHING"
 
-    insert_sql = (
-        "INSERT INTO technical_features "
-        "(ticker, date, feature_category, feature_name, feature_value, quality_score) "
-        "VALUES %s " + conflict_clause
-    )
+    insert_sql = "INSERT INTO technical_features (ticker, date, data) VALUES %s " + conflict_clause
 
     tuples = [_row_tuple_from_dict(r) for r in rows]
 
