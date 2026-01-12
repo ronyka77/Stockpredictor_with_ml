@@ -21,7 +21,6 @@ try:
     if not project_root.exists():
         project_root = Path(r"\\".join(str(project_root).split("\\")))
     sys.path.append(str(project_root))
-    logger.info(f"Project root mlflow_utils: {project_root}")
 except Exception as e:
     logger.error(f"Error setting project root path: {e}")
     sys.path.append(os.getcwd().parent)

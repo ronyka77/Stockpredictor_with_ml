@@ -1,6 +1,8 @@
 """MLP Predictor with training, evaluation, optimization, and MLflow integration."""
 
+import warnings
 import torch
+
 import torch.nn as nn
 import pandas as pd
 import numpy as np
@@ -9,25 +11,17 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
-from contextlib import contextmanager
 from sklearn.preprocessing import StandardScaler
 
 from src.models.time_series.base_pytorch_model import PyTorchBasePredictor
 from src.models.evaluation import ThresholdEvaluator
-from src.utils.core.logger import get_logger
+from src.utils.core.logger import get_logger, timeit
 
 logger = get_logger(__name__)
 
-
-@contextmanager
-def temporary_device(model, target_device):
-    """Context manager for temporary device switching."""
-    original_device = next(model.parameters(), torch.tensor(0.0)).device
-    try:
-        model.to(target_device)
-        yield
-    finally:
-        model.to(original_device)
+warnings.filterwarnings(
+    "ignore", message=r".*torch.distributed.reduce_op.*", category=FutureWarning
+)
 
 
 def load_artifact(run_id: str, artifact_path: str, loader_fn):
@@ -65,7 +59,7 @@ class MLPPredictor(PyTorchBasePredictor):
                 "task": "regression",
                 "learning_rate": 1e-3,
                 "epochs": 50,
-                "batch_size": 32,
+                "batch_size": 1024,
                 "optimizer": "adam",
                 "weight_decay": 0.0,
                 "gradient_clip": None,
@@ -109,17 +103,27 @@ class MLPPredictor(PyTorchBasePredictor):
         valid_mask = y.notna() & ~np.isinf(y)
         return X_clean[valid_mask], y[valid_mask]
 
+    @timeit
     def fit(
         self,
         train_loader,
         val_loader=None,
         scaler=None,
         feature_names=None,
-        resume_from_checkpoint: str = None,
+        trial: Optional[Any] = None,
     ):
         """Train MLP with early stopping and optional LR scheduling."""
         self.scaler = scaler
         self.feature_names = list(feature_names) if feature_names is not None else None
+
+        if self.device.type != "cuda" or not torch.cuda.is_available():
+            raise RuntimeError("CUDA is required for MLPPredictor.fit")
+
+        self.config["use_amp"] = True
+        self.config["non_blocking_transfer"] = True
+        torch.backends.cudnn.benchmark = True
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high")
 
         if self.model is None:
             self.model = self._create_model()
@@ -134,55 +138,91 @@ class MLPPredictor(PyTorchBasePredictor):
         self.optimizer = optimizer
         scheduler = self._create_scheduler(optimizer)
 
+        use_amp = bool(self.config.get("use_amp", True))
+        non_blocking_transfer = bool(self.config.get("non_blocking_transfer", True))
+        amp_enabled = bool(use_amp and self.device.type == "cuda" and torch.cuda.is_available())
+        grad_scaler = torch.amp.GradScaler(enabled=amp_enabled)
+
         self.best_val_loss = float("inf")
         self.early_stopping_counter = 0
 
         val_loss = None
         for epoch in range(epochs):
             self.model.train()
-            total_loss, total_gradient_norm, num_batches = 0.0, 0.0, 0
+            total_loss = torch.zeros((), device=self.device)
+            total_grad_norm = 0.0
+            num_batches = 0
 
             for batch_X, batch_y in train_loader:
-                batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
-                optimizer.zero_grad()
+                batch_X = batch_X.to(self.device, non_blocking=non_blocking_transfer)
+                batch_y = batch_y.to(self.device, non_blocking=non_blocking_transfer)
+                optimizer.zero_grad(set_to_none=True)
 
-                outputs = self.model(batch_X)
-                loss = criterion(outputs.view(-1), batch_y.view(-1))
-                loss.backward()
-                if gradient_clip:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
-                optimizer.step()
+                if amp_enabled:
+                    with torch.amp.autocast("cuda"):
+                        outputs = self.model(batch_X)
+                        loss = criterion(outputs.view(-1), batch_y.view(-1))
+                    grad_scaler.scale(loss).backward()
+                    if gradient_clip:
+                        grad_scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                    grad_scaler.step(optimizer)
+                    grad_scaler.update()
+                else:
+                    outputs = self.model(batch_X)
+                    loss = criterion(outputs.view(-1), batch_y.view(-1))
+                    loss.backward()
+                    if gradient_clip:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip)
+                    optimizer.step()
 
-                total_gradient_norm += (
-                    sum(
-                        p.grad.data.norm(2).item() ** 2
-                        for p in self.model.parameters()
-                        if p.grad is not None
-                    )
-                    ** 0.5
-                )
-
-                total_loss += float(loss.item())
+                total_loss = total_loss + loss.detach()
                 num_batches += 1
 
-            train_loss = total_loss / max(1, num_batches)
-            avg_gradient_norm = (
-                total_gradient_norm / max(1, num_batches) if total_gradient_norm > 0 else 0.0
-            )
+            train_loss = (total_loss / max(1, num_batches)).item()
+            if any(p.grad is not None for p in self.model.parameters()):
+                with torch.no_grad():
+                    grad_sq_sum = torch.zeros((), device=self.device)
+                    for p in self.model.parameters():
+                        if p.grad is None:
+                            continue
+                        grad_sq_sum = grad_sq_sum + p.grad.detach().pow(2).sum()
+                    total_grad_norm = float(torch.sqrt(grad_sq_sum).item())
+            avg_gradient_norm = total_grad_norm
 
             val_loss = None
             if val_loader is not None:
                 self.model.eval()
-                total_val_loss, val_batches = 0.0, 0
+                total_val_loss = torch.zeros((), device=self.device)
+                val_batches = 0
                 with torch.no_grad():
                     for batch_X, batch_y in val_loader:
-                        batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
-                        outputs = self.model(batch_X)
-                        total_val_loss += float(
-                            criterion(outputs.view(-1), batch_y.view(-1)).item()
-                        )
+                        batch_X = batch_X.to(self.device, non_blocking=non_blocking_transfer)
+                        batch_y = batch_y.to(self.device, non_blocking=non_blocking_transfer)
+                        if amp_enabled:
+                            with torch.amp.autocast("cuda"):
+                                outputs = self.model(batch_X)
+                                batch_loss = criterion(outputs.view(-1), batch_y.view(-1))
+                        else:
+                            outputs = self.model(batch_X)
+                            batch_loss = criterion(outputs.view(-1), batch_y.view(-1))
+
+                        total_val_loss = total_val_loss + batch_loss.detach()
                         val_batches += 1
-                val_loss = total_val_loss / max(1, val_batches)
+                val_loss = (total_val_loss / max(1, val_batches)).item()
+
+                if trial is not None:
+                    try:
+                        import optuna
+                    except Exception as e:
+                        logger.info(f"Optuna pruning unavailable: {e}")
+                    else:
+                        trial.report(val_loss, epoch)
+                        if trial.should_prune():
+                            logger.info(
+                                f"Optuna pruned trial at epoch {epoch + 1} with val_loss={val_loss:.6f}"
+                            )
+                            raise optuna.TrialPruned()
 
                 if val_loss < self.best_val_loss - early_stopping_min_delta:
                     self.best_val_loss = val_loss
@@ -303,11 +343,11 @@ class MLPPredictor(PyTorchBasePredictor):
 
         cleaned_X = MLPDataUtils.validate_and_clean_data(X)
 
-        if self.scaler is not None:
-            X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
-        else:
-            X_scaled = cleaned_X.copy().fillna(0).replace([np.inf, -np.inf], 0)
-            X_scaled = (X_scaled - X_scaled.mean()) / (X_scaled.std() + 1e-8)
+        if self.scaler is None:
+            raise ValueError(
+                "Scaler is not set. Fit with a train-fitted scaler or load a model that includes the saved scaler."
+            )
+        X_scaled, _ = MLPDataUtils.scale_data(cleaned_X, self.scaler, False)
 
         return torch.FloatTensor(X_scaled.values)
 
@@ -345,12 +385,12 @@ class MLPPredictor(PyTorchBasePredictor):
         self,
         x_train: pd.DataFrame,
         y_train: pd.Series,
-        x_test: pd.DataFrame,
-        x_test_scaled: pd.DataFrame,
-        y_test: pd.Series,
+        x_val: pd.DataFrame,
+        x_val_scaled: pd.DataFrame,
+        y_val: pd.Series,
         fitted_scaler=StandardScaler,
     ) -> callable:
-        """Create Optuna objective with threshold optimization."""
+        """Create Optuna objective using a validation holdout for tuning."""
         self.best_investment_success_rate = -np.inf
         self.best_trial_model = None
         self.best_trial_params = None
@@ -363,39 +403,71 @@ class MLPPredictor(PyTorchBasePredictor):
         def objective_fn(trial):
             from src.models.time_series.mlp.mlp_architecture import MLPDataUtils
 
-            layer_sizes = [
-                int(x)
-                for x in trial.suggest_categorical(
-                    "layer_sizes",
-                    (
-                        "64,32",
-                        "128,64",
-                        "256,128,64",
-                        "512,256,128,64",
-                        "128,64,32",
-                        "256,128,64,32",
-                    ),
-                ).split(",")
-            ]
+            import optuna
+
+            # Persist trial context into Optuna sqlite via user_attrs.
+            # Keep values scalar/JSON-serializable.
+            self._optuna_log_dataset_sizes(trial, x_train=x_train, x_test=x_val)
+
+            def _round_to_multiple(x: float, multiple: int = 8) -> int:
+                if multiple <= 0:
+                    return int(round(x))
+                return int(round(x / multiple) * multiple)
+
+            batch_size = trial.suggest_categorical("batch_size", (512, 1024, 2048, 4096, 8192))
+            base_lr = trial.suggest_float("base_lr", 4e-4, 7e-3, log=True)
+            lr_scale = float(np.sqrt(float(batch_size) / 4096.0))
+            learning_rate = float(base_lr * lr_scale)
+            trial.set_user_attr("effective_learning_rate", learning_rate)
+
+            n_layers = trial.suggest_int("n_layers", 2, 5)
+            hidden_dim = trial.suggest_categorical("hidden_dim", (128, 256, 512, 768))
+            taper = trial.suggest_float("taper", 0.55, 0.9)
+
+            layer_sizes: List[int] = []
+            prev = None
+            for i in range(int(n_layers)):
+                raw = float(hidden_dim) * float(taper**i)
+                size = max(32, _round_to_multiple(raw, 8))
+                if prev is not None and size > prev:
+                    size = prev
+                layer_sizes.append(int(size))
+                prev = int(size)
+
+            activation = trial.suggest_categorical("activation", ("relu", "gelu"))
+            batch_norm = trial.suggest_categorical("batch_norm", (True, False))
+            residual = (
+                trial.suggest_categorical("residual", (True, False)) if n_layers >= 3 else False
+            )
+
+            use_gradient_clip = trial.suggest_categorical("use_gradient_clip", (True, False))
+            gradient_clip = (
+                trial.suggest_float("gradient_clip", 0.8, 5.0, log=True)
+                if use_gradient_clip
+                else None
+            )
 
             model_params = {
                 "input_size": len(x_train.columns),
                 "layer_sizes": layer_sizes,
-                "learning_rate": trial.suggest_float("learning_rate", 1e-4, 5e-2, log=True),
-                "dropout": trial.suggest_float("dropout", 0.05, 0.5),
+                "learning_rate": learning_rate,
+                "dropout": trial.suggest_float("dropout", 0.0, 0.12),
                 "optimizer": "adamw",
-                "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
-                "activation": "relu",
+                "weight_decay": trial.suggest_float("weight_decay", 1e-9, 1e-4, log=True),
+                "activation": activation,
                 "epochs": trial.suggest_int("epochs", 5, 30),
-                "batch_norm": True,
-                "residual": False,
-                "gradient_clip": trial.suggest_float("gradient_clip", 0.1, 5.0, log=True),
-                "early_stopping_patience": 15,
+                "batch_norm": batch_norm,
+                "residual": residual,
+                "gradient_clip": gradient_clip,
+                "early_stopping_patience": trial.suggest_int("early_stopping_patience", 2, 6),
+                "early_stopping_min_delta": trial.suggest_float(
+                    "early_stopping_min_delta", 1e-5, 5e-4, log=True
+                ),
                 "lr_scheduler": "cosine",
             }
             data_params = {
-                "batch_size": trial.suggest_categorical("batch_size", (256, 512, 1024, 2048)),
-                "num_workers": 4,
+                "batch_size": batch_size,
+                "num_workers": 2,
                 "pin_memory": torch.cuda.is_available(),
             }
 
@@ -420,7 +492,7 @@ class MLPPredictor(PyTorchBasePredictor):
                     x_train, y_train, bs, True, nw, pm
                 )
                 val_loader = MLPDataUtils.create_dataloader_from_dataframe(
-                    x_test_scaled, y_test, bs, False, nw, pm
+                    x_val_scaled, y_val, bs, False, nw, pm
                 )
 
                 trial_model.fit(
@@ -428,14 +500,13 @@ class MLPPredictor(PyTorchBasePredictor):
                     val_loader,
                     scaler=self.fitted_scaler,
                     feature_names=self.feature_names,
+                    trial=trial,
                 )
 
-                prices = (
-                    x_test["close"].values if "close" in x_test.columns else np.ones(len(x_test))
-                )
+                prices = x_val["close"].values if "close" in x_val.columns else np.ones(len(x_val))
                 thr = trial_model.optimize_prediction_threshold(
-                    x_test=x_test,
-                    y_test=y_test,
+                    x_test=x_val,
+                    y_test=y_val,
                     current_prices_test=prices,
                     confidence_method="variance",
                 )
@@ -451,6 +522,22 @@ class MLPPredictor(PyTorchBasePredictor):
                     "profitable_investments": best["profitable_investments"],
                 }
 
+                self._optuna_log_trial_core_metrics(
+                    trial,
+                    profit_per_investment=optimized_profit_score,
+                    best_iteration=getattr(trial_model, "best_iteration", None),
+                    best_score=getattr(trial_model, "best_score", None),
+                )
+                self._optuna_log_threshold_metrics(
+                    trial,
+                    optimal_threshold=threshold_info.get("optimal_threshold"),
+                    samples_kept_ratio=threshold_info.get("samples_kept_ratio"),
+                    investment_success_rate=threshold_info.get("investment_success_rate"),
+                    custom_accuracy=threshold_info.get("custom_accuracy"),
+                    total_profit=threshold_info.get("total_threshold_profit"),
+                    profitable_investments=threshold_info.get("profitable_investments"),
+                )
+
                 if optimized_profit_score > self.best_investment_success_rate:
                     self.best_investment_success_rate = optimized_profit_score
                     self.best_trial_model = trial_model
@@ -463,13 +550,21 @@ class MLPPredictor(PyTorchBasePredictor):
                         self.optimal_threshold = threshold_info["optimal_threshold"]
                         self.confidence_method = "variance"
 
+                    thr_val = threshold_info.get("optimal_threshold")
+                    thr_str = (
+                        f"{float(thr_val):.3f}"
+                        if isinstance(thr_val, (int, float, np.floating))
+                        else "NA"
+                    )
                     logger.info(
-                        f"NEW BEST TRIAL {trial.number}: profit={optimized_profit_score:.3f}, threshold={threshold_info.get('optimal_threshold', 'N/A'):.3f}"
+                        f"NEW BEST TRIAL {trial.number}: profit={optimized_profit_score:.3f}, threshold={thr_str}"
                     )
                     self.previous_best = optimized_profit_score
 
                 return optimized_profit_score
 
+            except optuna.TrialPruned:
+                raise
             except Exception as e:
                 logger.warning(f"Trial {trial.number} failed: {e}")
                 return -1e6
@@ -587,31 +682,32 @@ class MLPPredictor(PyTorchBasePredictor):
                 with open(scaler_path, "wb") as f:
                     pickle.dump(scaler, f)
                 mlflow.log_artifact(scaler_path, artifact_path="preprocessor")
-                os.unlink(scaler_path)
+                # os.unlink(scaler_path)
 
             input_example = x_eval.iloc[:5].copy()
             for col in input_example.columns:
                 if input_example[col].dtype.kind == "i":
                     input_example[col] = input_example[col].astype("float64")
 
+            self.model.to(self.device)
             self.model.eval()
-            with temporary_device(self.model, torch.device("cpu")):
-                with torch.no_grad():
-                    input_tensor = torch.as_tensor(input_example.values, dtype=torch.float32)
-                    predictions_example = self.model(input_tensor).cpu().numpy()
-                signature = mlflow.models.infer_signature(input_example, predictions_example)
+            with torch.no_grad():
+                input_tensor = torch.as_tensor(
+                    input_example.values, dtype=torch.float32, device=self.device
+                )
+                predictions_example = self.model(input_tensor).detach().cpu().numpy()
+            signature = mlflow.models.infer_signature(input_example, predictions_example)
 
             mlflow.log_dict(
                 {"feature_names": list(x_eval.columns)}, "preprocessor/feature_names.json"
             )
 
-            with temporary_device(self.model, torch.device("cpu")):
-                mlflow.pytorch.log_model(
-                    pytorch_model=self.model,
-                    artifact_path="model",
-                    signature=signature,
-                    input_example=input_example,
-                )
+            mlflow.pytorch.log_model(
+                pytorch_model=self.model,
+                artifact_path="model",
+                signature=signature,
+                input_example=input_example,
+            )
 
             logger.info(f"MLP model saved. Run ID: {run.info.run_id}")
             return run.info.run_id

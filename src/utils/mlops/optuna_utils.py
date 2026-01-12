@@ -19,16 +19,17 @@ from src.utils.core.logger import get_logger
 logger = get_logger(__name__)
 
 
-def optuna_sqlite_storage_url_for_model(model_name: str) -> str:
-    """Return an Optuna sqlite storage URL for a given model name.
+def optuna_sqlite_storage_url_for_model(model_name: str, prediction_horizon: int) -> str:
+    """Return an Optuna sqlite storage URL for a given model name and horizon.
 
-    Requirement: outputs/optuna/{model_name}.db
+    Requirement: outputs/optuna/{model_name}_{prediction_horizon}.db
 
     Optuna expects forward slashes in sqlite URL on Windows.
     """
     db_dir = Path("outputs") / "optuna"
     db_dir.mkdir(parents=True, exist_ok=True)
-    db_path = (db_dir / f"{model_name}.db").resolve()
+    safe_name = (model_name or "model").strip() or "model"
+    db_path = (db_dir / f"{safe_name}_{int(prediction_horizon)}.db").resolve()
     return f"sqlite:///{db_path.as_posix()}"
 
 
@@ -103,7 +104,7 @@ def create_or_load_study(
     """
     import optuna
 
-    storage = storage_url or optuna_sqlite_storage_url_for_model(model_name)
+    storage = storage_url or optuna_sqlite_storage_url_for_model(model_name, prediction_horizon)
     sname = study_name or default_study_name(model_name, prediction_horizon, objective_slug)
 
     kwargs: Dict[str, Any] = {

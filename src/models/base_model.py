@@ -6,6 +6,9 @@ in the stock prediction system, with built-in MLflow tracking, persistence,
 and evaluation capabilities.
 """
 
+import glob
+import json
+import os
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
@@ -18,6 +21,117 @@ from src.utils.core.logger import get_logger
 from src.utils.mlops.mlflow_integration import MLflowIntegration
 
 logger = get_logger(__name__)
+
+
+def _find_latest_artifact(pattern: str) -> Optional[str]:
+    """Find the most recently modified file matching the given glob pattern.
+
+    Args:
+        pattern: Glob pattern to search for files
+
+    Returns:
+        Path to the most recent file, or None if no matches found
+    """
+    candidates = glob.glob(pattern)
+    if not candidates:
+        return None
+    return max(candidates, key=os.path.getmtime)
+
+
+def filter_to_selected_features(
+    x_train: pd.DataFrame, x_test: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[str]]:
+    """Filter training and test datasets to only include features selected by AutoGluon.
+
+    This function loads a feature selection file and filters both train and test
+    datasets to include only the selected features plus essential columns.
+
+    Args:
+        x_train: Training feature DataFrame
+        x_test: Test feature DataFrame
+
+    Returns:
+        Tuple of (filtered_x_train, filtered_x_test, selected_features_path)
+    """
+    selected_features_path = _find_latest_artifact("predictions/selected_features_*.json")
+    essential_columns = ["close", "ticker_id", "date_int"]
+    selected_features = None
+
+    if selected_features_path and os.path.exists(selected_features_path):
+        try:
+            with open(selected_features_path, "r") as f:
+                selected_features_data = json.load(f)
+                selected_features = selected_features_data["selected_features"]
+
+            # Filter to only include selected features that exist in the dataset
+            available_features = [col for col in selected_features if col in x_train.columns]
+            for essential_col in essential_columns:
+                if essential_col not in available_features:
+                    available_features.append(essential_col)
+
+            if len(available_features) != len(selected_features):
+                missing_features = [col for col in selected_features if col not in x_train.columns]
+                logger.warning(f"Missing features in dataset: {missing_features}")
+
+            x_train_filtered = x_train[available_features]
+            x_test_filtered = x_test[available_features]
+
+            logger.info(
+                f"Filtered to {len(available_features)} selected features, "
+                f"x_train shape: {x_train_filtered.shape}, x_test shape: {x_test_filtered.shape}"
+            )
+
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Error loading selected features file: {e}. Using all features.")
+            x_train_filtered, x_test_filtered = x_train, x_test
+    else:
+        logger.warning(
+            f"Selected features file not found: {selected_features_path}. Using all features."
+        )
+        x_train_filtered, x_test_filtered = x_train, x_test
+
+    return x_train_filtered, x_test_filtered, selected_features
+
+
+def load_and_prepare_data_polars_as_pandas(
+    *,
+    prediction_horizon: int = 10,
+    split_date: str = "2025-05-01",
+    clean_features: bool = True,
+    filter_features: bool = False,
+) -> Dict[str, Any]:
+    """Load and prepare ML training data via the Polars pipeline.
+
+    Args:
+        prediction_horizon: Number of days ahead to predict
+        split_date: Date to split train/test data
+        clean_features: Whether to clean features
+        filter_features: Whether to filter to selected features from AutoGluon
+
+    Returns:
+        Dictionary containing x_train, x_test, y_train, y_test
+    """
+    from src.data_utils.polars_ml_pipeline import (
+        prepare_ml_data_for_training_with_cleaning_polars,
+        to_pandas,
+    )
+
+    result = prepare_ml_data_for_training_with_cleaning_polars(
+        prediction_horizon=prediction_horizon, split_date=split_date, clean_features=clean_features
+    )
+
+    for key in ("x_train", "x_test", "y_train", "y_test"):
+        if key in result:
+            result[key] = to_pandas(result[key])
+
+    if filter_features and "x_train" in result and "x_test" in result:
+        x_train_filtered, x_test_filtered, _ = filter_to_selected_features(
+            result["x_train"], result["x_test"]
+        )
+        result["x_train"] = x_train_filtered
+        result["x_test"] = x_test_filtered
+
+    return result
 
 
 class DefaultHyperparameterConfig:
@@ -70,9 +184,6 @@ class BaseModel(ABC):
 
         # Unified thresholding defaults
         self.base_threshold = 0.5
-        # Provide a default hyperparameter_config object so gradient-boosting
-        # implementations can call `self.hyperparameter_config.get_default_params()`
-        # without having to instantiate their own config in tests.
         self.hyperparameter_config = DefaultHyperparameterConfig()
 
         logger.info(f"Initialized {model_name} model")

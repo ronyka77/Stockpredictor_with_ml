@@ -9,13 +9,13 @@ import numpy as np
 import optuna
 import pandas as pd
 
-from src.data_utils.polars_ml_pipeline import (
-    prepare_ml_data_for_training_with_cleaning_polars,
-    to_pandas,
+from src.models.base_model import (
+    BaseModel,
+    load_and_prepare_data_polars_as_pandas,
 )
-from src.models.base_model import BaseModel
 from src.models.evaluation import CustomMetrics, ThresholdEvaluator
-from src.utils.core.logger import get_logger
+from src.feature_engineering.feature_selector import CATEGORIES
+from src.utils.core.logger import get_logger, timeit
 from src.utils.data.cleaned_data_cache import collect_garbage
 from src.utils.mlops.mlflow_utils import MLFlowManager
 
@@ -144,6 +144,7 @@ class LightGBMModel(BaseModel):
         )
         return train, test
 
+    @timeit
     def fit(
         self,
         x_train: pd.DataFrame,
@@ -211,19 +212,49 @@ class LightGBMModel(BaseModel):
         ) = -np.inf, None, None, None
 
         def _trial_objective(trial: optuna.trial.Trial) -> float:
+            # constraint_strategy = trial.suggest_categorical(
+            #     "interaction_constraint_strategy", ["none", "strict", "moderate", "loose"]
+            # )
+            constraint_strategy = "none"
             params = {
-                "max_depth": trial.suggest_int("max_depth", 3, 15),
-                "learning_rate": trial.suggest_float("learning_rate", 0.0001, 0.15, log=True),
-                "n_estimators": trial.suggest_int("n_estimators", 100, 10000),
+                "boosting_type": trial.suggest_categorical(
+                    "boosting_type", ["gbdt", "goss"]
+                ),  # dart
+                "max_depth": trial.suggest_int("max_depth", 9, 18),
+                "learning_rate": trial.suggest_float("learning_rate", 0.00001, 0.005, log=True),
+                "n_estimators": trial.suggest_int("n_estimators", 500, 15000),
                 "subsample": trial.suggest_float("subsample", 0.6, 1.0),
                 "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
                 "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 10.0, step=0.1),
                 "reg_lambda": trial.suggest_float("reg_lambda", 0.0, 10.0, step=0.1),
                 "min_child_weight": trial.suggest_float("min_child_weight", 1, 30, step=0.1),
-                "min_child_samples": trial.suggest_int("min_child_samples", 5, 500),
+                "min_child_samples": trial.suggest_int("min_child_samples", 5, 200),
+                "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 5, 100),
+                "path_smooth": trial.suggest_float("path_smooth", 0.0, 1.0),
                 "num_leaves": trial.suggest_int("num_leaves", 10, 500),
-                "num_threads": self.max_cpu_cores,
             }
+
+            # Apply interaction constraints based on strategy
+            if constraint_strategy != "none":
+                feature_names = list(x_train.columns)
+                interaction_groups = self._create_financial_interaction_groups(
+                    feature_names, strategy=constraint_strategy
+                )
+                if interaction_groups:
+                    params["interaction_constraints"] = interaction_groups
+                    logger.info(
+                        f"Trial {trial.number}: Applying {constraint_strategy} interaction constraints "
+                        f"with {len(interaction_groups)} groups"
+                    )
+                    trial.set_user_attr("used_interaction_constraints", True)
+                    trial.set_user_attr("num_constraint_groups", len(interaction_groups))
+                    trial.set_user_attr("constraint_strategy", constraint_strategy)
+                else:
+                    logger.warning(f"Trial {trial.number}: No interaction groups created")
+                    trial.set_user_attr("used_interaction_constraints", False)
+            else:
+                trial.set_user_attr("used_interaction_constraints", False)
+                trial.set_user_attr("constraint_strategy", "none")
 
             # Helpful metadata for later dashboard analysis.
             self._optuna_log_dataset_sizes(trial, x_train=x_train, x_test=x_test)
@@ -241,7 +272,7 @@ class LightGBMModel(BaseModel):
                     current_prices_test=x_test["close"].values,
                     confidence_method="leaf_depth",
                     threshold_range=(0.01, 0.99),
-                    n_thresholds=90,
+                    n_thresholds=150,
                 )
                 best = res["best_result"]
                 score = float(best["test_profit_per_investment"])
@@ -524,6 +555,137 @@ class LightGBMModel(BaseModel):
         logger.info(f"Feature selection complete. Selected {len(selected)} features.")
         return selected
 
+    @staticmethod
+    def _matches_any_token(feature_name: str, tokens: List[str]) -> bool:
+        """Check if feature name contains any of the given tokens (case-insensitive)."""
+        feat_lower = str(feature_name).lower()
+        return any(str(tok).lower() in feat_lower for tok in tokens)
+
+    def _create_financial_interaction_groups(
+        self, feature_names: List[str], strategy: str = "moderate"
+    ) -> List[List[int]]:
+        """
+        Create financially-motivated interaction constraint groups using CATEGORIES.
+
+        Args:
+            feature_names: List of feature names in the dataset
+            strategy: Constraint strategy - "strict", "moderate", or "loose"
+                - strict: Separate groups with minimal cross-interaction
+                - moderate: Some cross-group interactions for related categories
+                - loose: Flexible grouping with broad interactions
+
+        Returns:
+            List of feature index groups that can interact within trees
+        """
+        logger.info(
+            f"Creating {strategy} interaction constraints for {len(feature_names)} features"
+        )
+
+        # Map features to categories using CATEGORIES from feature_selector
+        feature_to_category = {}
+        for idx, feat in enumerate(feature_names):
+            for category, tokens in CATEGORIES.items():
+                if self._matches_any_token(feat, tokens):
+                    feature_to_category[idx] = category
+                    break
+
+        # Group feature indices by category
+        category_indices = {}
+        for idx, category in feature_to_category.items():
+            category_indices.setdefault(category, []).append(idx)
+
+        logger.info(f"Categorized {len(feature_to_category)}/{len(feature_names)} features")
+        for cat, indices in category_indices.items():
+            logger.info(f"  {cat}: {len(indices)} features")
+
+        # Uncategorized features (date_int, ticker_id, etc.)
+        uncategorized = [i for i in range(len(feature_names)) if i not in feature_to_category]
+        if uncategorized:
+            logger.info(f"  uncategorized: {len(uncategorized)} features")
+
+        # Create interaction groups based on strategy
+        if strategy == "strict":
+            # Each category is its own group, no cross-category interaction
+            groups = list(category_indices.values())
+            # Add uncategorized features to their own group
+            if uncategorized:
+                groups.append(uncategorized)
+
+        elif strategy == "moderate":
+            # Merge financially related categories
+            groups = []
+
+            # Core market microstructure: price_volume + volatility + liquidity
+            core_group = (
+                category_indices.get("price_volume", [])
+                + category_indices.get("volatility", [])
+                + category_indices.get("liquidity", [])
+            )
+            if core_group:
+                groups.append(core_group)
+
+            # Momentum + technical indicators (derived signals)
+            signals_group = category_indices.get("momentum", []) + category_indices.get(
+                "technical_indicators", []
+            )
+            if signals_group:
+                groups.append(signals_group)
+
+            # Fundamentals + market metrics
+            fundamentals_group = category_indices.get("fundamental", []) + category_indices.get(
+                "market", []
+            )
+            if fundamentals_group:
+                groups.append(fundamentals_group)
+
+            # Uncategorized features can interact with core group
+            if uncategorized and groups:
+                groups[0].extend(uncategorized)
+            elif uncategorized:
+                groups.append(uncategorized)
+
+        elif strategy == "loose":
+            # Most features can interact, only separate fundamentals from technicals
+            groups = []
+
+            # Technical group: price, volume, technical indicators, momentum, volatility
+            technical_group = (
+                category_indices.get("price_volume", [])
+                + category_indices.get("technical_indicators", [])
+                + category_indices.get("momentum", [])
+                + category_indices.get("volatility", [])
+                + category_indices.get("liquidity", [])
+                + uncategorized
+            )
+            if technical_group:
+                groups.append(technical_group)
+
+            # Fundamental group (separate to avoid mixing with technical signals)
+            fundamental_group = category_indices.get("fundamental", []) + category_indices.get(
+                "market", []
+            )
+            if fundamental_group:
+                groups.append(fundamental_group)
+                # Allow fundamentals to also see some key technical features
+                if technical_group:
+                    # Add first 20 technical features to fundamental group
+                    fundamental_group.extend(technical_group[:20])
+
+        else:
+            logger.warning(f"Unknown strategy '{strategy}', using moderate as default")
+            return self._create_financial_interaction_groups(feature_names, "moderate")
+
+        # Filter out empty groups
+        groups = [g for g in groups if g]
+
+        logger.info(
+            f"Created {len(groups)} interaction constraint groups using {strategy} strategy"
+        )
+        for i, group in enumerate(groups, 1):
+            logger.info(f"  Group {i}: {len(group)} features")
+
+        return groups if groups else None
+
 
 def log_to_mlflow_lightgbm(model, metrics, params, experiment_name, x_eval):
     try:
@@ -592,36 +754,28 @@ def main() -> None:
         logger.info(f"MLflow experiment setup completed: {exp_id}")
         logger.info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
-        prediction_horizon, number_of_trials, n_features_to_select = 10, 50, 100
-        ml_data = prepare_ml_data_for_training_with_cleaning_polars(
-            prediction_horizon=prediction_horizon, split_date="2025-06-01"
+        prediction_horizon, number_of_trials = 10, 100
+        ml_data = load_and_prepare_data_polars_as_pandas(
+            prediction_horizon=prediction_horizon,
+            split_date="2025-06-01",
+            clean_features=True,
+            filter_features=True,
         )
-        x_train, x_test, y_train, y_test = (
-            to_pandas(ml_data["x_train"]),
-            to_pandas(ml_data["x_test"]),
-            to_pandas(ml_data["y_train"]),
-            to_pandas(ml_data["y_test"]),
-        )
+        x_train, x_test = ml_data["x_train"], ml_data["x_test"]
+        y_train, y_test = ml_data["y_train"], ml_data["y_test"]
         target_column, train_date_range, test_date_range = (
             ml_data["target_column"],
             ml_data["train_date_range"],
             ml_data["test_date_range"],
         )
+        logger.info(f"Data loaded with {x_train.shape[1]} features after selection")
         collect_garbage()
 
-        selected_features = LightGBMModel(
-            model_name="lightgbm_feature_selector", prediction_horizon=prediction_horizon
-        ).select_features(x_train, y_train, n_features_to_select)
-        x_train_sel, x_test_sel = x_train[selected_features], x_test[selected_features]
-        logger.info(f"DataFrames updated with {len(selected_features)} selected features.")
-
-        if "date_int" in x_test_sel.columns:
-            threshold = x_test_sel["date_int"].drop_duplicates().max() - 15
-            mask = x_test_sel["date_int"] < threshold
-            x_test_sel, y_test = x_test_sel[mask], y_test[mask]
-            logger.info(
-                f"Removed rows with date_int >= {threshold} (kept {len(x_test_sel)} samples)"
-            )
+        if "date_int" in x_test.columns:
+            threshold = x_test["date_int"].drop_duplicates().max() - 15
+            mask = x_test["date_int"] < threshold
+            x_test, y_test = x_test[mask], y_test[mask]
+            logger.info(f"Removed rows with date_int >= {threshold} (kept {len(x_test)} samples)")
         else:
             logger.warning("'date_int' column not found - skipping date filtering")
 
@@ -640,13 +794,15 @@ def main() -> None:
             target_column=str(target_column),
             study_name=study_name,
             load_if_exists=True,
-            sampler=optuna.samplers.TPESampler(seed=42, multivariate=True),
-            n_features=int(x_train_sel.shape[1]),
-            n_train=int(len(x_train_sel)),
-            n_test=int(len(x_test_sel)),
+            sampler=optuna.samplers.TPESampler(
+                seed=42, multivariate=True, warn_independent_sampling=False
+            ),
+            n_features=int(x_train.shape[1]),
+            n_train=int(len(x_train)),
+            n_test=int(len(x_test)),
         )
         study.optimize(
-            lgb_model.objective(x_train_sel, y_train, x_test_sel, y_test),
+            lgb_model.objective(x_train, y_train, x_test, y_test),
             n_trials=number_of_trials,
             n_jobs=1,
         )
@@ -660,20 +816,16 @@ def main() -> None:
         has_thresh = bool(tinfo and tinfo.get("optimal_threshold") is not None)
 
         if has_thresh:
-            cur = (
-                x_test_sel["close"].values
-                if "close" in x_test_sel.columns
-                else y_test.values * 0.95
-            )
+            cur = x_test["close"].values if "close" in x_test.columns else y_test.values * 0.95
             perf = final_model.threshold_evaluator.evaluate_threshold_performance(
                 model=final_model,
-                x_test=x_test_sel,
+                x_test=x_test,
                 y_test=y_test,
                 current_prices_test=cur,
                 threshold=getattr(final_model, "optimal_threshold", 0.5),
                 confidence_method=getattr(final_model, "confidence_method", "leaf_depth"),
             )
-            base_preds = final_model.predict(x_test_sel)
+            base_preds = final_model.predict(x_test)
             base_profit = final_model.threshold_evaluator.calculate_profit_score(
                 y_test.values, base_preds, cur
             )
@@ -694,11 +846,11 @@ def main() -> None:
             }
         else:
             cur = (
-                x_test_sel["close"].values
-                if "close" in x_test_sel.columns
+                x_test["close"].values
+                if "close" in x_test.columns
                 else np.ones(len(y_test), dtype=float)
             )
-            preds = final_model.predict(x_test_sel)
+            preds = final_model.predict(x_test)
             final_total_profit = final_model.threshold_evaluator.calculate_profit_score(
                 y_test.values, preds, cur
             )
@@ -725,7 +877,7 @@ def main() -> None:
             "final_test_samples": len(y_test),
             "hypertuning_best_profit": best_profit,
             "hypertuning_trials_completed": number_of_trials,
-            "features_selected": len(selected_features),
+            "features_selected": x_train.shape[1],
             **threshold_metrics,
         }
         final_metrics.update(
@@ -762,7 +914,7 @@ def main() -> None:
         saved_run_id = final_model.save_model(
             metrics=final_metrics,
             params=final_params,
-            x_eval=x_test_sel,
+            x_eval=x_test,
             experiment_name=experiment_name,
         )
         logger.info(f"Model saved to MLflow run: {saved_run_id}")

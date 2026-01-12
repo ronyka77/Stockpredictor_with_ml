@@ -160,6 +160,7 @@ def timeit(func):
     Works with both synchronous and asynchronous functions.
     """
     if asyncio.iscoroutinefunction(func):
+
         @functools.wraps(func)
         async def _async_wrapper(*args, **kwargs):
             start = time.perf_counter()
@@ -167,8 +168,8 @@ def timeit(func):
                 return await func(*args, **kwargs)
             finally:
                 elapsed = time.perf_counter() - start
-                # ASCII-only log message
-                _loguru_logger.info(f"Execution time for {func.__name__}: {elapsed:.6f} seconds")
+                _loguru_logger.info(f"{elapsed:.4f} seconds Execution time for {func.__name__}")
+
         return _async_wrapper
 
     @functools.wraps(func)
@@ -178,8 +179,8 @@ def timeit(func):
             return func(*args, **kwargs)
         finally:
             elapsed = time.perf_counter() - start
-            # ASCII-only log message
-            _loguru_logger.info(f"Execution time for {func.__name__}: {elapsed:.6f} seconds")
+            _loguru_logger.info(f"{elapsed:.4f} seconds Execution time for {func.__name__}")
+
     return _sync_wrapper
 
 

@@ -515,7 +515,7 @@ class BasePredictor(ABC):
         Filters out predictions that don't have realized prices yet, ensuring
         only completed trades are included in profitability analysis.
         """
-        # 🔥 FUTURE ROW FILTER: Only include rows with actual_price > 0 (completed/realized predictions)
+        # FUTURE ROW FILTER: Only include rows with actual_price > 0 (completed/realized predictions)
         if "actual_price" in results_df.columns:
             valid_mask = results_df["actual_price"] > 0
         else:
@@ -538,7 +538,7 @@ class BasePredictor(ABC):
         Count predictions that haven't been realized yet (no actual price available).
         Used to track the number of open positions that are still pending market closure.
         """
-        # 🔥 FUTURE ROW COUNTING: Count rows where actual_price is NaN (future/unrealized predictions)
+        # FUTURE ROW COUNTING: Count rows where actual_price is NaN (future/unrealized predictions)
         if "actual_price" in results_df.columns:
             return int(results_df["actual_price"].isna().sum())
         return 0

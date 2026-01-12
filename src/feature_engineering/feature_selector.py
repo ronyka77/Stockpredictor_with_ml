@@ -18,6 +18,138 @@ from src.utils.core.logger import get_logger, timeit
 
 logger = get_logger(__name__)
 
+CATEGORIES = {
+    "price_volume": [
+        "close",
+        "open",
+        "high",
+        "low",
+        "volume",
+        "vwap",
+        "returns",
+        "log_returns",
+        "price_change",
+        # Candlestick / price-shape features (often engineered from OHLC)
+        "Gap_Up",
+        "Gap_Down",
+        "Body_Size",
+        "Lower_Shadow",
+        "Upper_Shadow",
+        "Body_Shadow_Ratio",
+        "Price_Range",
+        "Price_Range_Pct",
+        "Price_High_Low_Ratio",
+        "Price_Close_Open_Ratio",
+        # Future price columns sometimes appear in datasets (ensure categorization)
+        "Future_Close",
+        "Future_High",
+    ],
+    "technical_indicators": [
+        "sma_5",
+        "sma_10",
+        "sma_20",
+        "sma_50",
+        "sma_200",
+        "ema_5",
+        "ema_10",
+        "ema_20",
+        "ema_50",
+        "rsi_14",
+        "macd",
+        "macd_signal",
+        "macd_hist",
+        "bb_upper",
+        "bb_middle",
+        "bb_lower",
+        "bb_width",
+        "stoch_k",
+        "stoch_d",
+        "williams_r",
+        "cci_14",
+        "mfi_14",
+        "roc_10",
+        "mom_10",
+        # Token-style matches for alternate naming conventions
+        "BB_",
+        "BB_Squeeze",
+        "BB_Above_Upper",
+        "BB_Below_Lower",
+        "MACD",
+        "MACD_Above_Signal",
+        "RSI_",
+        "Stoch_",
+        "Stoch_K_Above_D",
+        "Williams_R_",
+        "MFI_",
+        # Trend / cloud indicators
+        "Ichimoku_",
+    ],
+    "volatility": [
+        "volatility_10",
+        "volatility_20",
+        "volatility_30",
+        "atr_14",
+        "bollinger_volatility",
+        "parkinson_volatility",
+        # Alternate ATR feature naming
+        "ATR",
+        "ATR_Percent",
+        "ATR_Lower_Band",
+        "ATR_Upper_Band",
+        "ATR_Low_Volatility",
+        "ATR_High_Volatility",
+        # Volatility regimes / clustering
+        "Vol_Regime_",
+        "Vol_Clustering_",
+    ],
+    "momentum": [
+        "momentum_1d",
+        "momentum_5d",
+        "momentum_10d",
+        "momentum_20d",
+        "trend_strength",
+        "trend_direction",
+        # Alternate ROC naming (e.g., ROC_10_Positive, ROC_20_Strong_Negative)
+        "ROC_",
+    ],
+    "fundamental": [
+        "pe_ratio",
+        "pb_ratio",
+        "ps_ratio",
+        "ev_ebitda",
+        "roe",
+        "roa",
+        "roi",
+        "profit_margin",
+        "debt_to_equity",
+        "current_ratio",
+        "quick_ratio",
+        "book_value",
+    ],
+    "market": [
+        "market_cap",
+        "beta",
+        "alpha",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "max_drawdown",
+        "calmar_ratio",
+    ],
+    "liquidity": [
+        "dollar_volume",
+        "turnover_ratio",
+        "bid_ask_spread",
+        "market_impact",
+        "liquidity_ratio",
+        # Volume/flow derived indicators (treated as liquidity/participation signals)
+        "OBV",
+        "VPT",
+        "AD_Line",
+        "AD_Oscillator",
+        "Volume_",
+    ],
+}
+
 
 class FinancialFeatureSelector:
     """
@@ -30,95 +162,15 @@ class FinancialFeatureSelector:
     - Domain knowledge rules
     """
 
-    CATEGORIES = {
-        "price_volume": [
-            "close",
-            "open",
-            "high",
-            "low",
-            "volume",
-            "vwap",
-            "returns",
-            "log_returns",
-            "price_change",
-        ],
-        "technical_indicators": [
-            "sma_5",
-            "sma_10",
-            "sma_20",
-            "sma_50",
-            "sma_200",
-            "ema_5",
-            "ema_10",
-            "ema_20",
-            "ema_50",
-            "rsi_14",
-            "macd",
-            "macd_signal",
-            "macd_hist",
-            "bb_upper",
-            "bb_middle",
-            "bb_lower",
-            "bb_width",
-            "stoch_k",
-            "stoch_d",
-            "williams_r",
-            "cci_14",
-            "mfi_14",
-            "roc_10",
-            "mom_10",
-        ],
-        "volatility": [
-            "volatility_10",
-            "volatility_20",
-            "volatility_30",
-            "atr_14",
-            "bollinger_volatility",
-            "parkinson_volatility",
-        ],
-        "momentum": [
-            "momentum_1d",
-            "momentum_5d",
-            "momentum_10d",
-            "momentum_20d",
-            "trend_strength",
-            "trend_direction",
-        ],
-        "fundamental": [
-            "pe_ratio",
-            "pb_ratio",
-            "ps_ratio",
-            "ev_ebitda",
-            "roe",
-            "roa",
-            "roi",
-            "profit_margin",
-            "debt_to_equity",
-            "current_ratio",
-            "quick_ratio",
-            "book_value",
-        ],
-        "market": [
-            "market_cap",
-            "beta",
-            "alpha",
-            "sharpe_ratio",
-            "sortino_ratio",
-            "max_drawdown",
-            "calmar_ratio",
-        ],
-        "liquidity": [
-            "dollar_volume",
-            "turnover_ratio",
-            "bid_ask_spread",
-            "market_impact",
-            "liquidity_ratio",
-        ],
-    }
+    @staticmethod
+    def _matches_any_token(feature_name: str, tokens: List[str]) -> bool:
+        """Return True if any token is contained within the feature name (case-insensitive)."""
+        feat = str(feature_name).lower()
+        return any(str(tok).lower() in feat for tok in tokens)
 
     def __init__(
         self,
-        target_features: int = 60,
+        target_features: int = 100,
         correlation_threshold: float = 0.95,
         importance_threshold: float = 0.01,
         variance_threshold: float = 1e-4,
@@ -174,9 +226,9 @@ class FinancialFeatureSelector:
             "reduction_ratio": len(selected_features) / X.shape[1],
             "top_features": sorted(scores.items(), key=lambda x: x[1], reverse=True)[:10],
             "feature_categories": {
-                cat: sum(1 for f in selected_features if any(cf in f for cf in cat_feats))
+                cat: sum(1 for f in selected_features if self._matches_any_token(f, cat_feats))
                 for cat, cat_feats in self.CATEGORIES.items()
-                if any(any(cf in f for cf in cat_feats) for f in selected_features)
+                if any(self._matches_any_token(f, cat_feats) for f in selected_features)
             },
             "scores_summary": {
                 k: getattr(np, k.split("_")[0])(list(scores.values()))
@@ -248,7 +300,7 @@ class FinancialFeatureSelector:
             f"Correlation method selected {len(selected)} features, score range: [{min(scores_selected.values()):.4f}, {max(scores_selected.values()):.4f}]"
         )
         return selected, scores_selected
-    
+
     @timeit
     def _select_by_mutual_info(
         self, X: pd.DataFrame, y: pd.Series
@@ -342,7 +394,6 @@ class FinancialFeatureSelector:
         )
         return selected, scores_selected
 
-    @timeit
     def _select_by_rf(self, X: pd.DataFrame, y: pd.Series) -> Tuple[List[str], Dict[str, float]]:
         """Alias for Random Forest selector (kept for backward compatibility)."""
         return self._select_by_random_forest(X, y)
@@ -403,13 +454,19 @@ class FinancialFeatureSelector:
         """Apply domain knowledge filtering to ensure balanced feature selection."""
         category_best = {
             cat: max(
-                [f for f in features if any(cf in f for cf in cat_feats)],
+                [f for f in features if self._matches_any_token(f, cat_feats)],
                 key=lambda x: scores.get(x, 0),
                 default=None,
             )
             for cat, cat_feats in self.CATEGORIES.items()
         }
-        selected_by_cat = [f for f in category_best.values() if f]
+        # De-duplicate while preserving order (a feature may match multiple categories).
+        selected_by_cat = []
+        seen = set()
+        for f in category_best.values():
+            if f and f not in seen:
+                selected_by_cat.append(f)
+                seen.add(f)
         remaining = [f for f in features if f not in selected_by_cat]
         logger.info(f"Domain filtering: {len(selected_by_cat)} categories represented")
         return selected_by_cat + remaining
@@ -449,7 +506,7 @@ def main():
 
     logger.info(f"Training data shape: {x_train_pd.shape}, Test data shape: {x_test_pd.shape}")
 
-    selector = FinancialFeatureSelector(target_features=60, correlation_threshold=0.95)
+    selector = FinancialFeatureSelector(target_features=100, correlation_threshold=0.95)
 
     logger.info("Running ensemble feature selection...")
     x_train_selected, report = selector.select_features(

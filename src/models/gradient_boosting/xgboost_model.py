@@ -9,14 +9,10 @@ import optuna
 import pandas as pd
 import xgboost as xgb
 from datetime import datetime
-from src.models.base_model import BaseModel
+from src.models.base_model import BaseModel, load_and_prepare_data_polars_as_pandas
 from src.models.evaluation import ThresholdEvaluator, CustomMetrics
 from src.utils.core.logger import get_logger
 from src.utils.mlops.mlflow_utils import MLFlowManager
-from src.data_utils.polars_ml_pipeline import (
-    prepare_ml_data_for_training_with_cleaning_polars,
-    to_pandas,
-)
 
 logger = get_logger(__name__)
 
@@ -554,15 +550,11 @@ def main():
 
         # Setup: 10-day prediction horizon, 20 optimization trials, maximize profit per investment
         pred_horizon, n_trials, obj_col = 10, 20, "test_profit_per_investment"
-        # Load and prepare stock data with feature cleaning (Polars pipeline)
-        data = prepare_ml_data_for_training_with_cleaning_polars(
+        data = load_and_prepare_data_polars_as_pandas(
             prediction_horizon=pred_horizon, split_date="2025-06-15", clean_features=True
         )
-        # Convert Polars objects to pandas for downstream XGBoost usage
-        x_train = to_pandas(data["x_train"])
-        x_test = to_pandas(data["x_test"])
-        y_train = to_pandas(data["y_train"])
-        y_test = to_pandas(data["y_test"])
+        x_train, x_test = data["x_train"], data["x_test"]
+        y_train, y_test = data["y_train"], data["y_test"]
         logger.info(f"Data: {data['target_column']}")
 
         # Run Optuna hyperparameter optimization to find best XGBoost config.

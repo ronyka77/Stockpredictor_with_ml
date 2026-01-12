@@ -45,6 +45,13 @@ class MLPModule(nn.Module):
         self.residual = residual
         self.task = task
 
+        # Print initialization parameters for debugging/visibility
+        print(
+            f"MLP model created: input_size={self.input_size}, output_size={self.output_size}, "
+            f"activation={self.activation}, layer_sizes={self.layer_sizes}, dropout={self.dropout}, "
+            f"batch_norm={self.batch_norm}, residual={self.residual}, task={self.task}"
+        )
+
         sizes = [input_size, *self.layer_sizes]
         self.layers = nn.ModuleList([nn.Linear(a, b) for a, b in zip(sizes, sizes[1:])])
         self.batch_norms = (
@@ -57,12 +64,29 @@ class MLPModule(nn.Module):
 
         self.apply(self._init_weights)
 
-    @staticmethod
-    def _init_weights(m: nn.Module) -> None:
+    def _init_weights(self, m: nn.Module) -> None:
         if isinstance(m, nn.Linear):
-            nn.init.xavier_uniform_(m.weight)
+            is_output_linear = False
+            try:
+                if m is self.output_layer:
+                    is_output_linear = True
+                elif isinstance(self.output_layer, nn.Sequential) and len(self.output_layer) > 0:
+                    is_output_linear = m is self.output_layer[0]
+            except Exception:
+                is_output_linear = False
+
+            if is_output_linear:
+                nn.init.xavier_uniform_(m.weight)
+            elif self.activation in ("relu", "leaky_relu"):
+                nonlinearity = "leaky_relu" if self.activation == "leaky_relu" else "relu"
+                a = 0.01 if self.activation == "leaky_relu" else 0.0
+                nn.init.kaiming_uniform_(m.weight, a=a, nonlinearity=nonlinearity)
+            else:
+                nn.init.xavier_uniform_(m.weight)
+
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
+
         elif isinstance(m, nn.BatchNorm1d):
             nn.init.ones_(m.weight)
             nn.init.zeros_(m.bias)

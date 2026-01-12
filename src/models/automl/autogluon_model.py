@@ -108,7 +108,6 @@ class AutoGluonModel(BaseModel, ModelProtocol):
         train_df = X.copy()
 
         train_df[label] = y.values
-        # Backwards-compatible handling for callers using the old keyword name `X_val`
         if x_val is None and "X_val" in kwargs:
             x_val = kwargs.pop("X_val")
         if y_val is None and "y_val" in kwargs:
@@ -124,8 +123,8 @@ class AutoGluonModel(BaseModel, ModelProtocol):
             "GBM": {},
             "XGB": {},
             # "TABM": {},
-            "RF": {},
-            "CAT": {"task_type": "GPU"},
+            # "RF": {},
+            # "CAT": {"task_type": "GPU"},
             # "REALMLP": {},
         }
 

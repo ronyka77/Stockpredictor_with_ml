@@ -34,7 +34,11 @@ class PyTorchBasePredictor(BaseModel):
         threshold_evaluator: Optional[ThresholdEvaluator] = None,
     ):
         super().__init__(model_name, config, threshold_evaluator=threshold_evaluator)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA is required for PyTorchBasePredictor models, but torch.cuda.is_available() is False"
+            )
+        self.device = torch.device("cuda")
         logger.info(f"Using device: {self.device}")
         self.model = None
 
